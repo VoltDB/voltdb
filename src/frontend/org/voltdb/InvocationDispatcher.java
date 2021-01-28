@@ -17,7 +17,6 @@
 
 package org.voltdb;
 
-
 import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 
 import java.io.File;
@@ -372,7 +371,7 @@ public final class InvocationDispatcher {
             if (!catProc.getSinglepartition()
                     || (catProc.getPartitionparameter() != 0 && catProc.getPartitionparameter() != -1
                             && !task.isBatchCall())) {
-                return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE, new VoltTable[0],
+                return gracefulFailureResponse(
                         "Invalid procedure for all-partition execution. "
                                 + "Targeted procedure must be partitioned on the first parameter, "
                                 + " be a directed procedure or part of a batch call.",
@@ -380,7 +379,7 @@ public final class InvocationDispatcher {
             }
 
             if (task.getPartitionDestination() < 0 || task.getPartitionDestination() >= MpInitiator.MP_INIT_PID) {
-                return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE, new VoltTable[0],
+                return gracefulFailureResponse(
                         "Invalid destination partition provided: " + task.getPartitionDestination(),
                         task.clientHandle);
             }
@@ -395,14 +394,14 @@ public final class InvocationDispatcher {
             // must be single partition and must be partitioned on parameter 0
             // TODO could add support for calling a procedure without a partition parameter
             if (!catProc.getSinglepartition() || (catProc.getPartitionparameter() != 0) || catProc.getSystemproc()) {
-                return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                        new VoltTable[0], "Invalid procedure for all-partition execution. " +
+                return gracefulFailureResponse(
+                        "Invalid procedure for all-partition execution. " +
                                  "Targeted procedure must be partitioned, must be partitioned on the first parameter, " +
                                  "and must not be a system procedure.",
                         task.clientHandle);
             }
         } else if (catProc.getSinglepartition() && catProc.getPartitionparameter() == -1) {
-            return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE, new VoltTable[0],
+            return gracefulFailureResponse(
                     "Procedure " + catProc.getTypeName()
                             + " is a work procedure and needs to be invoked appropriately. "
                             + "The Client.callAllPartitionProcedure method should be used.",
@@ -415,7 +414,7 @@ public final class InvocationDispatcher {
             // ping just responds as fast as possible to show the connection is alive
             // nb: ping is not a real procedure, so this is checked before other "sysprocs"
             if ("@Ping".equals(procName)) {
-                return new ClientResponseImpl(ClientResponseImpl.SUCCESS, new VoltTable[]{statusTable}, "SUCCESS", task.clientHandle);
+                return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[]{ statusTable }, "SUCCESS", task.clientHandle);
             }
             else if ("@GetPartitionKeys".equals(procName)) {
                 return dispatchGetPartitionKeys(task);
@@ -502,8 +501,7 @@ public final class InvocationDispatcher {
             if (!MiscUtils.isPro()) {
                 SystemProcedureCatalog.Config sysProcConfig = SystemProcedureCatalog.listing.get(procName);
                 if ((sysProcConfig != null) && (sysProcConfig.commercial)) {
-                    return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                            new VoltTable[0],
+                    return gracefulFailureResponse(
                             procName + " is available in the Enterprise Edition of VoltDB only.",
                             task.clientHandle);
                 }
@@ -537,8 +535,7 @@ public final class InvocationDispatcher {
                             ? "Illegal partition parameter. Value cannot be " + task.getParameterAtIndex(
                                     ((CatalogContext.ProcedurePartitionInfo) catProc.getAttachment()).index)
                             : "Partition does not exist: " + task.getPartitionDestination();
-                    return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE, new VoltTable[0], errorMessage,
-                            task.clientHandle);
+                    return gracefulFailureResponse(errorMessage, task.clientHandle);
                 }
             } catch (Exception e) {
                 // unable to hash to a site, return an error
@@ -549,8 +546,9 @@ public final class InvocationDispatcher {
                 // getPartitionsForProcedure and the directed procedure handling can modify the parameters
                 task = MiscUtils.roundTripForCL(task);
             } catch (IOException e) {
-                return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE, new VoltTable[0],
+                return new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE, new VoltTable[0],
                         "Unable to execute " + task.getProcName() + " with parameters " + task.getParams());
+                // no client handle?
             }
 
             CreateTransactionResult result = createTransaction(handler.connectionId(), task, catProc.getReadonly(),
@@ -565,15 +563,14 @@ public final class InvocationDispatcher {
                  * create new transactions. Return an error. Another case is when elastic shrink, the target partition
                  * may be removed in between the transaction is created
                  */
-                return new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE, new VoltTable[0],
+                return serverUnavailableResponse(
                         "VoltDB failed to create the transaction internally.  It is possible this "
                                 + "was caused by a node failure or intentional shutdown. If the cluster recovers, "
                                 + "it should be safe to resend the work, as the work was never started.",
                         task.clientHandle);
             case PARTITION_REMOVED:
                 if (task.hasPartitionDestination()) {
-                    return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE, new VoltTable[0],
-                            "Partition does not exist: " + task.getPartitionDestination(), task.clientHandle);
+                    return gracefulFailureResponse("Partition does not exist: " + task.getPartitionDestination(), task.clientHandle);
                 }
                 // Loop back around and try to figure out the partitions again
                 Thread.yield();
@@ -732,7 +729,7 @@ public final class InvocationDispatcher {
             hostMessenger.sendPoisonPill(ihid, "@Jstack called", ForeignHost.PRINT_STACKTRACE);
         }
         if (success) {
-            return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], "SUCCESS", task.clientHandle);
+            return simpleSuccessResponse(task.clientHandle);
         }
         return gracefulFailureResponse(
                 "Failed to create the thread dump of " + ((ihid < 0) ? "all hosts." : "Host Id " + ihid + "."),
@@ -809,7 +806,7 @@ public final class InvocationDispatcher {
                                   ". Use shutdown to stop the cluster.", task);
         }
 
-        return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], "SUCCESS", task.clientHandle);
+        return simpleSuccessResponse(task.clientHandle);
     }
 
     private ClientResponseImpl dispatchPrepareStopNode(StoredProcedureInvocation task) {
@@ -850,7 +847,7 @@ public final class InvocationDispatcher {
            m_mailbox.send(CoreUtils.getHSIdFromHostAndSite(ihid, HostMessenger.CLIENT_INTERFACE_SITE_ID), message);
        }
 
-       return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], "SUCCESS", task.clientHandle);
+       return simpleSuccessResponse(task.clientHandle);
     }
 
     // We logged that StopNode/PrepareStopNode was called, so log rejection
@@ -878,8 +875,7 @@ public final class InvocationDispatcher {
             // when VoltDB.crash... is called, we close off the client interface
             // and it might not be possible to create new transactions.
             // Return an error.
-            return new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE,
-                    new VoltTable[0],
+            return serverUnavailableResponse(
                     "VoltDB failed to create the transaction internally.  It is possible this "
                     + "was caused by a node failure or intentional shutdown. If the cluster recovers, "
                     + "it should be safe to resend the work, as the work was never started.",
@@ -989,8 +985,7 @@ public final class InvocationDispatcher {
         }
         catch (Exception e) {
             authLog.warn(e.getMessage());
-            return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
-                                          new VoltTable[0], e.getMessage(), task.clientHandle);
+            return unexpectedFailureResponse(e.getMessage(), task.clientHandle);
         }
         assert(partition != -1);
         createTransaction(handler.connectionId(),
@@ -1073,7 +1068,7 @@ public final class InvocationDispatcher {
         // network threads are blocked from making zookeeper calls
         Future<Long> fut = voltdb.getSES(true).submit(new Callable<Long>() {
             @Override
-            public  Long call() {
+            public Long call() {
                 try {
                     Stat stat = zk.exists(VoltZK.operationMode, false);
                     if (stat == null) {
@@ -1187,6 +1182,8 @@ public final class InvocationDispatcher {
             return unexpectedFailureResponse(
                     "Internal error: detected concurrent invocations of \"voltadmin shutdown --save\"",
                     task.clientHandle);
+            // At this point, task.clientHandle refers to the null callback in the alternate adapter.
+            // But the response does get back to the client. How?
         }
 
         voltdb.getClientInterface().bindAdapter(alternateAdapter, null);
@@ -1559,11 +1556,12 @@ public final class InvocationDispatcher {
                 + " type " + catProc.getPartitioncolumn().getType()
                 + " Message: " + exMsg;
         authLog.warn(errorMessage);
-        ClientResponseImpl clientResponse = new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE,
-                new VoltTable[0], errorMessage, task.clientHandle);
-        return clientResponse;
+        return unexpectedFailureResponse(errorMessage, task.clientHandle);
     }
 
+    /*
+     * Utility methods for sending common client responses
+     */
     private final static ClientResponseImpl errorResponse(Connection c, long handle, byte status, String reason, Exception e, boolean log) {
         String realReason = reason;
         if (e != null) {
@@ -1576,15 +1574,19 @@ public final class InvocationDispatcher {
     }
 
     private final static ClientResponseImpl unexpectedFailureResponse(String msg, long handle) {
-        return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE, new VoltTable[0], msg, handle);
+        return new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE, new VoltTable[0], msg, handle);
     }
 
     private final static ClientResponseImpl gracefulFailureResponse(String msg, long handle) {
-        return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE, new VoltTable[0], msg, handle);
+        return new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE, new VoltTable[0], msg, handle);
     }
 
     private final static ClientResponseImpl serverUnavailableResponse(String msg, long handle) {
-        return new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE, new VoltTable[0], msg, handle);
+        return new ClientResponseImpl(ClientResponse.SERVER_UNAVAILABLE, new VoltTable[0], msg, handle);
+    }
+
+    private final static ClientResponseImpl simpleSuccessResponse(long handle) {
+        return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], "SUCCESS", handle);
     }
 
     /**
