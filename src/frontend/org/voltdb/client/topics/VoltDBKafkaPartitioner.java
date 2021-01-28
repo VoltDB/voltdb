@@ -39,13 +39,15 @@ import org.apache.kafka.common.config.types.Password;
 import org.apache.kafka.common.security.JaasContext;
 import org.apache.kafka.common.security.auth.SecurityProtocol;
 import org.apache.kafka.common.security.plain.PlainLoginModule;
+import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.VoltTypeException;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientImpl;
-
+import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.net.HostAndPort;
 
 /**
@@ -93,7 +95,7 @@ public class VoltDBKafkaPartitioner extends DefaultPartitioner {
 
     static final Logger LOG = Logger.getLogger(VoltDBKafkaPartitioner.class.getName());
     protected ClientImpl m_client;
-
+    private ImmutableMap<String, Boolean> m_topics = ImmutableMap.of();
     @Override
     public void configure(Map<String, ?> original) {
         PartitionConfig configs = new PartitionConfig(original);
@@ -105,7 +107,6 @@ public class VoltDBKafkaPartitioner extends DefaultPartitioner {
             urls = configs.getList(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG);
             useDefault = true;
         }
-
         for (String connection : urls) {
             if (useDefault) {
                 HostAndPort url = HostAndPort.fromString(connection);
@@ -119,8 +120,34 @@ public class VoltDBKafkaPartitioner extends DefaultPartitioner {
         }
     }
 
+    /**
+     *  Use DefaultPartitioner for opaque topics, otherwise use VoltDB hash mechanism for partition calculation.
+     *  Under the following corner cases that the partitioner could direct a producer to wrong partitions:
+     *  <ul>
+     *  <li>When opaque topics are dropped, then recreated as non-opaque topics, or vice versa
+     *  <li>When a VoltDB cluster is elastically expanded or reduced, the hash mechanism on VoltDB client is not promptly updated.
+     * </ul>
+     */
     @Override
     public int partition(String topic, Object key, byte[] keyBytes, Object value, byte[] valueBytes, Cluster cluster) {
+        // Lazy loading topics list
+        Boolean entry = m_topics.get(topic);
+        if (entry == null) {
+            loadTopics();
+            entry = m_topics.get(topic);
+            // There could be a window within which a topic is created and immediately dropped so that the topic
+            // is not found. Or the topic is not created.
+            if (entry == null) {
+                throw new KafkaException(String.format("Topic % is not found.", topic));
+            }
+        }
+
+        // Use DefaultPartitioner for opaque topics
+        if (entry.booleanValue()) {
+            return super.partition(topic, key, keyBytes, value, valueBytes, cluster);
+        }
+
+        int partition = -1;
         VoltType keyType = null;
         if (key != null) {
             try {
@@ -129,7 +156,6 @@ public class VoltDBKafkaPartitioner extends DefaultPartitioner {
                 // Types not supported in VoltDB
             }
         }
-        int partition = -1;
         if (keyType != null) { // VoltDB supported types
             partition = (int) m_client.getPartitionForParameter(keyType.getValue(), key);
         } else if (keyBytes != null){ // For any other types, use key value hash to get partition
@@ -147,6 +173,19 @@ public class VoltDBKafkaPartitioner extends DefaultPartitioner {
             } catch (Exception e) {
                 LOG.warning("Failed to close connections:" + e.getMessage());
             }
+        }
+    }
+
+    protected void loadTopics() {
+        try {
+            VoltTable topics = m_client.callProcedure("@SystemCatalog", "TOPICS").getResults()[0];
+            Map<String, Boolean> topicsMap = Maps.newHashMap();
+            while (topics.advanceRow()) {
+                topicsMap.put(topics.getString("TOPIC_NAME"), Boolean.parseBoolean(topics.getString("IS_OPAQUE")));
+            }
+            m_topics = ImmutableMap.copyOf(topicsMap);
+        } catch (Exception e) {
+            throw new KafkaException("Failed to get topics from VoltDB cluster", e);
         }
     }
 
