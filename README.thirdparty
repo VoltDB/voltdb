@@ -3220,7 +3220,7 @@ needed for netty's util package
  * limitations under the License.
  */
 =========================================================================================
-cron-java8-1.5
+cron-java8-1.7
 License URL: https://github.com/frode-carlsen/cron/blob/master/LICENSE
 Site: https://github.com/frode-carlsen/cron
 /*

@@ -57,6 +57,6 @@ public final class CronIntervalGenerator implements IntervalGenerator {
         ZonedDateTime barrier = now.plusYears(20);
         ZonedDateTime runAt = m_cronExpression.nextTimeAfter(now, barrier);
 
-        return ChronoUnit.NANOS.between(runAt, now);
+        return ChronoUnit.NANOS.between(now, runAt);
     }
 }
