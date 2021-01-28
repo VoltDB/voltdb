@@ -499,8 +499,12 @@ public class TestExportBaseSocketExport extends RegressionSuite {
 
                 int tupleCount = (int) stats.getLong("TUPLE_COUNT");
                 Integer existing = counts.computeIfAbsent(stream, s -> new HashMap<>()).put(partition, tupleCount);
-                if (waitForPending && existing != null) {
-                    assertEquals(existing.intValue(), tupleCount);
+                if (existing != null && existing != tupleCount) {
+                    Long host = stats.getLong("HOST_ID");
+                    System.out.println(String.format("%s %s:%d has different tuple count than expected %d vs %d", host,
+                            stream, partition, existing, tupleCount));
+                    Thread.sleep(250);
+                    continue outter;
                 }
             }
 
