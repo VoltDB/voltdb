@@ -20,6 +20,7 @@ package org.voltdb.compiler.statements;
 import java.util.regex.Matcher;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
+import org.hsqldb_voltpatches.lib.StringUtil;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DDLCompiler;
 import org.voltdb.compiler.DDLCompiler.DDLStatement;
@@ -37,18 +38,24 @@ public class DropStream extends StatementProcessor {
         super(ddlCompiler);
     }
 
-    private static boolean isRegularTable(VoltXMLElement m_schema, String name) {
+    private void validateTable(String name) throws VoltCompilerException {
         for (VoltXMLElement element : m_schema.children) {
             if (element.name.equals("table")
-                    && (!element.attributes.containsKey("export"))
                     && element.attributes.get("name").equalsIgnoreCase(name)) {
-                if (Boolean.parseBoolean(element.attributes.get("stream"))) {
-                    return false;
+                if (!Boolean.parseBoolean(element.attributes.get("stream"))) {
+                    throw m_compiler.new VoltCompilerException(String.format(
+                            "Invalid DROP STREAM statement: %s is not a stream.",
+                            name));
                 }
-                return true;
+                String topic = element.attributes.get("topicName");
+                if (!StringUtil.isEmpty(topic)) {
+                    throw m_compiler.new VoltCompilerException(String.format(
+                            "Cannot drop stream %s: It is used by topic %s.",
+                            name, topic));
+                }
+                break;
             }
         }
-        return false;
     }
 
     @Override
@@ -60,15 +67,9 @@ public class DropStream extends StatementProcessor {
         Matcher statementMatcher = SQLParser.matchDropStream(ddlStatement.statement);
         if (statementMatcher.matches()) {
             String streamName = checkIdentifierStart(statementMatcher.group(1), ddlStatement.statement);
-
-            if (isRegularTable(m_schema, streamName)) {
-                throw m_compiler.new VoltCompilerException(String.format(
-                        "Invalid DROP STREAM statement: table %s is not a stream.",
-                        streamName));
-            }
+            validateTable(streamName);
             m_returnAfterThis = true;
         }
         return false;
     }
-
 }

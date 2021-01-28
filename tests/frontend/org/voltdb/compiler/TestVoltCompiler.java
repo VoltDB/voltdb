@@ -3758,7 +3758,7 @@ public class TestVoltCompiler extends TestCase {
                 );
 
         // non-stream table
-        badDDLAgainstSimpleSchema(".+Invalid DROP STREAM statement: table e2 is not a stream.*",
+        badDDLAgainstSimpleSchema(".+Invalid DROP STREAM statement: e2 is not a stream.*",
                 "CREATE TABLE e2 (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
                         "DROP STREAM e2;\n"
                 );
