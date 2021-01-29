@@ -208,49 +208,13 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
 
         @Override
         public Wrapper poll(OutputContainerFactory ocf) throws IOException {
-            synchronized (PersistentBinaryDeque.this) {
-                if (m_cursorClosed) {
-                    throw new IOException("PBD.ReadCursor.poll(): " + m_cursorId + " - Reader has been closed");
-                }
-                assertions();
-
-                if (moveToValidSegment() == null) {
-                    return null;
-                }
-
-                PBDSegmentReader<M> segmentReader = getOrOpenReader();
-                long lastSegmentId = m_segments.lastEntry().getValue().segmentId();
-                while (!segmentReader.hasMoreEntries()) {
-                    if (m_segment.segmentId() == lastSegmentId) { // nothing more to read
-                        return null;
-                    }
-
-                    // Save closed readers until everything in the segment is acked.
-                    if (m_isTransient || segmentReader.allReadAndDiscarded()) {
-                        segmentReader.close();
-                    } else {
-                        segmentReader.closeAndSaveReaderState();
-                    }
-                    m_segment = m_segments.higherEntry(m_segment.segmentId()).getValue();
-                    // push to PBD will rewind cursors. So, this cursor may have already opened this segment
-                    segmentReader = getOrOpenReader();
-                }
-                BBContainer retcont = segmentReader.poll(ocf);
-                if (retcont == null) {
-                    return null;
-                }
-
-                m_numRead++;
-                assertions();
-                assert (retcont.b() != null);
-                return wrapRetCont(m_segment, segmentReader, retcont);
-            }
+            return pollCommon(ocf, Integer.MAX_VALUE);
         }
 
         @Override
-        public BinaryDequeReader.Entry<M> pollEntry(OutputContainerFactory ocf) throws IOException {
+        public BinaryDequeReader.Entry<M> pollEntry(OutputContainerFactory ocf, int maxSize) throws IOException {
             synchronized (PersistentBinaryDeque.this) {
-                Wrapper wrapper = poll(ocf);
+                Wrapper wrapper = pollCommon(ocf, maxSize);
                 if (wrapper == null) {
                     return null;
                 }
@@ -278,6 +242,46 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                         wrapper.free();
                     }
                 };
+            }
+        }
+
+        private Wrapper pollCommon(OutputContainerFactory ocf, int maxSize) throws IOException {
+            synchronized (PersistentBinaryDeque.this) {
+                if (m_cursorClosed) {
+                    throw new IOException("PBD.ReadCursor.poll(): " + m_cursorId + " - Reader has been closed");
+                }
+                assertions();
+
+                if (moveToValidSegment() == null) {
+                    return null;
+                }
+
+                PBDSegmentReader<M> segmentReader = getOrOpenReader();
+                long lastSegmentId = m_segments.lastEntry().getValue().segmentId();
+                while (!segmentReader.hasMoreEntries()) {
+                    if (m_segment.segmentId() == lastSegmentId) { // nothing more to read
+                        return null;
+                    }
+
+                    // Save closed readers until everything in the segment is acked.
+                    if (m_isTransient || segmentReader.allReadAndDiscarded()) {
+                        segmentReader.close();
+                    } else {
+                        segmentReader.closeAndSaveReaderState();
+                    }
+                    m_segment = m_segments.higherEntry(m_segment.segmentId()).getValue();
+                    // push to PBD will rewind cursors. So, this cursor may have already opened this segment
+                    segmentReader = getOrOpenReader();
+                }
+                BBContainer retcont = segmentReader.poll(ocf, maxSize);
+                if (retcont == null) {
+                    return null;
+                }
+
+                m_numRead++;
+                assertions();
+                assert (retcont.b() != null);
+                return wrapRetCont(m_segment, segmentReader, retcont);
             }
         }
 

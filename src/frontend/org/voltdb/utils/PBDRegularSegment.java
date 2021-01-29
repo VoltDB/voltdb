@@ -569,7 +569,7 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
 
             pollLoop:
             while (true) {
-                BBContainer cont = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, true);
+                BBContainer cont = reader.poll(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, Integer.MAX_VALUE, true);
                 ByteBuffer entry = null;
                 int length = 0;
                 if (cont != null) {
@@ -1083,11 +1083,15 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
         }
 
         @Override
-        public DBBPool.BBContainer poll(OutputContainerFactory factory) throws IOException {
-            return poll(factory, false);
+        public DBBPool.BBContainer poll(OutputContainerFactory factory, int maxSize) throws IOException {
+            return poll(factory, maxSize, false);
         }
 
-        DBBPool.BBContainer poll(OutputContainerFactory factory, boolean checkCrc)
+        DBBPool.BBContainer poll(OutputContainerFactory factory, boolean checkCrc) throws IOException {
+            return poll(factory, Integer.MAX_VALUE, checkCrc);
+        }
+
+        DBBPool.BBContainer poll(OutputContainerFactory factory, int maxSize, boolean checkCrc)
                 throws IOException {
             if (m_readerClosed) {
                 throw new IOException("Reader closed");
@@ -1108,6 +1112,11 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
                 b.flip();
                 final int entryCRC = b.getInt();
                 final int length = b.getInt();
+
+                if (length > maxSize) {
+                    return null;
+                }
+
                 final int entryId = b.getInt();
                 final char flags = b.getChar();
                 final boolean compressed = (flags & FLAG_COMPRESSED) != 0;
@@ -1129,6 +1138,9 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
                             fillBuffer(compressedBuf.b(), entryId, flags, entryCRC, checkCrc);
 
                             uncompressedLen = CompressionService.uncompressedLength(compressedBuf.bDR());
+                            if (uncompressedLen > maxSize) {
+                                return null;
+                            }
                             retcont = factory.getContainer(uncompressedLen);
                             retcont.b().limit(uncompressedLen);
                             CompressionService.decompressBuffer(compressedBuf.bDR(), retcont.b());
@@ -1158,6 +1170,7 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
                 m_bytesRead += uncompressedLen;
                 m_objectReadIndex++;
 
+                m_readOffset = m_fc.position();
                 return new DBBPool.DBBDelegateContainer(retcont) {
                     @Override
                     public void discard() {
@@ -1166,7 +1179,6 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
                     }
                 };
             } finally {
-                m_readOffset = m_fc.position();
                 m_fc.position(writePos);
             }
         }
@@ -1319,9 +1331,9 @@ class PBDRegularSegment<M> extends PBDSegment<M> {
         }
 
         @Override
-        BBContainer poll(OutputContainerFactory factory, boolean checkCrc) throws IOException {
+        BBContainer poll(OutputContainerFactory factory, int maxSize, boolean checkCrc) throws IOException {
             if (advanceEntry()) {
-                return super.poll(factory, checkCrc);
+                return super.poll(factory, maxSize, checkCrc);
             }
             return null;
         }
