@@ -78,7 +78,6 @@ import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
 import org.voltcore.utils.RateLimitedLogger;
 import org.voltcore.utils.ssl.MessagingChannel;
-import org.voltcore.utils.ssl.SSLConfiguration;
 import org.voltdb.AuthSystem.AuthProvider;
 import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.CatalogContext.ProcedurePartitionInfo;
@@ -111,8 +110,6 @@ import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Predicate;
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Throwables;
-import com.google_voltpatches.common.collect.ImmutableSet;
-import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 
 import io.netty.buffer.ByteBufAllocator;
@@ -368,16 +365,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                     "indicates problem with SSL configuration: " + e.getMessage());
                             return;
                         }
-                        sslEngine.setUseClientMode(false);
-                        sslEngine.setNeedClientAuth(false);
-
-                        Set<String> enabled = ImmutableSet.copyOf(sslEngine.getEnabledCipherSuites());
-                        Set<String> intersection = Sets.intersection(SSLConfiguration.PREFERRED_CIPHERS, enabled);
-                        if (intersection.isEmpty()) {
-                            hostLog.warn("Preferred cipher suites are not available");
-                            intersection = enabled;
-                        }
-                        sslEngine.setEnabledCipherSuites(intersection.toArray(new String[0]));
                         // blocking needs to be false for handshaking.
 
                         boolean handshakeStatus = false;

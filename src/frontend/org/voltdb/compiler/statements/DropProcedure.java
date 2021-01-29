@@ -19,7 +19,9 @@ package org.voltdb.compiler.statements;
 
 import java.util.regex.Matcher;
 
+import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Topic;
 import org.voltdb.compiler.DDLCompiler;
 import org.voltdb.compiler.DDLCompiler.DDLStatement;
 import org.voltdb.compiler.DDLCompiler.StatementProcessor;
@@ -45,6 +47,15 @@ public class DropProcedure extends StatementProcessor {
             return false;
         }
         String classOrProcName = checkIdentifierStart(statementMatcher.group(1), ddlStatement.statement);
+        CatalogMap<Topic> topics = db.getTopics();
+        for (Topic t : topics) {
+            if (classOrProcName.equalsIgnoreCase(t.getProcedurename())) {
+                throw m_compiler.new VoltCompilerException(String.format(
+                        "Invalid DROP PROCEDURE statement: %s is used by topic %s.",
+                        classOrProcName, t.getTypeName()));
+            }
+        }
+
         // Extract the ifExists bool from group 2
         m_tracker.removeProcedure(classOrProcName, (statementMatcher.group(2) != null));
 

@@ -38,6 +38,7 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
 import org.voltdb.catalog.Task;
 import org.voltdb.catalog.TaskParameter;
+import org.voltdb.catalog.Topic;
 import org.voltdb.task.TaskScope;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.IndexType;
@@ -222,6 +223,15 @@ public class JdbcDatabaseMetaDataGenerator
             new ColumnInfo("ENABLED", VoltType.STRING)
     };
 
+    static public final ColumnInfo[] TOPICS_SCHEMA = new ColumnInfo[] {
+            new ColumnInfo("TOPIC_NAME", VoltType.STRING),
+            new ColumnInfo("IS_SINGLE", VoltType.STRING),
+            new ColumnInfo("IS_OPAQUE", VoltType.STRING),
+            new ColumnInfo("STREAM_NAME", VoltType.STRING),
+            new ColumnInfo("PROCEDURE_NAME", VoltType.STRING),
+            new ColumnInfo("PROFILE", VoltType.STRING)
+    };
+
     JdbcDatabaseMetaDataGenerator(Catalog catalog, DefaultProcedureManager defaultProcs, InMemoryJarfile jarfile)
     {
         m_catalog = catalog;
@@ -272,6 +282,8 @@ public class JdbcDatabaseMetaDataGenerator
             result = getClasses();
         } else if (selector.equalsIgnoreCase("TASKS")) {
             result = getTasks();
+        } else if (selector.equalsIgnoreCase("TOPICS")) {
+            result = getTopics();
         }
         return result;
     }
@@ -854,6 +866,15 @@ public class JdbcDatabaseMetaDataGenerator
                     task.getScheduleclass(), getParamsString(task.getScheduleparameters()), task.getOnerror(),
                     TaskScope.translateIdToName(task.getScope()), task.getUser(), Boolean.toString(task.getEnabled()));
 
+        }
+        return results;
+    }
+
+    VoltTable getTopics() {
+        VoltTable results = new VoltTable(TOPICS_SCHEMA);
+        for (Topic topic : m_database.getTopics()) {
+            results.addRow(topic.getTypeName(), Boolean.toString(topic.getIssingle()), Boolean.toString(topic.getIsopaque()),
+                    topic.getStreamname(), topic.getProcedurename(), topic.getProfile());
         }
         return results;
     }

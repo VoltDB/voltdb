@@ -25,8 +25,7 @@ OffsetFetchResponsePartition::OffsetFetchResponsePartition(int16_t version, Chec
         m_leaderEpoch = in.readInt();
     }
     m_metadata = in.readString();
-
-    int16_t error = in.readShort();
+    __attribute__((unused)) int16_t error = in.readShort();
     vassert(error == 0);
 }
 
@@ -53,7 +52,7 @@ void OffsetFetchResponseTopic::write(const int16_t version, SerializeOutput& out
 OffsetFetchResponse::OffsetFetchResponse(int16_t version, CheckedSerializeInput& in) {
     in.readComponents(version, m_topics);
     if (version >= 2) {
-        int16_t error = in.readShort();
+        __attribute__((unused)) int16_t error = in.readShort();
         vassert(error == 0);
     }
 }

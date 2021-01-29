@@ -121,6 +121,7 @@ import org.voltcore.utils.OnDemandBinaryLogger;
 import org.voltcore.utils.Pair;
 import org.voltcore.utils.ShutdownHooks;
 import org.voltcore.utils.VersionChecker;
+import org.voltcore.utils.ssl.SSLConfiguration;
 import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKCountdownLatch;
 import org.voltcore.zk.ZKUtil;
@@ -236,7 +237,6 @@ import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Suppliers;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
-import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.Lists;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Ordering;
@@ -248,7 +248,7 @@ import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
-import io.netty.handler.ssl.CipherSuiteFilter;
+import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.OpenSsl;
 import io.netty.handler.ssl.SslContextBuilder;
 
@@ -434,6 +434,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
     @Override
     public void setShuttingdown(boolean preparingShuttingdown) {
+        consoleLog.info("Preparing to shut down: " + preparingShuttingdown);
         m_preparingShuttingdown = preparingShuttingdown;
     }
 
@@ -3363,7 +3364,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     private void setupSslContextCreators(SslType sslType, boolean setSslBuilder) {
-        SslContextFactory sslContextFactory = new SslContextFactory();
+        SslContextFactory sslContextFactory = new SslContextFactory.Server();
         String keyStorePath = getKeyTrustStoreAttribute("javax.net.ssl.keyStore", sslType.getKeystore(), "path");
         keyStorePath = null == keyStorePath  ? getResourcePath(Constants.DEFAULT_KEYSTORE_RESOURCE):getResourcePath(keyStorePath);
         if (keyStorePath == null || keyStorePath.trim().isEmpty()) {
@@ -3396,36 +3397,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
         sslContextFactory.setTrustStorePassword(trustStorePassword);
 
-        String[] excludeCiphers = new String[] {
-            "SSL_DHE_DSS_EXPORT_WITH_DES40_CBC_SHA",
-            "SSL_DHE_DSS_WITH_DES_CBC_SHA",
-            "SSL_DHE_RSA_EXPORT_WITH_DES40_CBC_SHA",
-            "SSL_DHE_RSA_WITH_DES_CBC_SHA",
-            "SSL_RSA_EXPORT_WITH_DES40_CBC_SHA",
-            "SSL_RSA_EXPORT_WITH_RC4_40_MD5",
-            "SSL_RSA_WITH_DES_CBC_SHA",
-            "TLS_DHE_DSS_WITH_AES_128_CBC_SHA",
-            "TLS_DHE_DSS_WITH_AES_256_CBC_SHA",
-            "TLS_DHE_RSA_WITH_AES_128_CBC_SHA",
-            "TLS_DHE_RSA_WITH_AES_256_CBC_SHA",
-            "TLS_ECDH_ECDSA_WITH_AES_128_CBC_SHA",
-            "TLS_ECDH_ECDSA_WITH_AES_256_CBC_SHA",
-            "TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA",
-            "TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA",
-            "TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA",
-            "TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA",
-            "TLS_ECDH_RSA_WITH_AES_128_CBC_SHA",
-            "TLS_ECDH_RSA_WITH_AES_256_CBC_SHA",
-            "TLS_RSA_WITH_AES_128_CBC_SHA",
-            "TLS_RSA_WITH_AES_128_CBC_SHA256",
-            "TLS_RSA_WITH_AES_128_GCM_SHA256",
-            "TLS_RSA_WITH_AES_256_CBC_SHA",
-            "TLS_RSA_WITH_AES_256_CBC_SHA256",
-            "TLS_RSA_WITH_AES_256_GCM_SHA384",
-        };
-
         // exclude weak ciphers
-        sslContextFactory.setExcludeCipherSuites(excludeCiphers);
+        sslContextFactory.setExcludeCipherSuites(SSLConfiguration.EXCLUDED_CIPHERS.toArray(new String[0]));
         sslContextFactory.setKeyManagerPassword(keyStorePassword);
 
         m_config.m_sslContextFactory = sslContextFactory;
@@ -3454,24 +3427,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 throw new IllegalArgumentException("Could not initialize TrustManagerFactory", e);
             }
 
-            ImmutableSet<String> excludeCipherSet = ImmutableSet.copyOf(excludeCiphers);
-
-            CipherSuiteFilter filter = (ciphers, defaultCiphiers, supportedCiphers) -> {
-                List<String> filteredCiphers = new ArrayList<>(supportedCiphers.size());
-                for (String cipher : ciphers == null ? defaultCiphiers : ciphers) {
-                    if (supportedCiphers.contains(cipher) && !excludeCipherSet.contains(cipher)) {
-                        filteredCiphers.add(cipher);
-                    }
-                }
-
-                return filteredCiphers.toArray(new String[filteredCiphers.size()]);
-            };
-
             try {
                 m_config.m_sslServerContext = SslContextBuilder.forServer(keyManagerFactory)
-                        .trustManager(trustManagerFactory).ciphers(null, filter).build();
+                        .trustManager(trustManagerFactory).ciphers(null, SSLConfiguration.CIPHER_FILTER)
+                        .clientAuth(ClientAuth.NONE).build();
                 m_config.m_sslClientContext = SslContextBuilder.forClient().trustManager(trustManagerFactory)
-                        .ciphers(null, filter).build();
+                        .ciphers(null, SSLConfiguration.CIPHER_FILTER).clientAuth(ClientAuth.NONE).build();
             } catch (SSLException e) {
                 throw new IllegalArgumentException("Could not create SslContexts", e);
             }
@@ -3909,25 +3870,43 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     /**
-     * Try to shut everything down so they system is ready to call
+     * Try to shut everything down so the system is ready to call
      * initialize again.
-     * @param mainSiteThread The thread that m_inititalized the VoltDB or
-     * null if called from that thread.
+     *
+     * There is protection to ensure that only one thread will execute
+     * the shutdown sequence. The return value is true for that thread,
+     * false for others. A thread getting a false return should simply
+     * wait for the shutdown to complete.
+     *
+     * The protection works like this:
+     *
+     * 1. Generally, the first thread through immediately sets the mode
+     *    to SHUTTINGDOWN, which prevents others from doing anything.
+     *    SHUTTINGDOWN persists until JVM exit. The flag m_isRunning
+     *    will go false at the end of shutdown.
+     *
+     * 2. But in the case that the mode is not SHUTTINGDOWN and the
+     *    flag m_isRunning is false, this means that we were never
+     *    really up. We don't set SHUTTINGDOWN in this case, and that
+     *    means we can't know if we are the first thread. It is assumed
+     *    that this does not matter and only occurs in test cases.
+     *    (In case this was a pre-existing condition)
+     *
+     * @param unused thread
+     * @return true iff this thread executed the shutdown
      */
     @Override
-    public boolean shutdown(Thread mainSiteThread) throws InterruptedException {
+    public boolean shutdown(Thread unused) throws InterruptedException {
         MeshProber criteria = m_meshProbe.get();
         if (criteria != null) {
             criteria.abortDetermination();
         }
-        synchronized(m_startAndStopLock) {
-            if (!m_isRunning) {
-                // initialize() was never called or shutdown() was already called
-                // so there is nothing to clean up
-                return true;
-            }
+        synchronized (m_startAndStopLock) {
             boolean did_it = false;
             if (m_mode != OperationMode.SHUTTINGDOWN) {
+                if (!m_isRunning) { // initialize() was never called
+                    return true;
+                }
                 did_it = true;
                 m_mode = OperationMode.SHUTTINGDOWN;
                 m_statusTracker.set(NodeState.SHUTTINGDOWN);

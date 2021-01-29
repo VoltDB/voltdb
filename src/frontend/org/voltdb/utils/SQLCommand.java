@@ -56,6 +56,7 @@ import org.json_voltpatches.JSONObject;
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
+import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.client.BatchTimeoutOverrideType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
@@ -400,6 +401,9 @@ public class SQLCommand {
                 case "tasks":
                     executeListTasks();
                     break;
+                case "topics":
+                    executeListTopics();
+                    break;
                 default:
                     String errorCase = (modifiers[0].equals("") || modifiers[0].equals(";")) ?
                             ("Incomplete SHOW command.\n") :
@@ -584,19 +588,35 @@ public class SQLCommand {
         return false;
     }
 
-    private static void execListConfigurations() throws Exception {
-        VoltTable configData = m_client.callProcedure("@SystemCatalog", "CONFIG").getResults()[0];
-        if (configData.getRowCount() != 0) {
-            printConfig(configData);
-        }
-    }
-
     private static void executeListTasks() throws Exception {
         VoltTable schedules = m_client.callProcedure("@SystemCatalog", "TASKS").getResults()[0];
         System.out.println("--- Tasks ----------------------------------------------------");
         while (schedules.advanceRow()) {
             System.out.println(schedules.getString(0));
         }
+    }
+
+    private static void executeListTopics() throws Exception {
+        ColumnInfo[] schema = new ColumnInfo[] {
+                new ColumnInfo("TOPIC_NAME", VoltType.STRING),
+                new ColumnInfo("STREAM_NAME", VoltType.STRING),
+                new ColumnInfo("PROCEDURE_NAME", VoltType.STRING)
+        };
+        VoltTable topicsTable = new VoltTable(schema);
+        StringBuffer opaque = new StringBuffer("\n--- Opaque Topics ----------------------------------------------");
+        VoltTable topics = m_client.callProcedure("@SystemCatalog", "TOPICS").getResults()[0];
+        while (topics.advanceRow()) {
+            if ("true".equalsIgnoreCase(topics.getString("IS_OPAQUE"))) {
+                opaque.append("\n" + topics.getString("TOPIC_NAME"));
+            } else {
+                topicsTable.addRow(topics.getString("TOPIC_NAME"), topics.getString("STREAM_NAME"), topics.getString("PROCEDURE_NAME"));
+            }
+        }
+        System.out.println("--- Topics ----------------------------------------------------");
+        if (topicsTable.getRowCount() > 0) {
+            System.out.println(topicsTable.toFormattedString());
+        }
+        System.out.println(opaque);
     }
 
     private static void execListClasses() {

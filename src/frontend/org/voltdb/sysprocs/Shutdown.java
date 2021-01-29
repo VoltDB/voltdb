@@ -42,38 +42,55 @@ import org.voltdb.VoltType;
  */
 public class Shutdown extends VoltSystemProcedure {
 
-    static void shutdownWork() {
+    /*
+     * The 'failsafe' mechanism is arranged to exit after 10 seconds
+     * no matter what. A thread is started when shutdown commences, and
+     * ordinarily we will have exited before that thread wakes from
+     * its sleep.
+     */
+    private static final long FAILSAFE_TIMEOUT = 10_000;
+    private static AtomicBoolean s_failsafeArmed;
+    private static Thread s_failsafe;
+    static {
+        initializeFailsafe();
+    }
+
+    private static void initializeFailsafe() {
+        s_failsafeArmed = new AtomicBoolean(false);
+        s_failsafe = new Thread() {
+            @Override
+            public void run() {
+                safeSleep(FAILSAFE_TIMEOUT);
+                shutdownWork(true);
+            }
+        };
+    }
+
+    private static void safeSleep(long msec) {
+        try {
+            Thread.sleep(msec);
+        } catch (InterruptedException e) {
+            // ignore
+        }
+    }
+
+    /*
+     * The very end of shutdown: log message and exit JVM
+     */
+    private static void shutdownWork(boolean isFailsafe) {
         VoltLogger voltLogger = new VoltLogger("HOST");
+        if (isFailsafe) {
+            voltLogger.info("Timed out waiting for shutdown completion; proceeding.");
+        }
         String msg = "VoltDB shutting down as requested by @Shutdown command.";
         CoreUtils.printAsciiArtLog(voltLogger, msg, Level.INFO);
         if (VoltDB.instanceOnServerThread()) {
             // Using shutdown from the localServerThread requires
             // the statics to be reinitialized for their next use
-            m_failsafeArmed = new AtomicBoolean(false);
-            m_failsafe = new Thread() {
-                @Override
-                public void run() {
-                    delayedShutdownWork();
-                }
-            };
+            initializeFailsafe();
         }
         System.exit(0);
     }
-
-    static void delayedShutdownWork() {
-        try {
-            Thread.sleep(10000);
-        } catch (InterruptedException e) {}
-        shutdownWork();
-    }
-
-    private static AtomicBoolean m_failsafeArmed = new AtomicBoolean(false);
-    private static Thread m_failsafe = new Thread() {
-        @Override
-        public void run() {
-            delayedShutdownWork();
-        }
-    };
 
     @Override
     public long[] getPlanFragmentIds() {
@@ -89,13 +106,12 @@ public class Shutdown extends VoltSystemProcedure {
     public DependencyPair executePlanFragment(Map<Integer, List<VoltTable>> dependencies,
                                            long fragmentId,
                                            ParameterSet params,
-                                           SystemProcedureExecutionContext context)
-    {
+                                           SystemProcedureExecutionContext context) {
         if (fragmentId == SysProcFragmentId.PF_shutdownSync) {
             VoltDB.instance().getHostMessenger().prepareForShutdown();
             // If this is executed on the LocalServerThread, the static will cause problems for subsequent tests.
-            if (!m_failsafeArmed.getAndSet(true)) {
-                m_failsafe.start();
+            if (!s_failsafeArmed.getAndSet(true)) {
+                s_failsafe.start(); // exit after 10 seconds no matter what
                 VoltLogger voltLogger = new VoltLogger("HOST");
                 String msg = "VoltDB shutdown operation requested and in progress. Cluster will terminate shortly.";
                 CoreUtils.printAsciiArtLog(voltLogger, msg, Level.INFO);
@@ -119,14 +135,11 @@ public class Shutdown extends VoltSystemProcedure {
                                 "Exception while attempting to shutdown VoltDB from shutdown sysproc",
                                 e);
                     }
-                    if (die) {
-                        shutdownWork();
+                    if (die) { // first thread to call 'shutdown' triggers exit
+                        shutdownWork(false);
                     }
-                    else {
-                        try {
-                            Thread.sleep(10000);
-                        }
-                        catch (InterruptedException e) {}
+                    else { // wait 'indefinitely', coded as 2 sec more than failsafe takes to kill us
+                        safeSleep(FAILSAFE_TIMEOUT+2000);
                     }
                 }
             };

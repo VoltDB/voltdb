@@ -589,11 +589,7 @@ struct CompiledSwap {
     }
 };
 
-#ifdef NDEBUG
-static bool hasNameIntegrity(std::string const& tableName, std::vector<std::string> const& indexNames) {
-    return true;
-}
-#else
+#ifndef NDEBUG
 static bool hasNameIntegrity(std::string const& tableName, std::vector<std::string> const& indexNames) {
     // Validate that future queries will be able to resolve the table
     // name and its associated index names.
@@ -1907,7 +1903,7 @@ void PersistentTable::swapTuples(TableTuple& originalTuple,
                  vassert(it != m_migratingRows.end());
                  MigratingBatch& batch = it->second;
                  void* addr = originalTuple.address();
-                 size_t found = batch.erase(addr);
+                 __attribute__((unused)) size_t found = batch.erase(addr);
                  vassert(found == 1);
                  batch.emplace(destinationTuple.address());
             }
@@ -2239,11 +2235,7 @@ std::vector<uint64_t> PersistentTable::getBlockAddresses() const {
     return blockAddresses;
 }
 
-#ifdef NDEBUG
-static bool isExistingTableIndex(std::vector<TableIndex*>&, TableIndex*) {
-    return false;
-}
-#else
+#ifndef NDEBUG
 static bool isExistingTableIndex(std::vector<TableIndex*>& indexes, TableIndex* index) {
     BOOST_FOREACH (auto existingIndex, indexes) {
         if (existingIndex == index) {
@@ -2272,7 +2264,7 @@ TableIndex* PersistentTable::index(std::string const& name) const {
 }
 
 void PersistentTable::addIndex(TableIndex* index) {
-    vassert(!isExistingTableIndex(m_indexes, index));
+    vassert(! isExistingTableIndex(m_indexes, index));
 
     // fill the index with tuples... potentially the slow bit
     TableTuple tuple(m_schema);
@@ -2421,7 +2413,8 @@ void PersistentTable::migratingAdd(int64_t txnId, TableTuple& tuple) {
         it = m_migratingRows.emplace_hint(it, txnId, MigratingBatch());
     }
     void* addr = tuple.address();
-    auto const success = it->second.insert(addr);
+    __attribute__((unused)) auto const success =
+        it->second.insert(addr);
     vassert(success.second);
 };
 

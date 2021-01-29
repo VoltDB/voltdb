@@ -219,8 +219,8 @@
 	<lib name="netty-all-4.1.53.Final.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/netty-all-4.1.53.Final.jar!/"/>
 	</lib>
-	<lib name="cron-java8-1.5.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/cron-java8-1.5.jar!/"/>
+	<lib name="cron-java8-1.7.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/cron-java8-1.7.jar!/"/>
 	</lib>
 	<lib name="jsch-0.1.55.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jsch-0.1.55.jar!/"/>

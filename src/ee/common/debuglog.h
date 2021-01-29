@@ -218,9 +218,7 @@ struct _TimerLevels {
 
 // A custom assert macro that adds stacktrace on message
 #ifdef NDEBUG
-// **NOTE**: We allow expr inside `vassert' to have side effect,
-// which GNU libc does not (by simply ommiting the expression)
-#define vassert(expr) (void)(expr)
+#define vassert(expr) (void)0
 #else
 #ifdef MACOSX
 // MACOS does not have an equivalent of __assert_fail; so we do

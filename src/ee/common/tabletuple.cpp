@@ -91,8 +91,8 @@ std::string TableTuple::debug(const std::string& tableName, bool skipNonInline) 
 
         for (int ctr = 0; ctr < m_schema->hiddenColumnCount(); ctr++) {
             buffer << "(";
-            const TupleSchema::HiddenColumnInfo* colInfo = m_schema->getHiddenColumnInfo(ctr);
-            vassert(!isVariableLengthType(colInfo->getVoltType()));
+            vassert(! isVariableLengthType(
+                        m_schema->getHiddenColumnInfo(ctr)->getVoltType()));
             buffer << getHiddenNValue(ctr).debug() << ")";
         }
     }
