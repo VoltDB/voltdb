@@ -125,8 +125,8 @@ bool tableutil::getLastTuple(const voltdb::PersistentTable* table, voltdb::Table
         }
         while (it.next(out)) {
             if (idx-- == 0) {
-                voltdb::TableTuple tmp;
-                vassert(!it.next(tmp));
+                __attribute__((unused)) voltdb::TableTuple tmp;
+                vassert(! it.next(tmp));
                 return true;
             }
         }
