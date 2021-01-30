@@ -347,12 +347,14 @@ class FastSerializer:
     #
     # We require a sufficiently-recent version of Python in order to have
     # reasonable TLS (not SSL) support. The minimum acceptable version is
-    # set to 2.7.13 so that we can explicitly use PROTOCOL_TLS. We could
-    # perhaps settle for 2.7.9 but I see little point in so doing.
+    # set to 2.7.5, as per Centos 7. We're a little bit picky about the
+    # protocol version: we want to use PROTOCOL_TLS, but that is not defined
+    # in 2.7.5, so we use PROTOCOL_SSLv23, which is the deprecated name
+    # for the same numerical value.
 
     def __wrap_socket(self, ss):
-        if sys.hexversion < 0x02070d00:
-            raise Exception('Use of SSL requires Python version 2.7.13 or greater; this is ' + \
+        if sys.hexversion < 0x02070500:
+            raise Exception('Use of SSL requires Python version 2.7.5 or greater; this is ' + \
                             sys.version.split(' ')[0])
 
         parsed_config = {}
@@ -375,12 +377,16 @@ class FastSerializer:
             self.ssl_config['ca_certs'] = parsed_config['cacerts']
             self.ssl_config['cert_reqs'] = ssl.CERT_REQUIRED
 
+        protocol = ssl.PROTOCOL_SSLv23
+        if sys.hexversion >= 0x02070d00:
+            protocol = ssl.PROTOCOL_TLS # same value!
+
         return ssl.wrap_socket(ss,
                                keyfile=self.ssl_config['keyfile'],
                                certfile=self.ssl_config['certfile'],
                                server_side=False,
                                cert_reqs=self.ssl_config['cert_reqs'],
-                               ssl_version=ssl.PROTOCOL_TLS,
+                               ssl_version=protocol,
                                ca_certs=self.ssl_config['ca_certs'])
 
     def __convert_jks_files(self, ss, jks_config):
