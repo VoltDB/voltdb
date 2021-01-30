@@ -64,10 +64,9 @@ int32_t CsvEncoder::encode(const TableTuple& tuple) {
             first = false;
         }
 
-        const TupleSchema::ColumnInfo* info = m_schema.getColumnInfo(index);
         const NValue value = tuple.getNValue(index);
         if (value.isNull()) {
-            vassert(info->allowNull);
+            vassert(m_schema.getColumnInfo(index)->allowNull);
 
             if (m_quoteAll) {
                 m_oss << m_quote;

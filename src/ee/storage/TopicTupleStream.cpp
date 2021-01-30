@@ -114,7 +114,7 @@ topics::TupleEncoder* TopicTupleStream::createEncoder(const StreamedTable& strea
             int end = commaIndex == std::string::npos ? columnsCsv.length() : commaIndex;
             std::string column = columnsCsv.substr(start, end - start);
             boost::trim(column);
-            bool found = false;
+            __attribute__((unused)) bool found = false;
             for (int i = 0; i < columnNames.size(); ++i) {
                 if (boost::iequals(column, columnNames[i])) {
                     columnIndexes.push_back(i);
@@ -220,12 +220,12 @@ size_t TopicTupleStream::appendTuple(VoltDBEngine* engine, int64_t txnId, int64_
     out.writeVarLong(offsetDelta);
     out.writeVarLong(keySize);
     if (keySize >= 0) {
-        int32_t written = m_keyEncoder->encode(out, tuple);
+        __attribute__((unused)) int32_t written = m_keyEncoder->encode(out, tuple);
         vassert(keySize == written);
     }
     out.writeVarLong(valueSize);
     if (valueSize >= 0) {
-        int32_t written = m_valueEncoder->encode(out, tuple);
+        __attribute__((unused)) int32_t written = m_valueEncoder->encode(out, tuple);
         vassert(valueSize == written);
     }
     out.writeVarLong(0); // headers count
