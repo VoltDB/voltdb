@@ -89,6 +89,7 @@ replica = Opt('replica', 'replica', None, 1)
 # name, change verb 'live rejoin' to 'rejoin'
 blocking = Opt('blocking', '', None, 1)
 topicsport = Opt('topicsport', 'topicsHostPort', str, 1)
+topicspublic = Opt('topicspublic', 'topicspublic', str, 1)
 
 # for newcli only
 mesh = Opt('host', 'mesh', str, 2)
@@ -123,7 +124,8 @@ volt_opts = {'create': [admin,
                         licensefile,
                         pause,
                         replica,
-                        topicsport],
+                        topicsport,
+                        topicspublic],
 
              'recover': [admin,
                          client,
@@ -141,7 +143,8 @@ volt_opts = {'create': [admin,
                          licensefile,
                          pause,
                          replica,
-                         topicsport],
+                         topicsport,
+                         topicspublic],
 
              'rejoin': [admin,
                         client,
@@ -156,7 +159,8 @@ volt_opts = {'create': [admin,
                         deployment,
                         placementgroup,
                         licensefile,
-                        topicsport],
+                        topicsport,
+                        topicspublic],
 
              'add': [admin,
                      client,
@@ -171,7 +175,8 @@ volt_opts = {'create': [admin,
                      deployment,
                      placementgroup,
                      licensefile,
-                     topicsport],
+                     topicsport,
+                     topicspublic],
 
              'init': [config,
                       voltdbroot,
@@ -199,7 +204,8 @@ volt_opts = {'create': [admin,
                        pause,
                        replica,
                        add,
-                       topicsport],
+                       topicsport,
+                       topicspublic],
              }
 
 volt_opts_mandatory = {'create': [],
