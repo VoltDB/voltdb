@@ -754,7 +754,7 @@ public class TestStatisticsSuite extends StatisticsTestSuiteBase {
         StatThread st = new StatThread();
         st.start();
 
-        cluster.recoverOne(2, 0);
+        assertTrue(cluster.recoverOne(2, 0));
 
         st.m_run = false;
         st.join();
