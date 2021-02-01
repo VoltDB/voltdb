@@ -382,7 +382,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                              * the login Volt message before the server finishes its handshake. This message
                              * is caught in the servers last handshake network read.
                              */
-                            remnant = handshaker.getRemnant();
+                            if (handshakeStatus) {
+                                remnant = handshaker.getRemnant();
+                            }
 
                         } catch (NotSslRecordException e) {
                             handshakeErr = String.format("Rejected accepting new connection from %s, client not using TLS/SSL",
