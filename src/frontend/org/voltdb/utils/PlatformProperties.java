@@ -148,11 +148,16 @@ public class PlatformProperties implements Serializable {
         // we ignore anything larger than physical memory.
         String memlimit = readLinuxStat("/sys/fs/cgroup/memory/memory.limit_in_bytes", false, 1);
         if (memlimit != null) {
-            long limitInMB = Long.parseLong(memlimit.trim()) / (1024 * 1024);
-            if (limitInMB > 0 && limitInMB < hw.ramInMegabytes) {
-                hostLog.info(String.format("Physical memory is %d MB, cgroup limit is %d MB; using cgroup limit",
-                                           hw.ramInMegabytes, limitInMB));
-                hw.ramInMegabytes = (int) limitInMB;
+            try {
+                long limitInMB = Long.parseLong(memlimit.trim()) / (1024 * 1024);
+                if (limitInMB > 0 && limitInMB < hw.ramInMegabytes) {
+                    hostLog.info(String.format("Physical memory is %d MB, cgroup limit is %d MB; using cgroup limit",
+                                               hw.ramInMegabytes, limitInMB));
+                    hw.ramInMegabytes = (int) limitInMB;
+                }
+            }
+            catch (NumberFormatException ex) {
+                // ignore
             }
         }
 
