@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2020-2021 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -20,12 +20,6 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-/*
- * This client inserts a specified number of rows into a Volt stream as topic.
- *
- * Another client or clients consume rows from the stream topic.
- */
-
 package topicbenchmark2;
 
 import java.io.IOException;
@@ -33,15 +27,14 @@ import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -70,7 +63,8 @@ import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.util.concurrent.RateLimiter;
 
 /**
- * Asychronously sends data to topics to test VoltDB export performance.
+ * This client inserts a specified number of rows into a Volt stream as topic.
+ * This client or other client instances can consume the expected number of rows from the stream topic.
  */
 public class TopicBenchmark2 {
 
@@ -78,22 +72,33 @@ public class TopicBenchmark2 {
     static final String TEST_TOPIC = "TEST_TOPIC";
     static final String GROUP_PREFIX = "Group";
 
+    static final SimpleDateFormat LOG_DF = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss,SSS");
+
     // CSV pre-formatted row template: only produce the string field as value
     static final String ROW_FMT = "\"The quick brown fox jumps over the lazy dog; "
             + "Portez ce vieux whisky au juge blond, qui l'aime fort\"";
 
     // Validated CLI config
-    final TopicBenchConfig config;
+    final TopicBenchConfig m_config;
 
-    Client client;
-    ArrayList<String> brokers = new ArrayList<>();
-    Set<String> createdGroups = ConcurrentHashMap.newKeySet();
+    Client m_client;
+    ArrayList<String> m_brokers = new ArrayList<>();
+    Set<String> m_createdGroups = ConcurrentHashMap.newKeySet();
 
-    AtomicLong rowId = new AtomicLong(0);
-    AtomicLong successfulInserts = new AtomicLong(0);
-    AtomicLong failedInserts = new AtomicLong(0);
+    AtomicLong m_rowId = new AtomicLong(0);
+    AtomicLong m_successfulInserts = new AtomicLong(0);
+    AtomicLong m_failedInserts = new AtomicLong(0);
 
-    static final SimpleDateFormat LOG_DF = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss,SSS");
+    enum Verification {
+        NONE,
+        RANDOM,
+        ALL
+    };
+
+    enum Verifier {
+        FAST,
+        LARGE,
+    }
 
     /**
      * Uses included {@link CLIConfig} class to
@@ -101,6 +106,8 @@ public class TopicBenchmark2 {
      * and validation.
      */
     static class TopicBenchConfig extends CLIConfig {
+        public Verification m_verification = Verification.ALL;
+        public Verifier m_verifier = Verifier.FAST;
 
         @Option(desc = "Topic (default " + TEST_TOPIC + ").")
         String topic = TEST_TOPIC;
@@ -112,7 +119,7 @@ public class TopicBenchmark2 {
         int topicPort = 9095;
 
         @Option(desc = "How many produce invocations per producer, or how many to verify per subscriber group if no producers.")
-        int count = 0;
+        long count = 0;
 
         @Option(desc = "How many producers (default 1, may be 0 for subscribers only).")
         int producers = 1;
@@ -156,12 +163,11 @@ public class TopicBenchmark2 {
         @Option(desc = "Log polling progress every X rows (default 0, no logging).")
         int pollprogress = 0;
 
-        /*
-         * Verifying uses an in-memory set of row ids per group. On large scale polling tests it is recommended
-         * to set this option to true so that there is only one group verifying it polled all the rows.
-         */
-        @Option(desc = "Only one random group verifies, to use in large scale tests (default false, all verify).")
-        boolean randomverify = false;
+        @Option(desc = "Verification (none, random, all) defines how many groups verify polling (default all)")
+        String verification = "ALL";
+
+        @Option(desc = "Verifier (fast, large) defines the type of verifier to use to verify polling (default fast)")
+        String verifier = "FAST";
 
         @Override
         public void validate() {
@@ -178,13 +184,25 @@ public class TopicBenchmark2 {
             if (sessiontimeout <= 0) exitWithMessageAndUsage("sessiontimeout must be > 0");
             if (maxpollsilence <= 0) exitWithMessageAndUsage("maxpollsilence must be > 0");
             if (pollprogress < 0) exitWithMessageAndUsage("pollprogress must be >= 0");
-            if (randomverify && groups <= 1) exitWithMessageAndUsage("randomverify requires more than 1 groups");
 
             // Fold deprecated subscribers parameter into groups and groupmembers
             if (subscribers > 0) {
                 if (groups > 0) exitWithMessageAndUsage("subscribers and groups cannot be > 0; using groups is preferred");
                 groups = subscribers;
                 groupmembers = 1;
+            }
+
+            try {
+                m_verification = Verification.valueOf(verification.toUpperCase());
+            }
+            catch (Exception e) {
+                exitWithMessageAndUsage(verification + " is an invalid verification value: " + e.getMessage());
+            }
+            try {
+                m_verifier = Verifier.valueOf(verifier.toUpperCase());
+            }
+            catch (Exception e) {
+                exitWithMessageAndUsage(verifier + " is an invalid verifier value: " + e.getMessage());
             }
         }
     }
@@ -206,21 +224,21 @@ public class TopicBenchmark2 {
      * @param args The arguments passed to the program
      */
     TopicBenchmark2(TopicBenchConfig config) {
-        this.config = config;
+        this.m_config = config;
         ClientConfig clientConfig = new ClientConfig();
         clientConfig.setReconnectOnConnectionLoss(true);
         clientConfig.setTopologyChangeAware(true);
         clientConfig.setClientAffinity(true);
-        client = ClientFactory.createClient(clientConfig);
+        m_client = ClientFactory.createClient(clientConfig);
 
         // Build boker string
         String[] serverArray = config.servers.split(",");
         for (String server : serverArray) {
             if (!StringUtils.isBlank(server)) {
-                brokers.add(server + ":" + config.topicPort);
+                m_brokers.add(server + ":" + config.topicPort);
             }
         }
-        log.info("Test using brokers: " + brokers);
+        log.info("Test using brokers: " + m_brokers);
     }
 
 
@@ -229,7 +247,7 @@ public class TopicBenchmark2 {
         VoltTable stats = null;
         while (retryStats-- > 0) {
             try {
-                stats = client.callProcedure("@Statistics", "topic", 0).getResults()[0];
+                stats = m_client.callProcedure("@Statistics", "topic", 0).getResults()[0];
                 break;
             } catch (ProcCallException e) {
                 log.warn("Error while calling procedures: ");
@@ -274,7 +292,7 @@ public class TopicBenchmark2 {
             while (stats.advanceRow()) {
                 long partitionid = stats.getLong("PARTITION_ID");
                 String source = stats.getString("TOPIC");
-                if (!config.topic.equalsIgnoreCase(source)) {
+                if (!m_config.topic.equalsIgnoreCase(source)) {
                     continue;
                 }
                 Long tupleCount = stats.getLong("LAST_OFFSET");
@@ -315,7 +333,7 @@ public class TopicBenchmark2 {
      */
     void connectToOneServer(String server) {
         try {
-            client.createConnection(server);
+            m_client.createConnection(server);
         }
         catch (IOException e) {
             log.info("Connection to " + server + " failed");
@@ -342,14 +360,14 @@ public class TopicBenchmark2 {
      * @return
      */
     KafkaConsumer<Long, String> getConsumer(String groupName) {
-        String sessionTimeout = Long.toString(TimeUnit.SECONDS.toMillis(config.sessiontimeout));
+        String sessionTimeout = Long.toString(TimeUnit.SECONDS.toMillis(m_config.sessiontimeout));
         Map<String, Object> consumerConfig = ImmutableMap.of(ConsumerConfig.GROUP_ID_CONFIG, groupName,
-                ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, brokers,
+                ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, m_brokers,
                 // Use volt max buffer size of 2MB
                 ConsumerConfig.MAX_PARTITION_FETCH_BYTES_CONFIG, "2097152",
                 ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, sessionTimeout);
 
-        if (createdGroups.add(groupName)) {
+        if (m_createdGroups.add(groupName)) {
             log.info("Joining group " + groupName + ", config = " + consumerConfig);
         }
         return new KafkaConsumer<Long, String>(consumerConfig, new LongDeserializer(), new StringDeserializer());
@@ -370,27 +388,26 @@ public class TopicBenchmark2 {
      * @param groupVerifier     group verifier or {@code null}
      * @param duplicateCount    duplicate counter of {@code null}
      */
-    void doReads(int id, String servers, int topicPort, int maxCount, AtomicInteger groupCount,
-            Set<Long> groupVerifier, AtomicInteger duplicateCount) {
-        assert (groupVerifier != null && duplicateCount != null) || (groupVerifier == null && duplicateCount == null);
-        String groupId = config.groupprefix + "-" + id;
+    void doReads(int id, String servers, int topicPort, long maxCount, AtomicInteger groupCount,
+            BaseVerifier groupVerifier) {
+        String groupId = m_config.groupprefix + "-" + id;
         long thId = Thread.currentThread().getId();
 
-        long maxSilence = TimeUnit.SECONDS.toMillis(config.maxpollsilence);
+        long maxSilence = TimeUnit.SECONDS.toMillis(m_config.maxpollsilence);
 
         long lastPollTime = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
-        int lastGroupCount = 0;
+        long lastGroupCount = 0;
 
-        int polledCount = 0;
-        int lastLogged = 0;
+        long polledCount = 0;
+        long lastLogged = 0;
         try {
             try (KafkaConsumer<Long, String> consumer = getConsumer(groupId)) {
-                consumer.subscribe(ImmutableList.of(config.topic));
+                consumer.subscribe(ImmutableList.of(m_config.topic));
                 while (true) {
                     // Poll records
                     ConsumerRecords<Long, String> records = consumer.poll(Duration.ofSeconds(1));
 
-                    if (groupVerifier != null && groupVerifier.size() == maxCount) {
+                    if (groupVerifier != null && groupVerifier.cardinality() == maxCount) {
                         // Another verifying thread polled the last records
                         return;
                     }
@@ -399,7 +416,7 @@ public class TopicBenchmark2 {
                     long elapsed = thisPollTime - lastPollTime;
 
                     // Decide if polling continues
-                    if (failedInserts.get() != 0) {
+                    if (m_failedInserts.get() != 0) {
                         return;
                     }
                     else if (records.count() > 0) {
@@ -411,26 +428,35 @@ public class TopicBenchmark2 {
                             records.forEach(record -> {
                                 try {
                                     Long rowId = record.key();
-                                    boolean added = groupVerifier.add(rowId);
-                                    if (!added) {
-                                        duplicateCount.incrementAndGet();
-                                    }
+                                    groupVerifier.addKey(rowId);
                                 }
                                 catch (Exception e) {
-                                    exitWithException("Group " + groupId + " thread " + thId + " failed parsing CSV record\n", e);
+                                    exitWithException("Group " + groupId + " thread " + thId + " failed parsing CSV record", e);
                                 }
                             });
-                            if (groupVerifier.size() == maxCount) {
+                            long curSize = groupVerifier.cardinality();
+                            if (curSize == maxCount) {
                                 // We are the one who got the last row for the group (records,count()  > 0)
-                                log.info("Group " + groupId + " thread " + thId + " verified, " + groupVerifier.size() + " records polled, "
-                                        + duplicateCount.get() + " duplicates");
+                                long startGaps = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
+                                boolean hasGaps = groupVerifier.hasGaps();
+                                long elapsedGaps = TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) - startGaps;
+                                log.info("Group " + groupId + " thread " + thId + " checked gaps in "
+                                        + TimeUnit.MILLISECONDS.toSeconds(elapsedGaps) + " seconds");
+
+                                if (hasGaps) {
+                                    throw new RuntimeException("Group " + groupId + " thread " + thId
+                                            + " verified, " + curSize + " records polled, "
+                                            + groupVerifier.duplicates() + " duplicates, failed with gaps");
+                                }
+                                log.info("Group " + groupId + " thread " + thId + " verified, " + curSize + " records polled, "
+                                        + groupVerifier.duplicates() + " duplicates");
                                 // Got all the expected rows
                                 return;
                             }
-                            else if (config.pollprogress != 0 && (groupVerifier.size() - lastLogged) > config.pollprogress) {
-                                lastLogged = groupVerifier.size() ;
-                                log.info("Group " + groupId + " thread " + thId + ", verified = " + groupVerifier.size()
-                                + ", dups = " + duplicateCount.get());
+                            else if (m_config.pollprogress != 0 && (curSize - lastLogged) > m_config.pollprogress) {
+                                lastLogged = curSize ;
+                                log.info("Group " + groupId + " thread " + thId + ", verified = " + curSize
+                                + ", dups = " + groupVerifier.duplicates());
                             }
                         }
                         else if (lastGroupCount >= maxCount) {
@@ -462,6 +488,17 @@ public class TopicBenchmark2 {
         }
     }
 
+    BaseVerifier getVerifier(long maxCount) {
+        switch (m_config.m_verifier) {
+        case FAST:
+            return new FastVerifier(maxCount);
+        case LARGE:
+            return new LargeVerifier(maxCount);
+        default:
+            return null;
+        }
+    }
+
     /**
      * Inserts values into the topic: all values have identical sizes
      *
@@ -470,12 +507,12 @@ public class TopicBenchmark2 {
      */
     void doInserts(int id, String servers, int topicPort) {
 
-        RateLimiter rateLimiter = config.insertrate > 0 ? RateLimiter.create(config.insertrate) : null;
-        int inserts = 0;
+        RateLimiter rateLimiter = m_config.insertrate > 0 ? RateLimiter.create(m_config.insertrate) : null;
+        long inserts = 0;
         AtomicLong completed = new AtomicLong(0);
         try {
             Properties props = new Properties();
-            props.put("bootstrap.servers", brokers);
+            props.put("bootstrap.servers", m_brokers);
             props.put("acks", "all");
             props.put("key.serializer", "org.apache.kafka.common.serialization.LongSerializer");
             props.put("value.serializer", "org.apache.kafka.common.serialization.StringSerializer");
@@ -484,28 +521,29 @@ public class TopicBenchmark2 {
             Producer<Long, String> producer = new KafkaProducer<>(props);
 
             // Insert records until we've reached the configured count
-            while (inserts < config.count) {
+            while (inserts < m_config.count) {
                 if (rateLimiter != null) {
                     rateLimiter.acquire();
                 }
                 final long start = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
 
-                producer.send(new ProducerRecord<Long, String>(config.topic, rowId.incrementAndGet(), ROW_FMT),
+                producer.send(new ProducerRecord<Long, String>(m_config.topic, m_rowId.getAndIncrement(), ROW_FMT),
                         new Callback() {
+                    @Override
                     public void onCompletion(RecordMetadata metadata, Exception e) {
                         long completedNow = completed.incrementAndGet();
                         long end = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
                         long elapsedSecs = TimeUnit.MILLISECONDS.toSeconds(end - start);
                         if(e != null) {
                             log.error("Thread " + id + " failed insert after " + elapsedSecs + " seconds: " + e.getMessage());
-                            failedInserts.incrementAndGet();
+                            m_failedInserts.incrementAndGet();
                         } else {
-                            successfulInserts.incrementAndGet();
-                            if (elapsedSecs > config.insertwarnthreshold) {
+                            m_successfulInserts.incrementAndGet();
+                            if (elapsedSecs > m_config.insertwarnthreshold) {
                                 log.warn("Thread " + id + " completed insert after " + elapsedSecs + " seconds");
                             }
                         }
-                        if (completedNow == config.count) {
+                        if (completedNow == m_config.count) {
                             log.info("Thread " + id + " completed " + completedNow + " records");
                         }
                     }
@@ -524,44 +562,45 @@ public class TopicBenchmark2 {
      * @return {@code ArrayList<Thread>} of subscribers, or {@code null} if no subscribers
      */
     ArrayList<Thread> startReaders() {
-        int nReaders = config.groups * config.groupmembers;
+        int nReaders = m_config.groups * m_config.groupmembers;
         if (nReaders == 0) {
             return null;
         }
 
         // The max count to check depends if we are running a combined producer/subscriber test
-        final int maxCount = config.producers != 0 ? config.count * config.producers : config.count;
+        final long maxCount = m_config.producers != 0 ? m_config.count * m_config.producers : m_config.count;
 
         int verifier = -1;
-        if (config.randomverify) {
+        if (m_config.m_verification == Verification.RANDOM) {
             Random r = new Random();
-            verifier = r.nextInt(config.groups);
-            log.info("Creating " + nReaders + " subscriber threads in " + config.groups
-                    + " groups to topic " + config.topic + ", group " + verifier + " verifying");
+            verifier = r.nextInt(m_config.groups);
+            log.info("Creating " + nReaders + " subscriber threads in " + m_config.groups
+                    + " groups to topic " + m_config.topic + ", group " + verifier + " verifying");
+        }
+        else if (m_config.m_verification == Verification.ALL){
+            log.info("Creating " + nReaders + " subscriber threads in " + m_config.groups
+                    + " groups to topic " + m_config.topic + ", all groups verifying");
         }
         else {
-            log.info("Creating " + nReaders + " subscriber threads in " + config.groups
-                    + " groups to topic " + config.topic + ", all groups verifying");
+            log.info("Creating " + nReaders + " subscriber threads in " + m_config.groups
+                    + " groups to topic " + m_config.topic + ", no groups verifying");
         }
 
         ArrayList<Thread> readers = new ArrayList<>();
-        for (int i = 0; i < config.groups; i++) {
-            boolean verifies = verifier < 0 || verifier == i;
+        for (int i = 0; i < m_config.groups; i++) {
+            boolean verifies = (m_config.m_verification == Verification.RANDOM && verifier == i) ||
+                    m_config.m_verification == Verification.ALL;
             final int groupId = i;
 
-            // Verifiers use a concurrent keySet predimensioned to the expected count, avoiding redimensioning as possible
-            final Set<Long> groupVerifier = verifies ?
-                    new ConcurrentHashMap<Long, Boolean>(maxCount, 1.0F).keySet(Boolean.TRUE)
-                    : null;
-            final AtomicInteger duplicateCount = verifies ? new AtomicInteger(0) : null;
+            final BaseVerifier groupVerifier = verifies ? getVerifier(maxCount) : null;
             final AtomicInteger groupCount = new AtomicInteger(0);
 
-            for (int j = 0; j <  config.groupmembers; j++) {
+            for (int j = 0; j <  m_config.groupmembers; j++) {
                 readers.add(new Thread(new Runnable() {
                     @Override
                     public void run() {
-                        doReads(groupId, config.servers, config.topicPort, maxCount, groupCount,
-                                groupVerifier, duplicateCount);
+                        doReads(groupId, m_config.servers, m_config.topicPort, maxCount,
+                                groupCount, groupVerifier);
                     }
                 }));
             }
@@ -575,18 +614,18 @@ public class TopicBenchmark2 {
      * @return {@code ArrayList<Thread>} of producers, or {@code null} if no producers
      */
     ArrayList<Thread> startWriters() {
-        if (config.producers == 0) {
+        if (m_config.producers == 0) {
             return null;
         }
 
-        log.info("Creating " + config.producers + " producer threads to topic " + config.topic);
+        log.info("Creating " + m_config.producers + " producer threads to topic " + m_config.topic);
         ArrayList<Thread> writers = new ArrayList<>();
-        for (int i = 0; i < config.producers; i++) {
+        for (int i = 0; i < m_config.producers; i++) {
             final int id = i;
             writers.add(new Thread(new Runnable() {
                 @Override
                 public void run() {
-                      doInserts(id, config.servers, config.topicPort);
+                      doInserts(id, m_config.servers, m_config.topicPort);
                   }
               }));
         }
@@ -603,7 +642,7 @@ public class TopicBenchmark2 {
     void runTest() throws InterruptedException, IOException {
         try {
             log.info("Test initialization");
-            connect(config.servers);
+            connect(m_config.servers);
         } catch (InterruptedException e) {
             exitWithException("ERROR: Error connecting to VoltDB", e);
         }
@@ -622,16 +661,17 @@ public class TopicBenchmark2 {
             });
             long duration = TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) - start;
 
-            log.info("Finished benchmark insertion in " + TimeUnit.MILLISECONDS.toSeconds(duration) + " seconds.");
-            if (failedInserts.get() == 0) {
-                if (!waitTilTupleCountSettles(successfulInserts.get())) {
+            log.info("Finished benchmark insertion in " + TimeUnit.MILLISECONDS.toSeconds(duration) + " seconds"
+                    + ", last rowId = " + (m_rowId.get() - 1));
+            if (m_failedInserts.get() == 0) {
+                if (!waitTilTupleCountSettles(m_successfulInserts.get())) {
                     log.info("TUPLE_COUNT did not settle in 10 minutes");
                 }
             }
         }
-        client.close();
+        m_client.close();
 
-        if (readers != null && failedInserts.get() == 0) {
+        if (readers != null && m_failedInserts.get() == 0) {
             readers.forEach(t -> {
                 try {
                     t.join();
@@ -642,10 +682,10 @@ public class TopicBenchmark2 {
         }
 
         long duration = TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) - start;
-        log.info("Benchmark complete: " + successfulInserts.get() + " successful, " + failedInserts.get() + " failed records"
+        log.info("Benchmark complete: " + m_successfulInserts.get() + " successful, " + m_failedInserts.get() + " failed records"
                 + " in " + TimeUnit.MILLISECONDS.toSeconds(duration) + " seconds");
 
-        if (failedInserts.get() != 0) {
+        if (m_failedInserts.get() != 0) {
             log.error("Test client failed");
             System.exit(-1);
         } else {

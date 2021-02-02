@@ -26,7 +26,7 @@ fi
 source $VOLTDB_BIN/voltenv
 
 VOLTDB="$VOLTDB_BIN/voltdb"
-LOG4J="$VOLTDB_VOLTDB/log4j.xml"
+LOG4J="./log4j.xml"
 LICENSE="$VOLTDB_VOLTDB/license.xml"
 HOST="localhost"
 
@@ -36,6 +36,7 @@ CLIENTLIBS=$({ \
     \ls -1 "$VOLTDB_LIB"/slf4j-*.jar; \
     \ls -1 "$VOLTDB_LIB"/log4j-*.jar; \
     \ls -1 "$VOLTDB_LIB"/commons-lang3-*.jar; \
+    \ls -1 "$VOLTDB_VOLTDB"/voltdb-*.jar; \
 } 2> /dev/null | paste -sd ':' - )
 CLIENTCLASSPATH=$CLIENTLIBS:$CLIENTCLASSPATH
 
@@ -189,7 +190,8 @@ function volt16a_subscribers() {
         --groupprefix=test6group10members01 \
         --pollprogress=1000000 \
         --sessiontimeout=45 \
-        --randomverify=true
+        --verifier=fast \
+        --verification=random
 }
 
 # Large producer/consumer test case successfully tested on volt16a with 3-node cluster
@@ -208,7 +210,7 @@ function volt16a_benchmark() {
         --groupprefix=test6group8members01 \
         --pollprogress=1000000 \
         --sessiontimeout=45 \
-        --randomverify=true
+        --verification=random
 }
 
 function shutdown() {
