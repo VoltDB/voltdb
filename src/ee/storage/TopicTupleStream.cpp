@@ -155,14 +155,14 @@ topics::TupleEncoder* TopicTupleStream::createEncoder(const StreamedTable& strea
                 return new topics::SingleValueEncoder<topics::ToStringEncoder>(index);
             }
         }
-        return new topics::CsvEncoder(*schema, columnIndexes, props);
+        return new topics::CsvEncoder(columnIndexes, props);
     }
 
     if (boost::iequals("AVRO", *encoding)) {
         return new topics::AvroEncoder(schemaId, *schema, columnIndexes, props);
     }
     if (boost::iequals("CSV", *encoding)) {
-        return new topics::CsvEncoder(*schema, columnIndexes, props);
+        return new topics::CsvEncoder(columnIndexes, props);
     }
 
     throwSerializableEEException("Unknown encoding: %s", encoding->c_str());

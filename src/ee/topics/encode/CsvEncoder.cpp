@@ -33,10 +33,9 @@ const char CsvEncoder::DEFAULT_CSV_QUOTE = '"';
 const char CsvEncoder::DEFAULT_CSV_ESCAPE = DEFAULT_CSV_QUOTE;
 const std::string CsvEncoder::DEFAULT_CSV_NULL = "\\N";
 
-CsvEncoder::CsvEncoder(const TupleSchema& schema, const std::vector<int32_t>& indexes,
+CsvEncoder::CsvEncoder(const std::vector<int32_t>& indexes,
         const TopicProperties& props)
-    : m_schema(schema),
-      m_indexes(indexes),
+    : m_indexes(indexes),
       m_separator(parseCharProperty(props, PROP_CSV_SEPARATOR, DEFAULT_CSV_SEPARATOR)),
       m_quote(parseCharProperty(props, PROP_CSV_QUOTE, DEFAULT_CSV_QUOTE)),
       m_escape(parseCharProperty(props, PROP_CSV_ESCAPE, DEFAULT_CSV_ESCAPE)),
@@ -66,8 +65,6 @@ int32_t CsvEncoder::encode(const TableTuple& tuple) {
 
         const NValue value = tuple.getNValue(index);
         if (value.isNull()) {
-            vassert(m_schema.getColumnInfo(index)->allowNull);
-
             if (m_quoteAll) {
                 m_oss << m_quote;
             }

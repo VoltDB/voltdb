@@ -39,7 +39,7 @@ void CsvEncoderTest::testString(const std::string& input, const std::string& exp
     m_tuple.setNValue(7, ValueFactory::getStringValue(input, &m_pool));
 
     std::vector<int32_t> indexes { 7 };
-    CsvEncoder csve(*m_schema, indexes, std::unordered_map<std::string, std::string>());
+    CsvEncoder csve(indexes, std::unordered_map<std::string, std::string>());
 
     int32_t size = csve.sizeOf(m_tuple);
     std::unique_ptr<uint8_t[]> encoded(new uint8_t[size]);
@@ -86,7 +86,7 @@ TEST_F(CsvEncoderTest, BasicNonNullableCsv) {
 
     // Verify default encoding
     std::vector<int32_t> indexes { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
-    CsvEncoder csve(*m_schema, indexes, std::unordered_map<std::string, std::string>());
+    CsvEncoder csve(indexes, std::unordered_map<std::string, std::string>());
 
     int32_t size = csve.sizeOf(m_tuple);
     std::unique_ptr<uint8_t[]> encoded(new uint8_t[size]);
@@ -102,7 +102,7 @@ TEST_F(CsvEncoderTest, BasicNonNullableCsv) {
     // Verify all quoted encoding
     std::unordered_map<std::string, std::string> props;
     props[CsvEncoder::PROP_CSV_QUOTE_ALL] = std::string("true");
-    CsvEncoder csve_quoted(*m_schema, indexes, props);
+    CsvEncoder csve_quoted( indexes, props);
 
     int32_t size_quoted = csve_quoted.sizeOf(m_tuple);
     std::unique_ptr<uint8_t[]> encoded_quoted(new uint8_t[size_quoted]);

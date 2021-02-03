@@ -27,14 +27,13 @@ namespace voltdb { namespace topics {
 
 class CsvEncoder : public TupleEncoder {
 public:
-    /**
+    /*
      * Constructor
      *
-     * @param schema of topic stream
      * @param index vector of indexes which are to be serialized
      * @param props map with properties which affect how values are serialized
      */
-    CsvEncoder(const TupleSchema& schema, const std::vector<int32_t>& indexes,
+    CsvEncoder(const std::vector<int32_t>& indexes,
             const TopicProperties& props);
 
     int32_t sizeOf(const TableTuple& tuple) override {
@@ -78,7 +77,6 @@ private:
     bool containsEscapableCharacters(const std::string& value);
     void insertEscapedValue(const std::string& value);
 
-    const TupleSchema& m_schema;
     const std::vector<int32_t> m_indexes;
 
     const char m_separator;
