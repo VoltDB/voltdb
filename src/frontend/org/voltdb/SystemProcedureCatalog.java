@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -717,6 +717,11 @@ public class SystemProcedureCatalog {
                 Builder.createSp("org.voltdb.sysprocs.TopicDirectInsertSP", -1, VoltType.INVALID)
                         .commercial().build());
 
+        builder.put("@ValidateDeployment",
+                new Config("org.voltdb.sysprocs.ValidateDeployment",
+                        Initiator.SINGLE_PARTITION, Mutable.READ_ONLY, 0, VoltType.VARBINARY,
+                        false, false, true, Durability.NOT_DURABLE,
+                        false, false, Restartability.NOT_APPLICABLE));
         listing = builder.build();
     }
 

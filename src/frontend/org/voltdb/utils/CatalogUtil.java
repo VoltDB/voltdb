@@ -239,8 +239,8 @@ public abstract class CatalogUtil {
     public static final String STAGED_CATALOG_PATH = Constants.CONFIG_DIR + File.separator + "staged-catalog.jar";
     public static final String VOLTDB_BUNDLE_LOCATION_PROPERTY_NAME = "voltdbbundlelocation";
 
-    private static JAXBContext m_jc;
-    private static Schema m_schema;
+    public static JAXBContext m_jc;
+    public static Schema m_schema;
     // 52mb - 4k, leave space for zookeeper header
     public static final int MAX_CATALOG_CHUNK_SIZE = VoltPort.MAX_MESSAGE_LENGTH - 4 * 1024;
     public static final int CATALOG_BUFFER_HEADER = 4 +  // version number
