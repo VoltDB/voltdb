@@ -122,7 +122,7 @@ private:
      */
     bool updateParHash(bool isReplicatedTable, int64_t parHash);
 
-    void writeEventData(DREventType type, ByteArray payloads);
+    void writeEventData(DREventType type, ByteArray payloads, int64_t spHandle);
 
     const DRTxnPartitionHashFlag m_initialHashFlag;
     DRTxnPartitionHashFlag m_hashFlag;
