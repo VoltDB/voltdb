@@ -161,7 +161,7 @@ public class RepairLog
         return m_txnCommitInterests.isEmpty();
     }
 
-    void notifyTxnCommitInterests(long handle) {
+    private void notifyTxnCommitInterests(long handle) {
         for (TransactionCommitInterest txnCommitInterest : m_txnCommitInterests) {
             txnCommitInterest.transactionCommitted(handle);
         }

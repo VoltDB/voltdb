@@ -1812,17 +1812,15 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 synchronized (m_lock) {
                     if (m_lastSentTruncationHandle < newHandle) {
                         m_lastSentTruncationHandle = newHandle;
-                        m_repairLog.notifyTxnCommitInterests(m_lastSentTruncationHandle);
-                        if (m_sendToHSIds.length == 0) {
-                            return;
-                        }
 
                         final RepairLogTruncationMessage truncMsg = new RepairLogTruncationMessage(newHandle);
                         // Also keep the local repair log's truncation point up-to-date
                         // so that it can trigger the callbacks.
                         truncMsg.m_sourceHSId = m_mailbox.getHSId();
-                        m_mailbox.deliver(truncMsg);
-                        m_mailbox.send(m_sendToHSIds, truncMsg);
+                        m_repairLog.deliver(truncMsg);
+                        if (m_sendToHSIds.length > 0) {
+                            m_mailbox.send(m_sendToHSIds, truncMsg);
+                        }
                     }
                 }
             }
