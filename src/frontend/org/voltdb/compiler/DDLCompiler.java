@@ -915,10 +915,21 @@ public class DDLCompiler {
     private void handleTTL(Database db) throws VoltCompilerException {
         for (Table table : db.getTables()) {
             TimeToLive ttl = table.getTimetolive().get(TimeToLiveVoltDB.TTL_NAME);
-            if (ttl != null && ttl.getTtlcolumn().getNullable()) {
-                throw m_compiler.new VoltCompilerException(
-                        "Column '" + table.getTypeName() + "." + ttl.getTtlcolumn().getName() +
-                                "' cannot be nullable for TTL.");
+            if (ttl != null) {
+                Column ttlColumn = ttl.getTtlcolumn();
+
+                if (ttlColumn.getNullable()) {
+                    throw m_compiler.new VoltCompilerException(
+                            "Column '" + table.getTypeName() + "." + ttlColumn.getName() +
+                                    "' cannot be nullable for TTL.");
+                }
+
+                VoltType ttlColumnType = VoltType.get((byte) ttlColumn.getType());
+                if (ttlColumnType != VoltType.TIMESTAMP) {
+                    throw m_compiler.new VoltCompilerException(
+                            "TTL column '" + table.getTypeName() + "." + ttlColumn.getName() +
+                                    "' must be of type " + VoltType.TIMESTAMP.getName());
+                }
             }
         }
     }

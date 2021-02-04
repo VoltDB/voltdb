@@ -1468,6 +1468,7 @@ if __name__ == "__main__":
                             ['Column', 'not found', 'Please update your query'],
                             ['Index: 0, Size: 0'],    # See ENG-15736
                             ['Column', 'cannot be nullable for TTL'],
+                            ['TTL column', 'must be of type TIMESTAMP'],
                             ['Partition columns must be an integer, varchar or varbinary type'],
                             ['Partition columns must be constrained "NOT NULL"'],
                             ['PARTITION has unknown COLUMN'],

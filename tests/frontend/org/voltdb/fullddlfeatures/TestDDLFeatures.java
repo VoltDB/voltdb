@@ -499,7 +499,7 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
         assertColumnSizeEquals("T63", "A1", 15);
         assertColumnIsNullable("T63", "A1");
         assertColumnDefaultValueEquals   ("T63", "A1", "'abc'");
-        assertColumnOrdinalPositionEquals("T63", "A1", 3);
+        assertColumnOrdinalPositionEquals("T63", "A1", 4);
         assertColumnOrdinalPositionEquals("T63", "C2", 1);
         assertColumnOrdinalPositionEquals("T63", "C3", 2);
 

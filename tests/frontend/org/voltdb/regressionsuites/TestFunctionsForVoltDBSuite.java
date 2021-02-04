@@ -30,7 +30,6 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.stream.Stream;
 
-import com.google_voltpatches.common.base.Strings;
 import org.junit.Test;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltDB;
@@ -43,6 +42,8 @@ import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb_testprocs.regressionsuites.failureprocs.BadParamTypesForTimestamp;
 import org.voltdb_testprocs.regressionsuites.fixedsql.GotBadParamCountsInJava;
+
+import com.google_voltpatches.common.base.Strings;
 
 
 /**
@@ -119,14 +120,16 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 ";\n" +
 
                 "create table M1 MIGRATE TO TARGET archiver (" +
+                "ts timestamp default now() not null," +
                 "a int not null, " +
                 "b int not null) " +
-                "USING TTL 10 minutes ON COLUMN a;" +
+                "USING TTL 10 minutes ON COLUMN ts;" +
 
                 "create table M2 MIGRATE TO TARGET archiver (" +
+                "ts timestamp default now() not null," +
                 "a int not null, " +
                 "b int not null) " +
-                "USING TTL 10 minutes ON COLUMN a;" +
+                "USING TTL 10 minutes ON COLUMN ts;" +
                 "PARTITION TABLE M2 ON COLUMN a;\n" +
 
                 "CREATE PROCEDURE IdFieldProc AS\n" +
@@ -3376,14 +3379,14 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         Client client = getClient();
         // insert some data into the migrating table.
         // m1 is replicated and m2 is partitioned.
-        Stream.of("insert into m1 values(1, 11);",
-                "insert into m1 values(2, 22);",
-                "insert into m1 values(3, 33);",
-                "insert into m1 values(4, 44);",
-                "insert into m2 values(1, 10);",
-                "insert into m2 values(2, 20);",
-                "insert into m2 values(3, 30);",
-                "insert into m2 values(4, 40);",
+        Stream.of("insert into m1(a, b) values(1, 11);",
+                "insert into m1(a, b) values(2, 22);",
+                "insert into m1(a, b) values(3, 33);",
+                "insert into m1(a, b) values(4, 44);",
+                "insert into m2(a, b) values(1, 10);",
+                "insert into m2(a, b) values(2, 20);",
+                "insert into m2(a, b) values(3, 30);",
+                "insert into m2(a, b) values(4, 40);",
                 "insert into p1 values(1, null, 4, 4.1);")
                 .forEachOrdered(stmt -> {
                     try {
@@ -3397,24 +3400,24 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 expected_m2 = {{1, 10}, {2, 20}, {3, 30}, {4, 40}}, empty = {};
         ClientResponse cr;
         // select migrating rows
-        cr = client.callProcedure("@AdHoc", "select * from m1 where not migrating() order by a, b;");
+        cr = client.callProcedure("@AdHoc", "select a, b from m1 where not migrating() order by a, b;");
         assertContentOfTable(expected_m1, cr.getResults()[0]);
 
-        cr = client.callProcedure("@AdHoc", "select * from m2 where not migrating() order by a, b;");
+        cr = client.callProcedure("@AdHoc", "select a, b from m2 where not migrating() order by a, b;");
         assertContentOfTable(expected_m2, cr.getResults()[0]);
 
         // forbid select !migrating rows
-        cr = client.callProcedure("@AdHoc", "select * from m1 where migrating() order by a, b;");
+        cr = client.callProcedure("@AdHoc", "select a, b from m1 where migrating() order by a, b;");
         assertContentOfTable(empty, cr.getResults()[0]);
-        cr = client.callProcedure("@AdHoc", "select * from m2 where migrating() order by a, b;");
+        cr = client.callProcedure("@AdHoc", "select a, b from m2 where migrating() order by a, b;");
         assertContentOfTable(empty, cr.getResults()[0]);
 
         cr = client.callProcedure("@AdHoc",
-                "select * from m1 where not migrating() and a >= 3 order by a, b;");
+                "select a, b from m1 where not migrating() and a >= 3 order by a, b;");
         assertContentOfTable(new Object[][]{{3, 33}, {4, 44}}, cr.getResults()[0]);
 
         cr = client.callProcedure("@AdHoc",
-                "select * from m2 where not migrating() and a >= 3 order by a, b;");
+                "select a, b from m2 where not migrating() and a >= 3 order by a, b;");
         assertContentOfTable(new Object[][]{{3, 30}, {4, 40}}, cr.getResults()[0]);
 
         // migrating with aggregate functions.

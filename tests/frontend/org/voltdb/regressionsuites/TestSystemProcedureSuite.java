@@ -36,6 +36,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NullCallback;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.types.TimestampType;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb_testprocs.regressionsuites.malicious.GoSleep;
 
@@ -327,10 +328,11 @@ public class TestSystemProcedureSuite extends RegressionSuite {
             schema.append("CREATE TABLE ").append(tableName)
             .append(" (\n" +
                     "  NAME VARCHAR(32 BYTES) NOT NULL,\n" +
+                    "  TS TIMESTAMP DEFAULT NOW() NOT NULL," +
                     "  PRICE FLOAT," +
                     "  NONID INTEGER NOT NULL," +
-                    "  ID INTEGER NOT NULL ").append(internalExtras)
-            .append(") USING TTL 10 SECONDS ON COLUMN ID;\n")
+                    "  ID INTEGER NOT NULL").append(internalExtras)
+            .append(") USING TTL 10 SECONDS ON COLUMN TS;\n")
             .append(externalExtras);
         }
         //*enable to debug*/ System.out.println(schema.toString());
@@ -787,9 +789,16 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         }
     }
 
-    private static final Object[][] THE_SWAP_CONTENTS = {{"1", 1.0, 1, 1}};
+    private static final Object[][] THE_SWAP_CONTENTS =
+        {
+            {"1", new TimestampType(), 1.0, 1, 1}
+        };
     private static final int THE_SWAP_COUNT = 1;
-    private static final Object[][] OTHER_SWAP_CONTENTS = {{"2", null, 2, 2}, {"3", 3.0, 3, 3}};
+    private static final Object[][] OTHER_SWAP_CONTENTS =
+        {
+            {"2", new TimestampType(), null, 2, 2},
+            {"3", new TimestampType(), 3.0, 3, 3}
+        };
     private static final int OTHER_SWAP_COUNT = 2;
 
     private void populateSwappyTables(Client client, String thisTable, String thatTable) throws Exception {

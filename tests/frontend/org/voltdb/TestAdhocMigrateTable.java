@@ -61,9 +61,9 @@ public class TestAdhocMigrateTable extends AdhocDDLTestBase {
     @Test
     public void testSimple() throws Exception {
         testMigrate(
-                "CREATE TABLE with_ttl migrate to target foo (i int NOT NULL, j FLOAT) USING TTL 1 minutes ON COLUMN i;\n" +
+                "CREATE TABLE with_ttl migrate to target foo (i TIMESTAMP DEFAULT NOW() NOT NULL, j FLOAT) USING TTL 1 minutes ON COLUMN i;\n" +
                 "CREATE TABLE without_ttl migrate to target foo (i int NOT NULL, j FLOAT, k VARCHAR(20));\n" +
-                "CREATE TABLE with_ttl_no_target(i int NOT NULL, j FLOAT) USING TTL 1 minutes ON COLUMN i;\n" +
+                "CREATE TABLE with_ttl_no_target(i TIMESTAMP DEFAULT NOW() NOT NULL, j FLOAT) USING TTL 1 minutes ON COLUMN i;\n" +
                 "CREATE TABLE without_ttl_no_target(i int NOT NULL, j FLOAT);\n",
                 Stream.of(
                         Pair.of("MIGRATE FROM without_ttl;", false),

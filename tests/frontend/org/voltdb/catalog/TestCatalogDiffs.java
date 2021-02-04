@@ -742,7 +742,7 @@ public class TestCatalogDiffs extends TestCase {
 
         // start with a table
         VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL, PRIMARY KEY(C1)) USING TTL 10 SECONDS ON COLUMN C2;");
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 TIMESTAMP DEFAULT NOW() NOT NULL, PRIMARY KEY(C1)) USING TTL 10 SECONDS ON COLUMN C2;");
         builder.addPartitionInfo("A", "C1");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testAlterTableTTL1.jar"));
         Catalog catOriginal = catalogForJar(testDir + File.separator + "testAlterTableTTL1.jar");
@@ -826,7 +826,7 @@ public class TestCatalogDiffs extends TestCase {
 
         // start with a stream
         VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("\nCREATE STREAM A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE STREAM A (C1 BIGINT NOT NULL, C2 TIMESTAMP DEFAULT NOW() NOT NULL);");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "testAlterStreamTTL1.jar"));
         Catalog catOriginal = catalogForJar(testDir + File.separator + "testAlterStreamTTL1.jar");
 

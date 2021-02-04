@@ -775,7 +775,7 @@ basic-cte-9-mixed       ::= cte{optional-9-cte-cols} AS (\
 ########################################
 # Grammar definitions used for both
 # kinds of CTE: "basic" (non-recursive,
-# above) and Recursive (below) 
+# above) and Recursive (below)
 #
 
 # Note: VALUES version not currently supported by VoltDB, so make this rare
@@ -2458,7 +2458,7 @@ ttl-definition          ::= USING TTL {ttl-value} [{ttl-time-unit}] \
                             [{batch-size}][ {max-frequency}]
 ttl-value               ::= {non-negative-int-value}
 ttl-time-unit           ::= SECONDS 5| MINUTES 3| HOURS | DAYS
-ttl-column              ::= {int-non-small-col-name} 2| {timestamp-column-name}
+ttl-column              ::= {timestamp-column-name}
 batch-size              ::= BATCH_SIZE {non-negative-int-value}[{digit}[{digit}]]
 max-frequency           ::= MAX_FREQUENCY {non-negative-int-value}
 
