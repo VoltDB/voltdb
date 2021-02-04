@@ -498,7 +498,7 @@
                 },
                 statusCode:{
                     401: function(response){
-                        alert('Failed to authenticate to the server via Kerberos. Please check the configuration of your client/browser')
+                        alert('Failed to authenticate to the server. Please check the configuration of your client/browser')
                     }
                 },
                 timeout: 60000
