@@ -111,6 +111,7 @@ namespace voltdb
         }
 
         inline void recordLastCommittedSpHandle(int64_t spHandle) {
+            vassert(m_lastCommittedSpHandle <= spHandle);
             m_lastCommittedSpHandle = spHandle;
         }
 

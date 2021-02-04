@@ -156,8 +156,11 @@ void AbstractDRTupleStream::openTransactionCommon(int64_t spHandle, int64_t uniq
 
 void AbstractDRTupleStream::commitTransactionCommon()
 {
+    vassert(m_committedTxnId <= m_openTxnId);
     m_committedTxnId = m_openTxnId;
+    vassert(m_committedUniqueId <= m_openUniqueId);
     m_committedUniqueId = m_openUniqueId;
+    vassert(m_committedSequenceNumber <= m_openSequenceNumber);
     m_committedSequenceNumber = m_openSequenceNumber;
 
     m_opened = false;
