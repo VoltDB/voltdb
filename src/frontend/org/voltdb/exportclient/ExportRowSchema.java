@@ -120,7 +120,7 @@ public class ExportRowSchema extends ExportRow {
     }
 
     /**
-     * Create a {@code ExportRowSchema} from a Catalog {@code Topic}, which must be OPAQUE.
+     * Create a {@code ExportRowSchema} from a Catalog {@code Topic}.
      * <p>
      * The created schema has no columns.
      *
@@ -130,7 +130,6 @@ public class ExportRowSchema extends ExportRow {
      * @return
      */
     public static ExportRowSchema create(Topic topic, int partitionId, long initialGenerationId, long generationId) {
-        assert topic.getIsopaque();
         return new ExportRowSchema(topic.getTypeName(), ImmutableList.of(), ImmutableList.of(), ImmutableList.of(),
                 -1, partitionId, initialGenerationId, generationId);
     }

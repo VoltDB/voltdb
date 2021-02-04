@@ -19,8 +19,11 @@
 
 #include "common/FatalException.hpp"
 #include "common/types.h"
+#include "common/serializeio.h"
+#include "common/UniqueId.hpp"
 
 #include <common/debuglog.h>
+#include <crc/crc32c.h>
 #include <cstring>
 #include <stdint.h>
 #include <limits>
@@ -46,8 +49,15 @@ namespace voltdb
               m_lastSpUniqueId(0)
         {}
 
-        ~StreamBlock()
+        virtual ~StreamBlock()
         {}
+
+        /**
+         * Return true if empty
+         */
+        virtual inline bool empty() const {
+            return offset() == 0;
+        }
 
         /**
          * Returns a pointer to the underlying raw memory allocation
@@ -104,7 +114,7 @@ namespace voltdb
             m_lastCommittedSpHandle = spHandle;
         }
 
-        inline void recordCompletedSpTxn(int64_t lastSpUniqueId) {
+        virtual void recordCompletedSpTxn(int64_t lastSpUniqueId) {
             m_lastSpUniqueId = lastSpUniqueId;
         }
 
@@ -162,7 +172,7 @@ namespace voltdb
             m_committedSequenceNumber(-1L)
         {}
 
-        ~ExportStreamBlock()
+        virtual ~ExportStreamBlock()
         {}
 
         inline void recordStartSequenceNumber(int64_t startSequenceNumber) {
@@ -198,10 +208,16 @@ namespace voltdb
             m_rowCount++;
         }
 
-        inline void truncateExportTo(size_t mark, int64_t seqNo) {
+        virtual inline void truncateExportTo(size_t mark, int64_t seqNo, int64_t spTxnId) {
             commonTruncateTo(mark);
             m_rowCount = seqNo - m_startSequenceNumber;
+            StreamBlock::recordCompletedSpTxn(spTxnId);
         }
+
+        /**
+         * Write out any extra header metadata
+         */
+        virtual inline void writeOutHeader() {}
 
     private:
         size_t m_rowCount;
@@ -302,6 +318,84 @@ namespace voltdb
         int64_t m_startDRSequenceNumber;
         int64_t m_lastDRSequenceNumber;
         int64_t m_lastMpUniqueId;
+    };
+
+    /**
+     * A type of ExportStreamBlock which reserves header space for a kafka batch header and can write that header out
+     * to the batch prior to the batch being pushed up to java
+     */
+    class TopicStreamBlock : public ExportStreamBlock {
+    public:
+        TopicStreamBlock(char* data, size_t headerSize, size_t capacity, size_t uso) :
+            ExportStreamBlock(data, headerSize, capacity, uso) {
+            m_offset = s_batchHeaderSize;
+        }
+
+        /**
+         * Return true if empty
+         */
+        bool empty() const override {
+            vassert(offset() >= s_batchHeaderSize);
+            return offset() == s_batchHeaderSize;
+        }
+
+        /**
+         * Record the spUniqueId and if first timestamp is not set yet then set it
+         */
+        void recordCompletedSpTxn(int64_t spUniqueId) override {
+            StreamBlock::recordCompletedSpTxn(spUniqueId);
+            if (m_firstTimestamp == -1) {
+                m_firstTimestamp = UniqueId::tsInMillis(spUniqueId);
+            }
+        }
+
+        /**
+         * Truncate the block and then if the block was rolled back to empty reset the first timestamp
+         */
+        void truncateExportTo(size_t mark, int64_t seqNo, int64_t spTxnId) override {
+            ExportStreamBlock::truncateExportTo(mark, seqNo, spTxnId);
+            if (m_lastSpUniqueId == 0) {
+                m_firstTimestamp = -1;
+            }
+        }
+
+        /**
+         * Write out the header for the batch using the kafka batch format
+         */
+        void writeOutHeader() override {
+            ReferenceSerializeOutput out(m_data, s_batchHeaderSize);
+            out.writeLong(startSequenceNumber());
+            out.writeInt(m_offset - sizeof(startSequenceNumber()) - sizeof(int32_t));
+            out.writeInt(-1); // Partition leader epoch
+            out.writeByte(s_magic);
+
+            int32_t crc = vdbcrc::crc32cInit();
+            size_t crcPosition = out.reserveBytes(sizeof(crc));
+            size_t crcStart = crcPosition + sizeof(crc);
+
+            out.writeShort(s_attributes);
+            out.writeInt(getRowCount() - 1); // offset delta from first offset to last
+            out.writeLong(m_firstTimestamp);
+            out.writeLong(UniqueId::tsInMillis(m_lastSpUniqueId));
+            out.writeLong(-1); // Producer ID
+            out.writeShort(-1); // Producer epoch
+            out.writeInt(-1); // sequence ID
+            out.writeInt(getRowCount());
+
+            vassert(out.position() == s_batchHeaderSize);
+
+            crc = vdbcrc::crc32c(crc, m_data + crcStart, m_offset - crcStart);
+            crc = vdbcrc::crc32cFinish(crc);
+            out.writeIntAt(crcPosition, crc);
+        }
+
+    private:
+        // Size of the header written out by writeOutHeader
+        static const int32_t s_batchHeaderSize = sizeof(int64_t) * 4 + sizeof(int32_t) * 6 + sizeof(int16_t) * 2 + 1;
+        static const int8_t s_magic = 2; // Called magic number by kafka but it is more of a version number
+        static const int16_t s_attributes = 8; // Batch attributes false except log append timestamps is true
+
+        int64_t m_firstTimestamp = -1;
     };
 }
 

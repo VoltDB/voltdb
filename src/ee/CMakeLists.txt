@@ -131,6 +131,8 @@ SET (VOLTDB_SRC
   catalog/statement.cpp
   catalog/table.cpp
   catalog/tableref.cpp
+  catalog/topic.cpp
+  catalog/property.cpp
   common/ExecuteWithMpMemory.cpp
   common/FatalException.cpp
   common/HiddenColumn.cpp
@@ -213,6 +215,8 @@ SET (VOLTDB_SRC
   topics/GroupStore.cpp
   topics/messages/OffsetCommit.cpp
   topics/messages/OffsetFetch.cpp
+  topics/encode/AvroEncoder.cpp
+  topics/encode/CsvEncoder.cpp
   topics/orm/Group.cpp
   topics/orm/GroupOffset.cpp
   topics/orm/GroupMember.cpp
@@ -281,6 +285,7 @@ SET (VOLTDB_SRC
   storage/TableStreamerContext.cpp
   storage/TableTupleAllocator.cpp
   storage/TempTableLimits.cpp
+  storage/TopicTupleStream.cpp
   storage/TupleBlock.cpp
   storage/constraintutil.cpp
   storage/persistenttable.cpp

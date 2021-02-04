@@ -54,6 +54,7 @@
 #include "common/ValuePeeker.hpp"
 #include "common/FatalException.hpp"
 #include "common/ExportSerializeIo.h"
+#include "common/serializeio.h"
 
 #include <common/debuglog.h>
 #include <ostream>

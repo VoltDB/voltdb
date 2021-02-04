@@ -26,9 +26,9 @@ package org.voltdb.export;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Map.Entry;
 
 import org.junit.After;
@@ -215,16 +215,9 @@ public class TestMultiStreamPolling extends ExportLocalClusterBase {
             }
             rowCount += ROW_BATCH;
         }
-        m_client.drain();
 
         // Wait for exports to drain
-        List<String> list = new ArrayList<>(1);
-        for (int i = 0; i < m_streamCount; i++) {
-            String streamName = String.format(STREAM_TEMPLATE, i);
-            list.add(streamName);
-        }
-        TestExportBaseSocketExport.waitForExportAllRowsDelivered(m_client, list);
-        m_verifier.verifyRows();
+        m_verifier.waitForTuplesAndVerify(m_client);
     }
 
     @Test(timeout = 600_000)
@@ -243,6 +236,7 @@ public class TestMultiStreamPolling extends ExportLocalClusterBase {
 
         // Insert rows on different streams but since they all go thru one export
         // track them thru the checkStream
+        Map<String, Long> counts = new HashMap<>();
         for (int i = 0; i < LOOP_COUNT; i++) {
             for (int j = 0; j < m_streamCount; j++) {
                 String streamName = String.format(STREAM_TEMPLATE, j);
@@ -252,14 +246,13 @@ public class TestMultiStreamPolling extends ExportLocalClusterBase {
                     m_client.callProcedure("@AdHoc", "insert into "+ streamName + " values(" + k + ", 1)");
                 }
                 rowCount += ROW_BATCH;
+                counts.compute(streamName, (n, c) -> (c == null ? 0 : c.longValue()) + ROW_BATCH);
             }
         }
-        m_client.drain();
 
         // Wait for exports to drain
-        List<String> list = new ArrayList<>(1);
-        list.add(checkStream);
-        TestExportBaseSocketExport.waitForExportAllRowsDelivered(m_client, list);
+        // Cannot use wait on verifier because verifier is tracking the targets not the streams
+        TestExportBaseSocketExport.waitForExportRowsToBeDelivered(m_client, counts);
         m_verifier.verifyRows();
     }
 }

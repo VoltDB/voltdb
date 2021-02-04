@@ -1756,6 +1756,54 @@ public class TestPersistentBinaryDeque {
         assertEquals(segmentCount, m_pbd.numberOfSegments());
     }
 
+    /*
+     * Test that when poll entry is provided with a max size and an entry exceeds that value null is returned and if the
+     * entry does not exceed that value it is returned
+     */
+    @Test
+    public void pollMaxSize() throws Exception {
+        m_pbd.offer(DBBPool.wrapBB(getFilledSmallBuffer(798464565L)));
+        m_pbd.offer(defaultContainer());
+        m_pbd.offer(DBBPool.wrapBB(getFilledSmallBuffer(-798464565L)));
+        m_pbd.offer(defaultContainer());
+
+        BinaryDequeReader<?> reader = m_pbd.openForRead(CURSOR_ID);
+
+        BinaryDequeReader.Entry<?> entry = reader.pollEntry(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY,
+                1 * 1024 * 1024);
+        assertNotNull(entry);
+        entry.release();
+
+        // Second entry should be too big to poll at 1MB max
+        entry = reader.pollEntry(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, 1 * 1024 * 1024);
+        assertNull(entry);
+
+        // Should now be able to poll at 2MB
+        entry = reader.pollEntry(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, 2 * 1024 * 1024);
+        assertNotNull(entry);
+        entry.release();
+
+        // Go really small for third entry
+        entry = reader.pollEntry(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, 512);
+        assertNull(entry);
+
+        // Can be polled at exact size
+        entry = reader.pollEntry(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, 1024);
+        assertNotNull(entry);
+        entry.release();
+
+        // Can poll last large entry
+        entry = reader.pollEntry(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY, 4 * 1024 * 1024);
+        assertNotNull(entry);
+        entry.release();
+
+        // No more entries in the PBD
+        entry = reader.pollEntry(PersistentBinaryDeque.UNSAFE_CONTAINER_FACTORY);
+        assertNull(entry);
+
+        m_pbd.closeCursor(CURSOR_ID);
+    }
+
     private int openSegmentReaderCount(String cursorId) {
         return m_pbd.getSegments().values().stream().mapToInt(r -> r.getReader(cursorId) == null ? 0 : 1).sum();
     }

@@ -33,6 +33,8 @@ import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
 import org.voltdb.regressionsuites.TestSQLTypesSuite;
 
+import com.google_voltpatches.common.collect.ImmutableMap;
+
 /**
  * End to end Export tests using the injected custom export.
  *
@@ -66,15 +68,13 @@ public class TestExportSnapshot extends TestExportBaseSocketExport {
     public void testExportSnapshotResetsSequenceNumber() throws Exception {
         System.out.println("testExportSnapshotResetsSequenceNumber");
         String targetStream = "S_NO_NULLS";
-        m_streamNames.add(targetStream);
         Client client = getClient();
         for (int i = 0; i < 10; i++) {
             final Object[] rowdata = TestSQLTypesSuite.m_midValues;
             final Object[] params = convertValsToParams(targetStream, i, rowdata);
             client.callProcedure("ExportInsertNoNulls", params);
         }
-        waitForExportAllRowsDelivered(client, m_streamNames);
-        quiesce(client);
+        waitForExportRowsToBeDelivered(client, ImmutableMap.of(targetStream, 10L));
 
         client.callProcedure("@SnapshotSave", "/tmp/" + System.getProperty("user.name"), "testnonce", (byte) 1);
 
@@ -97,14 +97,12 @@ public class TestExportSnapshot extends TestExportBaseSocketExport {
 
         // must still be able to verify the export data.
         // ENG-570
-        client.drain();
-        waitForExportAllRowsDelivered(client, m_streamNames);
         // Ignore first 10 rows received before restart, make sure the sequence number of
         // remaining rows start from beginning.
         for (int i = 0; i < 10; i++) {
             m_verifier.ignoreRow(targetStream, i);
         }
-        m_verifier.verifyRows();
+        m_verifier.waitForTuplesAndVerify(client);
         System.out.println("Passed!");
     }
 

@@ -1414,6 +1414,11 @@ public class CatalogDiffEngine {
             return true;
         }
 
+        // Note: only topics encoded inline need an EE update but this flag is coarse
+        if (suspect instanceof Topic || suspect.getParent() instanceof Topic) {
+            return true;
+        }
+
         // The other changes in the catalog will not be applied to EE,
         // including User, Group, Procedures, etc
         return false;

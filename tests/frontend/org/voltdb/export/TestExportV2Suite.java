@@ -23,7 +23,6 @@
 
 package org.voltdb.export;
 
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -100,7 +99,6 @@ public class TestExportV2Suite extends TestExportBaseSocketExport {
     {
         System.out.println("testExportMultiTable");
         final Client client = getClient();
-        m_streamNames.addAll(Arrays.asList("S_ALLOW_NULLS", "S_NO_NULLS"));
         while (!((ClientImpl) client).isHashinatorInitialized()) {
             Thread.sleep(1000);
             System.out.println("Waiting for hashinator to be initialized...");
@@ -143,7 +141,7 @@ public class TestExportV2Suite extends TestExportBaseSocketExport {
             params = convertValsToParams("S_NO_NULLS", i, rowdata);
             client.callProcedure("ExportInsertNoNulls", params);
         }
-        quiesceAndVerifyTarget(client, m_streamNames, m_verifier, DEFAULT_DELAY_MS, true);
+        m_verifier.waitForTuplesAndVerify(client);
     }
 
     @Test

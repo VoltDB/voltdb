@@ -86,8 +86,8 @@ void Group::markForDelete() {
     loadMembersIfNecessary();
     GroupOrmBase::markForDelete();
 
-    for (auto entry = m_members.begin(); entry != m_members.end(); ++entry) {
-        entry->second->markForDelete();
+    for (auto& member : m_members) {
+        member.second->markForDelete();
     }
 }
 
@@ -110,9 +110,9 @@ std::vector<GroupMember*> Group::getMembers(bool includeDeleted) {
 
 void Group::visitMembers(std::function<void(GroupMember&)> visitor, bool includeDeleted) {
     loadMembersIfNecessary();
-    for (auto entry = m_members.begin(); entry != m_members.end(); ++entry) {
-        if (includeDeleted || !entry->second->isDeleted()) {
-            visitor(*entry->second.get());
+    for (auto& member : m_members) {
+        if (includeDeleted || !member.second->isDeleted()) {
+            visitor(*member.second.get());
         }
     }
 }
@@ -131,8 +131,8 @@ GroupMember& Group::getOrCreateMember(const NValue& memberId) {
 bool Group::hasMember(bool includeDeleted) {
     loadMembersIfNecessary();
 
-    for (auto entry = m_members.begin(); entry != m_members.end(); ++entry) {
-        if (includeDeleted || !entry->second->isDeleted()) {
+    for (auto& member : m_members) {
+        if (includeDeleted || !member.second->isDeleted()) {
             return true;
         }
     }
@@ -149,8 +149,8 @@ void Group::commit(int64_t timestamp) {
     }
     GroupOrmBase::commit(timestamp);
 
-    for (auto entry = m_members.begin(); entry != m_members.end(); ++entry) {
-        entry->second->commit(timestamp);
+    for (auto& member : m_members) {
+        member.second->commit(timestamp);
     }
 }
 

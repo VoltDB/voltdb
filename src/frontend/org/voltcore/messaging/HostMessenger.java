@@ -83,6 +83,7 @@ import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Predicate;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.net.HostAndPort;
@@ -154,6 +155,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         public int localSitesCount;
         public final boolean startPause;
         public String recoveredPartitions;
+        // site IDs that when they are the destination and there is no registered mailbox respond with unknown site
+        public Set<Integer> respondUnknownSite = ImmutableSet.of();
+
         public Config(String coordIp, int coordPort, boolean paused) {
             startPause = paused;
             if (coordIp == null || coordIp.length() == 0) {
@@ -694,22 +698,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             /*
              * A basic site mailbox for the agreement site
              */
-            SiteMailbox sm = new SiteMailbox(this, agreementHSId);
-            createMailbox(agreementHSId, sm);
+            commonStartSetup(agreementHSId, agreementSites);
 
-
-            /*
-             * Construct the site with just this node
-             */
-            m_agreementSite =
-                new AgreementSite(
-                        agreementHSId,
-                        agreementSites,
-                        0,
-                        sm,
-                        new InetSocketAddress(m_config.getZKHost(), m_config.getZKPort()),
-                        m_config.backwardsTimeForgivenessWindow,
-                        m_failedHostsCallback);
             m_agreementSite.start();
             m_agreementSite.waitForRecovery();
             m_zk = org.voltcore.zk.ZKUtil.getClient(m_config.zkInterface, m_config.zkPort, 60 * 1000, VERBOTEN_THREADS);
@@ -1101,21 +1091,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
         m_acceptor.accrue(jos);
 
-        /*
-         * Create the local agreement site. It knows that it is recovering because the number of
-         * prexisting sites is > 0
-         */
-        SiteMailbox sm = new SiteMailbox(this, agreementHSId);
-        createMailbox(agreementHSId, sm);
-        m_agreementSite =
-            new AgreementSite(
-                    agreementHSId,
-                    agreementSites,
-                    yourHostId,
-                    sm,
-                    new InetSocketAddress(m_config.getZKHost(), m_config.getZKPort()),
-                    m_config.backwardsTimeForgivenessWindow,
-                    m_failedHostsCallback);
+        // Create the local agreement site. It knows that it is recovering because the number of prexisting sites is > 0
+        commonStartSetup(agreementHSId, agreementSites);
 
         /*
          * Now that the agreement site mailbox has been created it is safe
@@ -1152,6 +1129,38 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         }
 
         m_zk.create(CoreZK.hosts_host + getHostId(), hostInfo.toBytes(), Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
+    }
+
+    /**
+     * Create all of the initial mailboxes and the agreement site.
+     *
+     * @param agreementHSId  Host and SiteId for this hosts agreement site
+     * @param agreementSites Set of all known agreement sites including this one
+     * @throws IOException
+     */
+    private void commonStartSetup(long agreementHSId, Set<Long> agreementSites) throws IOException {
+        SiteMailbox sm = new SiteMailbox(this, agreementHSId);
+
+        synchronized (m_mapLock) {
+            assert m_siteMailboxes.isEmpty() : m_siteMailboxes;
+            ImmutableMap.Builder<Long, Mailbox> builder = ImmutableMap.<Long, Mailbox>builder().put(agreementHSId, sm);
+            // Create dummy mailboxes for all sites which want unknown site ID responses sent
+            m_config.respondUnknownSite.forEach(s -> {
+                long hsId = getHSIdForLocalSite(s);
+                builder.put(hsId, new DummyMailbox(agreementHSId, true));
+            });
+            m_siteMailboxes = builder.build();
+        }
+
+        m_agreementSite =
+                new AgreementSite(
+                        agreementHSId,
+                        agreementSites,
+                        getHostId(),
+                        sm,
+                        new InetSocketAddress(m_config.getZKHost(), m_config.getZKPort()),
+                        m_config.backwardsTimeForgivenessWindow,
+                        m_failedHostsCallback);
     }
 
     /**
@@ -1383,19 +1392,16 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     }
 
     public void registerMailbox(Mailbox mailbox) {
-        if (!m_siteMailboxes.containsKey(mailbox.getHSId())) {
-                throw new RuntimeException("Can only register a mailbox with an hsid alreadly generated");
-        }
-
         synchronized (m_mapLock) {
-            ImmutableMap.Builder<Long, Mailbox> b = ImmutableMap.builder();
-            for (Map.Entry<Long, Mailbox> e : m_siteMailboxes.entrySet()) {
-                if (e.getKey().equals(mailbox.getHSId())) {
-                    b.put(e.getKey(), mailbox);
-                } else {
-                    b.put(e.getKey(), e.getValue());
-                }
+            Long hsId = mailbox.getHSId();
+            if (!(m_siteMailboxes.get(hsId) instanceof DummyMailbox)) {
+                throw new RuntimeException(
+                        "Can only register a mailbox with a generated hsid and no mailbox already registered");
             }
+
+            ImmutableMap.Builder<Long, Mailbox> b = ImmutableMap.builder();
+            m_siteMailboxes.entrySet().stream().filter(e -> !hsId.equals(e.getKey())).forEach(b::put);
+            b.put(hsId, mailbox);
             m_siteMailboxes = b.build();
         }
     }
@@ -1406,64 +1412,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      */
     public long generateMailboxId(Long mailboxId) {
         final long hsId = mailboxId == null ? getHSIdForLocalSite(m_nextSiteId.getAndIncrement()) : mailboxId;
-        addMailbox(hsId, new Mailbox() {
-            @Override
-            public void send(long hsId, VoltMessage message) {
-            }
-
-            @Override
-            public void send(long[] hsIds, VoltMessage message) {
-            }
-
-            @Override
-            public void deliver(VoltMessage message) {
-                networkLog.info("No-op mailbox(" + CoreUtils.hsIdToString(hsId) + ") dropped message " + message);
-            }
-
-            @Override
-            public void deliverFront(VoltMessage message) {
-            }
-
-            @Override
-            public VoltMessage recv() {
-                return null;
-            }
-
-            @Override
-            public VoltMessage recvBlocking() {
-                return null;
-            }
-
-            @Override
-            public VoltMessage recvBlocking(long timeout) {
-                return null;
-            }
-
-            @Override
-            public VoltMessage recv(Subject[] s) {
-                return null;
-            }
-
-            @Override
-            public VoltMessage recvBlocking(Subject[] s) {
-                return null;
-            }
-
-            @Override
-            public VoltMessage recvBlocking(Subject[] s, long timeout) {
-                return null;
-            }
-
-            @Override
-            public long getHSId() {
-                return 0L;
-            }
-
-            @Override
-            public void setHSId(long hsId) {
-            }
-
-        });
+        addMailbox(hsId, new DummyMailbox(hsId));
         return hsId;
     }
 
@@ -1498,10 +1447,13 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         synchronized (m_mapLock) {
             ImmutableMap.Builder<Long, Mailbox> b = ImmutableMap.builder();
             for (Map.Entry<Long, Mailbox> e : m_siteMailboxes.entrySet()) {
-                if (e.getKey().equals(hsId)) {
-                    continue;
+                if (hsId == e.getKey()) {
+                    if (m_config.respondUnknownSite.contains(CoreUtils.getSiteIdFromHSId(hsId))) {
+                        b.put(e.getKey(), new DummyMailbox(e.getKey(), true));
+                    }
+                } else {
+                    b.put(e.getKey(), e.getValue());
                 }
-                b.put(e.getKey(), e.getValue());
             }
             m_siteMailboxes = b.build();
         }
@@ -1893,6 +1845,95 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         ForeignHost fh = m_foreignHosts.get(failedHostId);
         if (fh != null) {
             fh.updateDeadReportCount();
+        }
+    }
+
+    /**
+     * Dummy mailbox which either drops the message if a response isn't expected or responds with {@link UnknownSiteId}
+     */
+    private final class DummyMailbox implements Mailbox {
+        private final boolean m_respond;
+        private final long m_hsId;
+
+        DummyMailbox(long hsId, boolean respond) {
+            m_respond = respond;
+            m_hsId = hsId;
+        }
+
+        DummyMailbox(long hsId) {
+            this(hsId, m_config.respondUnknownSite.contains(CoreUtils.getSiteIdFromHSId(hsId)));
+        }
+
+        @Override
+        public void send(long hsId, VoltMessage message) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void send(long[] hsIds, VoltMessage message) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void deliver(VoltMessage message) {
+            if (m_respond) {
+                if (networkLog.isDebugEnabled()) {
+                    networkLog.debug(
+                            String.format("Message %s was sent to a site which has not been registered: %s from %s",
+                                    message.getClass().getSimpleName(), CoreUtils.hsIdToString(m_hsId),
+                                    CoreUtils.hsIdToString(message.m_sourceHSId)));
+                }
+                UnknownSiteId response = new UnknownSiteId(message);
+                response.m_sourceHSId = m_hsId;
+                HostMessenger.this.send(message.m_sourceHSId, response);
+            } else {
+                networkLog.info("No-op mailbox(" + CoreUtils.hsIdToString(m_hsId) + ") dropped message " + message);
+            }
+        }
+
+        @Override
+        public void deliverFront(VoltMessage message) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public VoltMessage recv() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public VoltMessage recvBlocking() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public VoltMessage recvBlocking(long timeout) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public VoltMessage recv(Subject[] s) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public VoltMessage recvBlocking(Subject[] s) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public VoltMessage recvBlocking(Subject[] s, long timeout) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public long getHSId() {
+            return m_hsId;
+        }
+
+        @Override
+        public void setHSId(long hsId) {
+            throw new UnsupportedOperationException();
         }
     }
 }

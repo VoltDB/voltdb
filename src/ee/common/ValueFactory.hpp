@@ -130,6 +130,31 @@ public:
         return retval;
     }
 
+    // Constructs a geography point NValue from value
+    static inline NValue getGeographyPointValue(const GeographyPointValue* value) {
+        NValue retval(ValueType::tPOINT);
+        if (value == nullptr) {
+            retval.setNull();
+        } else {
+            retval.getGeographyPointValue() = *value;
+        }
+        return retval;
+    }
+
+    // Constructs a geography NValue from value using pool if provided
+    static inline NValue getGeographyValue(const Polygon* value, Pool* pool = nullptr) {
+        NValue retval(ValueType::tGEOGRAPHY);
+        if (value == nullptr) {
+            retval.setNull();
+        } else {
+            size_t len = value->serializedLength();
+            char *data = retval.allocateValueStorage(len, pool == nullptr ? NValue::getTempStringPool() : pool);
+            SimpleOutputSerializer output(data, len);
+            value->saveToBuffer(output);
+        }
+        return retval;
+    }
+
     /** Returns valuetype = tNULL. Careful with this! */
     static NValue getNullValue() {
         return NValue::getNullValue();

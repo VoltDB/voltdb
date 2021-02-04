@@ -180,6 +180,20 @@ public:
         return retval;
     }
 
+    /**
+     * Read an int encoded as a variable length value
+     */
+    inline int32_t readVarInt() {
+        return readVarInt<int32_t>();
+    }
+
+    /**
+     * Read a long encoded as a variable length value
+     */
+    inline int64_t readVarLong() {
+        return readVarInt<int64_t>();
+    }
+
     /** Returns a pointer to the internal data buffer, advancing the read position by length. */
     const char* getRawPointer(size_t length) {
         const char* result = m_current;
@@ -240,6 +254,32 @@ public:
     }
 
 private:
+    /**
+     * Read an integer type encoded as a variable length value which was encoded with zigzag encoding
+     *
+     * https://en.wikipedia.org/wiki/Variable-length_quantity#Zigzag_encoding
+     */
+    template <typename type>
+    inline type readVarInt() {
+        // How many bits to increment the shift by for each byte in the value
+        const int32_t shiftIncrement = 7;
+        // The maximum shifts allowed for this type
+        const int32_t maxShift = (sizeof(type) * CHAR_BIT / shiftIncrement) * shiftIncrement;
+
+        uint64_t value = 0;
+        int shift = 0;
+        long b;
+        while (((b = readByte()) & 0x80) != 0) {
+            value |= (b & 0x7f) << shift;
+            shift += shiftIncrement;
+            if (shift > maxShift) {
+                throw SerializableEEException("Variable length integer value too large");
+            }
+        }
+        value |= b << shift;
+        return static_cast<type>(((value >> 1) ^ -(value & 1)));
+    }
+
     template <typename T>
     T readPrimitive() {
         T value;
@@ -274,6 +314,25 @@ class SerializeOutput {
             expand(minimum_desired);
         }
         vassert(m_capacity >= minimum_desired);
+    }
+
+    /**
+     * Convert a 64bit value into a zigzag encoding.
+     * https://en.wikipedia.org/wiki/Variable-length_quantity#Zigzag_encoding
+     */
+    inline static uint64_t zigZagLong(int64_t value) {
+        return (value << 1) ^ (value >> 63);
+    }
+
+    /**
+     * Calculate the number of bytes required to serialize a zig zag encoded value
+     */
+    inline static int sizeOfZigZaggedLong(uint64_t zigZagValue) {
+        int bytes = 1;
+        while (zigZagValue >>= 7) {
+            ++bytes;
+        }
+        return bytes;
     }
 
     // Beginning of the buffer.
@@ -395,6 +454,35 @@ public:
         int64_t data;
         memcpy(&data, &value, sizeof(data));
         return writePrimitiveAt(position, htonll(data));
+    }
+
+    /**
+     * Write a long as a variable length value using zigzag encoding
+     *
+     * https://en.wikipedia.org/wiki/Variable-length_quantity#Zigzag_encoding
+     */
+    inline size_t writeVarLong(int64_t value) {
+        uint64_t v = zigZagLong(value);
+        assureExpand(sizeOfZigZaggedLong(v));
+
+        const int mask  = 0x7F;
+        m_buffer[m_position] = v & mask;
+        size_t written = 1;
+
+        while (v >>= 7) {
+            m_buffer[m_position + written - 1] |= 0x80;
+            m_buffer[m_position + written++] = (v & mask);
+        }
+        m_position += written;
+
+        return written;
+    }
+
+    /**
+     * Calculate the size in bytes to serialize value as a variable length value
+     */
+    inline static size_t sizeOfVarLong(int64_t value) {
+        return sizeOfZigZaggedLong(zigZagLong(value));
     }
 
     // this explicitly accepts char* and length (or ByteArray)
@@ -592,9 +680,14 @@ public:
     }
 
 protected:
-    /** Resize this buffer to contain twice the amount desired. */
+    /** Resize this buffer to contain twice the amount desired or add 32MB to prevent constant doubling */
     virtual void expand(size_t minimum_desired) {
-        size_t next_capacity = (m_bytes.length() + minimum_desired) * 2;
+        size_t next_capacity;
+        if (minimum_desired > INITIAL_SIZE * 4) {
+            next_capacity = m_bytes.length() + INITIAL_SIZE * 4;
+        } else {
+            next_capacity = minimum_desired * 2;
+        }
         vassert(next_capacity < static_cast<size_t>(std::numeric_limits<int>::max()));
         m_bytes.copyAndExpand(static_cast<int>(next_capacity));
         initialize(m_bytes.data(), next_capacity);

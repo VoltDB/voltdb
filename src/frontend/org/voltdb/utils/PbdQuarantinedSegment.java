@@ -173,7 +173,7 @@ class PbdQuarantinedSegment<M> extends PBDSegment<M> {
         }
 
         @Override
-        public BBContainer poll(OutputContainerFactory factory) {
+        public BBContainer poll(OutputContainerFactory factory, int maxSize) {
             return null;
         }
 

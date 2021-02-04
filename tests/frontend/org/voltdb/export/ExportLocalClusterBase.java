@@ -119,7 +119,13 @@ public class ExportLocalClusterBase extends JUnit4LocalClusterTest {
          f.mkdirs();
     }
 
-    protected void insertToStream(String streamName, int startPkey, int numberOfRows, Client client, Object[] params) throws Exception {
+    protected void insertToStream(String streamName, int startPkey, int numberOfRows, Client client, Object[] params)
+            throws Exception {
+        insertToStream(streamName, startPkey, numberOfRows, client, params, true);
+    }
+
+    protected void insertToStream(String streamName, int startPkey, int numberOfRows, Client client, Object[] params,
+            boolean partitioned) throws Exception {
         String procName = streamName.toUpperCase() + ".insert";
         HashSet<String> errors = new HashSet<>();
         CountDownLatch latch = new CountDownLatch(numberOfRows);
@@ -127,7 +133,7 @@ public class ExportLocalClusterBase extends JUnit4LocalClusterTest {
         for (int i = startPkey; i < startPkey + numberOfRows; i++) {
             params[1] = i; // Pkey column
             if (m_verifier != null) {
-                m_verifier.addRow(client, streamName, i, params);
+                m_verifier.addRow(client, streamName, partitioned ? i : null, params);
             }
             client.callProcedure(cr -> {
                 latch.countDown();
@@ -143,6 +149,11 @@ public class ExportLocalClusterBase extends JUnit4LocalClusterTest {
     }
 
     protected void insertToStreamWithNewColumn(String streamName, int startPkey, int numberOfRows, Client client, Object[] params) throws Exception {
+        insertToStreamWithNewColumn(streamName, startPkey, numberOfRows, client, params, true);
+    }
+
+    protected void insertToStreamWithNewColumn(String streamName, int startPkey, int numberOfRows, Client client,
+            Object[] params, boolean partitioned) throws Exception {
         String procName = streamName.toUpperCase() + ".insert";
         HashSet<String> errors = new HashSet<>();
         CountDownLatch latch = new CountDownLatch(numberOfRows);
@@ -151,7 +162,7 @@ public class ExportLocalClusterBase extends JUnit4LocalClusterTest {
             params[1] = i; // Pkey column
             params[2] = i; // new column
             if (m_verifier != null) {
-                m_verifier.addRow(client, streamName, i, params);
+                m_verifier.addRow(client, streamName, partitioned ? i : null, params);
             }
             client.callProcedure(cr -> {
                 latch.countDown();

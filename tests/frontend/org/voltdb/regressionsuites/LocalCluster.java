@@ -62,6 +62,7 @@ import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.export.ExporterVersion;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CommandLine;
+import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
@@ -122,6 +123,8 @@ public class LocalCluster extends VoltServerConfig {
     int m_replicationPort = -1;
     private String m_drPublicHost;
     private int m_drPublicPort = -1;
+    private String m_topicsPublicHost;
+    private int m_topicsPublicPort = -1;
 
     // log message pattern match results by host
     private Map<Integer, Set<String>> m_logMessageMatchResults = new ConcurrentHashMap<>();
@@ -634,6 +637,14 @@ public class LocalCluster extends VoltServerConfig {
         m_drPublicPort = port;
     }
 
+    public void setTopicsPublicHost(String host) {
+        m_topicsPublicHost = host;
+    }
+
+    public void setTopicsPublicPort(int port) {
+        m_topicsPublicPort = port;
+    }
+
     private void startLocalServer(int hostId, boolean clearLocalDataDirectories) throws IOException {
         startLocalServer(hostId, templateCmdLine.internalPort(), clearLocalDataDirectories, templateCmdLine.m_startAction);
     }
@@ -676,6 +687,7 @@ public class LocalCluster extends VoltServerConfig {
             setDrPublicInterface(cmdln);
             portGenerator.nextReplicationPort();
             portGenerator.nextReplicationPort();
+            setTopicsPublicInterface(cmdln);
         }
         else {
             cmdln = m_cmdLines.get(hostId);
@@ -1184,7 +1196,7 @@ public class LocalCluster extends VoltServerConfig {
             }
 
             setDrPublicInterface(cmdln);
-
+            setTopicsPublicInterface(cmdln);
             // add the ipc ports
             if (m_target == BackendTarget.NATIVE_EE_IPC) {
                 // set 1 port for the EE process
@@ -1343,6 +1355,13 @@ public class LocalCluster extends VoltServerConfig {
         }
         if (m_drPublicPort != -1) {
             cmdln.m_drPublicPort = m_drPublicPort;
+        }
+    }
+
+    private void setTopicsPublicInterface(CommandLine cmdln) {
+        if (m_topicsPublicHost != null) {
+            cmdln.m_topicsPublicHostPort = MiscUtils.getHostAndPortFromInterfaceSpec(m_topicsPublicHost, "",
+                    m_topicsPublicPort != -1 ? m_topicsPublicPort : VoltDB.DEFAULT_TOPICS_PORT);
         }
     }
 

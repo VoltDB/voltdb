@@ -39,6 +39,7 @@ public class SaveRestoreBase extends RegressionSuite {
     protected static final String TESTNONCE = "testnonce";
     protected static final String MAGICNONCE = "MANUAL";
     protected static final String JAR_NAME = "sysproc-threesites.jar";
+    private static boolean s_cleanUp = true;
 
     public SaveRestoreBase(String s) {
         super(s);
@@ -47,16 +48,15 @@ public class SaveRestoreBase extends RegressionSuite {
     @Override
     public void setUp() throws Exception
     {
-        setUp(TESTNONCE);
-    }
-
-    public void setUp(String nonce) throws Exception
-    {
         File tempDir = new File(TMPDIR);
         if (!tempDir.exists()) {
             assertTrue(tempDir.mkdirs());
         }
-        deleteTestFiles(nonce);
+        if (s_cleanUp) {
+            // Clenaup during the first setUp for the suite
+            deleteTestFiles(TESTNONCE);
+            s_cleanUp = false;
+        }
         super.setUp();
         DefaultSnapshotDataTarget.m_simulateFullDiskWritingChunk = false;
         DefaultSnapshotDataTarget.m_simulateFullDiskWritingHeader = false;
@@ -66,13 +66,10 @@ public class SaveRestoreBase extends RegressionSuite {
     @Override
     public void tearDown() throws Exception
     {
-        tearDown(TESTNONCE);
-    }
-
-    public void tearDown(String nonce) throws Exception
-    {
         super.tearDown();
-        deleteTestFiles(nonce);
+        if (m_completeShutdown) {
+            deleteTestFiles(TESTNONCE);
+        }
         System.gc();
         System.runFinalization();
     }

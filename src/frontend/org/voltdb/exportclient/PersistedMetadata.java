@@ -26,6 +26,7 @@ import org.voltcore.utils.DeferredSerialization;
 import org.voltdb.catalog.Property;
 import org.voltdb.catalog.Table;
 import org.voltdb.catalog.Topic;
+import org.voltdb.e3.topics.TopicProperties;
 import org.voltdb.utils.SerializationHelper;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -74,15 +75,23 @@ public class PersistedMetadata implements DeferredSerialization {
      */
     public PersistedMetadata(Table table, Topic topic, int partitionId, long initialGenerationId, long generationId) {
         assert table != null || topic != null;
+
+        // Use 'topic' schema (i.e. an empty ExportRow) for opaque topics
+        boolean useTopicSchema = table == null;
         if (topic == null) {
             m_topicProperties = ImmutableMap.of();
         }
         else {
             m_topicProperties = StreamSupport.stream(topic.getProperties().spliterator(), false)
                     .collect(Collectors.toMap(Property::getTypeName, Property::getValue));
+
+            // Use 'topic' schema if non-opaque topic is using inline encoding.
+            if (!topic.getIsopaque()) {
+                useTopicSchema = TopicProperties.Key.TOPIC_STORE_ENCODED.get(m_topicProperties);
+            }
         }
-        m_schema = table != null ? ExportRowSchema.create(table, partitionId, initialGenerationId, generationId)
-                : ExportRowSchema.create(topic, partitionId, initialGenerationId, generationId);
+        m_schema = useTopicSchema ? ExportRowSchema.create(topic, partitionId, initialGenerationId, generationId)
+                : ExportRowSchema.create(table, partitionId, initialGenerationId, generationId);
     }
 
     private PersistedMetadata(Map<String, String> topicProperties, ExportRowSchema schema) {

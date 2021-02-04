@@ -125,8 +125,6 @@ public class TestExportInsertIntoSelectSuite extends TestExportBaseSocketExport 
         boolean isReplicatedSource = source.contains("REPL");
         boolean isReplicatedTarget = exportTarget.contains("REPL");
         boolean isSinglePartitionProcedure = insertSelectProc.contains("SP");
-        m_streamNames.clear();
-        m_streamNames.add(exportTarget);
 
         int i = 0;
         int tableRows = 0;
@@ -178,13 +176,8 @@ public class TestExportInsertIntoSelectSuite extends TestExportBaseSocketExport 
             numberOfInserts = cr.getResults()[0].asScalarLong();
         }
         assertEquals(tableRows, numberOfInserts);
-        System.out.println("Again Seen Verifiers: " + m_verifier.m_seen_verifiers);
-
         assertEquals(tableRows, m_verifier.getExportedDataCount());
-
-        // Wait until TUPLE_COUNT is populated in the stats
-        TestExportBaseSocketExport.waitForExportAllRowsDelivered(client, m_streamNames, DEFAULT_DELAY_MS, true, true);
-        m_verifier.verifyRows();
+        m_verifier.waitForTuplesAndVerify(client);
     }
 
     public void testReadFromStreamInsertIntoSelect() throws Exception {
@@ -242,14 +235,6 @@ public class TestExportInsertIntoSelectSuite extends TestExportBaseSocketExport 
         System.out.println("Testing insert from partitioned table to partitioned export stream");
         doInsertIntoSelectTest(EXPORT_TARGET_PART, SOURCE_PART, "TableInsertNoNulls", "ExportInsertFromTableSelectSP");
     }
-
-    // Inserting from a replicated table into a replicated stream should be allowed but is rejected with the following error:
-    //[ExportInsertFromTableSelectMP.class]: Failed to plan for statement (i_insert_select_repl) "INSERT INTO S_ALLOW_NULLS_REPL SELECT * FROM NO_NULLS_REPL;". Error: "The target table for an INSERT INTO ... SELECT statement is an stream with no partitioning column defined.  This is not currently supported.  Please define a partitioning column for this stream to use it with INSERT INTO ... SELECT."
-//    public void testReplTableToReplStream() throws Exception {
-//        System.out.println("\n\n------------------------------------------");
-//        System.out.println("Testing insert from partitioned table to partitioned export stream");
-//        doInsertIntoSelectTest(EXPORT_TARGET_REPL, SOURCE_REPL, "TableInsertNoNullsRepl", "ExportInsertFromTableSelectMP");
-//    }
 
     public TestExportInsertIntoSelectSuite(final String name) {
         super(name);

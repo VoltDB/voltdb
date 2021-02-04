@@ -27,7 +27,6 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.voltdb.BackendTarget;
-import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NullCallback;
@@ -36,7 +35,6 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
 import org.voltdb.regressionsuites.TestSQLTypesSuite;
-import org.voltdb.utils.MiscUtils;
 
 /**
  * End to end Export tests using the injected custom export.
@@ -90,7 +88,6 @@ public class TestExportRollback extends TestExportBaseSocketExport {
         System.out.println("testExportRollback");
         final Client client = getClient();
         String targetStream = "S_NO_NULLS";
-        m_streamNames.add(targetStream);
 
         final double rollbackPerc = 0.15;
         long seed = 0;
@@ -137,7 +134,7 @@ public class TestExportRollback extends TestExportBaseSocketExport {
         client.drain();
         System.out.println("Client Drained....");
 
-        quiesceAndVerifyTarget(client, m_streamNames, m_verifier);
+        m_verifier.waitForTuplesAndVerify(client);
     }
 
     public TestExportRollback(final String name) {

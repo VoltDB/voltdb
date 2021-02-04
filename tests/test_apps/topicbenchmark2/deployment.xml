@@ -1,22 +1,27 @@
 <?xml version="1.0"?>
-<!-- IMPORTANT: This file is an auto-generated default deployment configuration.
-                Changes to this file will be overwritten. Copy it elsewhere if you
-                want to use it as a starting point for a custom configuration. -->
 <deployment>
-   <cluster hostcount="1" />
+   <cluster hostcount="1"  sitesperhost="24" />
+   <!--  multi-node config  -->
+   <!--  cluster hostcount="3" sitesperhost="24" kfactor="1" / -->
    <systemsettings>
       <flushinterval minimum="10">
-          <export interval="10" />
-          <dr interval="500" />
+          <export interval="100" />
       </flushinterval>
    </systemsettings>
-   <topics enabled="true">
+    <threadpools>
+      <!-- make this 2 * number of cores (32 cores on volt16)
+      as some subscribers can block on I/O while others are transcoding poll results -->
+      <pool name="topicbenchmark" size="64" />
+    </threadpools>
+    <topics enabled="true" threadpool="topicbenchmark">
      <properties>
        <property name="port">9095</property>
+       <!--  should be 3/4 number of cores (32 cores on volt16)  -->
+       <property name="network.thread.count">24</property>
      </properties>
      <profiles>
        <profile name="topicbenchmark">
-         <retention policy="time" limit="1 hr" />
+         <retention policy="time" limit="1 dy" />
        </profile>
      </profiles>
    </topics>

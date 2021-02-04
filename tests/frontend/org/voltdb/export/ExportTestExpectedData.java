@@ -27,9 +27,12 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
@@ -37,11 +40,13 @@ import org.voltdb.client.ClientImpl;
 import org.voltdb.export.TestExportBaseSocketExport.ServerListener;
 import org.voltdb.exportclient.ExportDecoderBase;
 
+import com.google_voltpatches.common.collect.Maps;
+import com.google_voltpatches.common.util.concurrent.Uninterruptibles;
+
 public class ExportTestExpectedData {
-    // hash table name + partition to verifier
-    public final Map<String, ExportToSocketTestVerifier> m_verifiers = new HashMap<>();
-    public final Map<String, Boolean> m_seen_verifiers = new HashMap<>();
-    public final Map<String, Integer> m_expectedRowCount = new HashMap<>();
+
+    // Maps stream name to current information about the stream including validators for what is in each partition
+    private final Map<String, StreamInformation> m_streams = new ConcurrentHashMap<>();
 
     private final Map<String, ServerListener> m_serverSockets;
     // TODO: support per-table replicated stream check
@@ -59,50 +64,106 @@ public class ExportTestExpectedData {
         m_copies = copies;
     }
 
-    public synchronized void addRow(Client client, String tableName, Object partitionHash, Object[] data) {
-        long partition = getPartitionFromHashinator(client, partitionHash);
-        ExportToSocketTestVerifier verifier = m_verifiers.get(tableName + partition);
-        if (verifier == null) {
-            verifier = new ExportToSocketTestVerifier(tableName, (int) partition);
-            m_verifiers.put(tableName + partition, verifier);
-            m_seen_verifiers.put(tableName + partition, Boolean.TRUE);
-        }
-        verifier.addRow(data);
-        Integer count = m_expectedRowCount.get(tableName);
-        if (count == null) {
-            m_expectedRowCount.put(tableName,1);
-        }
-         else {
-            m_expectedRowCount.put(tableName,count+1);
-        }
+    public void addRow(Client client, String tableName, Object partitionValue, Object[] data) {
+        m_streams.computeIfAbsent(tableName, StreamInformation::new).addRow(client, partitionValue, data);
     }
 
     // All export tests using verifiers should ensure their clients have
     // an initialized hashinator, otherwise some calls to addRow() will be directed to
     // a partitionId of -1
-    private long getPartitionFromHashinator(Client client, Object partitionHash) {
+    private static long getPartitionFromHashinator(Client client, Object partitionValue) {
         long partition = ((ClientImpl) client).getPartitionForParameter(
-                VoltType.typeFromObject(partitionHash).getValue(), partitionHash);
+                (partitionValue == null ? VoltType.INTEGER : VoltType.typeFromObject(partitionValue)).getValue(),
+                partitionValue);
         if (partition != -1) {
             return partition;
         }
         int sleptTimes = 0;
-        while (!((ClientImpl) client).isHashinatorInitialized() && sleptTimes < 60000) {
-            try {
-                Thread.sleep(1);
-                sleptTimes++;
-            } catch (InterruptedException ex) {
-                ;
-            }
+        while (!((ClientImpl) client).isHashinatorInitialized() && sleptTimes < 6000) {
+            Uninterruptibles.sleepUninterruptibly(10, TimeUnit.MILLISECONDS);
+            ++sleptTimes;
         }
-        assertTrue(sleptTimes < 60000);
+        assertTrue(sleptTimes < 6000);
         partition = ((ClientImpl) client).getPartitionForParameter(
-                VoltType.typeFromObject(partitionHash).getValue(), partitionHash);
+                VoltType.typeFromObject(partitionValue).getValue(), partitionValue);
         assertTrue(partition != -1);
         return partition;
     }
 
-    public synchronized void verifyRows() throws Exception {
+    public void dropStream(String stream) {
+        m_streams.remove(stream);
+    }
+
+    /**
+     * Wait for all rows added to this verifier or inserted by this verifier to be exported by the cluster and then
+     * verify that the expected rows were received.
+     * <p>
+     * Note: default timeout is {@link TestExportBaseSocketExport#DEFAULT_TIMEOUT}
+     *
+     * @param client to use to query cluster
+     * @throws Exception
+     */
+    public void waitForTuplesAndVerify(Client client) throws Exception {
+        waitForTuplesAndVerify(client, TestExportBaseSocketExport.DEFAULT_TIMEOUT);
+    }
+
+    /**
+     * Wait for all rows added to this verifier or inserted by this verifier to be exported by the cluster and then
+     * verify that the expected rows were received.
+     *
+     * @param client  to use to query cluster
+     * @param timeout to wait for all rows to be delivered
+     * @throws Exception
+     */
+    public void waitForTuplesAndVerify(Client client, Duration timeout) throws Exception {
+        waitForTuples(client, true, timeout);
+        verifyRows();
+    }
+
+    /**
+     * Wait for the number of tuples added to this verifier to be reflected in the stats retrieved from {@code client}
+     * <p>
+     * Note always waits for pending tuples to be 0
+     * <p>
+     * Note: default timeout is {@link TestExportBaseSocketExport#DEFAULT_TIMEOUT}
+     *
+     * @param client  to use to query cluster
+     * @param timeout to wait for all tuples to be delivered
+     * @throws Exception
+     */
+    public void waitForTuples(Client client) throws Exception {
+        waitForTuples(client, TestExportBaseSocketExport.DEFAULT_TIMEOUT);
+    }
+
+    /**
+     * Wait for the number of tuples added to this verifier to be reflected in the stats retrieved from {@code client}
+     * <p>
+     * Note always waits for pending tuples to be 0
+     *
+     * @param client  to use to query cluster
+     * @param timeout to wait for all tuples to be delivered
+     * @throws Exception
+     */
+    public void waitForTuples(Client client, Duration timeout) throws Exception {
+        waitForTuples(client, true, timeout);
+    }
+
+    /**
+     * Wait for the number of tuples added to this verifier to be reflected in the stats retrieved from {@code client}
+     *
+     * @param client         to use to query cluster
+     * @param waitForPending If {@code true} this will wait for pending tuples to be 0
+     * @param timeout        to wait for all tuples to be delivered
+     * @throws Exception
+     */
+    public void waitForTuples(Client client, boolean waitForPending, Duration timeout) throws Exception {
+        TestExportBaseSocketExport.waitForExportRowsByPartitionToBeDelivered(client,
+                Maps.transformValues(m_streams,
+                        i -> Maps.transformValues(i.m_verifiers, ExportToSocketTestVerifier::getTotalCount)),
+                waitForPending, timeout);
+    }
+
+    public void verifyRows() throws Exception {
         /*
          * Process the row data in each table
          */
@@ -111,7 +172,6 @@ public class ExportTestExpectedData {
             System.out.println("Processing Table:" + tableName);
 
             String next[] = null;
-            assertEquals(getExpectedRowCount(tableName), f.getValue().getReceivedRowCount());
             if (!m_exact) {
                 continue;
             }
@@ -124,7 +184,7 @@ public class ExportTestExpectedData {
                     }
                     System.out.println(sb);
                 }
-                ExportToSocketTestVerifier verifier = m_verifiers.get(tableName + partitionId);
+                ExportToSocketTestVerifier verifier = getVerifier(tableName, partitionId);
                 Long rowSeq = Long.parseLong(next[ExportDecoderBase.INTERNAL_FIELD_COUNT]);
 
                 // verify occurrence if replicated
@@ -145,15 +205,36 @@ public class ExportTestExpectedData {
         }
     }
 
-    private int getExpectedRowCount(String tableName) {
-        return m_expectedRowCount.containsKey(tableName) ? m_expectedRowCount.get(tableName) : 0;
+    private ExportToSocketTestVerifier getVerifier(String stream, int partition) {
+        StreamInformation info = m_streams.get(stream);
+        return info == null ? null : info.getVerifier(partition);
     }
 
     public long getExportedDataCount() {
-        long retval = 0;
-        for (ExportToSocketTestVerifier verifier : m_verifiers.values()) {
-            retval += verifier.getSize();
+        return m_streams.values().stream().mapToLong(StreamInformation::getTupleCount).sum();
+    }
+
+    private static final class StreamInformation {
+        private long m_tupleCount;
+        final String m_name;
+        final Map<Integer, ExportToSocketTestVerifier> m_verifiers = new HashMap<>();
+
+        StreamInformation(String name) {
+            m_name = name;
         }
-        return retval;
+
+        synchronized void addRow(Client client, Object partitionValue, Object[] row) {
+            int partition = (int) getPartitionFromHashinator(client, partitionValue);
+            m_verifiers.computeIfAbsent(partition, p -> new ExportToSocketTestVerifier(m_name, partition)).addRow(row);
+            ++m_tupleCount;
+        }
+
+        synchronized long getTupleCount() {
+            return m_tupleCount;
+        }
+
+        synchronized ExportToSocketTestVerifier getVerifier(Integer partition) {
+            return m_verifiers.get(partition);
+        }
     }
 }

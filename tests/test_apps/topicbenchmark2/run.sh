@@ -3,6 +3,10 @@
 APPNAME="topicbenchmark2"
 COUNT=10000
 
+# Large memory for running client on performance systems e.g. volt16a
+# see volt16a_ functions below
+VOLT16A_MEM="-Xms64g -Xmx100g"
+
 # find voltdb binaries in either installation or distribution directory.
 if [ -n "$(which voltdb 2> /dev/null)" ]; then
     VOLTDB_BIN=$(dirname "$(which voltdb)")
@@ -22,7 +26,7 @@ fi
 source $VOLTDB_BIN/voltenv
 
 VOLTDB="$VOLTDB_BIN/voltdb"
-LOG4J="$VOLTDB_VOLTDB/log4j.xml"
+LOG4J="./log4j.xml"
 LICENSE="$VOLTDB_VOLTDB/license.xml"
 HOST="localhost"
 
@@ -32,6 +36,7 @@ CLIENTLIBS=$({ \
     \ls -1 "$VOLTDB_LIB"/slf4j-*.jar; \
     \ls -1 "$VOLTDB_LIB"/log4j-*.jar; \
     \ls -1 "$VOLTDB_LIB"/commons-lang3-*.jar; \
+    \ls -1 "$VOLTDB_VOLTDB"/voltdb-*.jar; \
 } 2> /dev/null | paste -sd ':' - )
 CLIENTCLASSPATH=$CLIENTLIBS:$CLIENTCLASSPATH
 
@@ -92,6 +97,8 @@ function server_common() {
     echo
     echo "VOLTDB_BIN=\"${VOLTDB_BIN}\""
     echo
+    echo "LOG4J=\"${LOG4J}\""
+    echo
     VOLTDB_OPTS="${VOLTDB_OPTS}" ${VOLTDB} start -H $HOST -l ${LICENSE}
 }
 
@@ -111,40 +118,99 @@ function run_benchmark_help() {
     java -classpath topicbenchmark2-client.jar:$CLIENTCLASSPATH topicbenchmark2.TopicBenchmark2 --help
 }
 
-# generic run on default topic
+# quick test run on default topic
 function run_benchmark() {
     srccompile-ifneeded
-    java -classpath topicbenchmark2-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
+    java -classpath topicbenchmark2-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file:${LOG4J} \
         topicbenchmark2.TopicBenchmark2 \
         --servers=localhost \
-        --count=500 \
+        --count=5000 \
+        --insertrate=1000 \
         --producers=2 \
-        --subscribers=2
+        --groups=2 \
+        --pollprogress=100 \
+        --groupmembers=2
 }
 
-# the following use a non-default topic as an example
 # producer-only, run once, make sure the (count * producers) matches the count of subscriber-only runs
+# note the use of insertrate to avoid timing out producers
 function run_producers() {
     srccompile-ifneeded
-    java -classpath topicbenchmark2-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
+    java -classpath topicbenchmark2-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file:$LOG4J \
         topicbenchmark2.TopicBenchmark2 \
         --servers=localhost \
         --topic=TEST_TOPIC \
-        --count=500 \
+        --count=500000 \
+        --insertrate=10000 \
         --producers=2 \
-        --subscribers=0
+        --groups=0
 }
 
 # subscriber-only, run once or more, make sure the count matches (count * producers) of the producer-only run
 function run_subscribers() {
     srccompile-ifneeded
-    java -classpath topicbenchmark2-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
+    java -classpath topicbenchmark2-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file:$LOG4J \
         topicbenchmark2.TopicBenchmark2 \
         --servers=localhost \
         --topic=TEST_TOPIC \
-        --count=1000 \
+        --count=1000000 \
         --producers=0 \
-        --subscribers=2
+        --groups=2 \
+        --groupmembers=2
+}
+
+# Large producer test case successfully tested on volt16a with 3-node cluster
+# Note the large memory and java 11
+function volt16a_producers() {
+    srccompile-ifneeded
+    export JAVA_HOME=/opt/jdk-11.0.2
+    /opt/jdk-11.0.2/bin/java ${VOLT16A_MEM} -classpath topicbenchmark2-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file:$LOG4J \
+        topicbenchmark2.TopicBenchmark2 \
+        --servers=volt16b,volt16c,volt16d \
+        --topic=TEST_TOPIC \
+        --count=10000000 \
+        --insertrate=1000000 \
+        --producers=100 \
+        --groups=0
+}
+
+# Large producer test case successfully tested on volt16a with 3-node cluster
+# Note the large memory and java 11
+function volt16a_subscribers() {
+    srccompile-ifneeded
+    export JAVA_HOME=/opt/jdk-11.0.2
+    /opt/jdk-11.0.2/bin/java ${VOLT16A_MEM} -classpath topicbenchmark2-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file:$LOG4J \
+        topicbenchmark2.TopicBenchmark2 \
+        --servers=volt16b,volt16c,volt16d \
+        --topic=TEST_TOPIC \
+        --count=1000000000 \
+        --producers=0 \
+        --groups=6 \
+        --groupmembers=10 \
+        --groupprefix=test6group10members01 \
+        --pollprogress=1000000 \
+        --sessiontimeout=45 \
+        --verifier=fast \
+        --verification=random
+}
+
+# Large producer/consumer test case successfully tested on volt16a with 3-node cluster
+# Note the large memory and java 11
+function volt16a_benchmark() {
+    srccompile-ifneeded
+    export JAVA_HOME=/opt/jdk-11.0.2
+    /opt/jdk-11.0.2/bin/java ${VOLT16A_MEM} -classpath topicbenchmark2-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file:$LOG4J \
+        topicbenchmark2.TopicBenchmark2 \
+        --servers=volt16b,volt16c,volt16d \
+        --count=20000000 \
+        --insertrate=1000000 \
+        --producers=50 \
+        --groups=6 \
+        --groupmembers=8 \
+        --groupprefix=test6group8members01 \
+        --pollprogress=1000000 \
+        --sessiontimeout=45 \
+        --verification=random
 }
 
 function shutdown() {

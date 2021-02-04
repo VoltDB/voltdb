@@ -41,7 +41,9 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.dtxn.LatencyStats;
 import org.voltdb.iv2.MpInitiator;
+import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.StatisticsTestSuiteBase;
+
 import junit.framework.Test;
 
 public class TestStatisticsSuite extends StatisticsTestSuiteBase {
@@ -716,6 +718,50 @@ public class TestStatisticsSuite extends StatisticsTestSuiteBase {
         // nine aggregate tables returned.  Assume that we have selected the right
         // subset of stats internally, just check that we get stuff.
         assertEquals(9, results.length);
+    }
+
+    /*
+     * Test that stats can be performed without error while a host is rejoining
+     */
+    public void testStatsDoesNotTimeoutDuringRejoin() throws Throwable {
+        System.out.println("\n\nTESTING " + getName() + "\n\n\n");
+
+        // Kill one host so it can rejoin
+        LocalCluster cluster = (LocalCluster) m_config;
+        cluster.killSingleHost(2);
+
+        // Give the cluster time to react
+        Thread.sleep(200);
+
+        Client client = getFullyConnectedClient();
+
+        class StatThread extends Thread {
+            volatile boolean m_run = true;
+            Throwable m_error = null;
+
+            @Override
+            public void run() {
+                try {
+                    while (m_run) {
+                        client.callProcedure("@Statistics", "memory", 0);
+                    }
+                } catch (Throwable t) {
+                    m_error = t;
+                }
+            }
+        }
+
+        StatThread st = new StatThread();
+        st.start();
+
+        assertTrue(cluster.recoverOne(2, 0));
+
+        st.m_run = false;
+        st.join();
+
+        if (st.m_error != null) {
+            throw st.m_error;
+        }
     }
 
     //

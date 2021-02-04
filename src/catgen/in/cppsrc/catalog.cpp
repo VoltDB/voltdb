@@ -371,15 +371,15 @@ void Catalog::hexDecodeString(const string &hexString, char *buffer) {
     buffer[i] = '\0';
 }
 
-/** pass in a buffer at least (2*len+1) */
+/** pass in a buffer at least (2*len+1) encode to uppercase hex as expected by hexCharToInt() */
 void Catalog::hexEncodeString(const char *string, char *buffer, size_t len) {
     vassert(buffer);
     int32_t i = 0;
     for (; i < len; i++) {
         char ch[2];
-        snprintf(ch, 2, "%x", (string[i] >> 4) & 0xF);
+        snprintf(ch, 2, "%X", (string[i] >> 4) & 0xF);
         buffer[i * 2] = ch[0];
-        snprintf(ch, 2, "%x", string[i] & 0xF);
+        snprintf(ch, 2, "%X", string[i] & 0xF);
         buffer[(i * 2) + 1] = ch[0];
     }
     buffer[i*2] = '\0';

@@ -74,6 +74,7 @@ import org.voltdb.snmp.SnmpTrapSender;
 import org.voltdb.task.TaskManager;
 import org.voltdb.utils.HTTPAdminListener;
 
+import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.MoreExecutors;
@@ -141,11 +142,7 @@ public class MockVoltDB implements VoltDBInterface
             cluster.setHeartbeattimeout(10000);
             assert(cluster != null);
 
-            try {
-                m_hostMessenger.start();
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
+            m_hostMessenger.start();
             VoltZK.createPersistentZKNodes(m_hostMessenger.getZK());
             m_hostMessenger.getZK().create(
                     VoltZK.cluster_metadata + "/" + m_hostMessenger.getHostId(),
@@ -162,8 +159,10 @@ public class MockVoltDB implements VoltDBInterface
                     null);
 
             m_statsAgent = new StatsAgent();
-            m_statsAgent.registerMailbox(m_hostMessenger,
-                    m_hostMessenger.getHSIdForLocalSite(HostMessenger.STATS_SITE_ID));
+            long hsId = m_hostMessenger.getHSIdForLocalSite(HostMessenger.STATS_SITE_ID);
+            // Use generate to install the dummy mailbox which is expected to be there by OpsAgent.registerMailbox
+            m_hostMessenger.generateMailboxId(hsId);
+            m_statsAgent.registerMailbox(m_hostMessenger, hsId);
             for (MailboxType type : MailboxType.values()) {
                 m_mailboxMap.put(type, new LinkedList<MailboxNodeContent>());
             }
@@ -171,6 +170,7 @@ public class MockVoltDB implements VoltDBInterface
                     new MailboxNodeContent(m_hostMessenger.getHSIdForLocalSite(HostMessenger.STATS_SITE_ID), null));
             m_siteTracker = new SiteTracker(m_hostId, m_mailboxMap);
         } catch (Exception e) {
+            Throwables.throwIfUnchecked(e);
             throw new RuntimeException(e);
         }
     }

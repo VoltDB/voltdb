@@ -42,7 +42,7 @@ public class StatisticsTestSuiteBase extends SaveRestoreBase {
 
     protected final static int SITES = 2;
     protected final static int HOSTS = 3;
-    protected final static int KFACTOR = MiscUtils.isPro() ? 1 : 0;
+    protected final static int KFACTOR = 1;
     protected final static int PARTITIONS = (SITES * HOSTS) / (KFACTOR + 1);
     protected final static String jarName = "statistics-cluster.jar";
     protected final static boolean hasLocalServer = false;
@@ -182,7 +182,8 @@ public class StatisticsTestSuiteBase extends SaveRestoreBase {
         assertEquals(PARTITIONS, partsSeen.size());
     }
 
-    static public Test suite(Class classzz, boolean isCommandLogTest) throws IOException {
+    static public Test suite(Class<? extends StatisticsTestSuiteBase> classzz, boolean isCommandLogTest)
+            throws IOException {
         return suite(classzz, isCommandLogTest, -1);
     }
 
@@ -191,16 +192,17 @@ public class StatisticsTestSuiteBase extends SaveRestoreBase {
     // helpers to allow multiple backends.
     // JUnit magic that uses the regression suite helper classes.
     //
-    static public Test suite(Class classzz, boolean isCommandLogTest, int replicationPort) throws IOException {
+    static public Test suite(Class<? extends StatisticsTestSuiteBase> classzz, boolean isCommandLogTest,
+            int replicationPort) throws IOException {
         return suite(classzz, isCommandLogTest, replicationPort, MultiConfigSuiteBuilder.ReuseServer.DEFAULT);
     }
 
-    static public Test suite(Class classzz, boolean isCommandLogTest, int replicationPort,
+    static public Test suite(Class<? extends StatisticsTestSuiteBase> classzz, boolean isCommandLogTest,
+            int replicationPort,
             MultiConfigSuiteBuilder.ReuseServer reuseServer) throws IOException {
-        VoltServerConfig config = null;
+        LocalCluster config = null;
 
-        MultiConfigSuiteBuilder builder
-                = new MultiConfigSuiteBuilder(classzz);
+        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(classzz);
 
         // Not really using TPCC functionality but need a database.
         // The testLoadMultipartitionTable procedure assumes partitioning
@@ -249,19 +251,19 @@ public class StatisticsTestSuiteBase extends SaveRestoreBase {
         config = new LocalCluster(jarName, StatisticsTestSuiteBase.SITES,
                 StatisticsTestSuiteBase.HOSTS, StatisticsTestSuiteBase.KFACTOR,
                 BackendTarget.NATIVE_EE_JNI);
-        ((LocalCluster) config).setHasLocalServer(hasLocalServer);
+        config.setHasLocalServer(hasLocalServer);
 
         if (MiscUtils.isPro() && isCommandLogTest) {
-            ((LocalCluster) config).setJavaProperty("LOG_SEGMENT_SIZE", "1");
-            ((LocalCluster) config).setJavaProperty("LOG_SEGMENTS", "1");
+            config.setJavaProperty("LOG_SEGMENT_SIZE", "1");
+            config.setJavaProperty("LOG_SEGMENTS", "1");
         }
 
         if (replicationPort > 0) {
             // cluster id is default to 0
             project.addLiteralSchema(drSchema);
             project.setDrProducerEnabled();
-            ((LocalCluster) config).setReplicationPort(replicationPort);
-            ((LocalCluster) config).overrideAnyRequestForValgrind();
+            config.setReplicationPort(replicationPort);
+            config.overrideAnyRequestForValgrind();
         }
 
         boolean success = config.compile(project);

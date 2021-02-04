@@ -23,7 +23,15 @@
 
 package org.voltdb.export;
 
-import com.google_voltpatches.common.collect.Maps;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -38,14 +46,8 @@ import org.voltdb.export.TestExportBaseSocketExport.ServerListener;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.utils.VoltFile;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.Maps;
 
 public class TestExportEndToEnd extends ExportLocalClusterBase {
 
@@ -135,7 +137,6 @@ public class TestExportEndToEnd extends ExportLocalClusterBase {
     public void testInsertAllNulls_ENG_19237() throws Exception {
         Client client = getClient(m_cluster);
         // only interested in nullable stream
-        streamNames.add("nullable");
         ClientResponse response = client.callProcedure("@AdHoc", NULLABLE_SCHEMA);
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
         response = client.callProcedure("@AdHoc",
@@ -143,7 +144,7 @@ public class TestExportEndToEnd extends ExportLocalClusterBase {
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
 
         // no crash
-        TestExportBaseSocketExport.waitForExportAllRowsDelivered(client, streamNames);
+        TestExportBaseSocketExport.waitForExportRowsToBeDelivered(client, ImmutableMap.of("nullable", 1L));
         assertEquals(3, m_cluster.getLiveNodeCount());
     }
 
@@ -152,17 +153,15 @@ public class TestExportEndToEnd extends ExportLocalClusterBase {
     public void testExportRejoinThenDropStream_ENG_15740() throws Exception
     {
         Client client = getClient(m_cluster);
-        streamNames.add("t_1");
         ClientResponse response = client.callProcedure("@AdHoc", T1_SCHEMA);
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        streamNames.add("t_2");
         response = client.callProcedure("@AdHoc", T2_SCHEMA);
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
         // Generate PBD files
         Object[] data = new Object[3];
         Arrays.fill(data, 1);
         insertToStream("t_1", 0, 100, client, data);
-        insertToStream("t_2", 0, 100, client, data);
+        insertToStream("t_2", 0, 100, client, data, false);
 
         // kill one node
         m_cluster.killSingleHost(1);
@@ -189,14 +188,14 @@ public class TestExportEndToEnd extends ExportLocalClusterBase {
         } while (stillInRepair && loopCnt < 10);
         assertTrue("Repair took more than 5 seconds", loopCnt < 10);
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        streamNames.remove("t_1");
+        m_verifier.dropStream("t_1");
 
         // rejoin node back
         m_cluster.rejoinOne(1);
         client.drain();
 
         client = getClient(m_cluster);
-        TestExportBaseSocketExport.waitForExportAllRowsDelivered(client, streamNames);
+        m_verifier.waitForTuplesAndVerify(client);
         assertEquals(3, m_cluster.getLiveNodeCount());
     }
 
@@ -204,10 +203,8 @@ public class TestExportEndToEnd extends ExportLocalClusterBase {
     public void testExportRejoinOldGenerationStream_ENG_16239() throws Exception
     {
         Client client = getClient(m_cluster);
-        streamNames.add("t_1");
         ClientResponse response = client.callProcedure("@AdHoc", T1_SCHEMA);
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        streamNames.add("t_2");
         response = client.callProcedure("@AdHoc", T2_SCHEMA);
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
         // Generate PBD files
@@ -243,6 +240,7 @@ public class TestExportEndToEnd extends ExportLocalClusterBase {
         } while (stillInRepair && loopCnt < 10);
         assertTrue("Repair took more than 5 seconds", loopCnt < 10);
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        m_verifier.dropStream("t_1");
         response = client.callProcedure("@AdHoc", T1_SCHEMA);
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
 
@@ -253,9 +251,8 @@ public class TestExportEndToEnd extends ExportLocalClusterBase {
         m_cluster.rejoinOne(0);
 
         client = getClient(m_cluster);
-        client.drain();
-        client.callProcedure("@Quiesce");
-        TestExportBaseSocketExport.waitForExportAllRowsDelivered(client, streamNames);
+        m_verifier.waitForTuples(client);
+
         // make sure no partition has more than active stream
         VoltTable stats = client.callProcedure("@Statistics", "export", 0).getResults()[0];
         Map<String, Integer> masterCounters = Maps.newHashMap();
