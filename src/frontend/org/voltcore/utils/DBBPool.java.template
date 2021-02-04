@@ -57,6 +57,16 @@ public final class DBBPool {
 #endif
 
     /**
+     *  run gc and finalizer
+     */
+    public static void cleanup() {
+#ifndef NO_MEMCHECK
+          System.gc();
+          System.runFinalization();
+#endif
+    }
+
+    /**
      * Abstract base class for a ByteBuffer container. A container serves to hold a reference
      * to the pool/arena/whatever the ByteBuffer was allocated from and possibly the address
      * of the ByteBuffer if it is a DirectByteBuffer. The container also provides the interface

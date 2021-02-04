@@ -116,6 +116,7 @@ import org.voltcore.messaging.SiteMailbox;
 import org.voltcore.messaging.SocketJoiner;
 import org.voltcore.network.CipherExecutor;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.OnDemandBinaryLogger;
 import org.voltcore.utils.Pair;
 import org.voltcore.utils.ShutdownHooks;
@@ -4038,12 +4039,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
                 // We left the status API up as long as possible...
                 StatusListener.shutdown();
-
-                // probably unnecessary, but for tests it's nice because it
-                // will do the memory checking and run finalizers
-                System.gc();
-                System.runFinalization();
-
+                DBBPool.cleanup();
                 m_isRunning = false;
             }
             return did_it;
