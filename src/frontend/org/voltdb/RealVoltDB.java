@@ -188,11 +188,6 @@ import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.messaging.MigratePartitionLeaderMessage;
 import org.voltdb.messaging.VoltDbMessageFactory;
 import org.voltdb.modular.ModuleManager;
-import org.voltdb.operator.PauseActivityStats;
-import org.voltdb.operator.ShutdownActivityStats;
-import org.voltdb.operator.StatusListener;
-import org.voltdb.operator.StopActivityStats;
-import org.voltdb.operator.XDCRReadinessStats;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.probe.MeshProber;
 import org.voltdb.processtools.ShellTools;
@@ -489,6 +484,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private ListeningExecutorService m_computationService;
 
     private Thread m_configLogger;
+
+    // Hooks for kubernetes operator support functions in Enterprise edition
+    private OperatorSupport m_operatorSupport = new OperatorSupport();
+
+    private void connectOperatorSupport() {
+        OperatorSupport opSupp = ProClass.newInstanceOf("org.voltdb.operator.OperatorSupportImpl",
+                                                        "operator", ProClass.HANDLER_IGNORE);
+        if (opSupp != null) {
+            m_operatorSupport = opSupp;
+        }
+    }
 
     // methods accessed via the singleton
     @Override
@@ -1086,7 +1092,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             ModuleManager.resetCacheRoot();
             CipherExecutor.SERVER.shutdown();
             CipherExecutor.CLIENT.shutdown();
-            StatusListener.shutdown();
 
             m_isRunningWithOldVerb = config.m_startAction.isLegacy();
 
@@ -1145,16 +1150,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             // Start the listener that responds to "status" requests. This needs
             // to be started "early" to be available during initialization.
-            else if (config.m_statusPort != VoltDB.DISABLED_PORT) {
-                try {
-                    StatusListener sl = new StatusListener(config.m_statusInterface, config.m_statusPort);
-                    sl.start();
-                    config.m_statusInterface = sl.getListenInterface();
-                    config.m_statusPort = sl.getAssignedPort();
-                    consoleLog.info(String.format("Listening for status requests on %s:%s", config.m_statusInterface, config.m_statusPort));
-                }
-                catch (StatusListener.InitException ex) {
-                    VoltDB.crashLocalVoltDB(ex.getMessage(), false, ex);
+            else {
+                connectOperatorSupport();
+                if (config.m_statusPort != VoltDB.DISABLED_PORT) {
+                    m_operatorSupport.startStatusListener(config);
                 }
             }
 
@@ -1661,11 +1660,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             replaceDRConsumerStatsWithDummy();
 
             // Operator function helpers
-            StatsAgent sa = getStatsAgent();
-            sa.registerStatsSource(StatsSelector.SHUTDOWN_CHECK, 0, new ShutdownActivityStats());
-            sa.registerStatsSource(StatsSelector.STOP_CHECK, 0, new StopActivityStats());
-            sa.registerStatsSource(StatsSelector.PAUSE_CHECK, 0, new PauseActivityStats());
-            sa.registerStatsSource(StatsSelector.XDCR_READINESS, 0, new XDCRReadinessStats());
+            m_operatorSupport.registerStatistics(getStatsAgent());
 
             /*
              * Initialize the command log on rejoin and join before configuring the IV2
@@ -4051,7 +4046,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 PartitionDRGateway.m_partitionDRGateways = ImmutableMap.of();
 
                 // We left the status API up as long as possible...
-                StatusListener.shutdown();
+                m_operatorSupport.stopStatusListener();
+
                 DBBPool.cleanup();
                 m_isRunning = false;
             }
@@ -4617,7 +4613,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 m_isRunning = false;
                 m_statusTracker.set(NodeState.STOPPED); // not that anyone is going to see this.
                 hostLog.warn("VoltDB node has been shutdown By @StopNode");
-                StatusListener.shutdown();
+                m_operatorSupport.stopStatusListener();
                 System.exit(0);
             }
         };
