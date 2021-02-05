@@ -111,10 +111,11 @@ namespace voltdb
         }
 
         inline void recordLastCommittedSpHandle(int64_t spHandle) {
+            vassert(m_lastCommittedSpHandle <= spHandle);
             m_lastCommittedSpHandle = spHandle;
         }
 
-        virtual void recordCompletedSpTxn(int64_t lastSpUniqueId) {
+        virtual void recordCompletedUniqueId(int64_t lastSpUniqueId) {
             m_lastSpUniqueId = lastSpUniqueId;
         }
 
@@ -208,10 +209,10 @@ namespace voltdb
             m_rowCount++;
         }
 
-        virtual inline void truncateExportTo(size_t mark, int64_t seqNo, int64_t spTxnId) {
+        virtual inline void truncateExportTo(size_t mark, int64_t seqNo, int64_t uniqueId) {
             commonTruncateTo(mark);
             m_rowCount = seqNo - m_startSequenceNumber;
-            StreamBlock::recordCompletedSpTxn(spTxnId);
+            StreamBlock::recordCompletedUniqueId(uniqueId);
         }
 
         /**
@@ -342,10 +343,10 @@ namespace voltdb
         /**
          * Record the spUniqueId and if first timestamp is not set yet then set it
          */
-        void recordCompletedSpTxn(int64_t spUniqueId) override {
-            StreamBlock::recordCompletedSpTxn(spUniqueId);
+        void recordCompletedUniqueId(int64_t uniqueId) override {
+            StreamBlock::recordCompletedUniqueId(uniqueId);
             if (m_firstTimestamp == -1) {
-                m_firstTimestamp = UniqueId::tsInMillis(spUniqueId);
+                m_firstTimestamp = UniqueId::tsInMillis(uniqueId);
             }
         }
 

@@ -104,7 +104,7 @@ public:
         vassert(seqNo > m_committedSequenceNumber && m_nextSequenceNumber > m_committedSequenceNumber);
         m_nextSequenceNumber = seqNo;
         TupleStreamBase::rollbackBlockTo(mark);
-        m_currBlock->truncateExportTo(mark, seqNo, m_openTxnId);
+        m_currBlock->truncateExportTo(mark, seqNo, m_openUniqueId);
     }
 
     size_t computeOffsets(const TableTuple &tuple, size_t *rowHeaderSz) const;
@@ -167,7 +167,7 @@ protected:
     inline size_t recordTupleAppended(size_t size, int64_t uniqueId) {
         const size_t startingUso = m_uso;
         m_currBlock->consumed(size);
-        m_currBlock->recordCompletedSpTxn(uniqueId);
+        m_currBlock->recordCompletedUniqueId(uniqueId);
 
         m_uso += size;
         m_nextSequenceNumber++;

@@ -500,10 +500,9 @@ void DRTupleStream::endTransaction(int64_t uniqueId) {
         m_currBlock->recordCompletedMpTxnForDR(uniqueId);
     } else {
         m_lastCommittedSpUniqueId = uniqueId;
-        m_currBlock->recordCompletedSpTxn(uniqueId);
-        // for sp, update the last Committed SpHandle
-        m_currBlock->recordLastCommittedSpHandle(m_openTxnId);
+        m_currBlock->recordCompletedUniqueId(uniqueId);
     }
+    m_currBlock->recordLastCommittedSpHandle(m_openTxnId);
     m_currBlock->recordCompletedSequenceNumForDR(m_openSequenceNumber);
 
     ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
@@ -613,14 +612,14 @@ void DRTupleStream::generateDREvent(DREventType type, int64_t spHandle,
     case DR_STREAM_END:
     case DR_STREAM_START:
     case DR_ELASTIC_REBALANCE: {
-        writeEventData(type, payloads);
+        writeEventData(type, payloads, spHandle);
         m_currBlock->recordCompletedSequenceNumForDR(m_openSequenceNumber);
         if (UniqueId::isMpUniqueId(uniqueId)) {
             m_lastCommittedMpUniqueId = uniqueId;
             m_currBlock->recordCompletedMpTxnForDR(uniqueId);
         } else {
             m_lastCommittedSpUniqueId = uniqueId;
-            m_currBlock->recordCompletedSpTxn(uniqueId);
+            m_currBlock->recordCompletedUniqueId(uniqueId);
         }
 
         m_committedUso = m_uso;
@@ -639,10 +638,10 @@ void DRTupleStream::generateDREvent(DREventType type, int64_t spHandle,
             // Hack change the event to a DR_STREAM_START with isNewStreamForElasticAdd set to true
             ByteArray flagBuf = ByteArray(1);
             flagBuf[0] = 1;
-            writeEventData(DR_STREAM_START, flagBuf);
+            writeEventData(DR_STREAM_START, flagBuf, spHandle);
         }
         else {
-            writeEventData(type, payloads);
+            writeEventData(type, payloads, spHandle);
         }
         m_currBlock->recordCompletedSequenceNumForDR(m_openSequenceNumber);
         if (UniqueId::isMpUniqueId(uniqueId)) {
@@ -650,7 +649,7 @@ void DRTupleStream::generateDREvent(DREventType type, int64_t spHandle,
             m_currBlock->recordCompletedMpTxnForDR(uniqueId);
         } else {
             m_lastCommittedSpUniqueId = uniqueId;
-            m_currBlock->recordCompletedSpTxn(uniqueId);
+            m_currBlock->recordCompletedUniqueId(uniqueId);
         }
 
         m_committedUso = m_uso;
@@ -666,7 +665,7 @@ void DRTupleStream::generateDREvent(DREventType type, int64_t spHandle,
         // streams in the release() of the corresponding UndoAction.
         // Currently, only SWAP_TABLE does this, if there are others in the
         // future, the above logic can be refactored into a function.
-        writeEventData(type, payloads);
+        writeEventData(type, payloads, spHandle);
         break;
     }
     default:
@@ -674,7 +673,7 @@ void DRTupleStream::generateDREvent(DREventType type, int64_t spHandle,
     }
 }
 
-void DRTupleStream::writeEventData(DREventType type, ByteArray payloads) {
+void DRTupleStream::writeEventData(DREventType type, ByteArray payloads, int64_t spHandle) {
     // Make sure current block is empty
     extendBufferChain(0);
     ExportSerializeOutput io(m_currBlock->mutableDataPtr(), m_currBlock->remaining());
@@ -684,6 +683,7 @@ void DRTupleStream::writeEventData(DREventType type, ByteArray payloads) {
 
     m_currBlock->startDRSequenceNumber(m_openSequenceNumber);
     m_currBlock->markAsEventBuffer(type);
+    m_currBlock->recordLastCommittedSpHandle(spHandle);
 }
 
 int32_t DRTupleStream::getTestDRBuffer(uint8_t drProtocolVersion,

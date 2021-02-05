@@ -128,7 +128,13 @@ public:
         m_largeTuple->move(m_largeTupleMemory);
     }
 
-    size_t appendTuple(int64_t lastCommittedSpHandle, int64_t currentSpHandle, DRRecordType type = DR_RECORD_INSERT)
+    size_t appendTuple(int64_t currentSpHandle, DRRecordType type = DR_RECORD_INSERT)
+    {
+        currentSpHandle = addPartitionId(currentSpHandle);
+        return appendTuple(currentSpHandle, currentSpHandle, type);
+    }
+
+    size_t appendTuple(int64_t currentSpHandle, int64_t uniqueId, DRRecordType type = DR_RECORD_INSERT)
     {
         // fill a tuple
         m_tuple->setNValue(0, ValueFactory::getIntegerValue(0));
@@ -136,20 +142,18 @@ public:
             int value = rand();
             m_tuple->setNValue(col, ValueFactory::getIntegerValue(value));
         }
-        lastCommittedSpHandle = addPartitionId(lastCommittedSpHandle);
-        currentSpHandle = addPartitionId(currentSpHandle);
+
         // append into the buffer
         return m_wrapper.appendTuple(tableHandle, 0, currentSpHandle,
-                               currentSpHandle, *m_tuple, type);
+                               uniqueId, *m_tuple, type);
     }
 
-    size_t appendLargeTuple(int64_t lastCommittedSpHandle, int64_t currentSpHandle, DRRecordType type = DR_RECORD_INSERT)
+    size_t appendLargeTuple(int64_t currentSpHandle, DRRecordType type = DR_RECORD_INSERT)
     {
         for (int col = 0; col < LARGE_TUPLE_COLUMN_COUNT; col++) {
             int64_t value = 10L;
             m_largeTuple->setNValue(col, ValueFactory::getBigIntValue(value));
         }
-        lastCommittedSpHandle = addPartitionId(lastCommittedSpHandle);
         currentSpHandle = addPartitionId(currentSpHandle);
         // append into the buffer
         return m_wrapper.appendTuple(tableHandle, 0, currentSpHandle,
@@ -239,7 +243,7 @@ TEST_F(DRTupleStreamTest, DoOneTuple)
 {
 
     // write a new tuple and then flush the buffer
-    appendTuple(1, 2);
+    appendTuple(2);
     m_wrapper.endTransaction(addPartitionId(2));
     m_wrapper.periodicFlush(-1, addPartitionId(2));
 
@@ -257,14 +261,14 @@ TEST_F(DRTupleStreamTest, BasicOps)
 {
     for (int i = 1; i < 10; i++)
     {
-        appendTuple(i-1, i);
+        appendTuple(i);
         m_wrapper.endTransaction(addPartitionId(i));
     }
     m_wrapper.periodicFlush(-1, addPartitionId(9));
 
     for (int i = 10; i < 20; i++)
     {
-        appendTuple(i-1, i);
+        appendTuple(i);
         m_wrapper.endTransaction(addPartitionId(i));
     }
     m_wrapper.periodicFlush(-1, addPartitionId(19));
@@ -275,6 +279,7 @@ TEST_F(DRTupleStreamTest, BasicOps)
     m_topend.drBlocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
     EXPECT_EQ(results->offset(), (MAGIC_TUPLE_PLUS_TRANSACTION_SIZE * 9));
+    EXPECT_EQ(results->lastCommittedSpHandle(), addPartitionId(9));
 
     // now get the second
     ASSERT_FALSE(m_topend.drBlocks.empty());
@@ -282,6 +287,7 @@ TEST_F(DRTupleStreamTest, BasicOps)
     m_topend.drBlocks.pop_front();
     EXPECT_EQ(results->uso(), (MAGIC_TUPLE_PLUS_TRANSACTION_SIZE * 9));
     EXPECT_EQ(results->offset(), (MAGIC_TUPLE_PLUS_TRANSACTION_SIZE * 10));
+    EXPECT_EQ(results->lastCommittedSpHandle(), addPartitionId(19));
 }
 
 
@@ -290,7 +296,7 @@ TEST_F(DRTupleStreamTest, OptimizedDeleteFormat) {
     for (int i = 1; i < 10; i++)
     {
         // first, send some delete records with an index
-        appendTuple(i-1, i, DR_RECORD_DELETE);
+        appendTuple(i, DR_RECORD_DELETE);
         m_wrapper.endTransaction(addPartitionId(i));
     }
     m_wrapper.periodicFlush(-1, addPartitionId(9));
@@ -298,7 +304,7 @@ TEST_F(DRTupleStreamTest, OptimizedDeleteFormat) {
     for (int i = 10; i < 20; i++)
     {
         // then send some delete records without an index
-        appendTuple(i-1, i, DR_RECORD_DELETE);
+        appendTuple(i, DR_RECORD_DELETE);
         m_wrapper.endTransaction(addPartitionId(i));
     }
     m_wrapper.periodicFlush(-1, addPartitionId(19));
@@ -325,14 +331,14 @@ TEST_F(DRTupleStreamTest, FarFutureFlush)
 {
     for (int i = 1; i < 10; i++)
     {
-        appendTuple(i-1, i);
+        appendTuple(i);
         m_wrapper.endTransaction(addPartitionId(i));
     }
     m_wrapper.periodicFlush(-1, addPartitionId(99));
 
     for (int i = 100; i < 110; i++)
     {
-        appendTuple(i-1, i);
+        appendTuple(i);
         m_wrapper.endTransaction(addPartitionId(i));
     }
     m_wrapper.periodicFlush(-1, addPartitionId(130));
@@ -361,7 +367,7 @@ TEST_F(DRTupleStreamTest, Fill) {
     // fill with just enough tuples to avoid exceeding buffer
     for (int i = 1; i <= tuples_to_fill; i++)
     {
-        appendTuple(i-1, i);
+        appendTuple(i);
         m_wrapper.endTransaction(addPartitionId(i));
     }
     // We shouldn't yet get a buffer because we haven't forced the
@@ -369,7 +375,7 @@ TEST_F(DRTupleStreamTest, Fill) {
     ASSERT_FALSE(m_topend.receivedDRBuffer);
 
     // now, drop in one more
-    appendTuple(tuples_to_fill, tuples_to_fill + 1);
+    appendTuple(tuples_to_fill + 1);
     m_wrapper.endTransaction(addPartitionId(tuples_to_fill + 1));
 
     ASSERT_TRUE(m_topend.receivedDRBuffer);
@@ -385,19 +391,19 @@ TEST_F(DRTupleStreamTest, Fill) {
  */
 TEST_F(DRTupleStreamTest, FillSingleTxnAndFlush) {
     int tuples_to_fill = (BUFFER_SIZE - 2 * MAGIC_TRANSACTION_SIZE) / MAGIC_TUPLE_SIZE;
-    appendTuple(0, 1);
+    appendTuple(1);
     m_wrapper.endTransaction(addPartitionId(1));
     // fill with just enough tuples to avoid exceeding buffer
     for (int i = 2; i <= tuples_to_fill; i++)
     {
-        appendTuple(1, 2);
+        appendTuple(2);
     }
     // We shouldn't yet get a buffer because we haven't forced the
     // generation of a new one by exceeding the current one.
     ASSERT_FALSE(m_topend.receivedDRBuffer);
 
     // now, drop in one more on the same TXN ID
-    appendTuple(1, 2);
+    appendTuple(2);
 
     // We should have received a buffer containing only the first txn
     ASSERT_TRUE(m_topend.receivedDRBuffer);
@@ -426,14 +432,14 @@ TEST_F(DRTupleStreamTest, TxnSpanTwoBuffers)
 {
     for (int i = 1; i <= 10; i++)
     {
-        appendTuple(i-1, i);
+        appendTuple(i);
         m_wrapper.endTransaction(addPartitionId(i));
     }
 
     int tuples_to_fill = 10;
     for (int i = 0; i < tuples_to_fill; i++)
     {
-        appendTuple(10, 11);
+        appendTuple(11);
     }
     m_wrapper.endTransaction(addPartitionId(11));
     m_wrapper.periodicFlush(-1, addPartitionId(11));
@@ -461,14 +467,14 @@ TEST_F(DRTupleStreamTest, TxnSpanBigBuffers)
     int tuples_to_fill_buffer = BUFFER_SIZE / MAGIC_TUPLE_PLUS_TRANSACTION_SIZE;
     for (int i = 1; i <= tuples_to_fill_buffer; i++)
     {
-        appendTuple(i-1, i);
+        appendTuple(i);
         m_wrapper.endTransaction(addPartitionId(i));
     }
 
     int tuples_to_fill_large_buffer = (LARGE_BUFFER_SIZE - MAGIC_TRANSACTION_SIZE) / MAGIC_TUPLE_SIZE;
     for (int i = 1; i <= tuples_to_fill_large_buffer; i++)
     {
-        appendTuple(tuples_to_fill_buffer, tuples_to_fill_buffer + 1);
+        appendTuple(tuples_to_fill_buffer + 1);
     }
 
     m_wrapper.endTransaction(addPartitionId(tuples_to_fill_buffer + 1));
@@ -498,7 +504,7 @@ TEST_F(DRTupleStreamTest, TxnSpanBufferThrowException)
     int tuples_cant_fill = 3 * LARGE_BUFFER_SIZE / MAGIC_TUPLE_SIZE;
     try {
         for (int i = 1; i <= tuples_cant_fill; i++) {
-            appendTuple(0, 1);
+            appendTuple(1);
         }
     }
     catch (SQLException& e) {
@@ -515,7 +521,7 @@ TEST_F(DRTupleStreamTest, TxnSpanBufferThrowException)
  */
 TEST_F(DRTupleStreamTest, TupleLargerThanDefaultSize)
 {
-    appendLargeTuple(0, 1);
+    appendLargeTuple(1);
     m_wrapper.endTransaction(addPartitionId(1));
     m_wrapper.periodicFlush(-1, addPartitionId(1));
     ASSERT_TRUE(m_topend.receivedDRBuffer);
@@ -535,7 +541,7 @@ TEST_F(DRTupleStreamTest, BigTxnsRollBuffers)
 
     // fill one large buffer
     for (;;) {
-        appendTuple(0, 1);
+        appendTuple(1);
         if (m_wrapper.getCurrBlock() != firstBlock) {
             secondBlock = m_wrapper.getCurrBlock();
             EXPECT_EQ(LARGE_STREAM_BLOCK, secondBlock->type());
@@ -548,7 +554,7 @@ TEST_F(DRTupleStreamTest, BigTxnsRollBuffers)
 
     // fill the first large buffer, and roll to another large buffer
     for (int i = 1; i <= tuples_to_fill; i++) {
-        appendTuple(1, 2);
+        appendTuple(2);
     }
     m_wrapper.endTransaction(addPartitionId(2));
 
@@ -573,7 +579,7 @@ TEST_F(DRTupleStreamTest, FillSingleTxnAndCommitWithRollback) {
     // fill with just enough tuples to avoid exceeding buffer
     for (int i = 1; i <= tuples_to_fill; i++)
     {
-        appendTuple(0, 1);
+        appendTuple(1);
     }
     // We shouldn't yet get a buffer because we haven't forced the
     // generation of a new one by exceeding the current one.
@@ -583,7 +589,7 @@ TEST_F(DRTupleStreamTest, FillSingleTxnAndCommitWithRollback) {
     // now, drop in one more on a new TXN ID.  This should commit
     // the whole first buffer.  Roll back the new tuple and make sure
     // we have a good buffer
-    size_t mark = appendTuple(1, 2);
+    size_t mark = appendTuple(2);
     m_wrapper.rollbackDrTo(mark, rowCostForDRRecord(DR_RECORD_INSERT));
 
     // so flush and make sure we got something sane
@@ -605,7 +611,7 @@ TEST_F(DRTupleStreamTest, FillWithOneTxn) {
     // fill several buffers
     for (int i = 0; i <= (tuples_to_fill + 10) * 3; i++)
     {
-        appendTuple(1, 2);
+        appendTuple(2);
     }
     // We shouldn't yet get a buffer even though we've filled a bunch because
     // the transaction is still open.
@@ -619,12 +625,12 @@ TEST_F(DRTupleStreamTest, FillWithOneTxn) {
 TEST_F(DRTupleStreamTest, RollbackFirstTuple)
 {
 
-    appendTuple(1, 2);
+    appendTuple(2);
     // rollback the first tuple
     m_wrapper.rollbackDrTo(0, rowCostForDRRecord(DR_RECORD_INSERT));
 
     // write a new tuple and then flush the buffer
-    appendTuple(2, 3);
+    appendTuple(3);
     m_wrapper.endTransaction(addPartitionId(3));
     m_wrapper.periodicFlush(-1, addPartitionId(3));
 
@@ -644,14 +650,14 @@ TEST_F(DRTupleStreamTest, RollbackFirstTuple)
 TEST_F(DRTupleStreamTest, TestPoisonPillIncludesIncompleteTxn)
 {
     long preOffset = m_wrapper.getCurrBlock()->offset();
-    appendTuple(0, 1);
+    appendTuple(1);
     // commit first tuple
     m_wrapper.endTransaction(addPartitionId(1));
     long offset = m_wrapper.getCurrBlock()->offset();
     EXPECT_GT(offset, preOffset);
 
     // write a new tuple
-    appendTuple(2, 3);
+    appendTuple(3);
     ASSERT_FALSE(m_topend.receivedDRBuffer);
     long newOffset = m_wrapper.getCurrBlock()->offset();
     EXPECT_GT(newOffset, offset);
@@ -677,12 +683,12 @@ TEST_F(DRTupleStreamTest, RollbackMiddleTuple)
     // append a bunch of tuples
     for (int i = 1; i <= 10; i++)
     {
-         appendTuple(i-1, i);
+         appendTuple(i);
          m_wrapper.endTransaction(addPartitionId(i));
     }
 
     // add another and roll it back and flush
-    size_t mark = appendTuple(10, 11);
+    size_t mark = appendTuple(11);
     m_wrapper.rollbackDrTo(mark, rowCostForDRRecord(DR_RECORD_INSERT));
     m_wrapper.periodicFlush(-1, addPartitionId(11));
 
@@ -702,7 +708,7 @@ TEST_F(DRTupleStreamTest, RollbackWholeBuffer)
     // append a bunch of tuples
     for (int i = 1; i <= 10; i++)
     {
-        appendTuple(i-1, i);
+        appendTuple(i);
         m_wrapper.endTransaction(addPartitionId(i));
     }
 
@@ -713,7 +719,7 @@ TEST_F(DRTupleStreamTest, RollbackWholeBuffer)
     size_t marks[tuples_to_fill];
     for (int i = 0; i < tuples_to_fill; i++)
     {
-        marks[i] = appendTuple(10, 11);
+        marks[i] = appendTuple(11);
     }
     for (int i = tuples_to_fill-1; i >= 0; i--)
     {
@@ -738,7 +744,7 @@ TEST_F(DRTupleStreamTest, RollbackEmptyTransaction)
     // append a bunch of tuples
     for (int i = 1; i <= 10; i++)
     {
-         appendTuple(i-1, i);
+         appendTuple(i);
          m_wrapper.endTransaction(addPartitionId(i));
     }
 
@@ -750,8 +756,8 @@ TEST_F(DRTupleStreamTest, RollbackEmptyTransaction)
     size_t mark2;
     {
         DRTupleStreamDisableGuard guard(m_context.get());
-        mark1 = appendTuple(10, 11);
-        mark2 = appendTuple(11, 12);
+        mark1 = appendTuple(11);
+        mark2 = appendTuple(12);
     }
     EXPECT_EQ(mark1, INVALID_DR_MARK);
     EXPECT_EQ(mark2, INVALID_DR_MARK);
@@ -764,7 +770,7 @@ TEST_F(DRTupleStreamTest, RollbackEmptyTransaction)
     EXPECT_EQ(expectedUniqueId, m_wrapper.getOpenUniqueIdForTest());
 
     // Append one more tuple after the rollback
-    appendTuple(12, 13);
+    appendTuple(13);
     m_wrapper.endTransaction(addPartitionId(13));
 
     m_wrapper.periodicFlush(-1, addPartitionId(14));
@@ -784,13 +790,13 @@ TEST_F(DRTupleStreamTest, RollbackEmptyTransaction)
 TEST_F(DRTupleStreamTest, BigBufferAfterExtendOnBeginTxn) {
     int tuples_to_fill = (BUFFER_SIZE - MAGIC_TRANSACTION_SIZE) / MAGIC_TUPLE_SIZE;
     for (int i = 0; i < tuples_to_fill; i++) {
-        appendTuple(1, 2);
+        appendTuple(2);
     }
     m_wrapper.endTransaction(addPartitionId(2));
     ASSERT_TRUE(m_wrapper.getCurrBlock());
     ASSERT_TRUE(m_wrapper.getCurrBlock()->remaining() < MAGIC_BEGIN_TRANSACTION_SIZE);
 
-    appendTuple(2, 3);
+    appendTuple(3);
 
     m_wrapper.periodicFlush(-1, addPartitionId(2));
     ASSERT_TRUE(m_topend.receivedDRBuffer);
@@ -798,11 +804,11 @@ TEST_F(DRTupleStreamTest, BigBufferAfterExtendOnBeginTxn) {
     m_topend.receivedDRBuffer = false;
 
     for (int i = 1; i < tuples_to_fill; i++) {
-        appendTuple(2, 3);
+        appendTuple(3);
     }
     ASSERT_TRUE(m_wrapper.getCurrBlock()->remaining() - MAGIC_END_TRANSACTION_SIZE < MAGIC_TUPLE_SIZE);
 
-    appendTuple(2, 3);
+    appendTuple(3);
     m_wrapper.endTransaction(addPartitionId(3));
 
     m_wrapper.periodicFlush(-1, addPartitionId(3));
@@ -816,7 +822,7 @@ TEST_F(DRTupleStreamTest, BigBufferAfterExtendOnBeginTxn) {
 TEST_F(DRTupleStreamTest, BufferEnforcesRowLimit) {
     m_topend.pushDRBufferRetval = 25;
 
-    appendTuple(1, 2);
+    appendTuple(2);
     m_wrapper.endTransaction(addPartitionId(2));
 
     m_wrapper.periodicFlush(-1, addPartitionId(2));
@@ -829,11 +835,11 @@ TEST_F(DRTupleStreamTest, BufferEnforcesRowLimit) {
     m_topend.drBlocks.pop_front();
     m_topend.receivedDRBuffer = false;
     for (int i = 0; i < 25; i++) {
-        appendTuple(2, 3);
+        appendTuple(3);
     }
     m_wrapper.endTransaction(addPartitionId(3));
 
-    appendTuple(3, 4);
+    appendTuple(4);
 
     m_wrapper.periodicFlush(-1, addPartitionId(3));
     ASSERT_TRUE(m_topend.receivedDRBuffer);
@@ -847,7 +853,7 @@ TEST_F(DRTupleStreamTest, BufferEnforcesRowLimit) {
 TEST_F(DRTupleStreamTest, BufferAllowsAtLeastOneTxn) {
     m_topend.pushDRBufferRetval = 0;
 
-    appendTuple(1, 2);
+    appendTuple(2);
     m_wrapper.endTransaction(addPartitionId(2));
 
     m_wrapper.periodicFlush(-1, addPartitionId(2));
@@ -860,7 +866,7 @@ TEST_F(DRTupleStreamTest, BufferAllowsAtLeastOneTxn) {
     m_topend.drBlocks.pop_front();
     m_topend.receivedDRBuffer = false;
 
-    appendTuple(2, 3);
+    appendTuple(3);
     m_wrapper.endTransaction(addPartitionId(3));
 
     m_wrapper.periodicFlush(-1, addPartitionId(3));
@@ -881,6 +887,28 @@ TEST_F(DRTupleStreamTest, EnumHack)
     type = DR_RECORD_UPDATE;
     type = static_cast<DRRecordType>((int)type + 5);
     EXPECT_EQ(DR_RECORD_UPDATE_BY_INDEX, type);
+}
+
+TEST_F(DRTupleStreamTest, EventPushesSpHandle) {
+    int64_t spHandle = addPartitionId(4);
+    int64_t uniqueId = UniqueId::makeIdFromComponents(VOLT_EPOCH_IN_MILLIS + 45361, 184, UniqueId::MP_INIT_PID);
+    m_wrapper.generateDREvent(DREventType::DR_STREAM_START, spHandle, uniqueId, ByteArray(5));
+
+    boost::shared_ptr<StreamBlock> results = m_topend.drBlocks.front();
+    m_topend.drBlocks.pop_front();
+    ASSERT_EQ(spHandle, results->lastCommittedSpHandle());
+}
+
+TEST_F(DRTupleStreamTest, MpPushesSpHandle) {
+    int64_t spHandle = addPartitionId(4);
+    int64_t uniqueId = UniqueId::makeIdFromComponents(VOLT_EPOCH_IN_MILLIS + 45361, 184, UniqueId::MP_INIT_PID);
+    appendTuple(spHandle, uniqueId);
+    m_wrapper.endTransaction(uniqueId);
+    m_wrapper.periodicFlush(-1, spHandle);
+
+    boost::shared_ptr<StreamBlock> results = m_topend.drBlocks.front();
+    m_topend.drBlocks.pop_front();
+    ASSERT_EQ(spHandle, results->lastCommittedSpHandle());
 }
 
 int main() {
