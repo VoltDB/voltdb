@@ -341,6 +341,13 @@ public class HTTPClientInterface {
                 return;
             }
 
+            if (InvocationDispatcher.getProcedureFromName(procName, VoltDB.instance().getCatalogContext()) == null) {
+                String err = String.format("Unknown procedure name '%s'.", procName);
+                ok(jsonp, err, response); // HTTP status = ok, VoltDB status = failure
+                request.setHandled(true);
+                return;
+            }
+
             continuation.suspend(response);
             suspended = true;
             JSONProcCallback cb;
