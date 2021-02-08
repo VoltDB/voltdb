@@ -443,11 +443,7 @@ void DRTupleStream::endTransaction(int64_t uniqueId) {
                     UniqueId::toString(UniqueId(uniqueId)).c_str());
         }
 
-        if (UniqueId::isMpUniqueId(uniqueId)) {
-            m_lastCommittedMpUniqueId = uniqueId;
-        } else {
-            m_lastCommittedSpUniqueId = uniqueId;
-        }
+        updateLastUniqueId(uniqueId, nullptr);
 
         commitTransactionCommon();
         return;
@@ -495,13 +491,7 @@ void DRTupleStream::endTransaction(int64_t uniqueId) {
         return;
     }
 
-    if (UniqueId::isMpUniqueId(uniqueId)) {
-        m_lastCommittedMpUniqueId = uniqueId;
-        m_currBlock->recordCompletedMpTxnForDR(uniqueId);
-    } else {
-        m_lastCommittedSpUniqueId = uniqueId;
-        m_currBlock->recordCompletedUniqueId(uniqueId);
-    }
+    updateLastUniqueId(uniqueId, m_currBlock);
     m_currBlock->recordLastCommittedSpHandle(m_openTxnId);
     m_currBlock->recordCompletedSequenceNumForDR(m_openSequenceNumber);
 
@@ -596,11 +586,7 @@ void DRTupleStream::generateDREvent(DREventType type, int64_t spHandle,
     }
 
     if (!m_enabled) {
-        if (UniqueId::isMpUniqueId(uniqueId)) {
-            m_lastCommittedMpUniqueId = uniqueId;
-        } else {
-            m_lastCommittedSpUniqueId = uniqueId;
-        }
+        updateLastUniqueId(uniqueId, nullptr);
 
         openTransactionCommon(spHandle, uniqueId);
         commitTransactionCommon();
@@ -614,13 +600,7 @@ void DRTupleStream::generateDREvent(DREventType type, int64_t spHandle,
     case DR_ELASTIC_REBALANCE: {
         writeEventData(type, payloads, spHandle);
         m_currBlock->recordCompletedSequenceNumForDR(m_openSequenceNumber);
-        if (UniqueId::isMpUniqueId(uniqueId)) {
-            m_lastCommittedMpUniqueId = uniqueId;
-            m_currBlock->recordCompletedMpTxnForDR(uniqueId);
-        } else {
-            m_lastCommittedSpUniqueId = uniqueId;
-            m_currBlock->recordCompletedUniqueId(uniqueId);
-        }
+        updateLastUniqueId(uniqueId, m_currBlock);
 
         m_committedUso = m_uso;
         openTransactionCommon(spHandle, uniqueId);
@@ -644,13 +624,7 @@ void DRTupleStream::generateDREvent(DREventType type, int64_t spHandle,
             writeEventData(type, payloads, spHandle);
         }
         m_currBlock->recordCompletedSequenceNumForDR(m_openSequenceNumber);
-        if (UniqueId::isMpUniqueId(uniqueId)) {
-            m_lastCommittedMpUniqueId = uniqueId;
-            m_currBlock->recordCompletedMpTxnForDR(uniqueId);
-        } else {
-            m_lastCommittedSpUniqueId = uniqueId;
-            m_currBlock->recordCompletedUniqueId(uniqueId);
-        }
+        updateLastUniqueId(uniqueId, m_currBlock);
 
         m_committedUso = m_uso;
         openTransactionCommon(spHandle, uniqueId);

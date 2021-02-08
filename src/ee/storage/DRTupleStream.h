@@ -124,6 +124,26 @@ private:
 
     void writeEventData(DREventType type, ByteArray payloads, int64_t spHandle);
 
+    /**
+     * Update either m_lastCommittedMpUniqueId or m_lastCommittedSpUniqueId with uniqueId and update block if it is not
+     * null
+     */
+    inline void updateLastUniqueId(int64_t uniqueId, DrStreamBlock* block) {
+        if (UniqueId::isMpUniqueId(uniqueId)) {
+            vassert(m_lastCommittedMpUniqueId <= uniqueId);
+            m_lastCommittedMpUniqueId = uniqueId;
+            if (block != nullptr) {
+                m_currBlock->recordCompletedMpTxnForDR(uniqueId);
+            }
+        } else {
+            vassert(m_lastCommittedSpUniqueId <= uniqueId);
+            m_lastCommittedSpUniqueId = uniqueId;
+            if (block != nullptr) {
+                m_currBlock->recordCompletedUniqueId(uniqueId);
+            }
+        }
+    }
+
     const DRTxnPartitionHashFlag m_initialHashFlag;
     DRTxnPartitionHashFlag m_hashFlag;
     int64_t m_firstParHash;
