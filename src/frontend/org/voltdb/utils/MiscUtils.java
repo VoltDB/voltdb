@@ -369,7 +369,7 @@ public class MiscUtils {
                 else {
                     hostLog.fatal("VoltDB license expired on " + expiresStr + ".");
                 }
-                hostLog.fatal("Please contact sales@voltdb.com to request a new license.");
+                hostLog.fatal("Please contact info@voltdb.com to request a new license.");
                 return false;
             }
             else {
