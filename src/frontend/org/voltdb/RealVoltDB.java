@@ -508,8 +508,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private ScheduledThreadPoolExecutor m_periodicPriorityWorkThread;
 
     // The configured license api: use to decide enterprise/community edition feature enablement
-    LicenseApi m_licenseApi;
-    String m_licenseInformation = "";
+    private LicenseApi m_licenseApi;
+
+    // Used by system information sysproc
+    // Populated on demand.
+    private String m_licenseInformation;
 
     private LatencyStats m_latencyStats;
     private LatencyHistogramStats m_latencyCompressedStats;
@@ -547,7 +550,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     @Override
     public String getLicenseInformation() {
-        return m_licenseInformation;
+        return buildLicenseSummary();
     }
 
     @Override
@@ -1415,20 +1418,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_snapshotIOAgent = new SnapshotIOAgentImpl(m_messenger,
                     m_messenger.getHSIdForLocalSite(HostMessenger.SNAPSHOT_IO_AGENT_ID));
             m_messenger.createMailbox(m_snapshotIOAgent.getHSId(), m_snapshotIOAgent);
-
-            try {
-                SimpleDateFormat sdf = new SimpleDateFormat("EEE MMM d, yyyy");
-                JSONObject jo = new JSONObject();
-                jo.put("trial", m_licenseApi.isAnyKindOfTrial());
-                jo.put("hostcount",m_licenseApi.maxHostcount());
-                jo.put("commandlogging", m_licenseApi.isCommandLoggingAllowed());
-                jo.put("wanreplication", m_licenseApi.isDrReplicationAllowed());
-                jo.put("expiration", sdf.format(m_licenseApi.expires().getTime()));
-                jo.put("type", m_licenseApi.getLicenseType());
-                m_licenseInformation = jo.toString();
-            } catch (JSONException ex) {
-                //Ignore
-            }
 
             // Create the GlobalServiceElector.  Do this here so we can register the MPI with it
             // when we construct it below
@@ -5740,4 +5729,46 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
         return false;
     }
+
+    /*
+     * Builds a summary of license information for use by
+     * the SystemInformation sysproc. Caches the value for
+     * future use.
+     */
+    private String buildLicenseSummary() {
+        String info;
+        synchronized (m_licenseSync) {
+            info = m_licenseInformation;
+            if (info == null || info.isEmpty()) {
+                try {
+                    LicenseApi licenseApi = getLicenseApi();
+                    SimpleDateFormat sdf = new SimpleDateFormat("EEE MMM d, yyyy");
+                    JSONObject jo = new JSONObject();
+                    jo.put("trial", licenseApi.isAnyKindOfTrial());
+                    jo.put("hostcount", licenseApi.maxHostcount());
+                    jo.put("commandlogging", licenseApi.isCommandLoggingAllowed());
+                    jo.put("wanreplication", licenseApi.isDrReplicationAllowed());
+                    jo.put("expiration", sdf.format(licenseApi.expires().getTime()));
+                    jo.put("type", licenseApi.getLicenseType());
+                    info = jo.toString();
+                } catch (JSONException ex) {
+                    hostLog.warn("Failed to summarize license information: " + ex.getMessage());
+                    info = "";
+                }
+                m_licenseInformation = info;
+            }
+        }
+        return info;
+    }
+
+    /*
+     * Cache reset for UpdateLicence sysproc
+     */
+    public void clearLicenseSummary() {
+        synchronized (m_licenseSync) {
+            m_licenseInformation = null;
+        }
+    }
+
+    private Object m_licenseSync = new Object();
 }
