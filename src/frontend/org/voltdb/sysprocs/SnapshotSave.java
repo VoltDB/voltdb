@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -189,6 +189,10 @@ public class SnapshotSave extends VoltSystemProcedure
         String formatStr = jsObj.optString(SnapshotUtil.JSON_FORMAT, SnapshotFormat.NATIVE.toString());
         final SnapshotFormat format = SnapshotFormat.getEnumIgnoreCase(formatStr);
         final String data = jsObj.optString(SnapshotUtil.JSON_DATA);
+        boolean terminus = false;
+        if (jsObj.has(SnapshotUtil.JSON_TERMINUS)) {
+            terminus = jsObj.getLong(SnapshotUtil.JSON_TERMINUS) != 0;
+        }
 
         String truncReqId = "";
         if (data != null && !data.isEmpty()) {
@@ -277,7 +281,7 @@ public class SnapshotSave extends VoltSystemProcedure
             boolean isTruncation = (stype == SnapshotPathType.SNAP_CL && !truncReqId.isEmpty());
             // Asynchronously create the completion node
             createCallback = SnapshotSaveAPI.createSnapshotCompletionNode(path, stype.toString(), nonce, txnId,
-                    isTruncation, truncReqId);
+                    isTruncation, terminus, truncReqId);
 
             // For snapshot targets creation, see executePlanFragment() in this file.
             results = performSnapshotCreationWork(path, stype.toString(), nonce, perPartitionTxnIds,

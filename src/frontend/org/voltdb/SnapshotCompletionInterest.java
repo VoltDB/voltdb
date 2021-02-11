@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -34,6 +34,7 @@ public interface SnapshotCompletionInterest {
         public final long multipartTxnId;
         public final Map<Integer, Long> partitionTxnIds;
         public final boolean truncationSnapshot;
+        public final boolean terminusSnapshot;
         public final boolean didSucceed;
         public final String requestId;
         public final Map<String, Map<Integer, ExportSnapshotTuple>> exportSequenceNumbers;
@@ -49,6 +50,7 @@ public interface SnapshotCompletionInterest {
                 final long multipartTxnId,
                 final Map<Integer, Long> partitionTxnIds,
                 final boolean truncationSnapshot,
+                final boolean terminusSnapshot,
                 final boolean didSucceed,
                 final String requestId,
                 final Map<String, Map<Integer, ExportSnapshotTuple>> exportSequenceNumbers,
@@ -61,6 +63,7 @@ public interface SnapshotCompletionInterest {
             this.multipartTxnId = multipartTxnId;
             this.partitionTxnIds = partitionTxnIds;
             this.truncationSnapshot = truncationSnapshot;
+            this.terminusSnapshot = terminusSnapshot;
             this.didSucceed = didSucceed;
             this.requestId = requestId;
             this.exportSequenceNumbers = exportSequenceNumbers;
@@ -79,11 +82,12 @@ public interface SnapshotCompletionInterest {
                 long multipartTxnId,
                 Map<Integer, Long> partitionTxnIds,
                 boolean truncationSnapshot,
+                boolean terminusSnapshot,
                 int drVersion,
                 long clusterCreateTime) {
             return new SnapshotCompletionEvent(
                     path, stype, nonce, multipartTxnId, partitionTxnIds, truncationSnapshot,
-                    true, "", null, null, new HashMap<>(), drVersion, clusterCreateTime);
+                    terminusSnapshot, true, "", null, null, new HashMap<>(), drVersion, clusterCreateTime);
         }
     }
 

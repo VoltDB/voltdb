@@ -216,6 +216,10 @@ public class SnapshotCompletionMonitor {
         }
     }
 
+    private boolean isTerminus(long terminus) {
+        return (terminus != 0L);
+    }
+
     private void processSnapshotData(byte data[]) throws Exception {
         if (data == null) {
             return;
@@ -227,6 +231,7 @@ public class SnapshotCompletionMonitor {
         SnapshotPathType stype = SnapshotPathType.valueOf(jsonObj.getString(SnapshotUtil.JSON_PATH_TYPE));
         String nonce = jsonObj.getString(SnapshotUtil.JSON_NONCE);
         boolean truncation = jsonObj.getBoolean("isTruncation");
+        long terminus = jsonObj.optLong(SnapshotUtil.JSON_TERMINUS, 0);
         boolean didSucceed = jsonObj.getBoolean("didSucceed");
         // A truncation request ID is not always provided. It's used for
         // snapshots triggered indirectly via ZooKeeper so that the
@@ -308,6 +313,7 @@ public class SnapshotCompletionMonitor {
                                 txnId,
                                 partitionTxnIdsMap,
                                 truncation,
+                                isTerminus(terminus),
                                 didSucceed,
                                 truncReqId,
                                 exportSequenceNumbers,

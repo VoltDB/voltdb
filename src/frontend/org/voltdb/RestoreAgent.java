@@ -498,17 +498,18 @@ SnapshotCompletionInterest, Promotable
         m_liveHosts = ImmutableSet.copyOf(hostMessenger.getLiveHostIds());
         m_voltdbrootPath = voltdbrootPath;
         m_terminusNonce = terminusNonce;
-
-        initialize(action);
     }
 
-    private void initialize(StartAction startAction) {
+    void initialize(StartAction startAction, boolean returnSegments) {
         // Load command log reinitiator
         CommandLogReinitiator replayAgent = ProClass.newInstanceOf("org.voltdb.CommandLogReinitiatorImpl",
                 "Command log replay", ProClass.HANDLER_IGNORE, m_hostId, startAction, m_hostMessenger, m_clPath,
                 m_liveHosts);
         if (replayAgent != null) {
             m_replayAgent = replayAgent;
+        }
+        if (returnSegments) {
+            m_replayAgent.returnAllSegments();
         }
         m_replayAgent.setCallback(this);
     }
@@ -713,10 +714,12 @@ SnapshotCompletionInterest, Promotable
         // Negotiate with other hosts about which snapshot to restore
         SnapshotInfo infoWithMinHostId = getRestorePlan();
         if (infoWithMinHostId != null && infoWithMinHostId.nonce.equals(m_terminusNonce)) {
-            m_replayAgent.returnAllSegments();
-            initialize(StartAction.CREATE);
+            LOG.info("Restoring database from shutdown snapshot " + m_terminusNonce + ". Command logs will not be used.");
+            initialize(StartAction.CREATE, true);
             m_planned = true;
             return infoWithMinHostId;
+        } else {
+            initialize(m_action, false);
         }
 
         /*
@@ -1334,7 +1337,8 @@ SnapshotCompletionInterest, Promotable
         // be reset and cleared as they are no longer valid.
         if (m_isLeader && m_action.doesRecover()) {
             VoltDBInterface instance = VoltDB.instance();
-            if (DrRoleType.MASTER.value().equals(instance.getCatalogContext().getCluster().getDrrole())) {
+            CatalogContext context = instance.getCatalogContext();
+            if (context != null && DrRoleType.MASTER.value().equals(context.getCluster().getDrrole())) {
                 ByteBuffer params = ByteBuffer.allocate(4);
                 params.putInt(ExecutionEngine.TaskType.RESET_DR_APPLIED_TRACKER.ordinal());
                 try {
