@@ -62,7 +62,6 @@ public class TopicsConfiguration extends TypedPropertiesBase<TopicsConfiguration
         });
         public static final Entry<Integer> NETWORK_THREAD_COUNT = new Entry<>("network.thread.count", Integer.class, 20);
         public static final Entry<String> CLUSTER_ID = new Entry<>("cluster.id", String.class);
-        public static final Entry<Integer> NEW_MEMBER_TIMEOUT = new Entry<>("newmember.timeout.ms", Integer.class, 60000);
         public static final Entry<Integer> GROUP_MAX_SESSION_TIMEOUT = new Entry<>("group.max.session.timeout.ms", Integer.class, 1_800_000);
         public static final Entry<Integer> GROUP_MIN_SESSION_TIMEOUT = new Entry<>("group.min.session.timeout.ms", Integer.class, 6000);
         public static final Entry<Integer> GROUP_MAX_SIZE = new Entry<>("group.max.size", Integer.class, Integer.MAX_VALUE);
