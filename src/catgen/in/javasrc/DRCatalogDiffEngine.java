@@ -65,17 +65,11 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
     private static final Set<Class<? extends CatalogType>> s_whiteListChildren =
             ImmutableSet.of(Column.class, Index.class, Constraint.class, Statement.class, ColumnRef.class);
 
-    private boolean m_isXDCR;
     private byte m_remoteClusterId;
 
     public DRCatalogDiffEngine(Catalog localCatalog, Catalog remoteCatalog, byte remoteClusterId) {
         super(localCatalog, remoteCatalog);
         m_remoteClusterId = remoteClusterId;
-    }
-
-    @Override
-    protected void initialize(Catalog prev, Catalog next) {
-        m_isXDCR = prev.getClusters().get("cluster").getDrrole().equals(DrRoleType.XDCR.value());
     }
 
     public static DRCatalogCommands serializeCatalogCommandsForDr(Catalog catalog, int protocolVersion) {

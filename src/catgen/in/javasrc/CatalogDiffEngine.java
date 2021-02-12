@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -166,7 +166,6 @@ public class CatalogDiffEngine {
      * @param next Tip of the new catalog.
      */
     public CatalogDiffEngine(Catalog prev, Catalog next, boolean forceVerbose) {
-        initialize(prev, next);
         m_supported = true;
         if (forceVerbose) {
             m_triggeredVerbosity = true;
@@ -202,13 +201,6 @@ public class CatalogDiffEngine {
 
     public CatalogDiffEngine(Catalog prev, Catalog next) {
         this(prev, next, false);
-    }
-
-    /**
-     * Override this to do initializations before the diff is calculated.
-     * The parameters are the same catalog parameters passed into the constructor.
-     */
-    protected void initialize(Catalog prev, Catalog next) {
     }
 
     public String commands() {
