@@ -31,7 +31,9 @@ import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.RealVoltDB;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltDBInterface;
 import org.voltdb.VoltNTSystemProcedure;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
@@ -103,18 +105,20 @@ public class UpdateLicense extends VoltNTSystemProcedure {
     //      Return the result.
     public static class LiveLicenseUpdate extends VoltNTSystemProcedure {
         public VoltTable run() {
+            VoltDBInterface voltdb = VoltDB.instance();
             VoltTable vt = constructResultTable();
-            File tmpLicense = new File(VoltDB.instance().getVoltDBRootPath(), tmpFileName);
+            File tmpLicense = new File(voltdb.getVoltDBRootPath(), tmpFileName);
             if (!tmpLicense.exists()) {
                 return constructFailureResponse(vt, "File not found: " + tmpLicense.getAbsolutePath(), null);
             }
-            File licenseF = new File(VoltDB.instance().getVoltDBRootPath(), Constants.LICENSE_FILE_NAME);
+            File licenseF = new File(voltdb.getVoltDBRootPath(), Constants.LICENSE_FILE_NAME);
             tmpLicense.renameTo(licenseF);
             LicenseApi newLicense = MiscUtils.createLicenseApi(licenseF.getAbsolutePath());
             if (newLicense == null) {
                 return constructFailureResponse(vt, "Invalid license format", licenseF);
             }
-            VoltDB.instance().updateLicenseApi(newLicense);
+            voltdb.updateLicenseApi(newLicense);
+            ((RealVoltDB)voltdb).clearLicenseSummary();
             vt.addRow(VoltSystemProcedure.STATUS_OK, "");
             return vt;
         }
