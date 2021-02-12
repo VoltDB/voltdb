@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -73,18 +73,13 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
     }
 
     public static DRCatalogCommands serializeCatalogCommandsForDr(Catalog catalog, int protocolVersion) {
-        Cluster cluster = catalog.getClusters().get("cluster");
-        Database db = cluster.getDatabases().get("database");
+        Cluster cluster = CatalogUtil.getCluster(catalog);
         CatalogSerializer serializer = new CatalogSerializer(s_whiteListFields, s_whiteListChildren);
 
-        if (protocolVersion == -1 || protocolVersion >= DRProtocol.MULTICLUSTER_PROTOCOL_VERSION) {
-            serializer.writeCommandForField(cluster, "drRole", true);
-        } else {
-            // The compatibility mode will not understand the new drRole field,
-            // so use the old field name. We'll remove this in v7.1 when the
-            // compatibility mode is deprecated.
-            serializer.writeCommandForField(db, "isActiveActiveDRed", true);
-        }
+        assert (protocolVersion == -1 || protocolVersion >= DRProtocol.MULTICLUSTER_PROTOCOL_VERSION);
+        serializer.writeCommandForField(cluster, "drRole", true);
+
+        Database db = CatalogUtil.getDatabase(catalog);
         for (Table t : db.getTables()) {
             if (t.getIsdred() && t.getMaterializer() == null && ! CatalogUtil.isStream(db, t)) {
                 t.accept(serializer);
