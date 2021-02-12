@@ -95,11 +95,6 @@ public class TopicBenchmark2 {
         ALL
     };
 
-    enum Verifier {
-        FAST,
-        LARGE,
-    }
-
     /**
      * Uses included {@link CLIConfig} class to
      * declaratively state command line options with defaults
@@ -107,7 +102,6 @@ public class TopicBenchmark2 {
      */
     static class TopicBenchConfig extends CLIConfig {
         public Verification m_verification = Verification.ALL;
-        public Verifier m_verifier = Verifier.FAST;
 
         @Option(desc = "Topic (default " + TEST_TOPIC + ").")
         String topic = TEST_TOPIC;
@@ -130,14 +124,20 @@ public class TopicBenchmark2 {
         @Option(desc = "Threshold in seconds to warn of long insertion times (default 90).")
         int insertwarnthreshold = 90;
 
-        @Option(desc = "How many subscribers (default 0): creates groups with 1 subscriber per group. DEPRECATED, use groups/groupmembers")
-        int subscribers = 0;
-
         @Option(desc = "How many subscriber groups (default 0).")
         int groups = 0;
 
         @Option(desc = "How many members per subscriber groups (default 0).")
         int groupmembers = 0;
+
+        @Option(desc = "Use static group members (default false).")
+        boolean staticmembers = false;
+
+        @Option(desc = "How many members in subscriber groups are transient (keep number low, default 0).")
+        int transientmembers = 0;
+
+        @Option(desc = "How many seconds max should a transient member be running (default 10).")
+        int transientmaxduration = 10;
 
         /*
          * The prefix should be changed for each repetition of a subscriber-only test that polls a pre-existing
@@ -156,18 +156,16 @@ public class TopicBenchmark2 {
         /*
          * This value may need to be increased when a polling and verifying thread hits this silence timeout without
          * showing the session timeout errors. This may happen towards the end of a large scale polling test.
+         * The default value is set to > 30s which is the value of the typical timeout in rebalances.
          */
-        @Option(desc = "Max polling silence per thread (default 30s).")
-        int maxpollsilence = 30;
+        @Option(desc = "Max polling silence per thread (default 45s).")
+        int maxpollsilence = 45;
 
         @Option(desc = "Log polling progress every X rows (default 0, no logging).")
         int pollprogress = 0;
 
         @Option(desc = "Verification (none, random, all) defines how many groups verify polling (default all)")
         String verification = "ALL";
-
-        @Option(desc = "Verifier (fast, large) defines the type of verifier to use to verify polling (default fast)")
-        String verifier = "FAST";
 
         @Override
         public void validate() {
@@ -177,32 +175,24 @@ public class TopicBenchmark2 {
             if (producers < 0) exitWithMessageAndUsage("producers must be >= 0");
             if (insertrate < 0) exitWithMessageAndUsage("insertrate must be >= 0");
             if (insertwarnthreshold <= 0) exitWithMessageAndUsage("insertwarnthreshold must be > 0");
-            if (subscribers < 0) exitWithMessageAndUsage("subscribers must be >= 0");
             if (topicPort <= 0) exitWithMessageAndUsage("topicPort must be > 0");
             if (groups < 0) exitWithMessageAndUsage("groups must be >= 0");
             if (groups > 0 && groupmembers <= 0) exitWithMessageAndUsage("groupmembers must be > 0 when groups are defined");
             if (sessiontimeout <= 0) exitWithMessageAndUsage("sessiontimeout must be > 0");
             if (maxpollsilence <= 0) exitWithMessageAndUsage("maxpollsilence must be > 0");
             if (pollprogress < 0) exitWithMessageAndUsage("pollprogress must be >= 0");
-
-            // Fold deprecated subscribers parameter into groups and groupmembers
-            if (subscribers > 0) {
-                if (groups > 0) exitWithMessageAndUsage("subscribers and groups cannot be > 0; using groups is preferred");
-                groups = subscribers;
-                groupmembers = 1;
-            }
+            if (transientmembers < 0) exitWithMessageAndUsage("transientmembers must be >= 0");
+            if (groups > 0 && transientmembers >= groupmembers)
+                exitWithMessageAndUsage("transientmembers must be < groupmembers, there must be at least 1 permanent member");
+            if (transientmaxduration <= 0) exitWithMessageAndUsage("transientmaxduration must be > 0");
+            if (transientmembers > 1 && maxpollsilence <= 30 )
+                exitWithMessageAndUsage("use a maxpollsilence value > 30s when using transient members (recommended 45s");
 
             try {
                 m_verification = Verification.valueOf(verification.toUpperCase());
             }
             catch (Exception e) {
                 exitWithMessageAndUsage(verification + " is an invalid verification value: " + e.getMessage());
-            }
-            try {
-                m_verifier = Verifier.valueOf(verifier.toUpperCase());
-            }
-            catch (Exception e) {
-                exitWithMessageAndUsage(verifier + " is an invalid verifier value: " + e.getMessage());
             }
         }
     }
@@ -361,11 +351,21 @@ public class TopicBenchmark2 {
      */
     KafkaConsumer<Long, String> getConsumer(String groupName) {
         String sessionTimeout = Long.toString(TimeUnit.SECONDS.toMillis(m_config.sessiontimeout));
-        Map<String, Object> consumerConfig = ImmutableMap.of(ConsumerConfig.GROUP_ID_CONFIG, groupName,
-                ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, m_brokers,
-                // Use volt max buffer size of 2MB
-                ConsumerConfig.MAX_PARTITION_FETCH_BYTES_CONFIG, "2097152",
-                ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, sessionTimeout);
+        ImmutableMap.Builder<String, Object> builder = ImmutableMap.builder();
+        builder.put(ConsumerConfig.GROUP_ID_CONFIG, groupName);
+        builder.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, m_brokers);
+        // Use volt max buffer size of 2MB
+        builder.put(ConsumerConfig.MAX_PARTITION_FETCH_BYTES_CONFIG, "2097152");
+        // Use a short rebalance timeout (default is 5 minutes)
+        // Rebalance timeout only configurable via poll interval?
+        builder.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, "10000");
+        builder.put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, sessionTimeout);
+
+        if (m_config.staticmembers) {
+            String memberName = groupName + Thread.currentThread().getId();
+            builder.put(ConsumerConfig.GROUP_INSTANCE_ID_CONFIG, memberName);
+        }
+        Map<String, Object> consumerConfig = builder.build();
 
         if (m_createdGroups.add(groupName)) {
             log.info("Joining group " + groupName + ", config = " + consumerConfig);
@@ -381,23 +381,27 @@ public class TopicBenchmark2 {
      * instead, the non-verifying groups will exit polling as soon as maxCount is reached regardless of duplicates.
      *
      * @param id                group identifier
-     * @param servers           list of servers
-     * @param topicPort         topic port
      * @param maxCount          the max count to poll
      * @param groupCount        the group count of polled records
-     * @param groupVerifier     group verifier or {@code null}
-     * @param duplicateCount    duplicate counter of {@code null}
+     * @param groupVerifier     group verifier or {@code null} if no verification
+     * @param maxDurationMs     max duration of this reader in milliseconds or {@code null} if unlimited
+     * @return {@code true} if polling completed (or in error), {@code false} if polling should be resumed
      */
-    void doReads(int id, String servers, int topicPort, long maxCount, AtomicInteger groupCount,
-            BaseVerifier groupVerifier) {
+    boolean doReads(int id, long maxCount, AtomicLong groupCount, BaseVerifier groupVerifier, Long maxDurationMs) {
         String groupId = m_config.groupprefix + "-" + id;
         long thId = Thread.currentThread().getId();
 
+        if (maxDurationMs != null) {
+            String staticMember = m_config.staticmembers ? " (static)" : "";
+            log.info("Group " + groupId + " thread " + thId + staticMember
+                    + " is transient for  " + maxDurationMs + " milliseconds");
+        }
+
         long maxSilence = TimeUnit.SECONDS.toMillis(m_config.maxpollsilence);
+        long startTime = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
+        long lastPollTime = startTime;
 
-        long lastPollTime = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
-        long lastGroupCount = 0;
-
+        long lastGroupCount = groupCount.get();
         long polledCount = 0;
         long lastLogged = 0;
         try {
@@ -409,7 +413,7 @@ public class TopicBenchmark2 {
 
                     if (groupVerifier != null && groupVerifier.cardinality() == maxCount) {
                         // Another verifying thread polled the last records
-                        return;
+                        return true;
                     }
 
                     long thisPollTime = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
@@ -417,7 +421,7 @@ public class TopicBenchmark2 {
 
                     // Decide if polling continues
                     if (m_failedInserts.get() != 0) {
-                        return;
+                        return true;
                     }
                     else if (records.count() > 0) {
                         lastPollTime = thisPollTime;
@@ -451,7 +455,7 @@ public class TopicBenchmark2 {
                                 log.info("Group " + groupId + " thread " + thId + " verified, " + curSize + " records polled, "
                                         + groupVerifier.duplicates() + " duplicates");
                                 // Got all the expected rows
-                                return;
+                                return true;
                             }
                             else if (m_config.pollprogress != 0 && (curSize - lastLogged) > m_config.pollprogress) {
                                 lastLogged = curSize ;
@@ -462,15 +466,15 @@ public class TopicBenchmark2 {
                         else if (lastGroupCount >= maxCount) {
                             // Non-verifying group is done
                             log.info("Group " + groupId + " thread " + thId + ", polled = " + lastGroupCount);
-                            return;
+                            return true;
                         }
                     }
                     else {
                         // No records
-                        int gc = groupCount.get();
+                        long gc = groupCount.get();
                         if (groupVerifier == null && gc >= maxCount) {
                             // Non-verifying group is done
-                            return;
+                            return true;
                         }
 
                         // Check for unnatural silence, i.e. no poll nor any group progress
@@ -479,6 +483,22 @@ public class TopicBenchmark2 {
                                     + TimeUnit.MILLISECONDS.toSeconds(elapsed) + " seconds, thread polled = " + polledCount
                                     + ", group polled = " + gc);
                         }
+                        else if (gc > lastGroupCount) {
+                            // Other members may have polled something since last time we did
+                            lastGroupCount = gc;
+                        }
+                    }
+
+                    // Transient member decides to bail here....
+                    if (maxDurationMs != null) {
+                        boolean bail = (thisPollTime - startTime) > maxDurationMs;
+                        // Make sure static members can make progress
+                        if (m_config.staticmembers && bail) bail = polledCount > 0;
+                        if (bail) {
+                            log.info("Group " + groupId + " thread " + thId + ", leaving group after  "
+                                    + maxDurationMs + " milliseconds, and " + polledCount + " records polled");
+                            return false;
+                        }
                     }
                 }
             }
@@ -486,17 +506,7 @@ public class TopicBenchmark2 {
         catch (Exception e) {
             exitWithException("Group " + groupId + " thread " + thId + " failed polling from topic\n", e);
         }
-    }
-
-    BaseVerifier getVerifier(long maxCount) {
-        switch (m_config.m_verifier) {
-        case FAST:
-            return new FastVerifier(maxCount);
-        case LARGE:
-            return new LargeVerifier(maxCount);
-        default:
-            return null;
-        }
+        return false;
     }
 
     /**
@@ -505,8 +515,8 @@ public class TopicBenchmark2 {
      * @throws InterruptedException
      * @throws NoConnectionsException
      */
-    void doInserts(int id, String servers, int topicPort) {
-
+    void doInserts() {
+        long thId = Thread.currentThread().getId();
         RateLimiter rateLimiter = m_config.insertrate > 0 ? RateLimiter.create(m_config.insertrate) : null;
         long inserts = 0;
         AtomicLong completed = new AtomicLong(0);
@@ -535,16 +545,16 @@ public class TopicBenchmark2 {
                         long end = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
                         long elapsedSecs = TimeUnit.MILLISECONDS.toSeconds(end - start);
                         if(e != null) {
-                            log.error("Thread " + id + " failed insert after " + elapsedSecs + " seconds: " + e.getMessage());
+                            log.error("Producer thread " + thId + " failed insert after " + elapsedSecs + " seconds: " + e.getMessage());
                             m_failedInserts.incrementAndGet();
                         } else {
                             m_successfulInserts.incrementAndGet();
                             if (elapsedSecs > m_config.insertwarnthreshold) {
-                                log.warn("Thread " + id + " completed insert after " + elapsedSecs + " seconds");
+                                log.warn("Producer thread " + thId + " completed insert after " + elapsedSecs + " seconds");
                             }
                         }
                         if (completedNow == m_config.count) {
-                            log.info("Thread " + id + " completed " + completedNow + " records");
+                            log.info("Producer thread " + thId + " completed " + completedNow + " records");
                         }
                     }
                 });
@@ -553,7 +563,7 @@ public class TopicBenchmark2 {
             producer.close();
         }
         catch (Exception e) {
-            exitWithException("Thread " + id + " failed inserting into topic\n", e);
+            exitWithException("Producer thread " + thId + " failed inserting into topic\n", e);
         }
     }
 
@@ -588,25 +598,87 @@ public class TopicBenchmark2 {
 
         ArrayList<Thread> readers = new ArrayList<>();
         for (int i = 0; i < m_config.groups; i++) {
+
             boolean verifies = (m_config.m_verification == Verification.RANDOM && verifier == i) ||
                     m_config.m_verification == Verification.ALL;
-            final int groupId = i;
 
-            final BaseVerifier groupVerifier = verifies ? getVerifier(maxCount) : null;
-            final AtomicInteger groupCount = new AtomicInteger(0);
+            final int groupId = i;
+            Map<Integer, Long> transients = getTransients();
+            if (!transients.isEmpty()) {
+                log.info("Subscriber group: " + groupId + " using transient members: " + transients);
+            }
+
+            final BaseVerifier groupVerifier = verifies ? new LargeVerifier(maxCount) : null;
+            final AtomicLong groupCount = new AtomicLong(0);
 
             for (int j = 0; j <  m_config.groupmembers; j++) {
+                final Long transientDurationMs = transients.get(j);
                 readers.add(new Thread(new Runnable() {
                     @Override
                     public void run() {
-                        doReads(groupId, m_config.servers, m_config.topicPort, maxCount,
-                                groupCount, groupVerifier);
+                        // Permanent group members will do one loop, transient group
+                        // members may iterate
+                        while (!doReads(groupId, maxCount, groupCount, groupVerifier,
+                                transientDurationMs)) {
+
+                            if (!isPollResumed(groupId, maxCount, groupCount)) {
+                                break;
+                            }
+                        }
                     }
                 }));
             }
         }
         readers.forEach(t -> t.start());
         return readers;
+    }
+
+    /**
+     * @return a map of transient members and their durations
+     */
+    Map<Integer, Long> getTransients() {
+        Map<Integer, Long> transients = new HashMap<>();
+        if (m_config.transientmembers == 0) {
+            return transients;
+        }
+        Random r = new Random();
+        while(transients.keySet().size() < m_config.transientmembers) {
+            int transientMember = r.nextInt(m_config.groupmembers);
+            if (transients.keySet().contains(transientMember)) {
+                // Same player shoots again
+                continue;
+            }
+            int transientDuration = r.nextInt(m_config.transientmaxduration) + 1;
+            transients.put(transientMember, TimeUnit.SECONDS.toMillis(transientDuration));
+        }
+        return transients;
+    }
+
+    /**
+     * Wait for polling to resume on the group
+     *
+     * @param id
+     * @param maxCount
+     * @param groupCount
+     * @return
+     */
+    boolean isPollResumed(int id, long maxCount, AtomicLong groupCount) {
+        long thId = Thread.currentThread().getId();
+        long lastGroupCount = groupCount.get();
+
+        for (long thisGroupCount = groupCount.get();
+                thisGroupCount == lastGroupCount; thisGroupCount = groupCount.get()) {
+
+            if (thisGroupCount >= maxCount) {
+                log.info("Group " + id + " thread " + thId + " will not resume polling.");
+                return false;
+            }
+
+            log.info("Group " + id + " thread " + thId + " waiting for 1 seconds...");
+            try { Thread.sleep(1000); } catch (Exception e) {}
+        }
+        log.info("Group " + id + " thread " + thId + " resumes polling");
+        return true;
     }
 
     /**
@@ -621,11 +693,10 @@ public class TopicBenchmark2 {
         log.info("Creating " + m_config.producers + " producer threads to topic " + m_config.topic);
         ArrayList<Thread> writers = new ArrayList<>();
         for (int i = 0; i < m_config.producers; i++) {
-            final int id = i;
             writers.add(new Thread(new Runnable() {
                 @Override
                 public void run() {
-                      doInserts(id, m_config.servers, m_config.topicPort);
+                      doInserts();
                   }
               }));
         }

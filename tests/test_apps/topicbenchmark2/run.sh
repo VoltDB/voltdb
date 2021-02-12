@@ -124,12 +124,13 @@ function run_benchmark() {
     java -classpath topicbenchmark2-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file:${LOG4J} \
         topicbenchmark2.TopicBenchmark2 \
         --servers=localhost \
-        --count=5000 \
-        --insertrate=1000 \
+        --count=500000 \
+        --insertrate=10000 \
         --producers=2 \
         --groups=2 \
-        --pollprogress=100 \
-        --groupmembers=2
+        --groupmembers=10 \
+        --pollprogress=10000 \
+        --transientmembers=3
 }
 
 # producer-only, run once, make sure the (count * producers) matches the count of subscriber-only runs
@@ -140,7 +141,7 @@ function run_producers() {
         topicbenchmark2.TopicBenchmark2 \
         --servers=localhost \
         --topic=TEST_TOPIC \
-        --count=500000 \
+        --count=5000000 \
         --insertrate=10000 \
         --producers=2 \
         --groups=0
@@ -153,10 +154,13 @@ function run_subscribers() {
         topicbenchmark2.TopicBenchmark2 \
         --servers=localhost \
         --topic=TEST_TOPIC \
-        --count=1000000 \
+        --count=10000000 \
         --producers=0 \
-        --groups=2 \
-        --groupmembers=2
+        --groups=6 \
+        --groupmembers=10 \
+        --groupprefix=test0r54 \
+        --pollprogress=100000 \
+        --transientmembers=5
 }
 
 # Large producer test case successfully tested on volt16a with 3-node cluster
