@@ -46,24 +46,19 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
        There are duplicates added to the set because it lists all the fields per type */
     private static final Set<String> s_whiteListFields = ImmutableSet.of(
             /* Table */
-            "isreplicated", "partitioncolumn", "materializer", "signature", "tuplelimit", "isDRed",
+            "isreplicated", "partitioncolumn", "materializer", "signature", "isDRed",
             /* ColumnRef */
             "index", "column",
             /* Column */
-            "index", "type", "size", "nullable", "name", "defaultvalue", "defaulttype",
-            "aggregatetype", "matviewsource", "matview", "inbytes",
+            "index", "type", "size", "nullable", "name", "inbytes",
             /* Index */
             "unique", "assumeUnique", "countable", "type", "expressionsjson", "predicatejson",
             /* Constraint */
-            "type", "oncommit", "index", "foreignkeytable",
-            /* Statement */
-            "sqltext", "querytype", "readonly", "singlepartition", "replicatedtabledml",
-            "iscontentdeterministic", "isorderdeterministic", "nondeterminismdetail", "cost",
-            "seqscancount", "explainplan", "tablesread", "tablesupdated", "indexesused", "cachekeyprefix"
+            "type", "oncommit", "index", "foreignkeytable"
             );
 
     private static final Set<Class<? extends CatalogType>> s_whiteListChildren =
-            ImmutableSet.of(Column.class, Index.class, Constraint.class, Statement.class, ColumnRef.class);
+            ImmutableSet.of(Column.class, Index.class, Constraint.class, ColumnRef.class);
 
     private byte m_remoteClusterId;
 
