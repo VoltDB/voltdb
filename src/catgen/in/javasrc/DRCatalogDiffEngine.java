@@ -125,38 +125,32 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
     }
 
     @Override
-    protected String checkModifyWhitelist(final CatalogType suspect, final CatalogType prevType, final String field) {
-        if (suspect instanceof Cluster ||
-            suspect instanceof PlanFragment ||
-            suspect instanceof MaterializedViewInfo) {
+    protected String checkModifyWhitelist(final CatalogType remoteType, final CatalogType localType,
+            final String field) {
+        if (remoteType instanceof Cluster ||
+            remoteType instanceof PlanFragment ||
+            remoteType instanceof MaterializedViewInfo) {
             if ("drRole".equalsIgnoreCase(field)) {
-                if (((String) prevType.getField(field)).equalsIgnoreCase(DrRoleType.XDCR.value()) ^
-                    ((String) suspect.getField(field)).equalsIgnoreCase(DrRoleType.XDCR.value())) {
+                if (((String) localType.getField(field)).equalsIgnoreCase(DrRoleType.XDCR.value()) ^
+                        ((String) remoteType.getField(field)).equalsIgnoreCase(DrRoleType.XDCR.value())) {
+                    m_replicableTables.clear();
                     return "Incompatible DR modes between two clusters";
                 }
             }
             return null;
-        } else if (suspect instanceof Table) {
-            if ("isdred".equalsIgnoreCase(field)) {
-                assert ((Boolean)suspect.getField("isDRed"));
-                return "Table " + suspect.getTypeName() + " has DR enabled on the remote cluster " + m_remoteClusterId + " but not on the local cluster";
-            }
-            if ("estimatedtuplecount".equals(field)) {
+        } else if (remoteType instanceof Table) {
+            if ("estimatedtuplecount".equals(field) ||
+                    "tuplelimit".equals(field) ||
+                    "tableType".equals(field)) {
                 return null;
             }
-            if ("tuplelimit".equals(field)) {
-                return null;
-            }
-            if ("tableType".equals(field)) {
-                return null;
-            }
-        } else if (suspect instanceof Database) {
+        } else if (remoteType instanceof Database) {
             if ("schema".equalsIgnoreCase(field) ||
                 "securityprovider".equalsIgnoreCase(field) ||
                 "isActiveActiveDRed".equalsIgnoreCase(field)) {
                 return null;
             }
-        } else if (suspect instanceof Column) {
+        } else if (remoteType instanceof Column) {
             if ("defaultvalue".equals(field) ||
                 "defaulttype".equals(field) ||
                 "matview".equals(field) ||
@@ -164,13 +158,14 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
                 "matviewsource".equals(field)) {
                 return null;
             }
-        } else if (isTableLimitDeleteStmt(suspect)) {
+        } else if (isTableLimitDeleteStmt(remoteType)) {
             return null;
-        } else if ((suspect instanceof Index && isUniqueIndex(suspect) == isUniqueIndex(prevType)) ||
-                   (suspect instanceof ColumnRef && !isUniqueIndexColumn(suspect))) {
+        } else if ((remoteType instanceof Index && isUniqueIndex(remoteType) == isUniqueIndex(localType))
+                || (remoteType instanceof ColumnRef && !isUniqueIndexColumn(remoteType))) {
             return null;
         }
-        return "Incompatible schema between remote cluster " + m_remoteClusterId + " and local cluster: field " + field + " in schema object " + suspect;
+        return "Incompatible schema between remote cluster " + m_remoteClusterId + " and local cluster: field " + field
+                + " in schema object " + remoteType;
     }
 
     private boolean isUniqueIndexColumn(CatalogType suspect) {
