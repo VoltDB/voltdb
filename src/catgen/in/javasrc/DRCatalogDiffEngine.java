@@ -21,6 +21,7 @@
 
 package org.voltdb.catalog;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -61,9 +62,11 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
             ImmutableSet.of(Column.class, Index.class, Constraint.class, ColumnRef.class);
 
     private byte m_remoteClusterId;
+    private final Set<Table> m_replicableTables = new HashSet<>();
 
     public DRCatalogDiffEngine(Catalog localCatalog, Catalog remoteCatalog, byte remoteClusterId) {
         super(localCatalog, remoteCatalog);
+        CatalogUtil.getDatabase(localCatalog).getTables().forEach(m_replicableTables::add);
         m_remoteClusterId = remoteClusterId;
     }
 
@@ -113,6 +116,7 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
         }
 
         if (suspect instanceof Column || isUniqueIndex(suspect) || isUniqueIndexColumn(suspect)) {
+            removeTableAncestor(suspect);
             return "Missing " + suspect + " from " + suspect.getParent() + " on " +
                 (ChangeType.ADDITION == changeType ? "local cluster" : "remote cluster " + m_remoteClusterId);
         }
@@ -159,8 +163,26 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
                 || (remoteType instanceof ColumnRef && !isUniqueIndexColumn(remoteType))) {
             return null;
         }
+        removeTableAncestor(localType);
         return "Incompatible schema between remote cluster " + m_remoteClusterId + " and local cluster: field " + field
                 + " in schema object " + remoteType;
+    }
+
+    /**
+     * Remove the ancestor of {@code type} which is a {@link Table} from {@link #m_replicableTables}. {@code type} can
+     * be a {@link Table}
+     *
+     * @param type {@link CatalogType} whose {@link Table} ancestor should be removed
+     */
+    private void removeTableAncestor(CatalogType type) {
+        for (CatalogType ancestor = type; ancestor != null; ancestor = ancestor.getParent()) {
+            if (ancestor instanceof Table) {
+                m_replicableTables.remove(ancestor);
+                return;
+            }
+        }
+
+        throw new IllegalArgumentException("Type does not have a table as an ancestor: " + type);
     }
 
     private boolean isUniqueIndexColumn(CatalogType suspect) {
@@ -179,5 +201,12 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
     @Override
     public List<TablePopulationRequirements> checkModifyIfTableIsEmptyWhitelist(CatalogType suspect, CatalogType prevType, String field) {
         return null;
+    }
+
+    /**
+     * @return The set of tables which can be a destination for replication from {@link #m_remoteClusterId}
+     */
+    public Set<Table> getReplicableTables() {
+        return m_replicableTables;
     }
 }
