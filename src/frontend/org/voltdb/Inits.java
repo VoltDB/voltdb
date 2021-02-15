@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -539,12 +539,9 @@ public class Inits {
             // Make the leader the only license enforcer.
             boolean isLeader = (m_rvdb.m_myHostId == 0);
             if (m_config.m_isEnterprise && isLeader && !m_isRejoin) {
-
-                if (!MiscUtils.validateLicense(m_rvdb.getLicenseApi(),
-                                               m_rvdb.m_clusterSettings.get().hostcount(),
+                if (!m_rvdb.m_licensing.validateLicense(m_rvdb.m_clusterSettings.get().hostcount(),
                         DrRoleType.fromValue(m_rvdb.getCatalogContext().getCluster().getDrrole()),
-                        m_rvdb.getConfig().m_startAction))
-                {
+                        m_rvdb.getConfig().m_startAction)) {
                     // validateLicense logs. Exit call is here for testability.
                     VoltDB.crashGlobalVoltDB("VoltDB license constraints are not met.", false, null);
                 }

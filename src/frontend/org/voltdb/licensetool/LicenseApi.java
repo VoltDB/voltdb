@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,7 +21,7 @@ import java.io.File;
 import java.util.Calendar;
 
 /**
- * The shared interface used to interact with license tool
+ * The shared interface used to interact with license
  * functionality implemented in the commercial repository.
  */
 public interface LicenseApi {
@@ -39,7 +39,7 @@ public interface LicenseApi {
     public Calendar expires();
     public String note();
     public boolean hardExpiration();
-    public boolean verify() throws LicenseException;
+    public boolean verify();
     public boolean isDrReplicationAllowed();
     public boolean isDrActiveActiveAllowed();
     public boolean isCommandLoggingAllowed();

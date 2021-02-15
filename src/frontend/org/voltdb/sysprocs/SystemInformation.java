@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -453,7 +453,7 @@ public class SystemInformation extends VoltSystemProcedure
         vt.addRow(hostId, "LOG4JPORT", Integer.toString(port));
         //Add license information
         if (MiscUtils.isPro()) {
-            vt.addRow(hostId, "LICENSE", VoltDB.instance().getLicenseInformation());
+            vt.addRow(hostId, "LICENSE", VoltDB.instance().getLicensing().getLicenseSummary());
         }
         populatePartitionGroups(hostId, vt);
 

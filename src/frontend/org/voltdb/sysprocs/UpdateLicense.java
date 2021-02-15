@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2020 VoltDB Inc.
+ * Copyright (C) 2020-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -31,7 +31,6 @@ import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.RealVoltDB;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDBInterface;
 import org.voltdb.VoltNTSystemProcedure;
@@ -42,7 +41,7 @@ import org.voltdb.VoltZK;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.common.Constants;
 import org.voltdb.licensetool.LicenseApi;
-import org.voltdb.utils.MiscUtils;
+import org.voltdb.licensetool.Licensing;
 
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.io.Files;
@@ -62,16 +61,18 @@ public class UpdateLicense extends VoltNTSystemProcedure {
     //      return the result.
     public static class LicenseValidation extends VoltNTSystemProcedure {
         public VoltTable run(byte[] licenseBytes) {
+            VoltDBInterface voltdb = VoltDB.instance();
             VoltTable vt = constructResultTable();
             // Write the bytes into a temporary file in voltdb root
-            File tmpLicense = new File(VoltDB.instance().getVoltDBRootPath(), tmpFileName);
+            File tmpLicense = new File(voltdb.getVoltDBRootPath(), tmpFileName);
             try {
                 Files.write(licenseBytes, tmpLicense);
             } catch (IOException e) {
                 return constructFailureResponse(vt, "Failed to write the new license to disk: " + e.getMessage(), null);
             }
             // validate the license format and signature
-            LicenseApi newLicense = MiscUtils.createLicenseApi(tmpLicense.getAbsolutePath());
+
+            LicenseApi newLicense = voltdb.getLicensing().createLicenseApi(tmpLicense.getAbsolutePath());
             if (newLicense == null) {
                 return constructFailureResponse(vt, "Invalid license format", tmpLicense);
             }
@@ -86,8 +87,8 @@ public class UpdateLicense extends VoltNTSystemProcedure {
             }
 
             // Are the changes allowed?
-            LicenseApi currentLicense = VoltDB.instance().getLicenseApi();
-            String error = MiscUtils.isLicenseChangeAllowed(newLicense, currentLicense);
+            LicenseApi currentLicense = voltdb.getLicensing().getLicenseApi();
+            String error = voltdb.getLicensing().isLicenseChangeAllowed(newLicense, currentLicense);
             if (error != null) {
                 return constructFailureResponse(vt, error, tmpLicense);
             }
@@ -113,12 +114,11 @@ public class UpdateLicense extends VoltNTSystemProcedure {
             }
             File licenseF = new File(voltdb.getVoltDBRootPath(), Constants.LICENSE_FILE_NAME);
             tmpLicense.renameTo(licenseF);
-            LicenseApi newLicense = MiscUtils.createLicenseApi(licenseF.getAbsolutePath());
-            if (newLicense == null) {
+            LicenseApi newLicense = voltdb.getLicensing().createLicenseApi(licenseF.getAbsolutePath());
+            if (newLicense == null) { // new license bad, old license already gone: double plus ungood
                 return constructFailureResponse(vt, "Invalid license format", licenseF);
             }
-            voltdb.updateLicenseApi(newLicense);
-            ((RealVoltDB)voltdb).clearLicenseSummary();
+            voltdb.getLicensing().updateLicenseApi(newLicense);
             vt.addRow(VoltSystemProcedure.STATUS_OK, "");
             return vt;
         }

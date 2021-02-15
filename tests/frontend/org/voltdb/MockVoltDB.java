@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -65,6 +65,7 @@ import org.voltdb.elastic.ElasticService;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.licensetool.LicenseApi;
+import org.voltdb.licensetool.Licensing;
 import org.voltdb.serdes.AvroSerde;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.DbSettings;
@@ -918,11 +919,8 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public void updateLicenseApi(LicenseApi newLicense) { }
-
-    @Override
-    public String getLicenseInformation() {
-        return "";
+    public Licensing getLicensing() {
+        return null;
     }
 
     @Override

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -184,7 +184,9 @@ import org.voltdb.iv2.TransactionTaskQueue;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.largequery.LargeBlockManager;
+import org.voltdb.licensetool.CommunityLicensing;
 import org.voltdb.licensetool.LicenseApi;
+import org.voltdb.licensetool.Licensing;
 import org.voltdb.messaging.MigratePartitionLeaderMessage;
 import org.voltdb.messaging.VoltDbMessageFactory;
 import org.voltdb.modular.ModuleManager;
@@ -507,12 +509,19 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private ScheduledThreadPoolExecutor m_periodicWorkThread;
     private ScheduledThreadPoolExecutor m_periodicPriorityWorkThread;
 
-    // The configured license api: use to decide enterprise/community edition feature enablement
-    private LicenseApi m_licenseApi;
+    // Interface to all things license-related
+    Licensing m_licensing;
 
-    // Used by system information sysproc
-    // Populated on demand.
-    private String m_licenseInformation;
+    private void connectLicensing() {
+        if (m_licensing == null) {
+            if (MiscUtils.isPro()) {
+                m_licensing = ProClass.newInstanceOf("org.voltdb.licensetool.ProLicensing",
+                                                     "licensing", ProClass.HANDLER_CRASH);
+            } else {
+                m_licensing = new CommunityLicensing();
+            }
+        }
+    }
 
     private LatencyStats m_latencyStats;
     private LatencyHistogramStats m_latencyCompressedStats;
@@ -539,18 +548,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     @Override
+    public Licensing getLicensing() {
+        return m_licensing;
+    }
+
+    @Override
     public LicenseApi getLicenseApi() {
-        return m_licenseApi;
-    }
-
-    @Override
-    public void updateLicenseApi(LicenseApi newLicenseApi) {
-        m_licenseApi = newLicenseApi;
-    }
-
-    @Override
-    public String getLicenseInformation() {
-        return buildLicenseSummary();
+        return m_licensing != null ? m_licensing.getLicenseApi() : null;
     }
 
     @Override
@@ -880,53 +884,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return 0;
     }
 
-    private int outputLicense(Configuration config) {
-        File licFH = new VoltFile(config.m_pathToLicense);
-
-        if (!licFH.isFile() || !licFH.canRead()) {
-            consoleLog.fatal("Failed to get license. " + licFH.getAbsolutePath());
-            return -1;
-        }
-
-        boolean useStdout = config.m_getOutput.equals("-");
-        try {
-            if (!useStdout && checkExistence(config, "license")) {
-                return -1;
-            }
-            try {
-                File target = new File(config.m_getOutput);
-                InputStream is = null;
-                OutputStream os = null;
-                try {
-                    is = new FileInputStream(licFH);
-                    os = new FileOutputStream(target);
-                    byte[] buffer = new byte[1024];
-                    int length;
-                    while ((length = is.read(buffer)) > 0) {
-                        if (useStdout) {
-                            System.out.write(buffer, 0, length);
-                        } else {
-                            os.write(buffer, 0, length);
-                        }
-                    }
-                } finally {
-                    is.close();
-                    os.close();
-                }
-            } catch (IOException e) {
-                consoleLog.fatal("Failed to copy license to " + config.m_getOutput
-                        + " : " + e.getMessage());
-                return -1;
-            }
-            if (!useStdout) {
-                consoleLog.info("license saved as " + config.m_getOutput);
-            }
-        } catch (Exception e) {
-            consoleLog.fatal("Failed to get license. " + "Please make sure voltdbroot is a valid directory. " + e.getMessage());
-            return -1;
-        }
-        return 0;
-    }
 
     @Override
     public void cli(Configuration config) {
@@ -960,121 +917,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 returnStatus = outputProcedures(config);
                 break;
             case LICENSE:
-                returnStatus = outputLicense(config);
+                connectLicensing();
+                returnStatus = m_licensing.outputLicense() ? 0 : -1;
                 break;
         }
         VoltDB.exit(returnStatus);
-    }
-
-    // Search in a few default places (./, jar file directory and ~/) when license file
-    // isn't specified in command line. Used in StartAction.INITIALIZATION.
-    //
-    // ENG-20094: For backward-compatibility VoltDB init command skips searching voltdbroot for license.
-    private Pair<LicenseApi, String> searchDefaultDirs() {
-        return searchDefaultDirs(null);
-    }
-
-    // Search in a few default places (voltdbroot, ./, jar file directory and ~/) when license
-    // file isn't specified in command line.
-    private Pair<LicenseApi, String> searchDefaultDirs(File vdbRoot) {
-        String[] defaultDirs = MiscUtils.buildDefaultLicenseDirs(vdbRoot);
-        for (String path : defaultDirs) {
-            hostLog.info("Searching for license file located at " + path);
-            LicenseApi api = MiscUtils.createLicenseApi(path);
-            if (api != null) {
-                hostLog.info("Found VoltDB license file at " + path);
-                return new Pair<>(api, path);
-            }
-        }
-        return null;
-    }
-
-    private Pair<LicenseApi, String> getLicense(String licensePath) {
-        Pair<LicenseApi, String> pair = null;
-        LicenseApi api = MiscUtils.createLicenseApi(licensePath);
-        if (api == null) {
-            hostLog.fatal("Unable to open license file in provided path: " + licensePath);
-        } else {
-            pair = new Pair<>(api, licensePath);
-        }
-        return pair;
-    }
-
-    private Pair<LicenseApi, String> loadLicenseApi(Configuration config) {
-        Pair<LicenseApi, String> pair = null;
-        if (config.m_startAction == StartAction.INITIALIZE) {
-            if (config.m_pathToLicense == null) {
-                pair = searchDefaultDirs();
-                // init without a license is not fatal
-            } else {
-                pair = getLicense(config.m_pathToLicense);
-            }
-        } else {
-            if (config.m_pathToLicense == null) {
-                pair = searchDefaultDirs(config.m_voltdbRoot);
-                if (pair == null) {
-                    hostLog.fatal("Unable to locate license file in default directories.");
-                }
-            } else {
-                consoleLog.warn("--license is deprecated in \"voltdb start\" command, please use it in \"voltdb init\".");
-                pair = getLicense(config.m_pathToLicense);
-            }
-        }
-        return pair;
-    }
-
-    private void determineEdition(Configuration config, LicenseApi api) {
-        String edition = "Community Edition";
-        if (api == null) {
-            // init without specifying license is not fatal
-            if (config.m_startAction == StartAction.INITIALIZE && config.m_pathToLicense == null) {
-                return;
-            }
-            hostLog.fatal("Please contact info@voltdb.com to request a license.");
-            VoltDB.crashLocalVoltDB(
-                    "Failed to initialize license verifier. " + "See previous log message for details.", false,
-                    null);
-        }
-        if (System.getProperty("user.name").equals("root")) {
-            hostLog.warn("VoltDB is running as root. " +
-                         "Running the VoltDB server software from the system root account is not recommended.");
-        }
-
-        if (config.m_isEnterprise) {
-            if (api.isEnterprise()) {
-                edition = "Enterprise Edition";
-            }
-            if (api.isPro()) {
-                edition = "Pro Edition";
-            }
-            if (api.isEnterpriseTrial()) {
-                edition = "Enterprise Edition";
-            }
-            if (api.isProTrial()) {
-                edition = "Pro Edition";
-            }
-            if (api.isAWSMarketplace()) {
-                edition = "AWS Marketplace Edition";
-            }
-        }
-
-        // this also prints out the license type on the console
-        readBuildInfo(edition);
-
-        // print out the licensee on the license
-        if (config.m_isEnterprise) {
-            String licensee = api.licensee();
-            if ((licensee != null) && (licensee.length() > 0)) {
-                consoleLog.info(String.format("Licensed to: %s", licensee));
-            }
-        }
-
-        // Log some facts about the user account: account name,
-        // home dir, working dir where Java was started
-        hostLog.info(String.format("User properties: user.name '%s' user.home '%s' user.dir '%s'",
-                                   System.getProperty("user.name"),
-                                   System.getProperty("user.home"),
-                                   System.getProperty("user.dir")));
     }
 
     /**
@@ -1112,18 +959,25 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
 
             // Check license availability
-            Pair<LicenseApi, String> licenseApiAndPath = loadLicenseApi(config);
-            String licensePath = null;
-            if (licenseApiAndPath != null) {
-                m_licenseApi = licenseApiAndPath.getFirst();
-                licensePath = licenseApiAndPath.getSecond();
-            } else {
-                // Some JUnit server thread tests reuse the license api
-                m_licenseApi = null;
-            }
+            connectLicensing();
+            m_licensing.loadLicenseApi(config);
 
             // Read build info and print license type on the console
-            determineEdition(config, m_licenseApi);
+            String edition = m_licensing.determineEdition();
+            readBuildInfo(edition);
+
+            // Log some facts about the user account: account name,
+            // home dir, working dir where Java was started
+            hostLog.info(String.format("User properties: user.name '%s' user.home '%s' user.dir '%s'",
+                                       System.getProperty("user.name"),
+                                       System.getProperty("user.home"),
+                                       System.getProperty("user.dir")));
+
+            // Warn if user is named "root"
+            if (System.getProperty("user.name").equals("root")) {
+                hostLog.warn("VoltDB is running as root. " +
+                             "Running the VoltDB server software from the system root account is not recommended.");
+            }
 
             // Replay command line args that we can see
             StringBuilder sb = new StringBuilder(2048).append("Command line arguments: ");
@@ -1186,7 +1040,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     CatalogUtil.addExportConfigToDRConflictsTable(readDepl.deployment.getExport());
                 }
                 stageDeploymentFileForInitialize(config, readDepl.deployment);
-                stageLicenseFile(config, licensePath);
+                m_licensing.stageLicenseFile();
                 stageSchemaFiles(config,
                         readDepl.deployment.getDr() != null &&
                                 DrRoleType.XDCR.equals(readDepl.deployment.getDr().getRole()));
@@ -1195,7 +1049,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 consoleLog.info("Initialized VoltDB root directory " + config.m_voltdbRoot.getPath());
                 VoltDB.exit(0);
             } else {
-                stageLicenseFile(config, licensePath);
+                m_licensing.stageLicenseFile();
             }
 
             if (config.m_startAction.isLegacy()) {
@@ -1388,7 +1242,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             validateStartAction();
 
             // Race to write license to ZK, compare local copy with ZK's.
-            checkLicenseConsistency(m_messenger.getZK());
+            m_licensing.checkLicenseConsistency(m_messenger.getZK());
 
             if (m_rejoining) {
                 //grab rejoining lock before catalog read
@@ -1434,8 +1288,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     int kfactor = m_catalogContext.getDeployment().getCluster().getKfactor();
                      m_joinCoordinator = ProClass.newInstanceOf("org.voltdb.elastic.ElasticJoinNodeCoordinator", "Elastic",
                             ProClass.HANDLER_LOG, m_messenger, VoltDB.instance().getVoltDBRootPath(), kfactor);
-                    if (!MiscUtils.validateLicense(getLicenseApi(),
-                            getHostCount() + m_joinCoordinator.getHostsJoining(),
+                     if (!m_licensing.validateLicense(getHostCount() + m_joinCoordinator.getHostsJoining(),
                             DrRoleType.fromValue(getCatalogContext().getCluster().getDrrole()),
                             m_config.m_startAction)) {
                         VoltDB.crashLocalVoltDB("VoltDB license constraints are not met.");
@@ -1716,7 +1569,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_globalServiceElector.registerService(() -> m_taskManager.promoteToLeader(m_catalogContext));
 
             // DR overflow directory
-            if (VoltDB.instance().getLicenseApi().isDrReplicationAllowed()) {
+            if (getLicenseApi().isDrReplicationAllowed()) {
                 m_producerDRGateway = ProClass.newInstanceOf("org.voltdb.dr2.DRProducer", "DR Producer",
                         ProClass.HANDLER_CRASH,
                         new VoltFile(VoltDB.instance().getDROverflowPath()),
@@ -1852,9 +1705,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_clientInterface.schedulePeriodicWorks();
 
             // print out a bunch of useful system info
-            logLicensingInfo();
+            m_licensing.logLicensingInfo();
             logDebuggingInfo(m_config, m_httpPortExtraLogMessage, m_jsonEnabled);
-
 
             // warn the user on the console if k=0 or if no command logging
             if (m_configuredReplicationFactor == 0) {
@@ -2155,7 +2007,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     class DailyLogTask implements Runnable {
         @Override
         public void run() {
-            logLicensingInfo();
+            m_licensing.logLicensingInfo();
             m_myHostId = m_messenger.getHostId();
             hostLog.info(String.format("Host id of this node is: %d", m_myHostId));
             hostLog.info("URL of deployment info: " + m_config.m_pathToDeployment);
@@ -2169,24 +2021,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             // daily maintenance
             EnterpriseMaintenance em = EnterpriseMaintenance.get();
             if (em != null) { em.dailyMaintenaceTask(); }
-        }
-    }
-
-    private void logLicensingInfo() {
-        SimpleDateFormat sdf = new SimpleDateFormat("EEE MMM d, yyyy");
-
-        hostLog.info("LICENSE INFORMATION: " + m_licenseApi.getLicenseType() + " license issued by VoltDB to " + m_licenseApi.licensee() + " on "
-                + sdf.format(m_licenseApi.issued().getTime()));
-        hostLog.info("LICENSE KEY: " + m_licenseApi.getSignature());
-        hostLog.info("LICENSE EXPIRES: " + sdf.format(m_licenseApi.expires().getTime()));
-        hostLog.info("LICENSE CONSTRAINTS: " + m_licenseApi.maxHostcount() + " nodes");
-
-        if(m_licenseApi.isUnrestricted()) {
-            hostLog.info("LICENSE FEATURES: Unrestricted");
-        }
-        else {
-            hostLog.info("LICENSE FEATURES: " + "commandLoggingEnabled=" + m_licenseApi.isCommandLoggingAllowed()
-                + ", activeActiveDREnabled=" + m_licenseApi.isDrActiveActiveAllowed() + ", isDatabaseReplicationAllowed=" + m_licenseApi.isDrReplicationAllowed());
         }
     }
 
@@ -2297,45 +2131,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     }
                 }
             }
-        }
-    }
-
-    private void checkLicenseConsistency(ZooKeeper zk) {
-        // Community?
-        if (!MiscUtils.isPro()) {
-            return;
-        }
-
-        // Enterprise!
-        String vdbroot = m_config.m_voltdbRoot.getPath();
-        File destF = new VoltFile(vdbroot, Constants.LICENSE_FILE_NAME);
-        String destPath = destF.getAbsolutePath();
-        if (!destF.exists()) {
-            VoltDB.crashLocalVoltDB("Couldn't locate license file at " + destPath);
-        }
-        byte[] licenseBytes = null;
-        try {
-            licenseBytes = org.voltcore.utils.CoreUtils.urlToBytes(destPath);
-        } catch (Exception ex) {
-            VoltDB.crashLocalVoltDB("Hit unexpected failure while reading license file at " + destPath);
-        }
-        try {
-            try {
-                // Race to upload license.
-                zk.create(VoltZK.license, licenseBytes, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-            } catch (KeeperException.NodeExistsException e) {
-                // If license node exists, compare the checksum with local license.
-                byte[] zkLicenseBytes = null;
-                zkLicenseBytes = zk.getData(VoltZK.license, null, null);
-                byte[] remoteHash = CatalogUtil.makeHash(zkLicenseBytes);
-                byte[] localHash = CatalogUtil.makeHash(licenseBytes);
-                if (!Arrays.equals(remoteHash, localHash)) {
-                    VoltDB.crashLocalVoltDB("Detected inconsistent license file in current node. "
-                            + "Please make sure license files under the following path on all nodes are the same: " + destPath);
-                }
-            }
-        } catch(Exception e) {
-            VoltDB.crashLocalVoltDB("Error while writing license to ZooKeeper: " + e);
         }
     }
 
@@ -2798,35 +2593,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
         // Save cluster settings properties derived from the deployment file
         ClusterSettings.create(CatalogUtil.asClusterSettingsMap(dt)).store();
-    }
-
-    private void stageLicenseFile(Configuration config, String licensePath) {
-        // No such need in community version
-        if (!MiscUtils.isPro()) {
-            return;
-        }
-        String vdbroot = config.m_voltdbRoot.getPath();
-        // Don't stage the staged file on top of itself.
-        File destF = new VoltFile(vdbroot, Constants.LICENSE_FILE_NAME);
-        String destPath = destF.getAbsolutePath();
-        if (licensePath != null && destPath.equals(licensePath)) {
-            hostLog.info("License file already staged: " + destPath);
-            return;
-        }
-        // delete the prior license if exists
-        if (config.m_startAction == StartAction.INITIALIZE && config.m_forceVoltdbCreate && destF.exists()) {
-            destF.delete();
-        }
-        // copy new license to voltdb root
-        if (licensePath != null) {
-            File licenseF = new File(licensePath);
-            try {
-                Files.copy(licenseF, destF);
-                hostLog.info("License file is copied to VoltDB root directory: " + destPath);
-            } catch (IOException e) {
-                VoltDB.crashLocalVoltDB("Unable to copy license file to " + vdbroot, false, e);
-            }
-        }
     }
 
     private void stageSchemaFiles(Configuration config, boolean isXCDR) {
@@ -5729,46 +5495,4 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
         return false;
     }
-
-    /*
-     * Builds a summary of license information for use by
-     * the SystemInformation sysproc. Caches the value for
-     * future use.
-     */
-    private String buildLicenseSummary() {
-        String info;
-        synchronized (m_licenseSync) {
-            info = m_licenseInformation;
-            if (info == null || info.isEmpty()) {
-                try {
-                    LicenseApi licenseApi = getLicenseApi();
-                    SimpleDateFormat sdf = new SimpleDateFormat("EEE MMM d, yyyy");
-                    JSONObject jo = new JSONObject();
-                    jo.put("trial", licenseApi.isAnyKindOfTrial());
-                    jo.put("hostcount", licenseApi.maxHostcount());
-                    jo.put("commandlogging", licenseApi.isCommandLoggingAllowed());
-                    jo.put("wanreplication", licenseApi.isDrReplicationAllowed());
-                    jo.put("expiration", sdf.format(licenseApi.expires().getTime()));
-                    jo.put("type", licenseApi.getLicenseType());
-                    info = jo.toString();
-                } catch (JSONException ex) {
-                    hostLog.warn("Failed to summarize license information: " + ex.getMessage());
-                    info = "";
-                }
-                m_licenseInformation = info;
-            }
-        }
-        return info;
-    }
-
-    /*
-     * Cache reset for UpdateLicence sysproc
-     */
-    public void clearLicenseSummary() {
-        synchronized (m_licenseSync) {
-            m_licenseInformation = null;
-        }
-    }
-
-    private Object m_licenseSync = new Object();
 }

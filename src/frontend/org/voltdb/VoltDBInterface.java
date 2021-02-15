@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -35,6 +35,7 @@ import org.voltdb.elastic.ElasticService;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.licensetool.LicenseApi;
+import org.voltdb.licensetool.Licensing;
 import org.voltdb.serdes.AvroSerde;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.snmp.SnmpTrapSender;
@@ -350,10 +351,11 @@ public interface VoltDBInterface
      * @return License API based on edition.
      */
     public LicenseApi getLicenseApi();
-    public void updateLicenseApi(LicenseApi newLicense);
 
-    //Return JSON string represenation of license information.
-    public String getLicenseInformation();
+    /**
+     * Return licensing support object.
+     */
+    public Licensing getLicensing();
 
     public <T> ListenableFuture<T> submitSnapshotIOWork(Callable<T> work);
 
