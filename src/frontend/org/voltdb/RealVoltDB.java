@@ -76,6 +76,7 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -4005,7 +4006,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             boolean requireCatalogDiffCmdsApplyToEE,
             boolean hasSchemaChange,
             boolean requiresNewExportGeneration,
-            boolean hasSecurityUserChange)
+            boolean hasSecurityUserChange,
+            Consumer<Map<Byte, String[]>> replicableTablesConsumer)
     {
 
         try {
@@ -4032,7 +4034,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     try {
                         doCatalogUpdate(diffCommands, nextCatalogVersion, genId, isForReplay,
                                         requireCatalogDiffCmdsApplyToEE, hasSchemaChange,
-                                        requiresNewExportGeneration, hasSecurityUserChange);
+                                        requiresNewExportGeneration, hasSecurityUserChange,
+                                        replicableTablesConsumer);
                     }
                     finally {
                         m_statusTracker.set(prevNodeState);
@@ -4054,7 +4057,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             boolean requireCatalogDiffCmdsApplyToEE,
             boolean hasSchemaChange,
             boolean requiresNewExportGeneration,
-            boolean hasSecurityUserChange) {
+            boolean hasSecurityUserChange,
+            Consumer<Map<Byte, String[]>> replicableTablesConsumer) {
 
         final ReplicationRole oldRole = getReplicationRole();
 
@@ -4167,7 +4171,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                                               (newDRConnectionSource != null && !newDRConnectionSource.equals(oldDRConnectionSource)
                                                ? newDRConnectionSource
                                                : null),
-                                              (byte) m_catalogContext.cluster.getPreferredsource());
+                                              (byte) m_catalogContext.cluster.getPreferredsource(),
+                                              replicableTablesConsumer);
         }
 
         // Check if this is promotion

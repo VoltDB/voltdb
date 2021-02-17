@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -253,7 +253,7 @@ public class MpInitiator extends BaseInitiator<MpScheduler> implements Promotabl
     {
         // note this will never require snapshot isolation because the MPI has no snapshot funtionality
         m_executionSite.updateCatalog(diffCmds, context, false, true, Long.MIN_VALUE, Long.MIN_VALUE, Long.MIN_VALUE,
-                isReplay, requireCatalogDiffCmdsApplyToEE, requiresNewExportGeneration);
+                isReplay, requireCatalogDiffCmdsApplyToEE, requiresNewExportGeneration, null);
         m_scheduler.updateCatalog(diffCmds, context);
     }
 

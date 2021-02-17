@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -44,6 +44,7 @@ import org.voltdb.VoltZK;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.dtxn.UndoAction;
 import org.voltdb.exceptions.SpecifiedException;
 import org.voltdb.plannerv2.VoltSchemaPlus;
 import org.voltdb.utils.CatalogUtil;
@@ -60,7 +61,9 @@ import org.voltdb.utils.VoltTableUtil;
  *
  */
 public class UpdateCore extends VoltSystemProcedure {
-    VoltLogger log = new VoltLogger("HOST");
+    private static VoltLogger log = new VoltLogger("HOST");
+    // Map from producer cluster ID to list of table names. Only used when applying a catalog
+    private static volatile Map<Byte, String[]> s_replicableTables;
 
     @Override
     public long[] getPlanFragmentIds() {
@@ -307,6 +310,20 @@ public class UpdateCore extends VoltSystemProcedure {
                 // Bring the DR and Export buffer update to date.
                 context.getSiteProcedureConnection().quiesce();
 
+                if (context.isLowestSiteId()) {
+                    registerUndoAction(new UndoAction() {
+                        @Override
+                        public void undo() {
+                            s_replicableTables = null;
+                        }
+
+                        @Override
+                        public void release() {
+                            s_replicableTables = null;
+                        }
+                    });
+                }
+
                 // update the global catalog if we get there first
                 CatalogContext catalogContext =
                         VoltDB.instance().catalogUpdate(
@@ -318,7 +335,8 @@ public class UpdateCore extends VoltSystemProcedure {
                                 requireCatalogDiffCmdsApplyToEE,
                                 hasSchemaChange,
                                 requiresNewExportGeneration,
-                                hasSecurityUserChange);
+                                hasSecurityUserChange,
+                                r -> s_replicableTables = r);
 
                 // If the cluster is in master role only (not replica or XDCR), reset trackers.
                 // The producer would have been turned off by the code above already.
@@ -334,7 +352,7 @@ public class UpdateCore extends VoltSystemProcedure {
                 context.updateCatalog(commands, catalogContext,
                         requiresSnapshotIsolation, txnId, uniqueId, spHandle,
                         isForReplay,
-                        requireCatalogDiffCmdsApplyToEE, requiresNewExportGeneration);
+                        requireCatalogDiffCmdsApplyToEE, requiresNewExportGeneration, s_replicableTables);
             }
             // if seen before by this code, then check to see if this is a restart
             else if (context.getCatalogVersion() == nextCatalogVersion) {

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -1767,4 +1767,22 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeDelet
     }
     return 1;
 }
+
+/*
+ * Class:     org_voltdb_jni_ExecutionEngine
+ * Method:    nativeSetReplicableTables
+ * Signature: (JI[[B)I
+ */
+SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSetReplicableTables
+  (JNIEnv *env, jclass clazz, jlong pointer, jint clusterId, jobjectArray tables) {
+    auto engine = castToEngine(pointer);
+    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
+    try {
+        return 0;
+    } catch (const FatalException &e) {
+        topend->crashVoltDB(e);
+    }
+    return 1;
+}
+
 /** @} */ // end of JNI doxygen group

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -282,4 +282,12 @@ public interface SiteProcedureConnection {
      * @return the max size for all MP responses
      */
     public long getMaxTotalMpResponseSize();
+
+    /**
+     * Set the list of tables which can be replicated to from {@code clusterId}
+     *
+     * @param clusterId of producer cluster
+     * @param tables    which match in both schemas and can be the target of replication
+     */
+    public void setReplicableTables(byte clusterId, String[] tables);
 }

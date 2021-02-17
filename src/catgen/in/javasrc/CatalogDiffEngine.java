@@ -37,8 +37,8 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 
 import org.apache.commons.lang3.StringUtils;
-import org.voltdb.VoltType;
 import org.voltdb.TableType;
+import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogChangeGroup.FieldChange;
 import org.voltdb.catalog.CatalogChangeGroup.TypeChanges;
 import org.voltdb.compiler.MaterializedViewProcessor;
@@ -166,6 +166,10 @@ public class CatalogDiffEngine {
      * @param next Tip of the new catalog.
      */
     public CatalogDiffEngine(Catalog prev, Catalog next, boolean forceVerbose) {
+        this(prev, next, forceVerbose, true);
+    }
+
+    protected CatalogDiffEngine(Catalog prev, Catalog next, boolean forceVerbose, boolean runDiff) {
         m_supported = true;
         if (forceVerbose) {
             m_triggeredVerbosity = true;
@@ -191,11 +195,8 @@ public class CatalogDiffEngine {
             m_changes.put(dc, new CatalogChangeGroup(dc));
         }
 
-        diffRecursively(prev, next);
-        if (m_triggeredVerbosity || m_triggerForVerbosity.equals("final")) {
-            System.out.println("DEBUG VERBOSE diffRecursively Errors:" +
-                               ( m_supported ? " <none>" : "\n" + errors()));
-            System.out.println("DEBUG VERBOSE diffRecursively Commands: " + commands());
+        if (runDiff) {
+            runDiff(prev, next);
         }
     }
 
@@ -298,6 +299,15 @@ public class CatalogDiffEngine {
 
     public String errors() {
         return m_errors.toString();
+    }
+
+    protected void runDiff(Catalog prev, Catalog next) {
+        diffRecursively(prev, next);
+        if (m_triggeredVerbosity || m_triggerForVerbosity.equals("final")) {
+            System.out.println("DEBUG VERBOSE diffRecursively Errors:" +
+                               ( m_supported ? " <none>" : "\n" + errors()));
+            System.out.println("DEBUG VERBOSE diffRecursively Commands: " + commands());
+        }
     }
 
     enum ChangeType {

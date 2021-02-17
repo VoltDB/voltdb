@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -255,7 +255,8 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         @Override
         public boolean updateCatalog(String diffCmds, CatalogContext context,
                 boolean requiresSnapshotIsolation, long txnId, long uniqueId, long spHandle, boolean isReplay,
-                boolean requireCatalogDiffCmdsApplyToEE, boolean requiresNewExportGeneration)
+                boolean requireCatalogDiffCmdsApplyToEE, boolean requiresNewExportGeneration,
+                Map<Byte, String[]> replicableTables)
         {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
@@ -798,5 +799,10 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     @Override
     public long getMaxTotalMpResponseSize() {
         return MpTransactionState.MP_MAX_TOTAL_RESP_SIZE / MpRoSitePool.MAX_POOL_SIZE;
+    }
+
+    @Override
+    public void setReplicableTables(byte clusterId, String[] tables) {
+        throw new UnsupportedOperationException();
     }
 }

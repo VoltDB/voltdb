@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -458,11 +458,13 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 long txnId, long uniqueId, long spHandle,
                 boolean isReplay,
                 boolean requireCatalogDiffCmdsApplyToEE,
-                boolean requiresNewExportGeneration)
+                boolean requiresNewExportGeneration,
+                Map<Byte, String[]> replicableTables)
         {
             return Site.this.updateCatalog(diffCmds, context, requiresSnapshotIsolation,
                     false, txnId, uniqueId, spHandle, isReplay,
-                    requireCatalogDiffCmdsApplyToEE, requiresNewExportGeneration);
+                    requireCatalogDiffCmdsApplyToEE, requiresNewExportGeneration,
+                    replicableTables);
         }
 
         @Override
@@ -1724,7 +1726,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                                  long spHandle,
                                  boolean isReplay,
                                  boolean requireCatalogDiffCmdsApplyToEE,
-                                 boolean requiresNewExportGeneration)
+                                 boolean requiresNewExportGeneration,
+                                 Map<Byte, String[]> replicableTables)
     {
         CatalogContext oldContext = m_context;
         m_context = context;
@@ -1785,11 +1788,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             }
         }
 
-        //Necessary to quiesce before updating the catalog
-        //so export data for the old generation is pushed to Java.
-        //No need to quiesce as there is no rolling of generation OLD datasources will be polled and pushed until there is no more data.
-        //m_ee.quiesce(m_lastCommittedSpHandle);
-        m_ee.updateCatalog(m_context.m_genId, requiresNewExportGeneration, diffCmds);
+        m_ee.updateCatalog(m_context.m_genId, requiresNewExportGeneration, diffCmds, replicableTables);
 
         m_tickProducer.changeTickInterval(newCluster.getGlobalflushinterval());
 
@@ -2072,5 +2071,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public void deleteExpiredOffsets(TimestampType deleteOlderThan) {
         m_ee.deleteExpiredTopicsOffsets(getNextUndoToken(), deleteOlderThan);
+    }
+
+    @Override
+    public void setReplicableTables(byte clusterId, String[] tables) {
+        m_ee.setReplicableTables(clusterId, tables);
     }
 }

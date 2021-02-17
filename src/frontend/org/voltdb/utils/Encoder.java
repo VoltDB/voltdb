@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -162,6 +162,11 @@ public class Encoder {
         if (string.length() == 0) {
             return new byte[0];
         }
+
+        return decompress(bytes);
+    }
+
+    public static byte[] decompress(byte[] bytes) {
         ByteArrayInputStream bais = new ByteArrayInputStream(bytes);
         InflaterInputStream dis = new InflaterInputStream(bais);
 

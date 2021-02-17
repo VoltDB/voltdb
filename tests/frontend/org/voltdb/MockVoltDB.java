@@ -35,6 +35,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -524,7 +525,8 @@ public class MockVoltDB implements VoltDBInterface
     public CatalogContext catalogUpdate(String diffCommands,
             int expectedCatalogVersion, int nextCatalogVersion, long genId,
             boolean isForReplay, boolean requireCatalogDiffCmdsApplyToEE,
-            boolean hasSchemaChange, boolean requiresNewExportGeneration,  boolean hasSecurityUserChange)
+            boolean hasSchemaChange, boolean requiresNewExportGeneration, boolean hasSecurityUserChange,
+            Consumer<Map<Byte, String[]>> replicableTablesConsumer)
     {
         throw new UnsupportedOperationException("unimplemented");
     }

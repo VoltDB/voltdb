@@ -722,6 +722,10 @@ public class SystemProcedureCatalog {
                         Initiator.SINGLE_PARTITION, Mutable.READ_ONLY, 0, VoltType.VARBINARY,
                         false, false, true, Durability.NOT_DURABLE,
                         false, false, Restartability.NOT_APPLICABLE));
+
+        builder.put("@SetReplicableTables",
+                Builder.createMp("org.voltdb.sysprocs.SetReplicableTables").commercial().allowedInReplica().build());
+
         listing = builder.build();
     }
 

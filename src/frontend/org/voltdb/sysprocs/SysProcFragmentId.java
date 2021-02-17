@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -282,6 +282,10 @@ public class SysProcFragmentId
     // @TopicControl
     public static final int PF_topicControl = 410;
     public static final int PF_topicControlAggregate = 411;
+
+    // @SetReplicableTables
+    public static final int PF_setReplicableTables = 412;
+    public static final int PF_setReplicableTablesAggregate = 413;
 
     public static boolean isEnableScoreboardFragment(byte[] planHash) {
         long fragId = VoltSystemProcedure.hashToFragId(planHash);

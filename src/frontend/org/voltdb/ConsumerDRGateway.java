@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
+import java.util.function.Consumer;
 
 import org.voltcore.utils.Pair;
 import org.voltdb.ProducerDRGateway.MeshMemberInfo;
@@ -38,7 +39,8 @@ public interface ConsumerDRGateway extends Promotable {
      *        Use -1 if there is no preferred snapshot source. If this joiner cluster has already
      *        received snapshot, this change will have no effect.
      */
-    void updateCatalog(CatalogContext catalog, String newConnectionSource, byte snapshotSource);
+    void updateCatalog(CatalogContext catalog, String newConnectionSource, byte snapshotSource,
+            Consumer<Map<Byte, String[]>> replicableTablesConsumer);
 
     void swapTables(final Set<Pair<String, Long>> swappedTables);
 
@@ -80,6 +82,8 @@ public interface ConsumerDRGateway extends Promotable {
     void resumeConsumerDispatcher(byte clusterId);
 
     void resetDrAppliedTracker(byte clusterId);
+
+    void setClusterCatalog(byte clusterId, byte[] catalog);
 
     void populateEmptyTrackersIfNeeded(byte producerClusterId, int producerPartitionCount);
 

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -669,11 +669,16 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     protected abstract void coreLoadCatalog(final long timestamp, final byte[] catalogBytes) throws EEException;
 
     /** Pass diffs to apply to the EE's catalog to update it */
-    public final void updateCatalog(final long timestamp, final boolean isStreamUpdate, final String diffCommands) throws EEException {
+    public final void updateCatalog(final long timestamp, final boolean isStreamUpdate, final String diffCommands,
+            Map<Byte, String[]> replicableTables) throws EEException {
         try {
             setupProcedure(null);
             m_fragmentContext = FragmentContext.CATALOG_UPDATE;
             coreUpdateCatalog(timestamp, isStreamUpdate, diffCommands);
+
+            if (replicableTables != null) {
+                replicableTables.forEach(this::setReplicableTables);
+            }
         }
         finally {
             m_fragmentContext = FragmentContext.UNKNOWN;
@@ -989,6 +994,14 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param deleteOlderThan timestamp to use to select what offsets should be deleted
      */
     public abstract void deleteExpiredTopicsOffsets(long undoToken, TimestampType deleteOlderThan);
+
+    /**
+     * Set the list of tables which can be replicated to from {@code clusterId}
+     *
+     * @param clusterId of producer cluster
+     * @param tables    which match in both schemas and can be the target of replication
+     */
+    public abstract void setReplicableTables(int clusterId, String[] tables);
 
     /*
      * Declare the native interface. Structurally, in Java, it would be cleaner to
@@ -1433,6 +1446,15 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @return 0 on success otherwise 1
      */
     native static protected int nativeDeleteExpiredTopicsOffsets(long pointer, long undoToken, long deleteOlderThan);
+
+    /**
+     * Set the list of tables which can be replicated to from {@code clusterId}
+     *
+     * @param pointer   to execution engine
+     * @param clusterId of producer cluster
+     * @param tables    which match in both schemas and can be the target of replication
+     */
+    native static protected int nativeSetReplicableTables(long pointer, int clusterId, byte[][] tables);
 
     public static byte[] getTestDRBuffer(int partitionId,
                                          int partitionKeyValues[], int flags[],

@@ -18,10 +18,12 @@ package org.voltdb;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 import org.voltcore.messaging.HostMessenger;
 import org.voltdb.catalog.Catalog;
@@ -165,6 +167,7 @@ public interface VoltDBInterface
      * @param genId stream table catalog generation id
      * @param currentTxnId  The transaction ID at which this method is called
      * @param deploymentBytes  The deployment file bytes
+     * @param replicableTablesConsumer Consumer for the map of which tables are replicable for dr
      */
     public CatalogContext catalogUpdate(
             String diffCommands,
@@ -175,7 +178,8 @@ public interface VoltDBInterface
             boolean requireCatalogDiffCmdsApplyToEE,
             boolean hasSchemaChange,
             boolean requiresNewExportGeneration,
-            boolean hasSecurityUserChange);
+            boolean hasSecurityUserChange,
+            Consumer<Map<Byte, String[]>> replicableTablesConsumer);
 
     /**
      * Given the information, write the new catalog jar file only

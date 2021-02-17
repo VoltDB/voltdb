@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -252,6 +252,9 @@ private:
     void fetchTopicsGroupOffsets(struct ipc_command *cmd);
     void deleteExpiredTopicsOffsets(struct ipc_command *cmd);
 
+    // Used to set which tables can be used for DR
+    void setReplicableTables(struct ipc_command *cmd);
+
     void signalHandler(int signum, siginfo_t *info, void *context);
     static void signalDispatcher(int signum, siginfo_t *info, void *context);
     void setupSigHandler(void) const;
@@ -490,6 +493,13 @@ typedef struct {
     char viewNameBytes[0];
 }__attribute__((packed)) set_views_enabled;
 
+typedef struct {
+    struct ipc_command cmd;
+    int32_t clusterId;
+    int32_t tableCount;
+    char tableNames[0];
+}__attribute__((packed)) set_replicable_tables;
+
 using namespace voltdb;
 
 // This is used by the signal dispatcher
@@ -675,6 +685,9 @@ bool VoltDBIPC::execute(struct ipc_command *cmd) {
            break;
        case 40:
            deleteExpiredTopicsOffsets(cmd);
+           break;
+       case 41:
+           setReplicableTables(cmd);
            break;
       default:
         result = stub(cmd);
@@ -1908,6 +1921,14 @@ void VoltDBIPC::applyBinaryLog(struct ipc_command *cmd) {
         response[0] = kErrorCode_Success;
         *reinterpret_cast<int64_t*>(&response[1]) = htonll(rows);
         writeOrDie(m_fd, (unsigned char*)response, 9);
+    } catch (const FatalException& e) {
+        crashVoltDB(e);
+    }
+}
+
+void VoltDBIPC::setReplicableTables(struct ipc_command *cmd) {
+    try {
+        sendResponseOrException(0);
     } catch (const FatalException& e) {
         crashVoltDB(e);
     }
