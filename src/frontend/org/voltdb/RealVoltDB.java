@@ -363,6 +363,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     AtomicBoolean m_replicationActive = new AtomicBoolean(false);
     private ProducerDRGateway m_producerDRGateway = null;
     private ConsumerDRGateway m_consumerDRGateway = null;
+    // Separate class to manage dr catalog commands, which are needed during recovery
+    private final DrProducerCatalogCommands m_drCatalogCommands = new DrProducerCatalogCommands();
 
     //Only restrict recovery completion during test
     static Semaphore m_testBlockRecoveryCompletion = new Semaphore(Integer.MAX_VALUE);
@@ -4171,9 +4173,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                                               (newDRConnectionSource != null && !newDRConnectionSource.equals(oldDRConnectionSource)
                                                ? newDRConnectionSource
                                                : null),
-                                              (byte) m_catalogContext.cluster.getPreferredsource(),
-                                              replicableTablesConsumer);
+                                              (byte) m_catalogContext.cluster.getPreferredsource());
         }
+
+        /*
+         * Calculate the set of replicable tables. Technically this could be skipped if no dr tables were modified. This
+         * is performed here and not in the NT procedure because between the execution of the NT procedure and now a
+         * remote catalog update could have been applied so this must be done as part of a transaction
+         */
+        replicableTablesConsumer.accept(m_drCatalogCommands.calculateReplicableTables(m_catalogContext.catalog));
 
         // Check if this is promotion
         if (oldRole == ReplicationRole.REPLICA &&
@@ -5493,6 +5501,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             return (init != null && !(init.getServiceState().isNormal()));
         }
         return false;
+    }
+
+    @Override
+    public DrProducerCatalogCommands getDrCatalogCommands() {
+        return m_drCatalogCommands;
     }
 
     /**

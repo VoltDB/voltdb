@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -64,6 +64,7 @@ public class ExtensibleSnapshotDigestData {
     public static final String DR_SP_UNIQUE_ID = "spUniqueId";
     public static final String DR_MP_UNIQUE_ID = "mpUniqueId";
     public static final String DR_MIXED_CLUSTER_SIZE_CONSUMER_STATE = "drMixedClusterSizeConsumerState";
+    public static final String DR_CATALOG_COMMANDS = "drCatalogCommands";
 
     //////////////////////////////////////////////////////////////
     // Make sure you've seen the warning at beginning of the class.
@@ -96,21 +97,31 @@ public class ExtensibleSnapshotDigestData {
     private final Map<Integer, JSONObject> m_drMixedClusterSizeConsumerState;
 
     /**
+     * Serialized form of a {@link DrProducerCatalogCommands} instance
+     */
+    private final JSONObject m_drCatalogCommands;
+
+    /**
      * Value that denotes that this snapshot is one created with shutdown --save. 0
      * being no, and other values yes
      */
     private long m_terminus;
 
+    /**
+     * Metadata used to resume an elastic operation
+     */
     private final JSONObject m_elasticOperationMetadata;
 
     public ExtensibleSnapshotDigestData(
             Map<String, Map<Integer, ExportSnapshotTuple>> exportSequenceNumbers,
             Map<Integer, TupleStreamStateInfo> drTupleStreamInfo,
             Map<Integer, JSONObject> drMixedClusterSizeConsumerState,
+            JSONObject drCatalogCommands,
             JSONObject elasticOperationMetadata, final JSONObject jsData) {
         m_exportSequenceNumbers = exportSequenceNumbers;
         m_drTupleStreamInfo = drTupleStreamInfo;
         m_drMixedClusterSizeConsumerState = drMixedClusterSizeConsumerState;
+        m_drCatalogCommands = drCatalogCommands;
         m_terminus = jsData != null ? jsData.optLong(SnapshotUtil.JSON_TERMINUS, 0L) : 0L;
         m_elasticOperationMetadata = elasticOperationMetadata;
     }
@@ -376,11 +387,24 @@ public class ExtensibleSnapshotDigestData {
         stringer.endObject();
     }
 
+    private void mergeDrCatalogCommandsToZk(JSONObject jsonObj) throws JSONException {
+        if (m_drCatalogCommands != null && !jsonObj.has(DR_CATALOG_COMMANDS)) {
+            jsonObj.put(DR_CATALOG_COMMANDS, m_drCatalogCommands);
+        }
+    }
+
+    private void writeDrCatalogCommandsToSnapshot(JSONStringer stringer) throws JSONException {
+        if (m_drCatalogCommands != null) {
+            stringer.key(DR_CATALOG_COMMANDS).value(m_drCatalogCommands);
+        }
+    }
+
     public void writeToSnapshotDigest(JSONStringer stringer) throws IOException {
         try {
             writeExportSequencesToSnapshot(stringer);
             writeExternalStreamStates(stringer);
             writeDRStateToSnapshot(stringer);
+            writeDrCatalogCommandsToSnapshot(stringer);
             stringer.key(SnapshotUtil.JSON_ELASTIC_OPERATION).value(m_elasticOperationMetadata);
         } catch (JSONException e) {
             throw new IOException(e);
@@ -403,6 +427,7 @@ public class ExtensibleSnapshotDigestData {
         mergeExternalStreamStatesToZK(jsonObj, log);
         mergeDRTupleStreamInfoToZK(jsonObj, log);
         mergeConsumerDrIdTrackerToZK(jsonObj);
+        mergeDrCatalogCommandsToZk(jsonObj);
         mergeTerminusToZK(jsonObj);
         jsonObj.put(SnapshotUtil.JSON_ELASTIC_OPERATION, m_elasticOperationMetadata);
     }

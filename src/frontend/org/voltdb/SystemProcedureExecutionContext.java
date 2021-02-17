@@ -112,7 +112,8 @@ public interface SystemProcedureExecutionContext {
     public void appendApplyBinaryLogTxns(int producerClusterId, int producerPartitionId,
                                          long localUniqueId, DRConsumerDrIdTracker tracker);
 
-    public void recoverWithDrAppliedTrackers(Map<Integer, Map<Integer, DRSiteDrIdTracker>> trackers);
+    public void recoverDrState(Map<Integer, Map<Integer, DRSiteDrIdTracker>> trackers,
+            Map<Byte, String[]> replicableTables);
 
     public void resetDrAppliedTracker();
 

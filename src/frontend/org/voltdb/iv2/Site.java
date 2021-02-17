@@ -579,9 +579,15 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         @Override
-        public void recoverWithDrAppliedTrackers(Map<Integer, Map<Integer, DRSiteDrIdTracker>> trackers)
+        public void recoverDrState(Map<Integer, Map<Integer, DRSiteDrIdTracker>> trackers,
+                Map<Byte, String[]> replicableTables)
         {
-            m_maxSeenDrLogsBySrcPartition = trackers;
+            if (trackers != null) {
+                m_maxSeenDrLogsBySrcPartition = trackers;
+            }
+            if (replicableTables != null) {
+                replicableTables.forEach(Site.this::setReplicableTables);
+            }
         }
 
         @Override

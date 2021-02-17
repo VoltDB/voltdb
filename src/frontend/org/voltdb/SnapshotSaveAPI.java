@@ -177,11 +177,14 @@ public class SnapshotSaveAPI
                         }
                     }
 
-                    ElasticService es = VoltDB.instance().getElasticService();
+                    VoltDBInterface vdb = VoltDB.instance();
+                    ElasticService es = vdb.getElasticService();
                     m_allLocalSiteSnapshotDigestData = new ExtensibleSnapshotDigestData(
                             SnapshotSiteProcessor.getExportSequenceNumbers(),
                             SnapshotSiteProcessor.getDRTupleStreamStateInfo(),
-                            remoteDataCenterLastIds, es == null ? null : es.getResumeMetadata(),
+                            remoteDataCenterLastIds,
+                            vdb.getDrCatalogCommands().getForRestore(),
+                            es == null ? null : es.getResumeMetadata(),
                             finalJsData);
                     m_allLocalSiteSnapshotDigestData.setDisabledExternalStreams(
                             SnapshotSiteProcessor.getDisabledExternalStreams());

@@ -21,7 +21,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
-import java.util.function.Consumer;
 
 import org.voltcore.utils.Pair;
 import org.voltdb.ProducerDRGateway.MeshMemberInfo;
@@ -39,8 +38,7 @@ public interface ConsumerDRGateway extends Promotable {
      *        Use -1 if there is no preferred snapshot source. If this joiner cluster has already
      *        received snapshot, this change will have no effect.
      */
-    void updateCatalog(CatalogContext catalog, String newConnectionSource, byte snapshotSource,
-            Consumer<Map<Byte, String[]>> replicableTablesConsumer);
+    void updateCatalog(CatalogContext catalog, String newConnectionSource, byte snapshotSource);
 
     void swapTables(final Set<Pair<String, Long>> swappedTables);
 
@@ -82,8 +80,6 @@ public interface ConsumerDRGateway extends Promotable {
     void resumeConsumerDispatcher(byte clusterId);
 
     void resetDrAppliedTracker(byte clusterId);
-
-    void setClusterCatalog(byte clusterId, byte[] catalog);
 
     void populateEmptyTrackersIfNeeded(byte producerClusterId, int producerPartitionCount);
 

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -71,6 +71,7 @@ import org.voltcore.zk.ZKUtil.StringCallback;
 import org.voltdb.DRConsumerDrIdTracker.DRSiteDrIdTracker;
 import org.voltdb.DependencyPair;
 import org.voltdb.DeprecatedProcedureAPIAccess;
+import org.voltdb.DrProducerCatalogCommands;
 import org.voltdb.ExtensibleSnapshotDigestData;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
@@ -312,11 +313,17 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 Map<Integer, Map<Integer, Map<Integer, DRSiteDrIdTracker>>> drMixedClusterSizeConsumerState =
                         (Map<Integer, Map<Integer, Map<Integer, DRSiteDrIdTracker>>>)ois.readObject();
 
+                @SuppressWarnings("unchecked")
+                Map<Byte, byte[]> drCatalogCommands = (Map<Byte, byte[]>) ois.readObject();
+
+                @SuppressWarnings("unchecked")
+                Map<Byte, String[]> replicableTables = (Map<Byte, String[]>) ois.readObject();
+
                 performRestoreDigeststate(context, isRecover, snapshotTxnId, perPartitionTxnIds, exportSequenceNumbers);
 
                 if (isRecover) {
                     performRecoverDigestState(context, clusterCreateTime, drVersion, drSequenceNumbers,
-                            drMixedClusterSizeConsumerState, disabledStreams);
+                            drMixedClusterSizeConsumerState, drCatalogCommands, replicableTables, disabledStreams);
                 }
             } catch (Exception e) {
                 SNAP_LOG.error("Unexpected error restoring digest state", e);
@@ -1128,6 +1135,16 @@ public class SnapshotRestore extends VoltSystemProcedure {
             digestScanResult.drSequenceNumbers.put(i, -1L);
         }
 
+        // Calculate the list of replicable tables for each remote cluster from the dr catalog commands
+        Map<Byte, byte[]> drCatalogCommands = null;
+        Map<Byte, String[]> replicableTables = null;
+        if (digestScanResult.drCatalogCommands != null) {
+            DrProducerCatalogCommands catalogCommands = VoltDB.instance().getDrCatalogCommands();
+            catalogCommands.restore(digestScanResult.drCatalogCommands);
+            drCatalogCommands = catalogCommands.get();
+            replicableTables = catalogCommands.calculateReplicableTables(VoltDB.instance().getCatalogContext().catalog);
+        }
+
         /*
          * Serialize all the export sequence numbers and then distribute them in a
          * plan fragment and each receiver will pull the relevant information for
@@ -1144,8 +1161,10 @@ public class SnapshotRestore extends VoltSystemProcedure {
             oos.writeObject(digestScanResult.disabledStreams);
             oos.writeObject(digestScanResult.drSequenceNumbers);
             oos.writeObject(digestScanResult.remoteDCLastSeenIds);
+            oos.writeObject(drCatalogCommands);
+            oos.writeObject(replicableTables);
             oos.flush();
-            byte exportSequenceNumberBytes[] = baos.toByteArray();
+            byte serializedDigestObjects[] = baos.toByteArray();
             oos.close();
 
             /*
@@ -1156,7 +1175,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
 
             results =
                     performDistributeDigestState(
-                            exportSequenceNumberBytes,
+                            serializedDigestObjects,
                             digestScanResult.digests.get(0).getLong("txnId"),
                             digestScanResult.perPartitionTxnIds,
                             digestScanResult.clusterCreateTime, digestScanResult.drVersion, isRecover);
@@ -1283,7 +1302,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
     }
 
     private VoltTable[] performDistributeDigestState(
-            byte[] exportSequenceNumberBytes,
+            byte[] serializedDigestObjects,
             long txnId,
             long perPartitionTxnIds[],
             long clusterCreateTime,
@@ -1293,7 +1312,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
         // success of writing tables to disk
         return createAndExecuteSysProcPlan(SysProcFragmentId.PF_restoreDistributeExportAndPartitionSequenceNumbers,
                 SysProcFragmentId.PF_restoreDistributeExportAndPartitionSequenceNumbersResults,
-                exportSequenceNumberBytes, txnId, perPartitionTxnIds, clusterCreateTime, drVersion, isRecover ? 1 : 0);
+                serializedDigestObjects, txnId, perPartitionTxnIds, clusterCreateTime, drVersion, isRecover ? 1 : 0);
     }
 
     private void performRestoreDigeststate(
@@ -1393,6 +1412,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
             long drVersion,
             Map<Integer, Long> drSequenceNumbers,
             Map<Integer, Map<Integer, Map<Integer, DRSiteDrIdTracker>>> drMixedClusterSizeConsumerState,
+            Map<Byte, byte[]> drCatalogCommands,
+            Map<Byte, String[]> replicableTables,
             Set<Integer> disabledStreams) {
         // If this is a truncation snapshot restored during recover, try to set DR protocol version
         if (drVersion != 0) {
@@ -1401,15 +1422,16 @@ public class SnapshotRestore extends VoltSystemProcedure {
 
         // Choose the lowest site ID so the ClusterCreateTime is only set once in RealVoltDB
         if (context.isLowestSiteId()) {
+            if (drCatalogCommands != null) {
+                VoltDB.instance().getDrCatalogCommands().setAll(drCatalogCommands);
+            }
             VoltDB.instance().setClusterCreateTime(clusterCreateTime);
         }
 
         //Last seen unique ids from remote data centers, load each local site
         Map<Integer, Map<Integer, DRSiteDrIdTracker>> drMixedClusterSizeConsumerStateForSite =
                 drMixedClusterSizeConsumerState.get(context.getPartitionId());
-        if (drMixedClusterSizeConsumerStateForSite != null) {
-            context.recoverWithDrAppliedTrackers(drMixedClusterSizeConsumerStateForSite);
-        }
+        context.recoverDrState(drMixedClusterSizeConsumerStateForSite, replicableTables);
 
         Integer myPartitionId = context.getPartitionId();
 
@@ -1551,6 +1573,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
         Map<Integer, Long> drSequenceNumbers;
         long perPartitionTxnIds[];
         Map<Integer, Map<Integer, Map<Integer, DRSiteDrIdTracker>>> remoteDCLastSeenIds;
+        JSONObject drCatalogCommands;
         long clusterCreateTime;
         long drVersion;
     }
@@ -1570,6 +1593,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
         ArrayList<JSONObject> digests = new ArrayList<JSONObject>();
         Set<Long> perPartitionTxnIds = new HashSet<Long>();
         Map<Integer, Map<Integer, Map<Integer, DRSiteDrIdTracker>>> remoteDCLastSeenIds = new HashMap<>();
+        JSONObject drCatalogCommands = null;
         long clusterCreateTime = VoltDB.instance().getHostMessenger().getInstanceId().getTimestamp();
         long drVersion = 0;
 
@@ -1698,6 +1722,8 @@ public class SnapshotRestore extends VoltSystemProcedure {
                     }
                 }
 
+                drCatalogCommands = digest.optJSONObject(ExtensibleSnapshotDigestData.DR_CATALOG_COMMANDS);
+
                 // Get cluster create time that was recorded in the snapshot
                 if (!digests.isEmpty() && digests.get(0).has("clusterCreateTime")) {
                     clusterCreateTime = digests.get(0).getLong("clusterCreateTime");
@@ -1734,6 +1760,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
             result.drSequenceNumbers = drSequenceNumbers;
             result.perPartitionTxnIds = Longs.toArray(perPartitionTxnIds);
             result.remoteDCLastSeenIds = remoteDCLastSeenIds;
+            result.drCatalogCommands = drCatalogCommands;
             result.clusterCreateTime = clusterCreateTime;
             result.drVersion = drVersion;
             return result;

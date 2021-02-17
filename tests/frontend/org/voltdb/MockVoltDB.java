@@ -1051,4 +1051,9 @@ public class MockVoltDB implements VoltDBInterface
     public AvroSerde getAvroSerde() {
         throw new UnsupportedOperationException();
     }
+
+    @Override
+    public DrProducerCatalogCommands getDrCatalogCommands() {
+        throw new UnsupportedOperationException();
+    }
 }

@@ -445,6 +445,11 @@ public interface VoltDBInterface
         return true;
     }
 
+    /**
+     * @return Instance of {@link DrProducerCatalogCommands} for the cluster. Never {@code null}
+     */
+    DrProducerCatalogCommands getDrCatalogCommands();
+
     default boolean doRecoverCheck() {
         return true;
     }

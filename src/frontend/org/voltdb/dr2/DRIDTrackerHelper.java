@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -186,6 +186,6 @@ public class DRIDTrackerHelper {
     public static void setDRIDTrackerFromBytes(SystemProcedureExecutionContext context, byte[] trackerBytes) throws IOException, ClassNotFoundException
     {
         Map<Integer, Map<Integer, DRSiteDrIdTracker>> clusterToPartitionMap = bytesToClusterTrackers(trackerBytes);
-        context.recoverWithDrAppliedTrackers(clusterToPartitionMap);
+        context.recoverDrState(clusterToPartitionMap, null);
     }
 }

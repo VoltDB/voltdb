@@ -307,7 +307,8 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         }
 
         @Override
-        public void recoverWithDrAppliedTrackers(Map<Integer, Map<Integer, DRSiteDrIdTracker>> trackers)
+        public void recoverDrState(Map<Integer, Map<Integer, DRSiteDrIdTracker>> trackers,
+                Map<Byte, String[]> replicableTables)
         {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
