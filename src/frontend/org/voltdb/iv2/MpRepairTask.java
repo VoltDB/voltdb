@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CancellationException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
@@ -52,8 +53,7 @@ public class MpRepairTask extends SiteTasker
 
     private InitiatorMailbox m_mailbox;
     private List<Long> m_spMasters;
-    private Object m_lock = new Object();
-    private boolean m_repairRan = false;
+    private AtomicBoolean m_repairRan = new AtomicBoolean(false);
     private final String whoami;
     private final RepairAlgo algo;
 
@@ -80,29 +80,25 @@ public class MpRepairTask extends SiteTasker
     public void run(SiteProcedureConnection connection) {
 
         // When MP is processing reads, the task will be queued to all MpRoSite but the task is processed only on one of MpRoSite.
-        synchronized (m_lock) {
-            if (!m_repairRan) {
+        if (m_repairRan.compareAndSet(false, true)) {
+            try {
                 try {
-                    try {
-                        algo.start().get();
-                        repairLogger.info(whoami + "finished repair.");
-                    } catch (CancellationException e) {
-                        repairLogger.info(whoami + "interrupted during repair.  Retrying.");
-                    }
-                } catch (InterruptedException ie) {
-                } catch (Exception e) {
-                    VoltDB.crashLocalVoltDB("Terminally failed MPI repair.", true, e);
-                } finally {
-                    m_repairRan = true;
-
-                    // At this point, all the repairs are completed. This should be the final repair task
-                    // in the repair process. Remove the mp repair blocker
-                    if (!m_leaderMigration && m_partitionLeaderPromotionComplete && m_mailbox.m_messenger != null) {
-                        VoltZK.removeActionBlocker(m_mailbox.m_messenger.getZK(), VoltZK.mpRepairInProgress, repairLogger);
-                    }
-                    if (m_txnRestartTrigger) {
-                        MpTerm.removeTxnRestartTrigger(m_mailbox.m_messenger.getZK());
-                    }
+                    algo.start().get();
+                    repairLogger.info(whoami + "finished repair.");
+                } catch (CancellationException e) {
+                    repairLogger.info(whoami + "interrupted during repair.  Retrying.");
+                }
+            } catch (InterruptedException ie) {
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB("Terminally failed MPI repair.", true, e);
+            } finally {
+                // At this point, all the repairs are completed. This should be the final repair task
+                // in the repair process. Remove the mp repair blocker
+                if (!m_leaderMigration && m_partitionLeaderPromotionComplete && m_mailbox.m_messenger != null) {
+                    VoltZK.removeActionBlocker(m_mailbox.m_messenger.getZK(), VoltZK.mpRepairInProgress, repairLogger);
+                }
+                if (m_txnRestartTrigger) {
+                    MpTerm.removeTxnRestartTrigger(m_mailbox.m_messenger.getZK());
                 }
             }
         }

@@ -1870,10 +1870,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
                 //create a blocker for repair if this is a MP leader and partition leaders change
                 if (m_leaderAppointer.isLeader()) {
-                    if ( m_cartographer.hasPartitionMastersOnHosts(failedHosts)) {
-                        VoltZK.createActionBlocker(m_messenger.getZK(), VoltZK.mpRepairInProgress,
-                                CreateMode.EPHEMERAL, hostLog, "MP Repair");
-                    } else {
+                    if (!m_cartographer.hasPartitionMastersOnHosts(failedHosts)) {
                         // When the last partition leader on a host is migrated away and there is an MP transaction which depends on
                         // the partition leader, the transaction can be deadlocked if the host is shutdown. Since the host does not have
                         // any partition leaders, its shutdown won't trigger transaction repair process to beak up the dependency.

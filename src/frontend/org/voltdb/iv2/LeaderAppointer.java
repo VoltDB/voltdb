@@ -287,6 +287,12 @@ public class LeaderAppointer implements Promotable
                             + CoreUtils.hsIdCollectionToString(children) + "]");
                 }
                 newLeaderHostId = -1;
+                if (!m_isLeaderMigrated) {
+                    // MP repair process will follow upon partition leader promotions.
+                    // Add a blocker to block uac or elastic operations when MP repair is in progress.
+                    // The blocker will be removed when the last MpRepairTask is executed.
+                    VoltZK.createActionBlocker(m_zk, VoltZK.mpRepairInProgress, CreateMode.PERSISTENT, tmLog, "MP Repair");
+                }
             }
 
             long masterHSId = children.get(0);
@@ -527,7 +533,7 @@ public class LeaderAppointer implements Promotable
         else {
             // Create MP repair ZK node to block rejoin
             VoltZK.createActionBlocker(m_zk, VoltZK.mpRepairInProgress,
-                    CreateMode.EPHEMERAL, tmLog, "MP Repair");
+                    CreateMode.PERSISTENT, tmLog, "MP Repair");
 
             // If we're taking over for a failed LeaderAppointer, we know when
             // we get here that every partition had a leader at some point in
