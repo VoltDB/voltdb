@@ -317,4 +317,9 @@ public class MockExecutionEngine extends ExecutionEngine {
     public void setReplicableTables(int clusterId, String[] tables) {
         throw new UnsupportedOperationException();
     }
+
+    @Override
+    public void clearReplicableTables() {
+        throw new UnsupportedOperationException();
+    }
 }

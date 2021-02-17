@@ -150,7 +150,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         , CommitTopicsGroupOffsets(38)
         , FetchTopicsGroupOffsets(39)
         , DeleteExpiredTopicsOffsets(40)
-        , SetReplicableTables(41);
+        , SetReplicableTables(41)
+        , ClearReplicableTables(42);
 
         Commands(final int id) {
             m_id = id;
@@ -2117,22 +2118,46 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
     @Override
     public void setReplicableTables(int clusterId, String[] tables) {
-        byte[][] tableNames = new byte[tables.length][];
+        byte[][] tableNames = null;
         int tablesSize = 0;
-        for (int i = 0; i < tables.length; ++i) {
-            tableNames[i] = tables[i].getBytes(Constants.UTF8ENCODING);
-            tablesSize += Integer.BYTES + tableNames.length;
+        if (tables != null) {
+            tableNames = new byte[tables.length][];
+            for (int i = 0; i < tables.length; ++i) {
+                tableNames[i] = tables[i].getBytes(Constants.UTF8ENCODING);
+                tablesSize += Integer.BYTES + tableNames.length;
+            }
         }
+
         verifyDataCapacity(Byte.BYTES + Integer.BYTES * 2 + tablesSize);
 
         m_data.clear();
         m_data.putInt(Commands.SetReplicableTables.m_id);
         m_data.putInt(clusterId);
-        m_data.putInt(tableNames.length);
-        for (byte[] table : tableNames) {
-            m_data.putInt(table.length);
-            m_data.put(table);
+        if (tableNames == null) {
+            m_data.putInt(-1);
+        } else {
+            m_data.putInt(tableNames.length);
+            for (byte[] table : tableNames) {
+                m_data.putInt(table.length);
+                m_data.put(table);
+            }
         }
+
+        try {
+            m_connection.write();
+            m_connection.readStatusByte();
+        } catch (final IOException e) {
+            e.printStackTrace();
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public void clearReplicableTables() {
+        verifyDataCapacity(Byte.BYTES);
+
+        m_data.clear();
+        m_data.putInt(Commands.ClearReplicableTables.m_id);
 
         try {
             m_connection.write();

@@ -3165,12 +3165,17 @@ int32_t VoltDBEngine::deleteExpiredTopicsOffsets(int64_t undoToken, int64_t dele
     return 1;
 }
 
-int32_t VoltDBEngine::setReplicableTables(int32_t clusterId, const std::vector<std::string>& replicableTables) {
+int32_t VoltDBEngine::setReplicableTables(int32_t clusterId, const std::vector<std::string>* replicableTables) {
     try {
+        if (replicableTables == nullptr) {
+            m_replicableTables.erase(clusterId);
+            return 0;
+        }
+
         auto& tablesByHash = m_replicableTables[clusterId];
         tablesByHash.clear();
 
-        for (const std::string& tableName : replicableTables) {
+        for (const std::string& tableName : *replicableTables) {
             TableCatalogDelegate* delegate = getTableDelegate(tableName);
             if (delegate == nullptr) {
                 continue;
@@ -3191,6 +3196,10 @@ int32_t VoltDBEngine::setReplicableTables(int32_t clusterId, const std::vector<s
         serializeException(e);
     }
     return 1;
+}
+
+void VoltDBEngine::clearReplicableTables() {
+    m_replicableTables.clear();
 }
 
 void VoltDBEngine::loadBuiltInJavaFunctions() {

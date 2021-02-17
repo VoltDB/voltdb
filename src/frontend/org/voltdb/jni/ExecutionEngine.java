@@ -999,9 +999,15 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * Set the list of tables which can be replicated to from {@code clusterId}
      *
      * @param clusterId of producer cluster
-     * @param tables    which match in both schemas and can be the target of replication
+     * @param tables    which match in both schemas and can be the target of replication. If {@code null} then the
+     *                  tables will be removed
      */
     public abstract void setReplicableTables(int clusterId, String[] tables);
+
+    /**
+     * Clear all clusters replicable tables
+     */
+    public abstract void clearReplicableTables();
 
     /*
      * Declare the native interface. Structurally, in Java, it would be cleaner to
@@ -1455,6 +1461,13 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param tables    which match in both schemas and can be the target of replication
      */
     native static protected int nativeSetReplicableTables(long pointer, int clusterId, byte[][] tables);
+
+    /**
+     * Clear the map of replicable tables for all clusters
+     *
+     * @param pointer to execution engine
+     */
+    native static protected int nativeClearReplicableTables(long pointer);
 
     public static byte[] getTestDRBuffer(int partitionId,
                                          int partitionKeyValues[], int flags[],

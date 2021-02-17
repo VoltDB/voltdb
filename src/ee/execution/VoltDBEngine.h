@@ -641,7 +641,12 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         /**
          * Set which tables can be the target for replication from clusterId
          */
-        int32_t setReplicableTables(int32_t clusterId, const std::vector<std::string>& replicableTables);
+        int32_t setReplicableTables(int32_t clusterId, const std::vector<std::string>* replicableTables);
+
+        /**
+         * Clear all replicable tables
+         */
+        void clearReplicableTables();
 
     private:
         /*

@@ -1183,13 +1183,21 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     @Override
     public void setReplicableTables(int clusterId, String[] tables) {
-        byte[][] tableNames = new byte[tables.length][];
+        byte[][] tableNames = null;
+        if (tables != null) {
+            tableNames = new byte[tables.length][];
 
-        for (int i = 0; i < tables.length; ++i) {
-            tableNames[i] = tables[i].getBytes(Constants.UTF8ENCODING);
+            for (int i = 0; i < tables.length; ++i) {
+                tableNames[i] = tables[i].getBytes(Constants.UTF8ENCODING);
+            }
         }
 
         checkErrorCode(nativeSetReplicableTables(pointer, clusterId, tableNames));
+    }
+
+    @Override
+    public void clearReplicableTables() {
+        checkErrorCode(nativeClearReplicableTables(pointer));
     }
 
     private byte[] readVarbinary(FastDeserializer defaultDeserializer) throws IOException {

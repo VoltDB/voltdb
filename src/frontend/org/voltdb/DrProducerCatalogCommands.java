@@ -61,6 +61,15 @@ public class DrProducerCatalogCommands {
     }
 
     /**
+     * Remove the catalog commands associated with {@code clusterId}
+     *
+     * @param clusterId of catalog commands to be removed
+     */
+    public void remove(byte clusterId) {
+        m_commands.remove(clusterId);
+    }
+
+    /**
      * @return an unmodifiable view of the current catalog commands
      */
     public Map<Byte, byte[]> get() {
@@ -122,5 +131,12 @@ public class DrProducerCatalogCommands {
         }
 
         return builder.build();
+    }
+
+    /**
+     * Clear all commands in this instance
+     */
+    public void clear() {
+        m_commands.clear();
     }
 }

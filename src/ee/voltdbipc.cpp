@@ -254,6 +254,7 @@ private:
 
     // Used to set which tables can be used for DR
     void setReplicableTables(struct ipc_command *cmd);
+    void clearReplicableTables(struct ipc_command *cmd);
 
     void signalHandler(int signum, siginfo_t *info, void *context);
     static void signalDispatcher(int signum, siginfo_t *info, void *context);
@@ -688,6 +689,9 @@ bool VoltDBIPC::execute(struct ipc_command *cmd) {
            break;
        case 41:
            setReplicableTables(cmd);
+           break;
+       case 42:
+           clearReplicableTables(cmd);
            break;
       default:
         result = stub(cmd);
@@ -1929,19 +1933,33 @@ void VoltDBIPC::applyBinaryLog(struct ipc_command *cmd) {
 void VoltDBIPC::setReplicableTables(struct ipc_command *cmd) {
     try {
         set_replicable_tables* params = (set_replicable_tables*)cmd;
-        int32_t size = params->tableCount;
 
-        std::vector<std::string> replicableTables;
-        replicableTables.reserve(size);
+        if (params->tableCount < 0) {
+            sendResponseOrException(m_engine->setReplicableTables(params->clusterId, nullptr));
+        } else {
+            int32_t size = params->tableCount;
 
-        int sz = static_cast<int> (ntohl(cmd->msgsize) - sizeof(set_replicable_tables));
-        ReferenceSerializeInputBE in(params->tableNames, sz);
+            std::vector<std::string> replicableTables;
+            replicableTables.reserve(size);
 
-        for (int i = 0; i < size; ++i) {
-            replicableTables.emplace_back(in.readTextString());
+            int sz = static_cast<int> (ntohl(cmd->msgsize) - sizeof(set_replicable_tables));
+            ReferenceSerializeInputBE in(params->tableNames, sz);
+
+            for (int i = 0; i < size; ++i) {
+                replicableTables.emplace_back(in.readTextString());
+            }
+
+            sendResponseOrException(m_engine->setReplicableTables(params->clusterId, &replicableTables));
         }
+    } catch (const FatalException& e) {
+        crashVoltDB(e);
+    }
+}
 
-        sendResponseOrException(m_engine->setReplicableTables(params->clusterId, replicableTables));
+void VoltDBIPC::clearReplicableTables(struct ipc_command *cmd) {
+    try {
+        m_engine->clearReplicableTables();
+        sendResponseOrException(0);
     } catch (const FatalException& e) {
         crashVoltDB(e);
     }
