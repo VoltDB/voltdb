@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -638,6 +638,11 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          */
         int32_t deleteExpiredTopicsOffsets(int64_t undoToken, int64_t deleteOlderThan);
 
+        /**
+         * Set which tables can be the target for replication from clusterId
+         */
+        int32_t setReplicableTables(int32_t clusterId, const std::vector<std::string>& replicableTables);
+
     private:
         /*
          * Tasks dispatched by executeTask
@@ -792,9 +797,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         ExportTupleStream* m_newestExportStreamWithPendingRows = nullptr;
 
         /*
-         * Only includes non-materialized tables
+         * Map from clusterId to a map from table hash to table for which tables can be targets for replication
          */
-        std::unordered_map<int64_t, PersistentTable*> m_tablesBySignatureHash;
+        std::unordered_map<int32_t, std::unordered_map<int64_t, PersistentTable*>> m_replicableTables;
 
         /**
          * System Catalog.

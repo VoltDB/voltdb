@@ -1928,7 +1928,20 @@ void VoltDBIPC::applyBinaryLog(struct ipc_command *cmd) {
 
 void VoltDBIPC::setReplicableTables(struct ipc_command *cmd) {
     try {
-        sendResponseOrException(0);
+        set_replicable_tables* params = (set_replicable_tables*)cmd;
+        int32_t size = params->tableCount;
+
+        std::vector<std::string> replicableTables;
+        replicableTables.reserve(size);
+
+        int sz = static_cast<int> (ntohl(cmd->msgsize) - sizeof(set_replicable_tables));
+        ReferenceSerializeInputBE in(params->tableNames, sz);
+
+        for (int i = 0; i < size; ++i) {
+            replicableTables.emplace_back(in.readTextString());
+        }
+
+        sendResponseOrException(m_engine->setReplicableTables(params->clusterId, replicableTables));
     } catch (const FatalException& e) {
         crashVoltDB(e);
     }

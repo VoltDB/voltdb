@@ -1778,7 +1778,16 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSetRe
     auto engine = castToEngine(pointer);
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
     try {
-        return 0;
+        std::vector<std::string> replicableTables;
+
+        jsize size = env->GetArrayLength(tables);
+        for (int i = 0; i < size; ++i) {
+            jbyteArray tableName = static_cast<jbyteArray>(env->GetObjectArrayElement(tables, i));
+            jbyte* tableNameBytes = env->GetByteArrayElements(tableName, nullptr);
+            replicableTables.emplace_back(reinterpret_cast<char*>(tableNameBytes), env->GetArrayLength(tableName));
+        }
+
+        return engine->setReplicableTables(clusterId, replicableTables);
     } catch (const FatalException &e) {
         topend->crashVoltDB(e);
     }

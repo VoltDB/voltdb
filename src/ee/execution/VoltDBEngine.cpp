@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -1928,7 +1928,7 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated, bool fromScrat
     if (! updateReplicated && fromScratch) {
         m_tables.clear();
         m_tablesByName.clear();
-        m_tablesBySignatureHash.clear();
+        m_replicableTables.clear();
 
         // need to re-map all the table ids / indexes
         getStatsManager().unregisterStatsSource(STATISTICS_SELECTOR_TYPE_TABLE);
@@ -1977,22 +1977,6 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated, bool fromScrat
         PersistentTable* persistentTable = tcd->getPersistentTable();
         if (persistentTable) {
             stats = persistentTable->getTableStats();
-            if (! tcd->materialized()) {
-                int64_t hash = *reinterpret_cast<const int64_t*>(tcd->signatureHash());
-                if (catTable->isreplicated()) {
-                    if (updateReplicated) {
-                        ExecuteWithAllSitesMemory execAllSites;
-                        for (auto engineIt : execAllSites) {
-                            EngineLocals& curr = engineIt.second;
-                            VoltDBEngine* currEngine = curr.context->getContextEngine();
-                            SynchronizedThreadLock::assumeSpecificSiteContext(curr);
-                            currEngine->m_tablesBySignatureHash[hash] = persistentTable;
-                        }
-                    }
-                } else if (! updateReplicated) {
-                    m_tablesBySignatureHash[hash] = persistentTable;
-                }
-            }
 
             // add all of the indexes to the stats source
             std::vector<TableIndex*> const& tindexes = persistentTable->allIndexes();
@@ -2061,10 +2045,22 @@ void VoltDBEngine::swapDRActions(PersistentTable* table1, PersistentTable* table
     int64_t hash2 = *reinterpret_cast<const int64_t*>(tcd2->signatureHash());
     // Most swap action is already done.
     // But hash(tcd1) is still pointing to old persistent table1, which is now table2.
-    vassert(m_tablesBySignatureHash[hash1] == table2);
-    vassert(m_tablesBySignatureHash[hash2] == table1);
-    m_tablesBySignatureHash[hash1] = table1;
-    m_tablesBySignatureHash[hash2] = table2;
+    for (auto& entry : m_replicableTables) {
+        auto& hashMap = entry.second;
+        auto hashEntry = hashMap.find(hash1);
+        if (hashEntry != hashMap.end()) {
+            // Table2 was in the map so update the pointer to table1
+            vassert(hashEntry->second == table2);
+            hashEntry->second = table1;
+        }
+
+        hashEntry = hashMap.find(hash2);
+        if (hashEntry != hashMap.end()) {
+            // Table1 was in the map so update the pointer to table2
+            vassert(hashEntry->second == table1);
+            hashEntry->second = table2;
+        }
+    }
     table1->signature(tcd1->signatureHash());
     table2->signature(tcd2->signatureHash());
 
@@ -2927,7 +2923,13 @@ int64_t VoltDBEngine::applyBinaryLog(
     // the coordinate cluster's consumer sides could operate in different protocols.
     // At that time, we need explicity pass in the consumer side protocol version for deciding weather
     // its corresponding remote producer has replicated stream or not.
-    return m_wrapper.apply(logs, m_tablesBySignatureHash, &m_stringPool, this, remoteClusterId, uniqueId);
+    auto clusterEntry = m_replicableTables.find(remoteClusterId);
+    if (clusterEntry == m_replicableTables.end()) {
+        std::ostringstream stream("Cluster ID not found in replicable tables map: ");
+        stream << remoteClusterId;
+        throw SerializableEEException(stream.str());
+    }
+    return m_wrapper.apply(logs, clusterEntry->second, &m_stringPool, this, remoteClusterId, uniqueId);
 }
 
 void VoltDBEngine::executeTask(TaskType taskType, ReferenceSerializeInputBE &taskInfo) {
@@ -3156,6 +3158,34 @@ int32_t VoltDBEngine::deleteExpiredTopicsOffsets(int64_t undoToken, int64_t dele
     setUndoToken(undoToken);
     try {
         m_groupStore->deleteExpiredOffsets(deleteOlderThan);
+        return 0;
+    } catch (const SerializableEEException& e) {
+        serializeException(e);
+    }
+    return 1;
+}
+
+int32_t VoltDBEngine::setReplicableTables(int32_t clusterId, const std::vector<std::string>& replicableTables) {
+    try {
+        auto& tablesByHash = m_replicableTables[clusterId];
+        tablesByHash.clear();
+
+        for (const std::string& tableName : replicableTables) {
+            TableCatalogDelegate* delegate = getTableDelegate(tableName);
+            if (delegate == nullptr) {
+                continue;
+            }
+
+            PersistentTable* table = delegate->getPersistentTable();
+            if (table == nullptr) {
+                vassert(false);
+                continue;
+            }
+
+            int64_t hash = *reinterpret_cast<const int64_t*>(delegate->signatureHash());
+            tablesByHash[hash] = table;
+        }
+
         return 0;
     } catch (const SerializableEEException& e) {
         serializeException(e);
