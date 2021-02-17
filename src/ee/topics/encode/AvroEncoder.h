@@ -48,15 +48,20 @@ public:
         return length;
     }
 
+    /**
+     * NOTE: this method expects nulls to be written with index 0 and non-null values written
+     * with index 1: this is a convention with the Java schema generation in AvroSerde.java,
+     * in order to avoid having to download and interpret schemas in the EE.
+     */
     int32_t encode(SerializeOutput& out, const TableTuple& tuple) override {
         const NValue value = tuple.getNValue(m_index);
         int32_t length = 0;
         if (value.isNull()) {
             vassert(m_nullable);
-            length = out.writeVarLong(1);
+            length = out.writeVarLong(0);
         } else {
             if (m_nullable) {
-                length = out.writeVarLong(0);
+                length = out.writeVarLong(1);
             }
             length += m_encoder->encode(out, value);
         }

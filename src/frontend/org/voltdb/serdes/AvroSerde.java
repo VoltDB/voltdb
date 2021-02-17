@@ -277,35 +277,45 @@ public class AvroSerde {
             default:
                 throw new IllegalArgumentException("Unsupported type: " + field.type());
             case TINYINT:
-                return addLogicalType(builder, SCHEMA_BYTE, field);
+                return addFieldType(builder, SCHEMA_BYTE, field);
             case SMALLINT:
-                return addLogicalType(builder, SCHEMA_SHORT, field);
+                return addFieldType(builder, SCHEMA_SHORT, field);
             case INTEGER:
-                return (field.isNullable() ? builder.type().nullable() : builder.type()).intType().noDefault();
+                return addFieldType(builder, Schema.create(Schema.Type.INT), field);
             case BIGINT:
-                return (field.isNullable() ? builder.type().nullable() : builder.type()).longType().noDefault();
+                return addFieldType(builder, Schema.create(Schema.Type.LONG), field);
             case DECIMAL:
-                return addLogicalType(builder, SCHEMA_DECIMAL, field);
+                return addFieldType(builder, SCHEMA_DECIMAL, field);
             case TIMESTAMP:
-                return addLogicalType(builder, configuration.m_timestamp, field);
+                return addFieldType(builder, configuration.m_timestamp, field);
             case FLOAT:
-                return (field.isNullable() ? builder.type().nullable() : builder.type()).doubleType().noDefault();
+                return addFieldType(builder, Schema.create(Schema.Type.DOUBLE), field);
             case STRING:
-                return (field.isNullable() ? builder.type().nullable() : builder.type()).stringType().noDefault();
+                return addFieldType(builder, Schema.create(Schema.Type.STRING), field);
             case GEOGRAPHY_POINT:
-                return addLogicalType(builder, configuration.m_geographyPoint, field);
+                return addFieldType(builder, configuration.m_geographyPoint, field);
             case GEOGRAPHY:
-                return addLogicalType(builder, configuration.m_geography, field);
+                return addFieldType(builder, configuration.m_geography, field);
             case VARBINARY:
-                return addLogicalType(builder, SCHEMA_BYTE_ARRAY, field);
+                return addFieldType(builder, SCHEMA_BYTE_ARRAY, field);
         }
     }
 
-    private FieldAssembler<Schema> addLogicalType(FieldBuilder<Schema> builder, Schema schema, FieldDescription field) {
+    /**
+     * Add a field type to the {@link FieldAssembler}, ensuring a constant index for nullables
+     * <p>
+     * Avro inline encoding doesn't interpret schemas and expects nulls to be at index 1.
+     *
+     * @param builder
+     * @param typeSchema
+     * @param field
+     * @return
+     */
+    private FieldAssembler<Schema> addFieldType(FieldBuilder<Schema> builder, Schema typeSchema, FieldDescription field) {
         if (field.isNullable()) {
-            return builder.type().unionOf().nullType().and().type(schema).endUnion().noDefault();
+            return builder.type().unionOf().nullType().and().type(typeSchema).endUnion().noDefault();
         }
-        return builder.type(schema).noDefault();
+        return builder.type(typeSchema).noDefault();
     }
 
     private Internal getInternal() throws IOException {

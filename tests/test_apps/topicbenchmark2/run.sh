@@ -30,8 +30,21 @@ LOG4J="./log4j.xml"
 LICENSE="$VOLTDB_VOLTDB/license.xml"
 HOST="localhost"
 
-# add kafka to client classpath
+# NOTE: this tool requires an accessible Confluent distribution download
+# and the variable CONFLUENT_HOME set to the location of this distribution, e.g. <path>/confluent-6.0.0.
+# This tool has been tested with confluent-6.6.0 and some adjustments to the jar files below may be
+# necessary if working with a different Confluent distribution.
 CLIENTLIBS=$({ \
+    \ls -1 "$CONFLUENT_HOME"/share/java/schema-registry/jersey-common-*.jar; \
+    \ls -1 "$CONFLUENT_HOME"/share/java/kafka-serde-tools/kafka-avro-serializer-*.jar; \
+    \ls -1 "$CONFLUENT_HOME"/share/java/kafka-serde-tools/kafka-schema-serializer-*.jar; \
+    \ls -1 "$CONFLUENT_HOME"/share/java/kafka-serde-tools/kafka-schema-registry-client-*.jar; \
+    \ls -1 "$CONFLUENT_HOME"/share/java/confluent-security/schema-registry/javax.ws.rs-api-*.jar; \
+    \ls -1 "$VOLTDB_LIB"/jackson-annotations-*.jar; \
+    \ls -1 "$VOLTDB_LIB"/jackson-core-*.jar; \
+    \ls -1 "$VOLTDB_LIB"/jackson-databind-*.jar; \
+    \ls -1 "$VOLTDB_LIB"/jackson-dataformat-cbor-*.jar; \
+    \ls -1 "$VOLTDB_LIB"/avro-*.jar; \
     \ls -1 "$VOLTDB_LIB"/kafka-clients-*.jar; \
     \ls -1 "$VOLTDB_LIB"/slf4j-*.jar; \
     \ls -1 "$VOLTDB_LIB"/log4j-*.jar; \
@@ -108,6 +121,12 @@ function init() {
     sqlcmd < topicTable.sql
 }
 
+# load schema and procedures for AVRO testing
+function init_avro() {
+    srccompile-ifneeded
+    sqlcmd < topicAvroTable.sql
+}
+
 # run the client that drives the example
 function client() {
     run_benchmark
@@ -125,7 +144,6 @@ function run_benchmark() {
         topicbenchmark2.TopicBenchmark2 \
         --servers=localhost \
         --count=500000 \
-        --insertrate=10000 \
         --producers=2 \
         --groups=2 \
         --groupmembers=10 \
@@ -134,7 +152,9 @@ function run_benchmark() {
 }
 
 # producer-only, run once, make sure the (count * producers) matches the count of subscriber-only runs
-# note the use of insertrate to avoid timing out producers
+# note the use of insertrate to avoid timing out producers.
+# In case the client complains of batch timeouts you may limit the insertion rate, e.g.:
+# --insertrate=10000 \
 function run_producers() {
     srccompile-ifneeded
     java -classpath topicbenchmark2-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file:$LOG4J \
@@ -142,12 +162,12 @@ function run_producers() {
         --servers=localhost \
         --topic=TEST_TOPIC \
         --count=5000000 \
-        --insertrate=10000 \
         --producers=2 \
         --groups=0
 }
 
 # subscriber-only, run once or more, make sure the count matches (count * producers) of the producer-only run
+# when repeating the test, make sure to change the group prefix so as to poll the topic from the beginning
 function run_subscribers() {
     srccompile-ifneeded
     java -classpath topicbenchmark2-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file:$LOG4J \
@@ -158,9 +178,56 @@ function run_subscribers() {
         --producers=0 \
         --groups=6 \
         --groupmembers=10 \
-        --groupprefix=test0r54 \
         --pollprogress=100000 \
-        --transientmembers=5
+        --transientmembers=3
+}
+
+# Use this to benchmark Volt inline avro performance against kafka
+function run_avro_benchmark() {
+    srccompile-ifneeded
+    java -classpath topicbenchmark2-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file:${LOG4J} \
+        topicbenchmark2.TopicBenchmark2 \
+        --servers=localhost \
+        --count=500000 \
+        --insertrate=10000 \
+        --useavro=true \
+        --producers=2 \
+        --groups=2 \
+        --groupmembers=10 \
+        --pollprogress=10000 \
+        --transientmembers=3
+}
+
+# Use this to benchmark Volt inline avro performance against kafka
+# In case the client complains of batch timeouts you may limit the insertion rate, e.g.:
+# --insertrate=10000 \
+function run_avro_producers() {
+    srccompile-ifneeded
+    java -classpath topicbenchmark2-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file:$LOG4J \
+        topicbenchmark2.TopicBenchmark2 \
+        --servers=localhost \
+        --topicPort=9095 \
+        --topic=TEST_TOPIC \
+        --count=5000000 \
+        --useavro=true \
+        --producers=2 \
+        --groups=0
+}
+
+# Use this to benchmark Volt inline avro performance against kafka
+function run_avro_subscribers() {
+    srccompile-ifneeded
+    java -classpath topicbenchmark2-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file:$LOG4J \
+        topicbenchmark2.TopicBenchmark2 \
+        --servers=localhost \
+        --topicPort=9095 \
+        --topic=TEST_TOPIC \
+        --count=10000000 \
+        --producers=0 \
+        --useavro=true \
+        --groups=1 \
+        --groupmembers=1 \
+        --pollprogress=100000
 }
 
 # Large producer test case successfully tested on volt16a with 3-node cluster
@@ -194,7 +261,6 @@ function volt16a_subscribers() {
         --groupprefix=test6group10members01 \
         --pollprogress=1000000 \
         --sessiontimeout=45 \
-        --verifier=fast \
         --verification=random
 }
 

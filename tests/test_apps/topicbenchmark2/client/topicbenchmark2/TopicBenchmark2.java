@@ -23,6 +23,7 @@
 package topicbenchmark2;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -31,11 +32,19 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.avro.Schema;
+import org.apache.avro.SchemaBuilder;
+import org.apache.avro.SchemaBuilder.FieldAssembler;
+import org.apache.avro.SchemaBuilder.FieldBuilder;
+import org.apache.avro.generic.GenericData;
+import org.apache.avro.generic.GenericRecord;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -57,6 +66,7 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.topics.VoltDBKafkaPartitioner;
+import org.voltdb.serdes.FieldDescription;
 
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -70,13 +80,16 @@ public class TopicBenchmark2 {
 
     static VoltLogger log = new VoltLogger("TOPICS");
     static final String TEST_TOPIC = "TEST_TOPIC";
-    static final String GROUP_PREFIX = "Group";
 
     static final SimpleDateFormat LOG_DF = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss,SSS");
 
-    // CSV pre-formatted row template: only produce the string field as value
-    static final String ROW_FMT = "\"The quick brown fox jumps over the lazy dog; "
-            + "Portez ce vieux whisky au juge blond, qui l'aime fort\"";
+    Random m_random = new Random();
+
+    // This will be overwritten from the program arguments
+    String m_varChar = new String();
+
+    // Only set up if useavro
+    GenericRecord m_avroRecord;
 
     // Validated CLI config
     final TopicBenchConfig m_config;
@@ -112,6 +125,21 @@ public class TopicBenchmark2 {
         @Option(desc="Topic port on servers (default 9095)")
         int topicPort = 9095;
 
+        @Option(desc="Size of varchar in record, in characters, min = 10, max = 32*1024, (default 512)")
+        int varcharsize = 512;
+
+        @Option(desc = "Use ASCII characters only (default = true, each char == 1 byte).")
+        boolean asciionly = true;
+
+        @Option(desc = "Use avro (requires schemaregistry, default false")
+        boolean useavro = false;
+
+        @Option(desc = "Use Kafka topics instead of Volt topic (default false")
+        boolean usekafka = false;
+
+        @Option(desc = "Schema registry URL (default http://localhost:8081). MUST match the value in deployment file.")
+        String schemaregistry = "http://localhost:8081";
+
         @Option(desc = "How many produce invocations per producer, or how many to verify per subscriber group if no producers.")
         long count = 0;
 
@@ -143,8 +171,8 @@ public class TopicBenchmark2 {
          * The prefix should be changed for each repetition of a subscriber-only test that polls a pre-existing
          * topic. This ensures that polling will start from the beginning of the topic.
          */
-        @Option(desc = "Subscriber group name prefix: use a different one for each subscriber test (default " + GROUP_PREFIX + ").")
-        String groupprefix = GROUP_PREFIX;
+        @Option(desc = "Subscriber group name prefix: use a different one for each subscriber test (default random-generated).")
+        String groupprefix = UUID.randomUUID().toString();
 
         /*
          * If this value is too low the test client will complain about inability to commit offsets because not
@@ -157,9 +185,13 @@ public class TopicBenchmark2 {
          * This value may need to be increased when a polling and verifying thread hits this silence timeout without
          * showing the session timeout errors. This may happen towards the end of a large scale polling test.
          * The default value is set to > 30s which is the value of the typical timeout in rebalances.
+         *
+         * NOTE: this parameter may be increased as the varcharsize is greater, because of the additional time
+         * spent handling larger record sizes. The default value is set to 120s which should be large enough
+         * for the cases tested on an 8-core MacBook pro 16 with 32Gb RAM.
          */
-        @Option(desc = "Max polling silence per thread (default 45s).")
-        int maxpollsilence = 45;
+        @Option(desc = "Max polling silence per thread (default 120s).")
+        int maxpollsilence = 120;
 
         @Option(desc = "Log polling progress every X rows (default 0, no logging).")
         int pollprogress = 0;
@@ -186,7 +218,8 @@ public class TopicBenchmark2 {
                 exitWithMessageAndUsage("transientmembers must be < groupmembers, there must be at least 1 permanent member");
             if (transientmaxduration <= 0) exitWithMessageAndUsage("transientmaxduration must be > 0");
             if (transientmembers > 1 && maxpollsilence <= 30 )
-                exitWithMessageAndUsage("use a maxpollsilence value > 30s when using transient members (recommended 45s");
+                exitWithMessageAndUsage("use a maxpollsilence value > 30s when using transient members (minimum recommended 45s");
+            if (varcharsize < 10 || varcharsize > 32768) exitWithMessageAndUsage("varcharsize must be > 10 and < 32768");
 
             try {
                 m_verification = Verification.valueOf(verification.toUpperCase());
@@ -203,8 +236,15 @@ public class TopicBenchmark2 {
      * @param e         The exception thrown
      */
     void exitWithException(String message, Exception e) {
+        exitWithException(message, e, false);
+    }
+
+    void exitWithException(String message, Exception e, boolean stackTrace) {
         log.error(message);
         log.info(e.getLocalizedMessage());
+        if (stackTrace) {
+            e.printStackTrace();
+        }
         System.exit(-1);
     }
 
@@ -215,13 +255,15 @@ public class TopicBenchmark2 {
      */
     TopicBenchmark2(TopicBenchConfig config) {
         this.m_config = config;
-        ClientConfig clientConfig = new ClientConfig();
-        clientConfig.setReconnectOnConnectionLoss(true);
-        clientConfig.setTopologyChangeAware(true);
-        clientConfig.setClientAffinity(true);
-        m_client = ClientFactory.createClient(clientConfig);
+        if (!m_config.usekafka) {
+            ClientConfig clientConfig = new ClientConfig();
+            clientConfig.setReconnectOnConnectionLoss(true);
+            clientConfig.setTopologyChangeAware(true);
+            clientConfig.setClientAffinity(true);
+            m_client = ClientFactory.createClient(clientConfig);
+        }
 
-        // Build boker string
+        // Build broker string
         String[] serverArray = config.servers.split(",");
         for (String server : serverArray) {
             if (!StringUtils.isBlank(server)) {
@@ -229,8 +271,46 @@ public class TopicBenchmark2 {
             }
         }
         log.info("Test using brokers: " + m_brokers);
+
+        if (m_config.producers > 0) {
+            // Generate a String to insert: all inserts use same value.
+            if (m_config.asciionly) {
+                m_varChar = RandomStringUtils.randomAlphanumeric(m_config.varcharsize);
+                log.info("Test producers using ASCII String (size in bytes = " + m_varChar.getBytes().length + "):\n" + m_varChar);
+            }
+            else {
+                m_varChar = RandomStringUtils.random(m_config.varcharsize, 0, 0, false, false, null, m_random);
+                log.info("Test producers using UNICODE String (size in bytes = " + m_varChar.getBytes().length + "):\n" + m_varChar);
+            }
+        }
+
+        if (m_config.useavro) {
+            setupAvro(m_varChar);
+        }
     }
 
+    /**
+     * Set up the one avro record used by all the producers
+     * <p>
+     * Note: the schema wil conflict with the schemas declared by Volt when loading the DDL,
+     * because the Volt schemas are the full record whereas here we only register 1 String colum.
+     * Therefore the schema registry must be put in compatibility NONE:
+     *
+     * curl -X PUT -H "Content-Type: application/vnd.schemaregistry.v1+json" \
+     *    --data '{"compatibility": "NONE"}' \
+     *     http://localhost:8081/config
+     *
+     * @param value the record value
+     */
+    void setupAvro(String value) {
+        FieldAssembler<Schema> schemaFields = SchemaBuilder.record("TOPIC_BENCH_PRODUCER").namespace("").fields();
+        schemaFields.name("TYPE_VARCHAR32K").type().stringType().noDefault();
+        Schema schema = schemaFields.endRecord();
+
+        m_avroRecord = new GenericData.Record(schema);
+        m_avroRecord.put("TYPE_VARCHAR32K", value);
+        log.info("Test producers using avro record: " + m_avroRecord.toString());
+    }
 
     VoltTable getTopicStats() throws IOException,InterruptedException{
         long retryStats = 5;
@@ -349,28 +429,41 @@ public class TopicBenchmark2 {
      * @param groupName
      * @return
      */
-    KafkaConsumer<Long, String> getConsumer(String groupName) {
+    KafkaConsumer<Long, Object> getConsumer(String groupName) {
         String sessionTimeout = Long.toString(TimeUnit.SECONDS.toMillis(m_config.sessiontimeout));
-        ImmutableMap.Builder<String, Object> builder = ImmutableMap.builder();
-        builder.put(ConsumerConfig.GROUP_ID_CONFIG, groupName);
-        builder.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, m_brokers);
+        Properties props = new Properties();
+        props.put(ConsumerConfig.GROUP_ID_CONFIG, groupName);
+        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, m_brokers);
         // Use volt max buffer size of 2MB
-        builder.put(ConsumerConfig.MAX_PARTITION_FETCH_BYTES_CONFIG, "2097152");
+        props.put(ConsumerConfig.MAX_PARTITION_FETCH_BYTES_CONFIG, "2097152");
         // Use a short rebalance timeout (default is 5 minutes)
         // Rebalance timeout only configurable via poll interval?
-        builder.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, "10000");
-        builder.put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, sessionTimeout);
+        props.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, "10000");
+        props.put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, sessionTimeout);
 
         if (m_config.staticmembers) {
             String memberName = groupName + Thread.currentThread().getId();
-            builder.put(ConsumerConfig.GROUP_INSTANCE_ID_CONFIG, memberName);
+            props.put(ConsumerConfig.GROUP_INSTANCE_ID_CONFIG, memberName);
         }
-        Map<String, Object> consumerConfig = builder.build();
+
+        props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, org.apache.kafka.common.serialization.LongDeserializer.class);
+        if (m_config.useavro) {
+            props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, io.confluent.kafka.serializers.KafkaAvroDeserializer.class);
+            props.put("schema.registry.url", m_config.schemaregistry);
+        }
+        else {
+            props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, org.apache.kafka.common.serialization.StringDeserializer.class);
+        }
+
+        if (m_config.usekafka) {
+            // This is not necessary with Volt which starts at the beginning
+            props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        }
 
         if (m_createdGroups.add(groupName)) {
-            log.info("Joining group " + groupName + ", config = " + consumerConfig);
+            log.info("Joining group " + groupName + ", config = " + props);
         }
-        return new KafkaConsumer<Long, String>(consumerConfig, new LongDeserializer(), new StringDeserializer());
+        return new KafkaConsumer<Long, Object>(props);
     }
 
     /**
@@ -405,11 +498,11 @@ public class TopicBenchmark2 {
         long polledCount = 0;
         long lastLogged = 0;
         try {
-            try (KafkaConsumer<Long, String> consumer = getConsumer(groupId)) {
+            try (KafkaConsumer<Long, Object> consumer = getConsumer(groupId)) {
                 consumer.subscribe(ImmutableList.of(m_config.topic));
                 while (true) {
                     // Poll records
-                    ConsumerRecords<Long, String> records = consumer.poll(Duration.ofSeconds(1));
+                    ConsumerRecords<Long, Object> records = consumer.poll(Duration.ofSeconds(1));
 
                     if (groupVerifier != null && groupVerifier.cardinality() == maxCount) {
                         // Another verifying thread polled the last records
@@ -504,7 +597,7 @@ public class TopicBenchmark2 {
             }
         }
         catch (Exception e) {
-            exitWithException("Group " + groupId + " thread " + thId + " failed polling from topic\n", e);
+            exitWithException("Group " + groupId + " thread " + thId + " failed polling from topic\n", e, true);
         }
         return false;
     }
@@ -515,6 +608,7 @@ public class TopicBenchmark2 {
      * @throws InterruptedException
      * @throws NoConnectionsException
      */
+    @SuppressWarnings("unchecked")
     void doInserts() {
         long thId = Thread.currentThread().getId();
         RateLimiter rateLimiter = m_config.insertrate > 0 ? RateLimiter.create(m_config.insertrate) : null;
@@ -524,11 +618,19 @@ public class TopicBenchmark2 {
             Properties props = new Properties();
             props.put("bootstrap.servers", m_brokers);
             props.put("acks", "all");
-            props.put("key.serializer", "org.apache.kafka.common.serialization.LongSerializer");
-            props.put("value.serializer", "org.apache.kafka.common.serialization.StringSerializer");
-            props.put(ProducerConfig.PARTITIONER_CLASS_CONFIG, VoltDBKafkaPartitioner.class.getName());
-
-            Producer<Long, String> producer = new KafkaProducer<>(props);
+            props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, org.apache.kafka.common.serialization.LongSerializer.class);
+            if (m_config.useavro) {
+                props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG,
+                        io.confluent.kafka.serializers.KafkaAvroSerializer.class);
+                props.put("schema.registry.url", m_config.schemaregistry);
+            }
+            else {
+                props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, org.apache.kafka.common.serialization.StringSerializer.class);
+            }
+            if (!m_config.usekafka) {
+                props.put(ProducerConfig.PARTITIONER_CLASS_CONFIG, VoltDBKafkaPartitioner.class.getName());
+            }
+            KafkaProducer producer = new KafkaProducer(props);
 
             // Insert records until we've reached the configured count
             while (inserts < m_config.count) {
@@ -537,7 +639,14 @@ public class TopicBenchmark2 {
                 }
                 final long start = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
 
-                producer.send(new ProducerRecord<Long, String>(m_config.topic, m_rowId.getAndIncrement(), ROW_FMT),
+                ProducerRecord<Long, Object> record = null;
+                if (m_config.useavro) {
+                    record = new ProducerRecord<Long, Object>(m_config.topic, m_rowId.getAndIncrement(), m_avroRecord);
+                }
+                else {
+                    record = new ProducerRecord<Long, Object>(m_config.topic, m_rowId.getAndIncrement(), m_varChar);
+                }
+                producer.send(record,
                         new Callback() {
                     @Override
                     public void onCompletion(RecordMetadata metadata, Exception e) {
@@ -563,7 +672,7 @@ public class TopicBenchmark2 {
             producer.close();
         }
         catch (Exception e) {
-            exitWithException("Producer thread " + thId + " failed inserting into topic\n", e);
+            exitWithException("Producer thread " + thId + " failed inserting into topic\n", e, true);
         }
     }
 
@@ -582,8 +691,7 @@ public class TopicBenchmark2 {
 
         int verifier = -1;
         if (m_config.m_verification == Verification.RANDOM) {
-            Random r = new Random();
-            verifier = r.nextInt(m_config.groups);
+            verifier = m_random.nextInt(m_config.groups);
             log.info("Creating " + nReaders + " subscriber threads in " + m_config.groups
                     + " groups to topic " + m_config.topic + ", group " + verifier + " verifying");
         }
@@ -641,14 +749,13 @@ public class TopicBenchmark2 {
         if (m_config.transientmembers == 0) {
             return transients;
         }
-        Random r = new Random();
         while(transients.keySet().size() < m_config.transientmembers) {
-            int transientMember = r.nextInt(m_config.groupmembers);
+            int transientMember = m_random.nextInt(m_config.groupmembers);
             if (transients.keySet().contains(transientMember)) {
                 // Same player shoots again
                 continue;
             }
-            int transientDuration = r.nextInt(m_config.transientmaxduration) + 1;
+            int transientDuration = m_random.nextInt(m_config.transientmaxduration) + 1;
             transients.put(transientMember, TimeUnit.SECONDS.toMillis(transientDuration));
         }
         return transients;
@@ -711,11 +818,13 @@ public class TopicBenchmark2 {
      * @throws NoConnectionsException
      */
     void runTest() throws InterruptedException, IOException {
-        try {
-            log.info("Test initialization");
-            connect(m_config.servers);
-        } catch (InterruptedException e) {
-            exitWithException("ERROR: Error connecting to VoltDB", e);
+        log.info("Test initialization");
+        if (m_client != null) {
+            try {
+                connect(m_config.servers);
+            } catch (InterruptedException e) {
+                exitWithException("ERROR: Error connecting to VoltDB", e);
+            }
         }
 
         long start = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
@@ -734,13 +843,16 @@ public class TopicBenchmark2 {
 
             log.info("Finished benchmark insertion in " + TimeUnit.MILLISECONDS.toSeconds(duration) + " seconds"
                     + ", last rowId = " + (m_rowId.get() - 1));
-            if (m_failedInserts.get() == 0) {
+
+            if (m_client != null && m_failedInserts.get() == 0) {
                 if (!waitTilTupleCountSettles(m_successfulInserts.get())) {
                     log.info("TUPLE_COUNT did not settle in 10 minutes");
                 }
             }
         }
-        m_client.close();
+        if (m_client != null) {
+            m_client.close();
+        }
 
         if (readers != null && m_failedInserts.get() == 0) {
             readers.forEach(t -> {

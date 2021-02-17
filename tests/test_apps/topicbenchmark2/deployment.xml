@@ -1,8 +1,12 @@
 <?xml version="1.0"?>
 <deployment>
-   <cluster hostcount="1"  sitesperhost="24" />
    <!--  multi-node config  -->
    <!--  cluster hostcount="3" sitesperhost="24" kfactor="1" / -->
+   <cluster hostcount="1"  sitesperhost="24" />
+   <!--
+       NOTE: avo registry URL must match the value of the 'schemaregistry' parameter
+   -->
+   <avro registry="http://localhost:8081" namespace="" />
    <systemsettings>
       <flushinterval minimum="10">
           <export interval="100" />

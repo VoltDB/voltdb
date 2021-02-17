@@ -134,25 +134,25 @@ TEST_F(AvroEncoderTest, NullableAvro) {
     ReferenceSerializeInputBE in(encoded.get(), written);
     validateHeader(in, 25);
 
-    ASSERT_EQ(0, in.readVarInt()); // Union index indicating not null
+    ASSERT_EQ(1, in.readVarInt()); // Union index indicating not null
     ASSERT_EQ(1, in.readVarInt()); // tinyint
 
-    ASSERT_EQ(0, in.readVarInt()); // Union index indicating not null
+    ASSERT_EQ(1, in.readVarInt()); // Union index indicating not null
     ASSERT_EQ(2, in.readVarInt()); // smallint
 
-    ASSERT_EQ(0, in.readVarInt()); // Union index indicating not null
+    ASSERT_EQ(1, in.readVarInt()); // Union index indicating not null
     ASSERT_EQ(3, in.readVarInt()); // integer
 
-    ASSERT_EQ(0, in.readVarInt()); // Union index indicating not null
+    ASSERT_EQ(1, in.readVarInt()); // Union index indicating not null
     ASSERT_EQ(6092398495938644137L, in.readVarLong()); // bigint
 
-    ASSERT_EQ(0, in.readVarInt()); // Union index indicating not null
+    ASSERT_EQ(1, in.readVarInt()); // Union index indicating not null
     ASSERT_EQ(5, readAvroDouble(in)); // double
 
-    ASSERT_EQ(0, in.readVarInt()); // Union index indicating not null
+    ASSERT_EQ(1, in.readVarInt()); // Union index indicating not null
     ASSERT_EQ(6, in.readVarLong()); // timestamp
 
-    ASSERT_EQ(0, in.readVarInt()); // Union index indicating not null
+    ASSERT_EQ(1, in.readVarInt()); // Union index indicating not null
     ASSERT_EQ(16, in.readVarLong()); // Size of decimal
     int64_t val = in.readLong();
     ASSERT_EQ(0, ntohll(val)); // Highest significant bits
@@ -160,7 +160,7 @@ TEST_F(AvroEncoderTest, NullableAvro) {
     ASSERT_EQ(7000000000000, ntohll(val)); // Lowest significant bits with scale of 12
 
     // Validate the string  can be deserialized
-    ASSERT_EQ(0, in.readVarInt()); // Union index indicating not null
+    ASSERT_EQ(1, in.readVarInt()); // Union index indicating not null
     int64_t len = in.readVarInt();
     ASSERT_EQ(varchar.length(), len);
     std::unique_ptr<char[]> strDecoded(new char[len]);
@@ -168,7 +168,7 @@ TEST_F(AvroEncoderTest, NullableAvro) {
     ASSERT_EQ(varchar, std::string(strDecoded.get(), len));
 
     // Validate the var binary can be deserialized
-    ASSERT_EQ(0, in.readVarInt()); // Union index indicating not null
+    ASSERT_EQ(1, in.readVarInt()); // Union index indicating not null
     len = in.readVarInt();
     ASSERT_EQ(binary.size(), len);
     std::unique_ptr<char[]> binaryDecoded(new char[len]);
@@ -176,12 +176,12 @@ TEST_F(AvroEncoderTest, NullableAvro) {
     ASSERT_EQ(0, ::memcmp(binary.data(), binaryDecoded.get(), len));
 
     // Validate the point
-    ASSERT_EQ(0, in.readVarInt()); // Union index indicating not null
+    ASSERT_EQ(1, in.readVarInt()); // Union index indicating not null
     ASSERT_EQ(point.getLongitude(), in.readDouble());
     ASSERT_EQ(point.getLatitude(), in.readDouble());
 
     // Validate the geography
-    ASSERT_EQ(0, in.readVarInt()); // Union index indicating not null
+    ASSERT_EQ(1, in.readVarInt()); // Union index indicating not null
     len = in.readVarInt();
     ASSERT_EQ(geography.serializedLength(), len);
     std::unique_ptr<char[]> geoBytes(new char[len]);
@@ -209,9 +209,9 @@ TEST_F(AvroEncoderTest, AllNullAvro) {
     ReferenceSerializeInputBE in(encoded.get(), size);
     validateHeader(in, 25);
 
-    // Validate all union indexers are 1 which indicates null
+    // Validate all union indexers are 0 which indicates null
     for (int i = 0; i < m_schema->columnCount(); ++i) {
-        ASSERT_EQ(1, in.readVarInt());
+        ASSERT_EQ(0, in.readVarInt());
     }
 
     ASSERT_EQ(0, in.remaining());
