@@ -780,7 +780,7 @@ void VoltDBEngine::serializeToUDFOutputBuffer(int32_t functionId, const NValue& 
  *                         udf(b) has an udafIndex of 0, and udf(a) has an udafIndex of 1.
  */
 void VoltDBEngine::serializeToUDFOutputBuffer(int32_t functionId,
-        vector<NValue> const& argVector, int32_t argCount, ValueType type, int32_t udafIndex) {
+        std::vector<NValue> const& argVector, int32_t argCount, ValueType type, int32_t udafIndex) {
     // Determined the buffer size needed.
     // Information put in the buffer (sequentially)
     // * buffer size needed (int32_t)
@@ -793,7 +793,7 @@ void VoltDBEngine::serializeToUDFOutputBuffer(int32_t functionId,
     assert(argCount <= argVector.size());
 
     int32_t bufferSizeNeeded = 4 * sizeof(int32_t);
-    vector<NValue> cast_argument(argCount);
+    std::vector<NValue> cast_argument(argCount);
     if (type != ValueType::tINVALID) {
         for (int i = 0; i < argCount; i++) {
             cast_argument[i] = argVector[i].castAs(type);
@@ -873,7 +873,7 @@ void VoltDBEngine::callJavaUserDefinedAggregateStart(int32_t functionId) {
 }
 
 void VoltDBEngine::callJavaUserDefinedAggregateAssemble(
-        int32_t functionId, vector<NValue>& argVector, int32_t argCount, int32_t udafIndex) {
+        int32_t functionId, std::vector<NValue>& argVector, int32_t argCount, int32_t udafIndex) {
     UserDefinedFunctionInfo *info = findInMapOrNull(functionId, m_functionInfo);
     checkUserDefinedFunctionInfo(info, functionId);
     serializeToUDFOutputBuffer(functionId, argVector, argCount,

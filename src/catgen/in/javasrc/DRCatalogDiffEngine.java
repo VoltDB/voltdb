@@ -133,12 +133,12 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
     }
 
     public static String[] calculateReplicableTables(byte clusterId, byte[] remoteCatalogBytes) {
-        Catalog drCatalog = DRCatalogDiffEngine.getDrCatalog(VoltDB.instance().getCatalogContext().catalog);
-        return DRCatalogDiffEngine.calculateReplicableTables(clusterId, drCatalog, remoteCatalogBytes);
+        Catalog drCatalog = getDrCatalog(VoltDB.instance().getCatalogContext().catalog);
+        return calculateReplicableTables(clusterId, drCatalog, remoteCatalogBytes);
     }
 
     public static String[] calculateReplicableTables(byte clusterId, Catalog local, byte[] remoteCatalogBytes) {
-        Catalog remote = DRCatalogDiffEngine.deserializeCatalogCommandsForDr(remoteCatalogBytes);
+        Catalog remote = deserializeCatalogCommandsForDr(remoteCatalogBytes);
 
         DRCatalogDiffEngine diff = new DRCatalogDiffEngine(local, remote, clusterId);
 
