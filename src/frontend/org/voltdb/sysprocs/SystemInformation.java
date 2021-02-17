@@ -21,7 +21,6 @@ import java.io.File;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
-import java.text.SimpleDateFormat;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -58,7 +57,6 @@ import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.User;
-import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.utils.CatalogUtil;
@@ -625,61 +623,7 @@ public class SystemInformation extends VoltSystemProcedure
     static public VoltTable populateLicenseProperties()
     {
         VoltTable results = new VoltTable(clusterInfoSchema);
-        SimpleDateFormat sdf = new SimpleDateFormat("EEE MMM d, yyyy");
-        LicenseApi licenseApi = VoltDB.instance().getLicenseApi();
-
-
-        results.addRow("PERMIT_VERSION", Integer.toString(licenseApi.getVersion()));
-        results.addRow("PERMIT_SCHEME", Integer.toString(licenseApi.getScheme()));
-
-        if(licenseApi.getLicenseType() != null)
-        {
-            results.addRow("TYPE", licenseApi.getLicenseType());
-        }
-        if(licenseApi.getIssuerCompany() != null)
-        {
-            results.addRow("ISSUER_COMPANY", licenseApi.getIssuerCompany());
-        }
-        if(licenseApi.getIssuerEmail() != null)
-        {
-            results.addRow("ISSUER_EMAIL", licenseApi.getIssuerEmail());
-        }
-        if(licenseApi.getIssuerUrl() != null)
-        {
-            results.addRow("ISSUER_URL", licenseApi.getIssuerUrl());
-        }
-        if(licenseApi.getIssuerPhone() != null)
-        {
-            results.addRow("ISSUER_PHONE", licenseApi.getIssuerPhone());
-        }
-        if(licenseApi.issued() != null)
-        {
-            results.addRow("ISSUE_DATE", sdf.format(licenseApi.issued().getTime()));
-        }
-        if(licenseApi.licensee() != null)
-        {
-            results.addRow("LICENSEE", licenseApi.licensee());
-        }
-        if(licenseApi.expires() != null)
-        {
-            results.addRow("EXPIRATION", sdf.format(licenseApi.expires().getTime()));
-        }
-
-        results.addRow("HOSTCOUNT_MAX", Integer.toString(licenseApi.maxHostcount()));
-        results.addRow("FEATURES_TRIAL", Boolean.toString(licenseApi.isAnyKindOfTrial()));
-        results.addRow("FEATURES_UNRESTRICTED", Boolean.toString(licenseApi.isUnrestricted()));
-        results.addRow("FEATURES_COMMANDLOGGING", Boolean.toString(licenseApi.isCommandLoggingAllowed()));
-        results.addRow("FEATURES_DRREPLICATION", Boolean.toString(licenseApi.isDrReplicationAllowed()));
-        results.addRow("FEATURES_DRACTIVEACTIVE", Boolean.toString(licenseApi.isDrActiveActiveAllowed()));
-
-        if(licenseApi.note() != null)
-        {
-            results.addRow("NOTE", licenseApi.note());
-        }
-        if(licenseApi.getSignature() != null)
-        {
-            results.addRow("SIGNATURE", licenseApi.getSignature());
-        }
+        VoltDB.instance().getLicensing().populateLicenseInfo(results);
         return results;
     }
 }

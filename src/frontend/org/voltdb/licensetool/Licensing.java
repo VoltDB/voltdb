@@ -19,6 +19,7 @@ package org.voltdb.licensetool;
 
 import org.voltdb.StartAction;
 import org.voltdb.VoltDB.Configuration;
+import org.voltdb.VoltTable;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 
@@ -40,4 +41,5 @@ public interface Licensing {
     public String isLicenseChangeAllowed(LicenseApi newLicense, LicenseApi currentLicense);
     public void updateLicenseApi(LicenseApi newApi);
     public String getLicenseSummary();
+    public void populateLicenseInfo(VoltTable results);
 }

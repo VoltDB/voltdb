@@ -23,6 +23,7 @@ import java.util.Calendar;
 import org.voltdb.StartAction;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.Configuration;
+import org.voltdb.VoltTable;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.utils.MiscUtils;
 
@@ -105,6 +106,11 @@ public final class CommunityLicensing implements Licensing {
     public String getLicenseSummary() {
         unsupported();
         return null;
+    }
+
+    @Override
+    public void populateLicenseInfo(VoltTable results) {
+        unsupported();
     }
 
     private void unsupported() {
