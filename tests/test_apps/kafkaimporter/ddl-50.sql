@@ -653,154 +653,104 @@ PARTITION TABLE kafkaimporttable49 ON COLUMN instance_id;
 
 CREATE PROCEDURE ImportCountMinMax as select count(instance_id), min(instance_id), max(instance_id) from kafkaimporttable0;
 
-CREATE PROCEDURE InsertOnly0 as upsert into KAFKAIMPORTTABLE0 VALUES(?, ?, ?, ?, ?);
-PARTITION PROCEDURE InsertOnly0 ON TABLE Kafkaimporttable0 COLUMN instance_id;
+CREATE PROCEDURE InsertOnly0 PARTITION ON TABLE  Kafkaimporttable0 COLUMN instance_id as upsert into KAFKAIMPORTTABLE0 VALUES(?, ?, ?, ?, ?);
 
-CREATE PROCEDURE InsertOnly1 as upsert into KAFKAIMPORTTABLE1 VALUES(?, ?, ?, ?, ?);
-PARTITION PROCEDURE InsertOnly1 ON TABLE Kafkaimporttable1 COLUMN instance_id;
+CREATE PROCEDURE InsertOnly1 PARTITION ON TABLE  Kafkaimporttable1 COLUMN instance_id as upsert into KAFKAIMPORTTABLE1 VALUES(?, ?, ?, ?, ?);
 
-CREATE PROCEDURE InsertOnly2 as upsert into KAFKAIMPORTTABLE2 VALUES(?, ?, ?, ?, ?);
-PARTITION PROCEDURE InsertOnly2 ON TABLE Kafkaimporttable2 COLUMN instance_id;
+CREATE PROCEDURE InsertOnly2 PARTITION ON TABLE  Kafkaimporttable2 COLUMN instance_id as upsert into KAFKAIMPORTTABLE2 VALUES(?, ?, ?, ?, ?);
 
-CREATE PROCEDURE InsertOnly3 as upsert into KAFKAIMPORTTABLE3 VALUES(?, ?, ?, ?, ?);
-PARTITION PROCEDURE InsertOnly3 ON TABLE Kafkaimporttable3 COLUMN instance_id;
+CREATE PROCEDURE InsertOnly3 PARTITION ON TABLE  Kafkaimporttable3 COLUMN instance_id as upsert into KAFKAIMPORTTABLE3 VALUES(?, ?, ?, ?, ?);
 
-CREATE PROCEDURE InsertOnly4 as upsert into KAFKAIMPORTTABLE4 VALUES(?, ?, ?, ?, ?);
-PARTITION PROCEDURE InsertOnly4 ON TABLE Kafkaimporttable4 COLUMN instance_id;
+CREATE PROCEDURE InsertOnly4 PARTITION ON TABLE  Kafkaimporttable4 COLUMN instance_id as upsert into KAFKAIMPORTTABLE4 VALUES(?, ?, ?, ?, ?);
 
-CREATE PROCEDURE InsertOnly5 as upsert into KAFKAIMPORTTABLE5 VALUES(?, ?, ?, ?, ?);
-PARTITION PROCEDURE InsertOnly5 ON TABLE Kafkaimporttable5 COLUMN instance_id;
+CREATE PROCEDURE InsertOnly5 PARTITION ON TABLE  Kafkaimporttable5 COLUMN instance_id as upsert into KAFKAIMPORTTABLE5 VALUES(?, ?, ?, ?, ?);
 
-CREATE PROCEDURE InsertOnly6 as upsert into KAFKAIMPORTTABLE6 VALUES(?, ?, ?, ?, ?);
-PARTITION PROCEDURE InsertOnly6 ON TABLE Kafkaimporttable6 COLUMN instance_id;
+CREATE PROCEDURE InsertOnly6 PARTITION ON TABLE  Kafkaimporttable6 COLUMN instance_id as upsert into KAFKAIMPORTTABLE6 VALUES(?, ?, ?, ?, ?);
 
-CREATE PROCEDURE InsertOnly7 as upsert into KAFKAIMPORTTABLE7 VALUES(?, ?, ?, ?, ?);
-PARTITION PROCEDURE InsertOnly7 ON TABLE Kafkaimporttable7 COLUMN instance_id;
+CREATE PROCEDURE InsertOnly7 PARTITION ON TABLE  Kafkaimporttable7 COLUMN instance_id as upsert into KAFKAIMPORTTABLE7 VALUES(?, ?, ?, ?, ?);
 
-CREATE PROCEDURE InsertOnly8 as upsert into KAFKAIMPORTTABLE8 VALUES(?, ?, ?, ?, ?);
-PARTITION PROCEDURE InsertOnly8 ON TABLE Kafkaimporttable8 COLUMN instance_id;
+CREATE PROCEDURE InsertOnly8 PARTITION ON TABLE  Kafkaimporttable8 COLUMN instance_id as upsert into KAFKAIMPORTTABLE8 VALUES(?, ?, ?, ?, ?);
 
-CREATE PROCEDURE InsertOnly9 as upsert into KAFKAIMPORTTABLE9 VALUES(?, ?, ?, ?, ?);
-PARTITION PROCEDURE InsertOnly9 ON TABLE Kafkaimporttable9 COLUMN instance_id;
+CREATE PROCEDURE InsertOnly9 PARTITION ON TABLE  Kafkaimporttable9 COLUMN instance_id as upsert into KAFKAIMPORTTABLE9 VALUES(?, ?, ?, ?, ?);
 
-CREATE PROCEDURE InsertOnly10 as upsert into KAFKAIMPORTTABLE10 VALUES(?, ?, ?, ?, ?);
-PARTITION PROCEDURE InsertOnly10 ON TABLE Kafkaimporttable10 COLUMN instance_id;
+CREATE PROCEDURE InsertOnly10 PARTITION ON TABLE  Kafkaimporttable10 COLUMN instance_id as upsert into KAFKAIMPORTTABLE10 VALUES(?, ?, ?, ?, ?);
 
-CREATE PROCEDURE InsertOnly11 as upsert into KAFKAIMPORTTABLE11 VALUES(?, ?, ?, ?, ?);
-PARTITION PROCEDURE InsertOnly11 ON TABLE Kafkaimporttable11 COLUMN instance_id;
+CREATE PROCEDURE InsertOnly11 PARTITION ON TABLE  Kafkaimporttable11 COLUMN instance_id as upsert into KAFKAIMPORTTABLE11 VALUES(?, ?, ?, ?, ?);
 
-CREATE PROCEDURE InsertOnly12 as upsert into KAFKAIMPORTTABLE12 VALUES(?, ?, ?, ?, ?);
-PARTITION PROCEDURE InsertOnly12 ON TABLE Kafkaimporttable12 COLUMN instance_id;
+CREATE PROCEDURE InsertOnly12 PARTITION ON TABLE  Kafkaimporttable12 COLUMN instance_id as upsert into KAFKAIMPORTTABLE12 VALUES(?, ?, ?, ?, ?);
 
-CREATE PROCEDURE InsertOnly13 as upsert into KAFKAIMPORTTABLE13 VALUES(?, ?, ?, ?, ?);
-PARTITION PROCEDURE InsertOnly13 ON TABLE Kafkaimporttable13 COLUMN instance_id;
+CREATE PROCEDURE InsertOnly13 PARTITION ON TABLE  Kafkaimporttable13 COLUMN instance_id as upsert into KAFKAIMPORTTABLE13 VALUES(?, ?, ?, ?, ?);
 
-CREATE PROCEDURE InsertOnly14 as upsert into KAFKAIMPORTTABLE14 VALUES(?, ?, ?, ?, ?);
-PARTITION PROCEDURE InsertOnly14 ON TABLE Kafkaimporttable14 COLUMN instance_id;
+CREATE PROCEDURE InsertOnly14 PARTITION ON TABLE  Kafkaimporttable14 COLUMN instance_id as upsert into KAFKAIMPORTTABLE14 VALUES(?, ?, ?, ?, ?);
 
-CREATE PROCEDURE InsertOnly15 as upsert into KAFKAIMPORTTABLE15 VALUES(?, ?, ?, ?, ?);
-PARTITION PROCEDURE InsertOnly15 ON TABLE Kafkaimporttable15 COLUMN instance_id;
+CREATE PROCEDURE InsertOnly15 PARTITION ON TABLE  Kafkaimporttable15 COLUMN instance_id as upsert into KAFKAIMPORTTABLE15 VALUES(?, ?, ?, ?, ?);
 
-CREATE PROCEDURE InsertOnly16 as upsert into KAFKAIMPORTTABLE16 VALUES(?, ?, ?, ?, ?);
-PARTITION PROCEDURE InsertOnly16 ON TABLE Kafkaimporttable16 COLUMN instance_id;
+CREATE PROCEDURE InsertOnly16 PARTITION ON TABLE  Kafkaimporttable16 COLUMN instance_id as upsert into KAFKAIMPORTTABLE16 VALUES(?, ?, ?, ?, ?);
 
-CREATE PROCEDURE InsertOnly17 as upsert into KAFKAIMPORTTABLE17 VALUES(?, ?, ?, ?, ?);
-PARTITION PROCEDURE InsertOnly17 ON TABLE Kafkaimporttable17 COLUMN instance_id;
+CREATE PROCEDURE InsertOnly17 PARTITION ON TABLE  Kafkaimporttable17 COLUMN instance_id as upsert into KAFKAIMPORTTABLE17 VALUES(?, ?, ?, ?, ?);
 
-CREATE PROCEDURE InsertOnly18 as upsert into KAFKAIMPORTTABLE18 VALUES(?, ?, ?, ?, ?);
-PARTITION PROCEDURE InsertOnly18 ON TABLE Kafkaimporttable18 COLUMN instance_id;
+CREATE PROCEDURE InsertOnly18 PARTITION ON TABLE  Kafkaimporttable18 COLUMN instance_id as upsert into KAFKAIMPORTTABLE18 VALUES(?, ?, ?, ?, ?);
 
-CREATE PROCEDURE InsertOnly19 as upsert into KAFKAIMPORTTABLE19 VALUES(?, ?, ?, ?, ?);
-PARTITION PROCEDURE InsertOnly19 ON TABLE Kafkaimporttable19 COLUMN instance_id;
+CREATE PROCEDURE InsertOnly19 PARTITION ON TABLE  Kafkaimporttable19 COLUMN instance_id as upsert into KAFKAIMPORTTABLE19 VALUES(?, ?, ?, ?, ?);
 
-CREATE PROCEDURE InsertOnly20 as upsert into KAFKAIMPORTTABLE20 VALUES(?, ?, ?, ?, ?);
-PARTITION PROCEDURE InsertOnly20 ON TABLE Kafkaimporttable20 COLUMN instance_id;
+CREATE PROCEDURE InsertOnly20 PARTITION ON TABLE  Kafkaimporttable20 COLUMN instance_id as upsert into KAFKAIMPORTTABLE20 VALUES(?, ?, ?, ?, ?);
 
-CREATE PROCEDURE InsertOnly21 as upsert into KAFKAIMPORTTABLE21 VALUES(?, ?, ?, ?, ?);
-PARTITION PROCEDURE InsertOnly21 ON TABLE Kafkaimporttable21 COLUMN instance_id;
+CREATE PROCEDURE InsertOnly21 PARTITION ON TABLE  Kafkaimporttable21 COLUMN instance_id as upsert into KAFKAIMPORTTABLE21 VALUES(?, ?, ?, ?, ?);
 
-CREATE PROCEDURE InsertOnly22 as upsert into KAFKAIMPORTTABLE22 VALUES(?, ?, ?, ?, ?);
-PARTITION PROCEDURE InsertOnly22 ON TABLE Kafkaimporttable22 COLUMN instance_id;
+CREATE PROCEDURE InsertOnly22 PARTITION ON TABLE  Kafkaimporttable22 COLUMN instance_id as upsert into KAFKAIMPORTTABLE22 VALUES(?, ?, ?, ?, ?);
 
-CREATE PROCEDURE InsertOnly23 as upsert into KAFKAIMPORTTABLE23 VALUES(?, ?, ?, ?, ?);
-PARTITION PROCEDURE InsertOnly23 ON TABLE Kafkaimporttable23 COLUMN instance_id;
+CREATE PROCEDURE InsertOnly23 PARTITION ON TABLE  Kafkaimporttable23 COLUMN instance_id as upsert into KAFKAIMPORTTABLE23 VALUES(?, ?, ?, ?, ?);
 
-CREATE PROCEDURE InsertOnly24 as upsert into KAFKAIMPORTTABLE24 VALUES(?, ?, ?, ?, ?);
-PARTITION PROCEDURE InsertOnly24 ON TABLE Kafkaimporttable24 COLUMN instance_id;
+CREATE PROCEDURE InsertOnly24 PARTITION ON TABLE  Kafkaimporttable24 COLUMN instance_id as upsert into KAFKAIMPORTTABLE24 VALUES(?, ?, ?, ?, ?);
 
-CREATE PROCEDURE InsertOnly25 as upsert into KAFKAIMPORTTABLE25 VALUES(?, ?, ?, ?, ?);
-PARTITION PROCEDURE InsertOnly25 ON TABLE Kafkaimporttable25 COLUMN instance_id;
+CREATE PROCEDURE InsertOnly25 PARTITION ON TABLE  Kafkaimporttable25 COLUMN instance_id as upsert into KAFKAIMPORTTABLE25 VALUES(?, ?, ?, ?, ?);
 
-CREATE PROCEDURE InsertOnly26 as upsert into KAFKAIMPORTTABLE26 VALUES(?, ?, ?, ?, ?);
-PARTITION PROCEDURE InsertOnly26 ON TABLE Kafkaimporttable26 COLUMN instance_id;
+CREATE PROCEDURE InsertOnly26 PARTITION ON TABLE  Kafkaimporttable26 COLUMN instance_id as upsert into KAFKAIMPORTTABLE26 VALUES(?, ?, ?, ?, ?);
 
-CREATE PROCEDURE InsertOnly27 as upsert into KAFKAIMPORTTABLE27 VALUES(?, ?, ?, ?, ?);
-PARTITION PROCEDURE InsertOnly27 ON TABLE Kafkaimporttable27 COLUMN instance_id;
+CREATE PROCEDURE InsertOnly27 PARTITION ON TABLE  Kafkaimporttable27 COLUMN instance_id as upsert into KAFKAIMPORTTABLE27 VALUES(?, ?, ?, ?, ?);
 
-CREATE PROCEDURE InsertOnly28 as upsert into KAFKAIMPORTTABLE28 VALUES(?, ?, ?, ?, ?);
-PARTITION PROCEDURE InsertOnly28 ON TABLE Kafkaimporttable28 COLUMN instance_id;
+CREATE PROCEDURE InsertOnly28 PARTITION ON TABLE  Kafkaimporttable28 COLUMN instance_id as upsert into KAFKAIMPORTTABLE28 VALUES(?, ?, ?, ?, ?);
 
-CREATE PROCEDURE InsertOnly29 as upsert into KAFKAIMPORTTABLE29 VALUES(?, ?, ?, ?, ?);
-PARTITION PROCEDURE InsertOnly29 ON TABLE Kafkaimporttable29 COLUMN instance_id;
+CREATE PROCEDURE InsertOnly29 PARTITION ON TABLE  Kafkaimporttable29 COLUMN instance_id as upsert into KAFKAIMPORTTABLE29 VALUES(?, ?, ?, ?, ?);
 
-CREATE PROCEDURE InsertOnly30 as upsert into KAFKAIMPORTTABLE30 VALUES(?, ?, ?, ?, ?);
-PARTITION PROCEDURE InsertOnly30 ON TABLE Kafkaimporttable30 COLUMN instance_id;
+CREATE PROCEDURE InsertOnly30 PARTITION ON TABLE  Kafkaimporttable30 COLUMN instance_id as upsert into KAFKAIMPORTTABLE30 VALUES(?, ?, ?, ?, ?);
 
-CREATE PROCEDURE InsertOnly31 as upsert into KAFKAIMPORTTABLE31 VALUES(?, ?, ?, ?, ?);
-PARTITION PROCEDURE InsertOnly31 ON TABLE Kafkaimporttable31 COLUMN instance_id;
+CREATE PROCEDURE InsertOnly31 PARTITION ON TABLE  Kafkaimporttable31 COLUMN instance_id as upsert into KAFKAIMPORTTABLE31 VALUES(?, ?, ?, ?, ?);
 
-CREATE PROCEDURE InsertOnly32 as upsert into KAFKAIMPORTTABLE32 VALUES(?, ?, ?, ?, ?);
-PARTITION PROCEDURE InsertOnly32 ON TABLE Kafkaimporttable32 COLUMN instance_id;
+CREATE PROCEDURE InsertOnly32 PARTITION ON TABLE  Kafkaimporttable32 COLUMN instance_id as upsert into KAFKAIMPORTTABLE32 VALUES(?, ?, ?, ?, ?);
 
-CREATE PROCEDURE InsertOnly33 as upsert into KAFKAIMPORTTABLE33 VALUES(?, ?, ?, ?, ?);
-PARTITION PROCEDURE InsertOnly33 ON TABLE Kafkaimporttable33 COLUMN instance_id;
+CREATE PROCEDURE InsertOnly33 PARTITION ON TABLE  Kafkaimporttable33 COLUMN instance_id as upsert into KAFKAIMPORTTABLE33 VALUES(?, ?, ?, ?, ?);
 
-CREATE PROCEDURE InsertOnly34 as upsert into KAFKAIMPORTTABLE34 VALUES(?, ?, ?, ?, ?);
-PARTITION PROCEDURE InsertOnly34 ON TABLE Kafkaimporttable34 COLUMN instance_id;
+CREATE PROCEDURE InsertOnly34 PARTITION ON TABLE  Kafkaimporttable34 COLUMN instance_id as upsert into KAFKAIMPORTTABLE34 VALUES(?, ?, ?, ?, ?);
 
-CREATE PROCEDURE InsertOnly35 as upsert into KAFKAIMPORTTABLE35 VALUES(?, ?, ?, ?, ?);
-PARTITION PROCEDURE InsertOnly35 ON TABLE Kafkaimporttable35 COLUMN instance_id;
+CREATE PROCEDURE InsertOnly35 PARTITION ON TABLE  Kafkaimporttable35 COLUMN instance_id as upsert into KAFKAIMPORTTABLE35 VALUES(?, ?, ?, ?, ?);
 
-CREATE PROCEDURE InsertOnly36 as upsert into KAFKAIMPORTTABLE36 VALUES(?, ?, ?, ?, ?);
-PARTITION PROCEDURE InsertOnly36 ON TABLE Kafkaimporttable36 COLUMN instance_id;
+CREATE PROCEDURE InsertOnly36 PARTITION ON TABLE  Kafkaimporttable36 COLUMN instance_id as upsert into KAFKAIMPORTTABLE36 VALUES(?, ?, ?, ?, ?);
 
-CREATE PROCEDURE InsertOnly37 as upsert into KAFKAIMPORTTABLE37 VALUES(?, ?, ?, ?, ?);
-PARTITION PROCEDURE InsertOnly37 ON TABLE Kafkaimporttable37 COLUMN instance_id;
+CREATE PROCEDURE InsertOnly37 PARTITION ON TABLE  Kafkaimporttable37 COLUMN instance_id as upsert into KAFKAIMPORTTABLE37 VALUES(?, ?, ?, ?, ?);
 
-CREATE PROCEDURE InsertOnly38 as upsert into KAFKAIMPORTTABLE38 VALUES(?, ?, ?, ?, ?);
-PARTITION PROCEDURE InsertOnly38 ON TABLE Kafkaimporttable38 COLUMN instance_id;
+CREATE PROCEDURE InsertOnly38 PARTITION ON TABLE  Kafkaimporttable38 COLUMN instance_id as upsert into KAFKAIMPORTTABLE38 VALUES(?, ?, ?, ?, ?);
 
-CREATE PROCEDURE InsertOnly39 as upsert into KAFKAIMPORTTABLE39 VALUES(?, ?, ?, ?, ?);
-PARTITION PROCEDURE InsertOnly39 ON TABLE Kafkaimporttable39 COLUMN instance_id;
+CREATE PROCEDURE InsertOnly39 PARTITION ON TABLE  Kafkaimporttable39 COLUMN instance_id as upsert into KAFKAIMPORTTABLE39 VALUES(?, ?, ?, ?, ?);
 
-CREATE PROCEDURE InsertOnly40 as upsert into KAFKAIMPORTTABLE40 VALUES(?, ?, ?, ?, ?);
-PARTITION PROCEDURE InsertOnly40 ON TABLE Kafkaimporttable40 COLUMN instance_id;
+CREATE PROCEDURE InsertOnly40 PARTITION ON TABLE  Kafkaimporttable40 COLUMN instance_id as upsert into KAFKAIMPORTTABLE40 VALUES(?, ?, ?, ?, ?);
 
-CREATE PROCEDURE InsertOnly41 as upsert into KAFKAIMPORTTABLE41 VALUES(?, ?, ?, ?, ?);
-PARTITION PROCEDURE InsertOnly41 ON TABLE Kafkaimporttable41 COLUMN instance_id;
+CREATE PROCEDURE InsertOnly41 PARTITION ON TABLE  Kafkaimporttable41 COLUMN instance_id as upsert into KAFKAIMPORTTABLE41 VALUES(?, ?, ?, ?, ?);
 
-CREATE PROCEDURE InsertOnly42 as upsert into KAFKAIMPORTTABLE42 VALUES(?, ?, ?, ?, ?);
-PARTITION PROCEDURE InsertOnly42 ON TABLE Kafkaimporttable42 COLUMN instance_id;
+CREATE PROCEDURE InsertOnly42 PARTITION ON TABLE  Kafkaimporttable42 COLUMN instance_id as upsert into KAFKAIMPORTTABLE42 VALUES(?, ?, ?, ?, ?);
 
-CREATE PROCEDURE InsertOnly43 as upsert into KAFKAIMPORTTABLE43 VALUES(?, ?, ?, ?, ?);
-PARTITION PROCEDURE InsertOnly43 ON TABLE Kafkaimporttable43 COLUMN instance_id;
+CREATE PROCEDURE InsertOnly43 PARTITION ON TABLE  Kafkaimporttable43 COLUMN instance_id as upsert into KAFKAIMPORTTABLE43 VALUES(?, ?, ?, ?, ?);
 
-CREATE PROCEDURE InsertOnly44 as upsert into KAFKAIMPORTTABLE44 VALUES(?, ?, ?, ?, ?);
-PARTITION PROCEDURE InsertOnly44 ON TABLE Kafkaimporttable44 COLUMN instance_id;
+CREATE PROCEDURE InsertOnly44 PARTITION ON TABLE  Kafkaimporttable44 COLUMN instance_id as upsert into KAFKAIMPORTTABLE44 VALUES(?, ?, ?, ?, ?);
 
-CREATE PROCEDURE InsertOnly45 as upsert into KAFKAIMPORTTABLE45 VALUES(?, ?, ?, ?, ?);
-PARTITION PROCEDURE InsertOnly45 ON TABLE Kafkaimporttable45 COLUMN instance_id;
+CREATE PROCEDURE InsertOnly45 PARTITION ON TABLE  Kafkaimporttable45 COLUMN instance_id as upsert into KAFKAIMPORTTABLE45 VALUES(?, ?, ?, ?, ?);
 
-CREATE PROCEDURE InsertOnly46 as upsert into KAFKAIMPORTTABLE46 VALUES(?, ?, ?, ?, ?);
-PARTITION PROCEDURE InsertOnly46 ON TABLE Kafkaimporttable46 COLUMN instance_id;
+CREATE PROCEDURE InsertOnly46 PARTITION ON TABLE  Kafkaimporttable46 COLUMN instance_id as upsert into KAFKAIMPORTTABLE46 VALUES(?, ?, ?, ?, ?);
 
-CREATE PROCEDURE InsertOnly47 as upsert into KAFKAIMPORTTABLE47 VALUES(?, ?, ?, ?, ?);
-PARTITION PROCEDURE InsertOnly47 ON TABLE Kafkaimporttable47 COLUMN instance_id;
+CREATE PROCEDURE InsertOnly47 PARTITION ON TABLE  Kafkaimporttable47 COLUMN instance_id as upsert into KAFKAIMPORTTABLE47 VALUES(?, ?, ?, ?, ?);
 
-CREATE PROCEDURE InsertOnly48 as upsert into KAFKAIMPORTTABLE48 VALUES(?, ?, ?, ?, ?);
-PARTITION PROCEDURE InsertOnly48 ON TABLE Kafkaimporttable48 COLUMN instance_id;
+CREATE PROCEDURE InsertOnly48 PARTITION ON TABLE  Kafkaimporttable48 COLUMN instance_id as upsert into KAFKAIMPORTTABLE48 VALUES(?, ?, ?, ?, ?);
 
-CREATE PROCEDURE InsertOnly49 as upsert into KAFKAIMPORTTABLE49 VALUES(?, ?, ?, ?, ?);
-PARTITION PROCEDURE InsertOnly49 ON TABLE Kafkaimporttable49 COLUMN instance_id;
+CREATE PROCEDURE InsertOnly49 PARTITION ON TABLE  Kafkaimporttable49 COLUMN instance_id as upsert into KAFKAIMPORTTABLE49 VALUES(?, ?, ?, ?, ?);
 
 END_OF_BATCH
