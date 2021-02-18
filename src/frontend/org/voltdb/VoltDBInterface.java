@@ -440,4 +440,8 @@ public interface VoltDBInterface
             InMemoryJarfile catalogJar, Catalog curCatalog, CatalogChangeResult ccr) {
         return true;
     }
+
+    default boolean doRecoverCheck() {
+        return true;
+    }
 }

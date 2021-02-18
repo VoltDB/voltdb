@@ -5492,4 +5492,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
         return false;
     }
+
+    /**
+     * @return true if cluster is recovered with missing nodes and dr enabled
+     */
+    @Override
+    public boolean doRecoverCheck() {
+        if (m_durable && m_config.m_missingHostCount > 0 && m_config.m_startAction == StartAction.RECOVER) {
+            return !DrRoleType.NONE.value().equals(m_catalogContext.getCluster().getDrrole());
+        }
+        return false;
+    }
 }
