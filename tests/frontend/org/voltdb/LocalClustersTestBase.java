@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2018-2019 VoltDB Inc.
+ * Copyright (C) 2018-2021 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -81,6 +81,7 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
             + "create procedure " + SELECT_ALL_PREFIX + "{0}" + REPLICATED_TAG + "{1} as select key, value from {0}"
             + REPLICATED_TAG + "{1} order by key;" + "dr table {0}" + REPLICATED_TAG + "{1};");
 
+    /** {@link TableDdlStatements} has a mirror of this so both need to be modified together */
     static final MessageFormat PARTITIONED_TABLE_FMT = new MessageFormat(
             "create table {0}{1} (key bigint not null, value bigint not null, PRIMARY KEY(key));"
                     + "partition table {0}{1} on column key;"
@@ -466,6 +467,10 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
         TableType.TOPIC.generateTableDDL(sb, m_methodName, topicNum, profileClause);
     }
 
+    protected TableDdlStatements getTableDdlStatements(int tableNumber) {
+        return new TableDdlStatements(m_methodName, tableNumber);
+    }
+
     /**
      * Wrapper around calling DML procedure.
      *
@@ -755,6 +760,55 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
         public String toString() {
             return "ClusterConfiguration [siteCount=" + siteCount + ", hostCount=" + hostCount + ", kfactor=" + kfactor
                     + "]";
+        }
+    }
+
+    public static class TableDdlStatements {
+        private static MessageFormat s_createTable = new MessageFormat(
+                "create table {0}{1} (key bigint not null, value bigint not null)");
+        private static MessageFormat[] s_tableModifications = {
+                new MessageFormat("alter table {0}{1} add primary key(key)"),
+                new MessageFormat("partition table {0}{1} on column key"),
+                new MessageFormat("dr table {0}{1};") };
+        private static MessageFormat[] s_procedures = {
+                new MessageFormat("create procedure " + INSERT_PREFIX + "{0}{1} "
+                        + "as insert into {0}{1} (key, value) values (?, ?)"),
+                new MessageFormat("create procedure " + INSERT_PREFIX_P + "{0}{1} "
+                        + "partition on table {0}{1} column key " + "as insert into {0}{1} (key, value) values (?, ?)"),
+                new MessageFormat("create procedure " + SELECT_ALL_PREFIX
+                        + "{0}{1} as select key, value from {0}{1} order by key") };
+
+        private final String m_methodName;
+        private final int m_tableNumber;
+
+        TableDdlStatements(String methodName, int tableNumber) {
+            m_methodName = methodName;
+            m_tableNumber = tableNumber;
+
+        }
+
+        public String getCreateTable() {
+            return format(s_createTable);
+        }
+
+        public List<String> getModifyTable() {
+            return format(s_tableModifications);
+        }
+
+        public List<String> getProcedures() {
+            return format(s_procedures);
+        }
+
+        private List<String> format(MessageFormat[] formats) {
+            List<String> ddl = new ArrayList<>(formats.length);
+            for (MessageFormat format : formats) {
+                ddl.add(format(format));
+            }
+            return ddl;
+        }
+
+        private String format(MessageFormat format) {
+            return format.format(new Object[] { m_methodName, m_tableNumber });
         }
     }
 
