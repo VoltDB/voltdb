@@ -179,8 +179,9 @@ abstract class BatchProcedureTask {
                             if (totalResult == -2) {
                                 RateLimitedLogger.tryLogForMessage(System.currentTimeMillis(), 60, TimeUnit.SECONDS,
                                         hostLog, Level.WARN,
-                                        "Procedure %s is being used for batch execution but does not return compatible result tables. "
-                                                + "Procedure should either return 0 tables or 1 table with one column and one row with a non null integer value.",
+                                        "During batch processing, procedure %s is returning results that are ignored. "
+                                                + "Batch procedures should either be void or return tables which can be interpreted as a scalar long. "
+                                                + "See org.voltdb.VoltTable.asScalarLong()",
                                         procName);
                             }
                         }
