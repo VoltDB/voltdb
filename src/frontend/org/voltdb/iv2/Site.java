@@ -586,7 +586,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 m_maxSeenDrLogsBySrcPartition = trackers;
             }
             if (replicableTables != null) {
-                replicableTables.forEach(Site.this::setReplicableTables);
+                Site.this.setReplicableTables(replicableTables);
             }
         }
 
@@ -1563,6 +1563,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             Map<String, Map<Integer, ExportSnapshotTuple>> exportSequenceNumbers,
             Map<Integer, Long> drSequenceNumbers,
             Map<Integer, Map<Integer, Map<Integer, DRSiteDrIdTracker>>> allConsumerSiteTrackers,
+            Map<Byte, byte[]> drCatalogCommands,
+            Map<Byte, String[]> replicableTables,
             boolean requireExistingSequenceNumbers,
             long clusterCreateTime) {
         // transition from kStateRejoining to live rejoin replay.
@@ -1641,6 +1643,13 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 m_maxSeenDrLogsBySrcPartition = thisConsumerSiteTrackers;
             }
         }
+
+        if (m_isLowestSiteId) {
+            VoltDB.instance().getDrCatalogCommands().setAll(drCatalogCommands);
+        }
+
+        setReplicableTables(replicableTables);
+
         m_runningState = RunningState.REPLAYING;
         m_replayCompletionAction = replayComplete;
         if (hostLog.isDebugEnabled()) {
@@ -2084,5 +2093,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public void setReplicableTables(byte clusterId, String[] tables) {
         m_ee.setReplicableTables(clusterId, tables);
+    }
+
+    void setReplicableTables(Map<Byte, String[]> replicableTables) {
+        m_ee.clearReplicableTables();
+        replicableTables.forEach(this::setReplicableTables);
     }
 }

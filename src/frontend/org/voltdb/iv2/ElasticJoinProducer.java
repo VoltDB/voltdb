@@ -204,6 +204,8 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
                                     event.exportSequenceNumbers,
                                     event.drSequenceNumbers,
                                     event.drMixedClusterSizeConsumerState,
+                                    event.drCatalogCommands,
+                                    event.replicableTables,
                                     false /* requireExistingSequenceNumbers */,
                                     event.clusterCreateTime);
                     if (m_commaSeparatedNameOfViewsToPause != null) {

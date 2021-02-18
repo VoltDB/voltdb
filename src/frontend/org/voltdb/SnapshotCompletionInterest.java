@@ -40,6 +40,8 @@ public interface SnapshotCompletionInterest {
         public final Map<String, Map<Integer, ExportSnapshotTuple>> exportSequenceNumbers;
         public final Map<Integer, Long> drSequenceNumbers;
         public final Map<Integer, Map<Integer, Map<Integer, DRSiteDrIdTracker>>> drMixedClusterSizeConsumerState;
+        public final Map<Byte, byte[]> drCatalogCommands;
+        public final Map<Byte, String[]> replicableTables;
         public final int drVersion;
         public final long clusterCreateTime;
 
@@ -56,6 +58,8 @@ public interface SnapshotCompletionInterest {
                 final Map<String, Map<Integer, ExportSnapshotTuple>> exportSequenceNumbers,
                 final Map<Integer, Long> drSequenceNumbers,
                 final Map<Integer, Map<Integer, Map<Integer, DRSiteDrIdTracker>>> drMixedClusterSizeConsumerState,
+                final Map<Byte, byte[]> drCatalogCommands,
+                final Map<Byte, String[]> replicableTables,
                 final int drVersion,
                 final long clusterCreateTime) {
             this.path = path;
@@ -69,6 +73,8 @@ public interface SnapshotCompletionInterest {
             this.exportSequenceNumbers = exportSequenceNumbers;
             this.drSequenceNumbers = drSequenceNumbers;
             this.drMixedClusterSizeConsumerState = drMixedClusterSizeConsumerState;
+            this.drCatalogCommands = drCatalogCommands;
+            this.replicableTables = replicableTables;
             this.drVersion = drVersion;
             this.clusterCreateTime = clusterCreateTime;
         }
@@ -87,7 +93,7 @@ public interface SnapshotCompletionInterest {
                 long clusterCreateTime) {
             return new SnapshotCompletionEvent(
                     path, stype, nonce, multipartTxnId, partitionTxnIds, truncationSnapshot,
-                    terminusSnapshot, true, "", null, null, new HashMap<>(), drVersion, clusterCreateTime);
+                    terminusSnapshot, true, "", null, null, new HashMap<>(), null, null, drVersion, clusterCreateTime);
         }
     }
 

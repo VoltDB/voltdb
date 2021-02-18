@@ -301,6 +301,13 @@ public class SnapshotCompletionMonitor {
                 drMixedClusterSizeConsumerState.put(consumerPartitionId, ExtensibleSnapshotDigestData.buildConsumerSiteDrIdTrackersFromJSON(siteInfo, false));
             }
 
+            // Create a new DrProducerCatalogCommands because we do not want to modify the one being used
+            JSONObject catalogCommands = jsonObj.getJSONObject(ExtensibleSnapshotDigestData.DR_CATALOG_COMMANDS);
+            DrProducerCatalogCommands drCatalogCommands = new DrProducerCatalogCommands();
+            drCatalogCommands.restore(catalogCommands);
+            Map<Byte, String[]> replicableTables = drCatalogCommands
+                    .calculateReplicableTables(VoltDB.instance().getCatalogContext().catalog);
+
             Iterator<SnapshotCompletionInterest> iter = m_interests.iterator();
             while (iter.hasNext()) {
                 SnapshotCompletionInterest interest = iter.next();
@@ -319,6 +326,8 @@ public class SnapshotCompletionMonitor {
                                 exportSequenceNumbers,
                                 Collections.unmodifiableMap(drSequenceNumbers),
                                 Collections.unmodifiableMap(drMixedClusterSizeConsumerState),
+                                drCatalogCommands.get(),
+                                Collections.unmodifiableMap(replicableTables),
                                 drVersion,
                                 clusterCreateTime));
                 } catch (Exception e) {

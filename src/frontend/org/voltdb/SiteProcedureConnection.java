@@ -210,6 +210,8 @@ public interface SiteProcedureConnection {
             Map<String, Map<Integer, ExportSnapshotTuple>> exportSequenceNumbers,
             Map<Integer, Long> drSequenceNumbers,
             Map<Integer, Map<Integer, Map<Integer, DRSiteDrIdTracker>>> allConsumerSiteTrackers,
+            Map<Byte, byte[]> drCatalogCommands,
+            Map<Byte, String[]> replicableTables,
             boolean requireExistingSequenceNumbers,
             long clusterCreateTime);
 
