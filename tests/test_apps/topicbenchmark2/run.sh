@@ -29,6 +29,7 @@ VOLTDB="$VOLTDB_BIN/voltdb"
 LOG4J="./log4j.xml"
 LICENSE="$VOLTDB_VOLTDB/license.xml"
 HOST="localhost"
+CONFLUENT_HOME=${CONFLUENT_HOME:-/home/opt/confluent-6.0.1}
 
 # NOTE: this tool requires an accessible Confluent distribution download
 # and the variable CONFLUENT_HOME set to the location of this distribution, e.g. <path>/confluent-6.0.0.
