@@ -65,14 +65,15 @@ public class SnapshotConverter {
                 if (!f.exists()) {
                     System.err.println("Error: " + dir + " does not exist");
                     invalidDir = true;
-                }
-                if (!f.canRead()) {
-                    System.err.println("Error: " + dir + " does not have read permission set");
-                    invalidDir = true;
-                }
-                if (!f.canExecute()) {
-                    System.err.println("Error: " + dir + " does not have execute permission set");
-                    invalidDir = true;
+                } else {
+                    if (!f.canRead()) {
+                        System.err.println("Error: " + dir + " does not have read permission set");
+                        invalidDir = true;
+                    }
+                    if (!f.canExecute()) {
+                        System.err.println("Error: " + dir + " does not have execute permission set");
+                        invalidDir = true;
+                    }
                 }
                 directories.add(f);
                 if (invalidDir) {
@@ -103,18 +104,19 @@ public class SnapshotConverter {
                 if (!outdir.exists()) {
                     System.err.println("Error: " + outdir.getPath() + " does not exist");
                     invalidDir = true;
-                }
-                if (!outdir.canRead()) {
-                    System.err.println("Error: " + outdir.getPath() + " does not have read permission set");
-                    invalidDir = true;
-                }
-                if (!outdir.canExecute()) {
-                    System.err.println("Error: " + outdir.getPath() + " does not have execute permission set");
-                    invalidDir = true;
-                }
-                if (!outdir.canWrite()) {
-                    System.err.println("Error: " + outdir.getPath() + " does not have write permission set");
-                    invalidDir = true;
+                } else {
+                    if (!outdir.canRead()) {
+                        System.err.println("Error: " + outdir.getPath() + " does not have read permission set");
+                        invalidDir = true;
+                    }
+                    if (!outdir.canExecute()) {
+                        System.err.println("Error: " + outdir.getPath() + " does not have execute permission set");
+                        invalidDir = true;
+                    }
+                    if (!outdir.canWrite()) {
+                        System.err.println("Error: " + outdir.getPath() + " does not have write permission set");
+                        invalidDir = true;
+                    }
                 }
                 if (invalidDir) {
                     System.exit(-1);
