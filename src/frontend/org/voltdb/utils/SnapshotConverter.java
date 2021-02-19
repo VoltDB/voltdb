@@ -48,6 +48,7 @@ public class SnapshotConverter {
         File outdir = null;
         String type = null;
         char delimiter = '\0';
+        boolean filterHiddenColumns = false;
 
         for (int ii = 0; ii < args.length; ii++) {
             String arg = args[ii];
@@ -137,6 +138,8 @@ public class SnapshotConverter {
                     printHelpAndQuit(-1);
                 }
                 ii++;
+            } else if (arg.equals("--filter-hidden")) {
+                filterHiddenColumns = true;
             } else {
                 if (snapshotName != null) {
                     System.err.println("Error: Multiple snapshots specified for conversion. First - " + snapshotName + " second " + args[ii]);
@@ -291,7 +294,7 @@ public class SnapshotConverter {
                     }
                 }
                 try {
-                    CSVTableSaveFile.convertTableSaveFile(delimiter, partitions, outfile, infile);
+                    CSVTableSaveFile.convertTableSaveFile(delimiter, partitions, outfile, infile, filterHiddenColumns);
                 } catch (Exception e) {
                     System.err.println("Error: Failed to convert " + infile.getPath() + " to " + outfile.getPath());
                     e.printStackTrace();
@@ -307,7 +310,7 @@ public class SnapshotConverter {
     private static void printHelpAndQuit( int code) {
         System.out.println("Usage: snapshotconverter --help");
         System.out.println("snapshotconverter --dir dir1 --dir dir2 --dir dir3 " +
-                "--table table1 --table table2 --table table3 --type CSV|TSV --outdir dir snapshot_name --timezone GMT+0");
+                "--table table1 --table table2 --table table3 --type CSV|TSV --outdir dir snapshot_name --timezone GMT+0 [--filter-hidden]");
         System.exit(code);
     }
 }

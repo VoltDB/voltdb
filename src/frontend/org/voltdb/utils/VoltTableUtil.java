@@ -82,9 +82,9 @@ public class VoltTableUtil {
 
     public static void toCSVWriter(CSVWriter csv, VoltTable vt, List<VoltType> columnTypes) throws IOException {
         final SimpleDateFormat sdf = m_sdf.get();
-        String[] fields = new String[vt.getColumnCount()];
+        String[] fields = new String[columnTypes.size()];
         while (vt.advanceRow()) {
-            for (int ii = 0; ii < vt.getColumnCount(); ii++) {
+            for (int ii = 0; ii < fields.length; ii++) {
                 final VoltType type = columnTypes.get(ii);
                 if (type == VoltType.BIGINT
                         || type == VoltType.INTEGER

@@ -23,108 +23,130 @@
 
 package org.voltdb.utils;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
-import java.io.LineNumberReader;
 import java.util.Calendar;
 import java.util.Random;
 
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
 import org.voltdb.regressionsuites.LocalCluster;
-import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
-import org.voltdb.regressionsuites.SaveRestoreBase;
 import org.voltdb.sysprocs.saverestore.SystemTable;
 
-import junit.framework.Test;
+import au.com.bytecode.opencsv_voltpatches.CSVReader;
 
-public class TestSnapshotConverter extends SaveRestoreBase
+public class TestSnapshotConverter extends JUnit4LocalClusterTest
 {
+    @Rule
+    public final TemporaryFolder m_tempFolder = new TemporaryFolder();
 
-    public TestSnapshotConverter(String name) {
-        super(name);
+    private LocalCluster m_cluster;
+
+    @Before
+    public void setup() throws IOException {
+        VoltProjectBuilder project = new VoltProjectBuilder();
+        project.addLiteralSchema(
+                "CREATE TABLE T_SP(A2 VARCHAR(128), A1 INTEGER NOT NULL, A3 VARCHAR(64), A4 VARCHAR(64));"
+                        + "CREATE TABLE T_MP MIGRATE TO TARGET T (A2 VARCHAR(128), A1 INTEGER NOT NULL, A3 VARCHAR(64), A4 VARCHAR(64));"
+                        + "CREATE STREAM S(A2 VARCHAR(128), A1 INTEGER NOT NULL, A3 VARCHAR(64), A4 VARCHAR(64));"
+                        + "CREATE VIEW V(A1, A2) AS SELECT A1, A2 FROM S GROUP BY A1, A2;");
+        project.addPartitionInfo("T_SP", "A1");
+        project.addPartitionInfo("S", "A1");
+        if (MiscUtils.isPro()) {
+            project.addDRTables(new String[] { "T_SP", "T_MP" });
+            project.setXDCR();
+        }
+
+        m_cluster = new LocalCluster("testsnapshotstatus.jar", 8, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        assertTrue(m_cluster.compile(project));
+        m_cluster.startCluster();
     }
 
-    // Regression test for ENG-8609
-    public void testSnapshotConverter() throws NoConnectionsException, IOException, ProcCallException
-    {
-        if (isValgrind()) {
+    /*
+     * Regression test for ENG-8609
+     *
+     * Test that hidden columns are filtered out when flag is passed to SnapshotConverter
+     */
+    @Test
+    public void testSnapshotConverter() throws NoConnectionsException, IOException, ProcCallException {
+        if (m_cluster.isValgrind()) {
             return;
         }
 
-        Client client = getClient();
+        Client client = m_cluster.createClient();
         int expectedLines = 10;
         Random r = new Random(Calendar.getInstance().getTimeInMillis());
         for (int i = 0; i < expectedLines; i++) {
             int id = r.nextInt();
-            client.callProcedure("T_SP.insert", String.format("Test String %s:%d", "SP", i), id, "blab", "blab");
-            client.callProcedure("T_MP.insert", String.format("Test String %s:%d", "MP", i), id, "blab", "blab");
+            client.callProcedure("T_SP.insert", "Test String SP:" + i, id, "blab", "blab");
+            client.callProcedure("T_MP.insert", "Test String MP:" + i, id, "blab", "blab");
+            client.callProcedure("S.insert", "Test String S:" + i, id, "blab", "blab");
         }
 
         VoltTable[] results = null;
-        results = client.callProcedure("@SnapshotSave", TMPDIR, TESTNONCE, 1).getResults();
+        File snapshotDir = m_tempFolder.newFolder("snapshot");
+        String nonce = "NONCE";
+        results = client.callProcedure("@SnapshotSave", snapshotDir.getPath(), nonce, 1).getResults();
 
         System.out.println(results[0]);
         results = client.callProcedure("@SnapshotStatus").getResults();
 
         System.out.println(results[0]);
         // better be two rows
-        assertEquals(2 + SystemTable.values().length, results[0].getRowCount());
+        assertEquals(3 + SystemTable.values().length, results[0].getRowCount());
 
-        // start convert to MP snapshot to csv
-        String[] argsMP = {"--table", "T_MP", "--type", "CSV", "--dir", TMPDIR, "--outdir",TMPDIR, TESTNONCE};
-        SnapshotConverter.main(argsMP);
-        File mpFile = new File(TMPDIR+"/T_MP.csv");
-        assertEquals(expectedLines,countLines(mpFile));
-        mpFile.deleteOnExit();
+        File unfiltered = m_tempFolder.newFolder("unfiltered");
+        // start convert tables and views to csv
+        String[] args = { "--table", "T_MP", "--table", "T_SP", "--table", "V", "--type", "CSV", "--dir",
+                snapshotDir.getPath(), "--outdir", unfiltered.getPath(), nonce };
+        SnapshotConverter.main(args);
 
-        // start convert to SP snapshot to csv
-        String[] argsSP = {"--table", "T_SP", "--type", "CSV", "--dir", TMPDIR, "--outdir",TMPDIR, TESTNONCE};
-        SnapshotConverter.main(argsSP);
-        File spFile = new File(TMPDIR+"/T_SP.csv");
         // this test will fail frequently with different lines before ENG-8609
-        assertEquals(expectedLines,countLines(spFile));
-        spFile.deleteOnExit();
+        assertLineAndColumnCount(new File(unfiltered, "T_SP.csv"), expectedLines, MiscUtils.isPro() ? 5 : 4);
+        assertLineAndColumnCount(new File(unfiltered, "T_MP.csv"), expectedLines, MiscUtils.isPro() ? 6 : 5);
+        assertLineAndColumnCount(new File(unfiltered, "V.csv"), expectedLines, 3);
+
+        // Now test with --filter-hidden and validate that hidden columns are removed from tables and views
+        File filtered = m_tempFolder.newFolder("filtered");
+        args = new String[] { "--table", "T_MP", "--table", "T_SP", "--table", "V", "--type", "CSV", "--dir",
+                snapshotDir.getPath(), "--outdir", filtered.getPath(), "--filter-hidden", nonce };
+        SnapshotConverter.main(args);
+
+        assertLineAndColumnCount(new File(filtered, "T_SP.csv"), expectedLines, 4);
+        assertLineAndColumnCount(new File(filtered, "T_MP.csv"), expectedLines, 4);
+        assertLineAndColumnCount(new File(filtered, "V.csv"), expectedLines, 2);
     }
 
-    //
-    // Build a list of the tests to be run. Use the regression suite
-    // helpers to allow multiple backends.
-    // JUnit magic that uses the regression suite helper classes.
-    //
-    static public Test suite() throws IOException
-    {
-        MultiConfigSuiteBuilder builder =
-            new MultiConfigSuiteBuilder(TestSnapshotConverter.class);
+    public static void assertLineAndColumnCount(File csvFile, int expectedLines, int expectedColumns)
+            throws IOException {
+        int lines = 0, columns = -1;
 
-        VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addLiteralSchema(
-                "CREATE TABLE T_SP(A2 VARCHAR(128), A1 INTEGER NOT NULL, A3 VARCHAR(64), A4 VARCHAR(64));" +
-
-                "CREATE TABLE T_MP(A2 VARCHAR(128), A1 INTEGER NOT NULL, A3 VARCHAR(64), A4 VARCHAR(64));");
-        project.addPartitionInfo("T_SP", "A1");
-
-        LocalCluster lcconfig = new LocalCluster("testsnapshotstatus.jar", 8, 1, 0,
-                                               BackendTarget.NATIVE_EE_JNI);
-        assertTrue(lcconfig.compile(project));
-        builder.addServerConfig(lcconfig);
-
-        return builder;
-    }
-
-    public static int countLines(File aFile) {
-        try (LineNumberReader reader = new LineNumberReader(new FileReader(aFile))) {
-            while ((reader.readLine()) != null) {
-                ;
+        try (FileReader fileReader = new FileReader(csvFile); CSVReader csvReader = new CSVReader(fileReader)) {
+            String[] line;
+            while ((line = csvReader.readNext()) != null) {
+                if (columns == -1) {
+                    columns = line.length;
+                } else {
+                    assertEquals(columns, line.length);
+                }
+                ++lines;
             }
-            return reader.getLineNumber();
-        } catch (Exception ex) {
-            return -1;
         }
+
+        assertEquals(csvFile.getPath() + " lines", expectedLines, lines);
+        assertEquals(csvFile.getPath() + " columns", expectedColumns, columns);
     }
 }

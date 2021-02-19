@@ -223,6 +223,10 @@ public abstract class CatalogUtil {
     public static final VoltTable.ColumnInfo MIGRATE_HIDDEN_COLUMN_INFO =
             new VoltTable.ColumnInfo(MIGRATE_HIDDEN_COLUMN_NAME, VoltType.BIGINT);
 
+    // Map of all of the hidden columns from column name to type
+    public static final Map<String, VoltType> HIDDEN_COLUMNS = ImmutableMap.of(DR_HIDDEN_COLUMN_NAME, VoltType.BIGINT,
+            VIEW_HIDDEN_COLUMN_NAME, VoltType.BIGINT, MIGRATE_HIDDEN_COLUMN_NAME, VoltType.BIGINT);
+
     public static final String ROW_LENGTH_LIMIT = "row.length.limit";
     public static final int EXPORT_INTERNAL_FIELD_Length = 41; // 8 * 5 + 1;
 

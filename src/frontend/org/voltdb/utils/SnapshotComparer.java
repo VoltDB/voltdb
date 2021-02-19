@@ -759,7 +759,7 @@ class SnapshotLoader {
         try {
             SNAPSHOT_LOG.debug("Converting table " + tableName + " to " + outfileName);
             Integer[] relevantPartition = isReplicated ? null : new Integer[]{partitionid};
-            CSVTableSaveFile.convertTableSaveFile(delimiter, relevantPartition, outfile, infile);
+            CSVTableSaveFile.convertTableSaveFile(delimiter, relevantPartition, outfile, infile, false);
         } catch (Exception e) {
             System.err.println(e.getMessage());
             System.err.println("Error: Failed to convert " + infile.getPath() + " to " + outfile.getPath());

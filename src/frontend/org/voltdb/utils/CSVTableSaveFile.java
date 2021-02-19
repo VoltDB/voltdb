@@ -17,12 +17,16 @@
 
 package org.voltdb.utils;
 
+import static org.voltdb.utils.CatalogUtil.HIDDEN_COLUMNS;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.SyncFailedException;
+import java.util.ArrayList;
+import java.util.ListIterator;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -32,6 +36,7 @@ import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.sysprocs.saverestore.TableSaveFile;
 
 public class CSVTableSaveFile {
@@ -44,10 +49,12 @@ public class CSVTableSaveFile {
     private final AtomicInteger m_activeConverters = new AtomicInteger(CoreUtils.availableProcessors());
     private final TableSaveFile m_saveFile;
     private final char m_delimiter;
+    private final boolean m_filterHiddenColumns;
 
-    public CSVTableSaveFile(File saveFile, char delimiter, Integer partitions[])
+    public CSVTableSaveFile(File saveFile, char delimiter, Integer partitions[], boolean filterHiddenColumns)
             throws IOException {
         m_delimiter = delimiter;
+        m_filterHiddenColumns = filterHiddenColumns;
         final FileInputStream fis = new FileInputStream(saveFile);
         m_saveFile = new TableSaveFile(fis, 10, partitions);
         for (int ii = 0; ii < m_converterThreads.length; ii++) {
@@ -111,7 +118,8 @@ public class CSVTableSaveFile {
                 try {
                     final VoltTable vt = PrivateVoltTableFactory
                             .createVoltTableFromBuffer(c.b(), true);
-                    Pair<Integer, byte[]> p = VoltTableUtil.toCSV( vt, m_delimiter, null, lastNumCharacters);
+                    Pair<Integer, byte[]> p = VoltTableUtil.toCSV(vt, getColumns(vt), m_delimiter, null,
+                            lastNumCharacters);
                     lastNumCharacters = p.getFirst();
                     byte csvBytes[] = p.getSecond();
                     // should not insert empty byte[] if not last ConverterThread
@@ -123,6 +131,43 @@ public class CSVTableSaveFile {
                     c.discard();
                 }
             }
+        }
+
+        /**
+         * Generate the list of column types that are part of this conversion
+         *
+         * @param table that is being converted
+         * @return column types
+         */
+        private ArrayList<VoltType> getColumns(VoltTable table) {
+            int columnCount = table.getColumnCount();
+            ArrayList<VoltType> columns = new ArrayList<>(columnCount);
+            for (int i = 0; i < columnCount; ++i) {
+                columns.add(table.getColumnType(i));
+            }
+
+            if (m_filterHiddenColumns) {
+                /*
+                 * Hidden columns are always at the end so start at the end and move toward the beginning until a hidden
+                 * column is not found
+                 *
+                 * NOTE: This removal is not ideal because some hidden columns are mutually exclusive and in theory a
+                 * real column could have the same name as a hidden column but the likely hood of having false positives
+                 * is low so that is not being handled by this simplistic filter
+                 */
+                int index = columnCount;
+                int lowestIndex = columnCount - HIDDEN_COLUMNS.size();
+                ListIterator<VoltType> iter = columns.listIterator(index);
+                while (index > lowestIndex && iter.hasPrevious()) {
+                    if (iter.previous().equals(HIDDEN_COLUMNS.get(table.getColumnName(--index)))) {
+                        iter.remove();
+                    } else {
+                        break;
+                    }
+                }
+            }
+
+            return columns;
         }
 
         @Override
@@ -196,17 +241,16 @@ public class CSVTableSaveFile {
             System.exit(-1);
         }
 
-        convertTableSaveFile(delimiter, partitions, outfile, infile);
+        convertTableSaveFile(delimiter, partitions, outfile, infile, false);
     }
 
     public static void convertTableSaveFile(char delimiter,
-            Integer[] partitions, final File outfile, final File infile)
+            Integer[] partitions, final File outfile, final File infile, boolean filterHiddenColumns)
             throws FileNotFoundException, IOException, InterruptedException,
             SyncFailedException {
         final FileOutputStream fos = new FileOutputStream(outfile, true);
         try {
-            final CSVTableSaveFile converter = new CSVTableSaveFile(infile,
-                    delimiter, partitions);
+            final CSVTableSaveFile converter = new CSVTableSaveFile(infile, delimiter, partitions, filterHiddenColumns);
             try {
                 while (true) {
                     final byte bytes[] = converter.read();
