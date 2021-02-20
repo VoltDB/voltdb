@@ -1682,8 +1682,13 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     {
         SettableFuture<Boolean> written = null;
         if (m_replayComplete) {
-            written = m_cl.logIv2Fault(m_mailbox.getHSId(),
-                new HashSet<Long>(m_replicaHSIds), m_partitionId, spHandle);
+            Set<Long> replicas = new HashSet<>();
+            if (isLeader()) {
+                replicas.addAll(m_replicaHSIds);
+            } else {
+                replicas.addAll(VoltDB.instance().getCartographer().getReplicasForPartition(m_partitionId));
+            }
+            written = m_cl.logIv2Fault(m_mailbox.getHSId(), replicas, m_partitionId, spHandle);
         }
         return written;
     }
