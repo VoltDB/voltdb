@@ -302,7 +302,7 @@ public class SchemaChangeClient {
                     try {
                         if (ddlString.length() > 0) {
                             log.info(_F("\n::: DDL Batch (BEGIN) :::\n%s\n::: DDL Batch (END) :::", ddlString));
-                            String error = execLiveDDL(client, ddlString, false);
+                            String error = execLiveDDL(client, ddlString);
                             if (error == null) {
                                 // hoooey!
                                 this.lastSuccessfulDDL = ddlString;
@@ -334,6 +334,7 @@ public class SchemaChangeClient {
                                     result = BatchResult.BATCH_FAILED;
                                     this.lastFailureDDL = ddlString;
                                     this.lastFailureError = error;
+                                    log.error(error);
                                 }
                             }
                         }
@@ -1093,7 +1094,7 @@ public class SchemaChangeClient {
     /**
      * Execute DDL and returns an error string for failure or null for success.
      */
-    private static String execLiveDDL(Client client, String ddl, boolean hardFail) throws IOException
+    private static String execLiveDDL(Client client, String ddl) throws IOException
     {
         String error = null;
         ClientResponse cr = null;
@@ -1130,16 +1131,6 @@ public class SchemaChangeClient {
                             ((ClientResponseImpl)cr).toJSONString());
             }
         }
-
-        if (error != null) {
-            log.error(error);
-            // Fail hard (or allow retries)?
-            if (hardFail) {
-                String msg = (cr != null ? ((ClientResponseImpl)cr).toJSONString() : _F("Unknown @AdHoc failure"));
-                throw new IOException(msg);
-            }
-        }
-
         return error;
     }
 }
