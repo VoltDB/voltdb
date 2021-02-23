@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,18 +23,27 @@
 
 package org.voltdb.sysprocs.saverestore;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.List;
 
 import org.junit.After;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 import org.voltcore.TransactionIdManager;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.DefaultSnapshotDataTarget;
 import org.voltdb.DeprecatedDefaultSnapshotDataTarget;
+import org.voltdb.NativeSnapshotDataTarget;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -43,13 +52,11 @@ import org.voltdb.messaging.FastSerializer;
 
 import com.google_voltpatches.common.util.concurrent.Callables;
 
-import junit.framework.TestCase;
-
 /**
  * This test also provides pretty good coverage of DefaultSnapshotTarget
  *
  */
-public class TestTableSaveFile extends TestCase {
+public class TestTableSaveFile {
     private static int[] VERSION0 = { 0, 0, 0, 0 };
     private static int[] VERSION1 = { 0, 0, 0, 1 };
     private static int[] VERSION2 = { 0, 0, 0, 2 };
@@ -67,7 +74,11 @@ public class TestTableSaveFile extends TestCase {
 
     private TableSaveFile savefile;
 
-    @Override
+    protected static File s_tmpDirectory = new File(System.getProperty("java.io.tmpdir"));
+
+    @Rule
+    public final TemporaryFolder m_folder = new TemporaryFolder(s_tmpDirectory);
+
     @After
     public void tearDown() throws Exception {
         if (savefile != null) {
@@ -79,24 +90,24 @@ public class TestTableSaveFile extends TestCase {
     }
 
     private void serializeChunk(VoltTable chunk,
-            DefaultSnapshotDataTarget target,
+            NativeSnapshotDataTarget target,
             int partitionId) throws Exception {
-        FastSerializer fs = new FastSerializer();
+        try (FastSerializer fs = new FastSerializer()) {
+            fs.writeTable(chunk);
+            BBContainer c = fs.getBBContainer();
+            ByteBuffer b = c.b();
+            b.getInt();
+            int headerLength = b.getInt();
+            b.position(b.position() + headerLength);// at row count
+            BBContainer container = DBBPool.allocateDirect(b.remaining() + 4);
+            ByteBuffer payload = container.b();
+            payload.putInt(partitionId);
+            payload.put(b);
+            payload.flip();
+            c.discard();
 
-        fs.writeTable(chunk);
-        BBContainer c = fs.getBBContainer();
-        ByteBuffer b = c.b();
-        b.getInt();
-        int headerLength = b.getInt();
-        b.position(b.position() + headerLength);// at row count
-        BBContainer container = DBBPool.allocateDirect(b.remaining() + 4);
-        ByteBuffer payload = container.b();
-        payload.putInt(partitionId);
-        payload.put(b);
-        payload.flip();
-        c.discard();
-
-        target.write(Callables.returning(container), -1);
+            target.write(Callables.returning(container), -1);
+        }
     }
 
     private Pair<VoltTable, File> generateTestTable(int numberOfItems)
@@ -107,41 +118,38 @@ public class TestTableSaveFile extends TestCase {
                 new ColumnInfo("RT_INTVAL", VoltType.INTEGER),
                 new ColumnInfo("RT_FLOATVAL", VoltType.FLOAT) };
         VoltTable table = new VoltTable(columnInfo);
-        final File f = File.createTempFile("foo", "bar");
-        f.deleteOnExit();
+        final File f = m_folder.newFile();
         ArrayList<Integer> partIds = new ArrayList<Integer>();
         partIds.add(0);
         partIds.add(1);
         partIds.add(2);
         partIds.add(3);
         partIds.add(4);
-        DefaultSnapshotDataTarget dsdt = new DefaultSnapshotDataTarget(f,
-                HOST_ID, CLUSTER_NAME, DATABASE_NAME, TABLE_NAME,
-                TOTAL_PARTITIONS, false, partIds, PrivateVoltTableFactory.getSchemaBytes(table),
-                TXN_ID, TIMESTAMP, VERSION2);
+        NativeSnapshotDataTarget target = createTarget(f, false, partIds, PrivateVoltTableFactory.getSchemaBytes(table),
+                VERSION2);
 
         VoltTable currentChunkTable = new VoltTable(columnInfo,
                 columnInfo.length);
         int partitionId = 0;
         for (int i = 0; i < numberOfItems; i++) {
             if (i % 1000 == 0 && i > 0) {
-                serializeChunk(currentChunkTable, dsdt, partitionId++);
+                serializeChunk(currentChunkTable, target, partitionId++);
                 currentChunkTable = new VoltTable(columnInfo, columnInfo.length);
             }
             Object[] row = new Object[] { i, "name_" + i, i, new Double(i) };
             currentChunkTable.addRow(row);
             table.addRow(row);
         }
-        serializeChunk(currentChunkTable, dsdt, partitionId++);
-        dsdt.close();
+        serializeChunk(currentChunkTable, target, partitionId++);
+        target.close();
 
         return new Pair<VoltTable, File>(table, f, false);
     }
 
+    @Test
     public void testHeaderAccessors() throws Exception {
         System.out.println("Running testHeaderAccessors");
-        final File f = File.createTempFile("foo", "bar");
-        f.deleteOnExit();
+        final File f = m_folder.newFile();
         VoltTable.ColumnInfo columns[] = { new VoltTable.ColumnInfo("Foo", VoltType.STRING) };
         byte[] schema = PrivateVoltTableFactory.getSchemaBytes(new VoltTable(columns));
         ArrayList<Integer> partIds = new ArrayList<Integer>();
@@ -150,11 +158,8 @@ public class TestTableSaveFile extends TestCase {
         partIds.add(2);
         partIds.add(3);
         partIds.add(4);
-        DefaultSnapshotDataTarget dsdt = new DefaultSnapshotDataTarget(f,
-                HOST_ID, CLUSTER_NAME, DATABASE_NAME, TABLE_NAME,
-                TOTAL_PARTITIONS, false, partIds, schema,
-                TXN_ID, TIMESTAMP, VERSION1);
-        dsdt.close();
+        NativeSnapshotDataTarget target = createTarget(f, false, partIds, schema, VERSION1);
+        target.close();
 
         FileInputStream fis = new FileInputStream(f);
         savefile = new TableSaveFile(fis, 3, null);
@@ -195,6 +200,7 @@ public class TestTableSaveFile extends TestCase {
         assertEquals(TOTAL_PARTITIONS, savefile.getTotalPartitions());
     }
 
+    @Test
     public void testLoadingVersion0Header() throws Exception {
         System.out.println("Running testLoadingVersion0Header");
         final File f = File.createTempFile("foo", "bar");
@@ -247,6 +253,7 @@ public class TestTableSaveFile extends TestCase {
         assertEquals(TOTAL_PARTITIONS, savefile.getTotalPartitions());
     }
 
+    @Test
     public void testFullTable() throws Exception {
         System.out.println("Running testFullTable");
         Pair<VoltTable, File> generated = generateTestTable(1000);
@@ -266,6 +273,7 @@ public class TestTableSaveFile extends TestCase {
         }
     }
 
+    @Test
     public void testChunkTable() throws Exception {
         System.out.println("Running testChunkTable");
         Pair<VoltTable, File> generated = generateTestTable(100000);
@@ -303,5 +311,18 @@ public class TestTableSaveFile extends TestCase {
         } finally {
             savefile.close();
         }
+    }
+
+    protected NativeSnapshotDataTarget createTarget(File file, boolean isReplicated, List<Integer> partitionIds,
+            byte[] schemaBytes, int[] version) throws IOException {
+        return createTarget(file, HOST_ID, CLUSTER_NAME, DATABASE_NAME, TABLE_NAME, TOTAL_PARTITIONS, isReplicated,
+                partitionIds, schemaBytes, TXN_ID, TIMESTAMP, version);
+    }
+
+    protected NativeSnapshotDataTarget createTarget(File file, int hostId, String clusterName, String databaseName,
+            String tableName, int numPartitions, boolean isReplicated, List<Integer> partitionIds, byte[] schemaBytes,
+            long txnId, long timestamp, int[] version) throws IOException {
+        return new DefaultSnapshotDataTarget(file, hostId, clusterName, databaseName, tableName, numPartitions,
+                isReplicated, partitionIds, schemaBytes, txnId, timestamp, version);
     }
 }

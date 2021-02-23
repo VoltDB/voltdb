@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -135,19 +135,33 @@ public final class CompressionService {
 
             @Override
             public BBContainer call() throws Exception {
-                final ByteBuffer outBuffer = outBufferC.b();
-                //Reserve 4-bytes for the CRC
-                final int crcPosition = outBuffer.position();
-                outBuffer.position(outBuffer.position() + 4);
-                final int crcCalcStart = outBuffer.position();
-                compressBuffer(inBuffer, outBuffer);
-                final int crc32c =
-                        DBBPool.getCRC32C( outBufferC.address(), crcCalcStart, outBuffer.limit() - crcCalcStart);
-                outBuffer.putInt(crcPosition, crc32c);
+                compressAndCRC32cBuffer(inBuffer, outBufferC);
                 return outBufferC;
             }
 
         });
+    }
+
+    /**
+     * Compress the contents of {@code in} and put the compressed data preceded by an int CRC32c checksum in
+     * {@code outContainer}
+     *
+     * @param in           data to compress
+     * @param outContainer buffer to write crc and compressed data into
+     * @return number of compressed byte. Does not include crc size
+     * @throws IOException
+     */
+    public static int compressAndCRC32cBuffer(ByteBuffer in, BBContainer outContainer) throws IOException {
+        int crcSize = Integer.BYTES;
+        final ByteBuffer out = outContainer.b();
+        // Reserve 4-bytes for the CRC
+        final int crcPosition = out.position();
+        out.position(crcPosition + crcSize);
+        final int crcCalcStart = out.position();
+        int result = compressBuffer(in, out);
+        final int crc32c = DBBPool.getCRC32C(outContainer.address(), crcCalcStart, out.limit() - crcCalcStart);
+        out.putInt(crcPosition, crc32c);
+        return result;
     }
 
     public static int compressBuffer(ByteBuffer buffer, ByteBuffer output) throws IOException {

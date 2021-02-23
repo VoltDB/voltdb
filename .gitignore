@@ -61,6 +61,7 @@ doc/tutorials/*/*.jar
 /tests/ee/.settings/
 /tools/voltify.venv
 /src/ee/org_voltdb_utils_PosixAdvise.h
+/src/ee/org_voltdb_utils_DirectIoFileChannel.h
 /src/frontend/org/voltcore/utils/DBBPool.java
 /src/frontend/org/voltcore/utils/.flagfile
 /tests/sqlcmd/scripts/**/*.outdiffs

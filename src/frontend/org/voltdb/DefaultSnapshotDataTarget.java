@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -35,19 +35,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
-import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
-import org.json_voltpatches.JSONObject;
-import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.Level;
-import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Bits;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.RateLimitedLogger;
-import org.voltdb.messaging.FastSerializer;
-import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.PosixAdvise;
 
@@ -57,10 +51,9 @@ import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.ListeningScheduledExecutorService;
 import com.google_voltpatches.common.util.concurrent.MoreExecutors;
-import com.google_voltpatches.common.util.concurrent.UnsynchronizedRateLimiter;
 
 
-public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
+public class DefaultSnapshotDataTarget extends NativeSnapshotDataTarget {
     /*
      * Make it possible for test code to block a write and thus snapshot completion
      */
@@ -71,10 +64,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
     private final File m_file;
     private final FileChannel m_channel;
     private final FileOutputStream m_fos;
-    private static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
     private final RateLimitedLogger m_syncServiceLogger =  new RateLimitedLogger(TimeUnit.MINUTES.toNanos(1), SNAP_LOG, Level.ERROR);
-    private Runnable m_onCloseHandler = null;
-    private Runnable m_inProgressHandler = null;
 
     /*
      * If a write fails then this snapshot is hosed.
@@ -86,7 +76,6 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
      */
     private volatile boolean m_writeFailed = false;
     private volatile IOException m_writeException = null;
-    private volatile IOException m_reportedSerializationFailure = null;
 
     private volatile long m_bytesWritten = 0;
 
@@ -106,11 +95,6 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
      */
     private volatile boolean m_acceptOneWrite = false;
 
-    private boolean m_needsFinalClose = true;
-
-    @SuppressWarnings("unused")
-    private final String m_tableName;
-
     private final AtomicInteger m_outstandingWriteTasks = new AtomicInteger(0);
     private final ReentrantLock m_outstandingWriteTasksLock = new ReentrantLock();
     private final Condition m_noMoreOutstandingWriteTasksCondition =
@@ -119,63 +103,6 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
     private static final ListeningExecutorService m_es = CoreUtils.getListeningSingleThreadExecutor("Snapshot write service ");
     static final ListeningScheduledExecutorService m_syncService = MoreExecutors.listeningDecorator(
             Executors.newSingleThreadScheduledExecutor(CoreUtils.getThreadFactory("Snapshot sync service")));
-
-    public static final int SNAPSHOT_SYNC_FREQUENCY = Integer.getInteger("SNAPSHOT_SYNC_FREQUENCY", 500);
-    public static final int SNAPSHOT_FADVISE_BYTES = Integer.getInteger("SNAPSHOT_FADVISE_BYTES", 1024 * 1024 * 2);
-    public static final int SNAPSHOT_RATELIMIT_MEGABYTES;
-    public static final boolean USE_SNAPSHOT_RATELIMIT;
-
-    static {
-        int limit = Integer.getInteger("SNAPSHOT_RATELIMIT_MEGABYTES", Integer.MAX_VALUE);
-        if (limit < 1) {
-            SNAP_LOG.warn("Invalid snapshot rate limit " + limit + ", no limit will be applied");
-            SNAPSHOT_RATELIMIT_MEGABYTES = Integer.MAX_VALUE;
-        } else {
-            SNAPSHOT_RATELIMIT_MEGABYTES = limit;
-        }
-        if (SNAPSHOT_RATELIMIT_MEGABYTES < Integer.MAX_VALUE) {
-            USE_SNAPSHOT_RATELIMIT = true;
-            SNAP_LOG.info("Rate limiting snapshots to " + SNAPSHOT_RATELIMIT_MEGABYTES + " megabytes/second");
-        } else {
-            USE_SNAPSHOT_RATELIMIT = false;
-        }
-    }
-
-    public static final UnsynchronizedRateLimiter SNAPSHOT_RATELIMITER =
-            UnsynchronizedRateLimiter.create(SNAPSHOT_RATELIMIT_MEGABYTES * 1024.0 * 1024.0, 1, TimeUnit.SECONDS);
-
-    public static void enforceSnapshotRateLimit(int permits) {
-        if (USE_SNAPSHOT_RATELIMIT) {
-            SNAPSHOT_RATELIMITER.acquire(permits);
-        }
-    }
-
-    public DefaultSnapshotDataTarget(
-            final File file,
-            final int hostId,
-            final String clusterName,
-            final String databaseName,
-            final String tableName,
-            final int numPartitions,
-            final boolean isReplicated,
-            final List<Integer> partitionIds,
-            final byte[] schemaBytes,
-            final long txnId,
-            final long timestamp) throws IOException {
-        this(
-                file,
-                hostId,
-                clusterName,
-                databaseName,
-                tableName,
-                numPartitions,
-                isReplicated,
-                partitionIds,
-                schemaBytes,
-                txnId,
-                timestamp,
-                new int[] { 0, 0, 0, 2 });
-    }
 
     public DefaultSnapshotDataTarget(
             final File file,
@@ -191,76 +118,17 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
             final long timestamp,
             int version[]
             ) throws IOException {
-        String hostname = CoreUtils.getHostnameOrAddress();
+        super(isReplicated);
+
         m_file = file;
-        m_tableName = tableName;
         m_fos = new FileOutputStream(file);
         m_channel = m_fos.getChannel();
-        m_needsFinalClose = !isReplicated;
-        final FastSerializer fs = new FastSerializer();
-        fs.writeInt(0);//CRC
-        fs.writeInt(0);//Header length placeholder
-        fs.writeByte(1);//Indicate the snapshot was not completed, set to true for the CRC calculation, false later
-        for (int ii = 0; ii < 4; ii++) {
-            fs.writeInt(version[ii]);//version
-        }
-        JSONStringer stringer = new JSONStringer();
-        byte jsonBytes[] = null;
-        try {
-            stringer.object();
-            stringer.keySymbolValuePair("txnId", txnId);
-            stringer.keySymbolValuePair("hostId", hostId);
-            stringer.keySymbolValuePair("hostname", hostname);
-            stringer.keySymbolValuePair("clusterName", clusterName);
-            stringer.keySymbolValuePair("databaseName", databaseName);
-            stringer.keySymbolValuePair("tableName", tableName.toUpperCase());
-            stringer.keySymbolValuePair("isReplicated", isReplicated);
-            stringer.keySymbolValuePair("isCompressed", true);
-            stringer.keySymbolValuePair("checksumType", "CRC32C");
-            stringer.keySymbolValuePair("timestamp", timestamp);
-            /*
-             * The timestamp string is for human consumption, automated stuff should use
-             * the actual timestamp
-             */
-            stringer.keySymbolValuePair("timestampString", SnapshotUtil.formatHumanReadableDate(timestamp));
-            if (!isReplicated) {
-                stringer.key("partitionIds").array();
-                for (int partitionId : partitionIds) {
-                    stringer.value(partitionId);
-                }
-                stringer.endArray();
 
-                stringer.keySymbolValuePair("numPartitions", numPartitions);
-            }
-            stringer.endObject();
-            String jsonString = stringer.toString();
-            JSONObject jsonObj = new JSONObject(jsonString);
-            jsonString = jsonObj.toString(4);
-            jsonBytes = jsonString.getBytes("UTF-8");
-        } catch (Exception e) {
-            throw new IOException(e);
-        }
-        fs.writeInt(jsonBytes.length);
-        fs.write(jsonBytes);
-
-        final BBContainer container = fs.getBBContainer();
-        container.b().position(4);
-        container.b().putInt(container.b().remaining() - 4);
-        container.b().position(0);
-
-        final PureJavaCrc32 crc = new PureJavaCrc32();
-        ByteBuffer aggregateBuffer = ByteBuffer.allocate(container.b().remaining() + schemaBytes.length);
-        aggregateBuffer.put(container.b());
-        container.discard();
-        aggregateBuffer.put(schemaBytes);
-        aggregateBuffer.flip();
-        crc.update(aggregateBuffer.array(), 4, aggregateBuffer.capacity() - 4);
-
-        final int crcValue = (int) crc.getValue();
-        aggregateBuffer.putInt(crcValue).position(8);
-        aggregateBuffer.put((byte)0).position(0);//Haven't actually finished writing file
+        BBContainer container = serializeHeader(DBBPool::allocateDirect, hostId, clusterName, databaseName, tableName,
+                numPartitions, isReplicated, partitionIds, schemaBytes, txnId, timestamp, version);
 
         if (m_simulateFullDiskWritingHeader) {
+            container.discard();
             m_writeException = new IOException("Disk full");
             m_writeFailed = true;
             m_fos.close();
@@ -273,7 +141,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
          */
         m_acceptOneWrite = true;
         ListenableFuture<?> writeFuture =
-                write(Callables.returning(DBBPool.wrapBB(aggregateBuffer)), false);
+                write(Callables.returning(container), false);
         try {
             writeFuture.get();
         } catch (InterruptedException e) {
@@ -361,17 +229,6 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
     }
 
     @Override
-    public void reportSerializationFailure(IOException ex) {
-        m_reportedSerializationFailure = ex;
-    }
-
-    @Override
-    public boolean needsFinalClose()
-    {
-        return m_needsFinalClose;
-    }
-
-    @Override
     public void close() throws IOException, InterruptedException {
         try {
             m_outstandingWriteTasksLock.lock();
@@ -396,31 +253,21 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                 SNAP_LOG.error("Error waiting on snapshot sync task cancellation", e);
             }
             m_channel.force(false);
+
+            m_channel.position(8);
+            if (!m_writeFailed && m_reportedSerializationFailure == null) {
+                ByteBuffer completed = ByteBuffer.allocate(1);
+                completed.put((byte) 1).flip();
+                m_channel.write(completed);
+            }
+
+            m_channel.force(false);
         } finally {
             s_bytesAllowedBeforeSync.release(m_bytesWrittenSinceLastSync.getAndSet(0));
+            m_channel.close();
         }
-        m_channel.position(8);
-        ByteBuffer completed = ByteBuffer.allocate(1);
-        if (m_writeFailed || m_reportedSerializationFailure != null) {
-            completed.put((byte)0).flip();
-        } else {
-            completed.put((byte)1).flip();
-        }
-        m_channel.write(completed);
-        m_channel.force(false);
-        m_channel.close();
-        if (m_onCloseHandler != null) {
-            m_onCloseHandler.run();
-        }
-        if (m_reportedSerializationFailure != null) {
-            // There was an error reported by the EE during serialization
-            throw m_reportedSerializationFailure;
-        }
-    }
 
-    @Override
-    public int getHeaderSize() {
-        return 0;
+        postClose();
     }
 
     /*
@@ -576,58 +423,12 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
     }
 
     @Override
-    public void setOnCloseHandler(Runnable onClose) {
-        m_onCloseHandler = onClose;
-    }
-
-    @Override
     public Exception getLastWriteException() {
         return m_writeException;
     }
 
     @Override
-    public SnapshotFormat getFormat() {
-        return SnapshotFormat.NATIVE;
-    }
-
-    @Override
-    public Exception getSerializationException() {
-        return m_reportedSerializationFailure;
-    }
-
-    /**
-     * Get the row count if any, of the content wrapped in the given {@link BBContainer}
-     * @param tupleData
-     * @return the numbers of tuple data rows contained within a container
-     */
-    @Override
-    public int getInContainerRowCount(BBContainer tupleData) {
-        return SnapshotDataTarget.ROW_COUNT_UNSUPPORTED;
-    }
-
-    @Override
     public String toString() {
         return m_file.toString();
-    }
-
-    public static void setRate(final Integer megabytesPerSecond) {
-        m_es.execute(new Runnable() {
-            @Override
-            public void run() {
-                if (megabytesPerSecond == null) {
-                    SNAPSHOT_RATELIMITER.setRate(SNAPSHOT_RATELIMIT_MEGABYTES * 1024.0 * 1024.0);
-                } else {
-                    SNAPSHOT_RATELIMITER.setRate(megabytesPerSecond * 1024.0 * 1024.0);
-                }
-            }
-        });
-    }
-
-    public void setInProgressHandler(Runnable inProgress) {
-        m_inProgressHandler = inProgress;
-    }
-
-    public void trackProgress() {
-        m_inProgressHandler.run();
     }
 }

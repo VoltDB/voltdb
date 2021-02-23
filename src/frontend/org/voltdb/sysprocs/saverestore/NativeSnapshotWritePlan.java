@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,7 +17,6 @@
 
 package org.voltdb.sysprocs.saverestore;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -30,8 +29,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.InstanceId;
-import org.voltdb.DefaultSnapshotDataTarget;
 import org.voltdb.ExtensibleSnapshotDigestData;
+import org.voltdb.NativeSnapshotDataTarget;
 import org.voltdb.SnapshotDataFilter;
 import org.voltdb.SnapshotDataTarget;
 import org.voltdb.SnapshotFormat;
@@ -41,7 +40,6 @@ import org.voltdb.SnapshotTableTask;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
-import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.sysprocs.SnapshotRegistry;
 
@@ -202,12 +200,17 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan<SnapshotRequestCo
     {
         return new Callable<Boolean>() {
             private final HashMap<Integer, SnapshotDataTarget> m_createdTargets = Maps.newHashMap();
+            final int hostId = context.getHostId();
 
             @Override
             public Boolean call() throws Exception
             {
                 // TRAIL [SnapSave:6]  - 3.3 [1 site/host] Create completion tasks
                 final AtomicInteger numTables = new AtomicInteger(tables.size());
+
+                NativeSnapshotDataTarget.Factory factory = NativeSnapshotDataTarget.getFactory(file_path,
+                        hostId, context.getCluster().getTypeName(), context.getDatabase().getTypeName(),
+                        partitionCount, tracker.getPartitionsForHost(hostId), txnId, timestamp);
 
                 NativeSnapshotWritePlan.createFileBasedCompletionTasks(file_path, pathType, file_nonce,
                         txnId, partitionTransactionIds, context, extraSnapshotData,
@@ -218,12 +221,12 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan<SnapshotRequestCo
                         isTruncationSnapshot);
 
                 for (SnapshotTableTask task : replicatedSnapshotTasks) {
-                    SnapshotDataTarget target = getSnapshotDataTarget(numTables, task);
+                    SnapshotDataTarget target = getSnapshotDataTarget(factory, numTables, task);
                     task.setTarget(target);
                 }
 
                 for (SnapshotTableTask task : partitionedSnapshotTasks) {
-                    SnapshotDataTarget target = getSnapshotDataTarget(numTables, task);
+                    SnapshotDataTarget target = getSnapshotDataTarget(factory, numTables, task);
                     task.setTarget(target);
                 }
 
@@ -249,67 +252,27 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan<SnapshotRequestCo
                 return true;
             }
 
-            private SnapshotDataTarget getSnapshotDataTarget(AtomicInteger numTables, SnapshotTableTask task)
-                    throws IOException
-            {
+            private SnapshotDataTarget getSnapshotDataTarget(NativeSnapshotDataTarget.Factory factory,
+                    AtomicInteger numTables, SnapshotTableTask task) throws IOException {
                 SnapshotDataTarget target = m_createdTargets.get(task.m_tableInfo.getTableId());
                 if (target == null) {
-                    target = createDataTargetForTable(file_path, file_nonce, task.m_tableInfo, txnId,
-                                                      context.getHostId(), context.getCluster().getTypeName(),
-                                                      context.getDatabase().getTypeName(), partitionCount,
-                                                      DrRoleType.XDCR.value().equals(context.getCluster().getDrrole()),
-                                                      tracker, timestamp, numTables, snapshotRecord, config);
+                    String saveFile = SnapshotUtil.constructFilenameForTable(task.m_tableInfo, file_nonce,
+                            SnapshotFormat.NATIVE, hostId);
+
+                    target = factory.create(saveFile, task.m_tableInfo);
+
+                    m_targets.add(target);
+                    final Runnable onClose = new TargetStatsClosure(target, Arrays.asList(task.m_tableInfo.getName()),
+                            numTables, snapshotRecord);
+                    target.setOnCloseHandler(onClose);
+                    final Runnable inProgress = new TargetStatsProgress(snapshotRecord);
+                    target.setInProgressHandler(inProgress);
+
                     m_createdTargets.put(task.m_tableInfo.getTableId(), target);
                 }
                 return target;
             }
         };
-    }
-
-    private SnapshotDataTarget createDataTargetForTable(String file_path,
-                                                        String file_nonce,
-                                                        SnapshotTableInfo table,
-                                                        long txnId,
-                                                        int hostId,
-                                                        String clusterName,
-                                                        String databaseName,
-                                                        int partitionCount,
-                                                        boolean isActiveActiveDRed,
-                                                        SiteTracker tracker,
-                                                        long timestamp,
-                                                        AtomicInteger numTables,
-                                                        SnapshotRegistry.Snapshot snapshotRecord,
-                                                        SnapshotRequestConfig config)
-            throws IOException
-    {
-        // TRAIL [SnapSave:7]  - 3.4 [1 site/host] Create file and snapshot target for tables
-
-        File saveFilePath = SnapshotUtil.constructFileForTable(
-                table,
-                file_path,
-                file_nonce,
-                SnapshotFormat.NATIVE,
-                hostId);
-
-        SnapshotDataTarget sdt = new DefaultSnapshotDataTarget(saveFilePath,
-                hostId,
-                clusterName,
-                databaseName,
-                table.getName(),
-                partitionCount,
-                table.isReplicated(),
-                tracker.getPartitionsForHost(hostId),
-                table.getSchema(),
-                txnId,
-                timestamp);
-
-        m_targets.add(sdt);
-        final Runnable onClose = new TargetStatsClosure(sdt, Arrays.asList(table.getName()), numTables, snapshotRecord);
-        sdt.setOnCloseHandler(onClose);
-        final Runnable inProgress = new TargetStatsProgress(snapshotRecord);
-        sdt.setInProgressHandler(inProgress);
-
-        return sdt;
     }
 
     static void createFileBasedCompletionTasks(

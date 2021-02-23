@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -929,9 +929,8 @@ public class SnapshotSiteProcessor {
     public HashSet<Exception> completeSnapshotWork(SystemProcedureExecutionContext context)
         throws InterruptedException {
         HashSet<Exception> retval = new HashSet<Exception>();
-        //Set to 10 gigabytes/sec, basically unlimited
-        //Does nothing if rate limiting is not enabled
-        DefaultSnapshotDataTarget.setRate(1024 * 10);
+        // Force rate limit to be disabled
+        DefaultSnapshotDataTarget.enforceSnapshotRateLimit(false);
         try {
             while (m_snapshotTableTasks != null) {
                 Future<?> result = doSnapshotWork(context, true);
@@ -949,7 +948,7 @@ public class SnapshotSiteProcessor {
             }
         } finally {
             //Request default rate again
-            DefaultSnapshotDataTarget.setRate(null);
+            DefaultSnapshotDataTarget.enforceSnapshotRateLimit(true);
         }
 
         /**

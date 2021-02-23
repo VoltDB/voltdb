@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -54,7 +54,7 @@ public final class Bits {
         }
     }
 
-    private static int PAGE_SIZE = -1;
+    private static final int PAGE_SIZE;
 
     static {
         sun.misc.Unsafe unsafeTemp = null;
@@ -64,17 +64,26 @@ public final class Bits {
             e.printStackTrace();
         }
         unsafe = unsafeTemp;
+        PAGE_SIZE = unsafe.pageSize();
     }
 
     public static int pageSize() {
-        if (PAGE_SIZE == -1) {
-            PAGE_SIZE = unsafe.pageSize();
-        }
         return PAGE_SIZE;
     }
 
     public static int numPages(int size) {
-        return (size + pageSize()  - 1) / pageSize();
+        return (size + PAGE_SIZE - 1) / PAGE_SIZE;
+    }
+
+    /**
+     * Round up {@code value} to multiple of {@link #s_pageSize}
+     *
+     * @param value to round up
+     * @return rounded value
+     */
+    public static int roundupToPage(int value) {
+        // add align-1 and clear all bits prior to align
+        return (value + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
     }
 
     //Target for storing the checksum to prevent dead code elimination
