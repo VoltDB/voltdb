@@ -753,14 +753,18 @@ public class SnapshotSiteProcessor {
                                 try {
                                     t.join();
                                 } catch (InterruptedException e) {
+                                    snapshotSucceeded = false;
                                     return;
                                 }
                             }
-                            Exception exp = null;
+                            Throwable exp = null;
                             for (final SnapshotDataTarget t : snapshotTargets) {
                                 try {
                                     t.close();
-                                } catch (IOException | InterruptedException e) {
+                                    if (exp == null) {
+                                        exp = t.getLastWriteException();
+                                    }
+                                } catch (Throwable e) {
                                     snapshotSucceeded = false;
                                     if (exp == null) {
                                         exp = e;
@@ -768,7 +772,7 @@ public class SnapshotSiteProcessor {
                                     continue;
                                 }
                             }
-                            if (!snapshotSucceeded) {
+                            if (exp != null) {
                                 throw new RuntimeException(exp);
                             }
 
@@ -780,6 +784,9 @@ public class SnapshotSiteProcessor {
                                     SNAP_LOG.error("Error running snapshot completion task", e);
                                 }
                             }
+                        } catch (Throwable t) {
+                            snapshotSucceeded = false;
+                            throw t;
                         } finally {
                             // Caching the value here before the site removes itself from the
                             // ExecutionSitesCurrentlySnapshotting set, so
