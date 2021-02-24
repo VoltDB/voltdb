@@ -79,9 +79,9 @@ import com.google_voltpatches.common.util.concurrent.RateLimiter;
 public class TopicBenchmark2 {
 
     static VoltLogger log = new VoltLogger("TOPICS");
-    static final String TEST_TOPIC = "TEST_TOPIC";
-
     static final SimpleDateFormat LOG_DF = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss,SSS");
+
+    static final String TEST_TOPIC = "TEST_TOPIC";
 
     Random m_random = new Random();
 
@@ -100,7 +100,14 @@ public class TopicBenchmark2 {
 
     AtomicLong m_rowId = new AtomicLong(0);
     AtomicLong m_successfulInserts = new AtomicLong(0);
+
+    /*
+         guard against permanent errors i.e. we define a number of consecutive errors after which we'd bail out of the producer
+         m_failedInserts                    Accumulated failures over the entire test
+         m_failedConsecutiveInserts  Increment at each failure, reset to 0 if successful insert occurs
+     */
     AtomicLong m_failedInserts = new AtomicLong(0);
+    AtomicLong m_failedConsecutiveInserts = new AtomicLong(0);
 
     enum Verification {
         NONE,
@@ -198,6 +205,9 @@ public class TopicBenchmark2 {
 
         @Option(desc = "Verification (none, random, all) defines how many groups verify polling (default all)")
         String verification = "ALL";
+
+        @Option(desc = "Maximum number of consecutive failed producer calls (inserts) before bailing out (default 1000)")
+        long maxfailedinserts = 1000;
 
         @Override
         public void validate() {
@@ -658,8 +668,15 @@ public class TopicBenchmark2 {
                         if(e != null) {
                             log.error("Producer thread " + thId + " failed insert after " + elapsedSecs + " seconds: " + e.getMessage());
                             m_failedInserts.incrementAndGet();
+                            m_failedConsecutiveInserts.incrementAndGet(); // accumlate failure and check if over the bail out limit
+                            if (m_failedConsecutiveInserts.longValue() > m_config.maxfailedinserts) {
+                                log.error("Producer thread exceeds consecutive failure limit: " + m_config.maxfailedinserts);
+                                exitWithException("Producer thread " + thId + " failed inserting into topic\n", e, false);
+                            }
+
                         } else {
                             m_successfulInserts.incrementAndGet();
+                            m_failedConsecutiveInserts.set(0); // had a successful insert, reset error counter
                             if (elapsedSecs > m_config.insertwarnthreshold) {
                                 log.warn("Producer thread " + thId + " completed insert after " + elapsedSecs + " seconds");
                             }
