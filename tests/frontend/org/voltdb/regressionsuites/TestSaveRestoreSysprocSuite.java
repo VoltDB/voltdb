@@ -63,9 +63,9 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.BackendTarget;
 import org.voltdb.ClientResponseImpl;
-import org.voltdb.DefaultSnapshotDataTarget;
 import org.voltdb.FlakyTestRule;
 import org.voltdb.FlakyTestRule.Flaky;
+import org.voltdb.SnapshotErrorInjectionUtils;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -1083,7 +1083,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         //
         // Take a snapshot that will block snapshots in the system
         //
-        DefaultSnapshotDataTarget.m_simulateBlockedWrite = new CountDownLatch(1);
+        CountDownLatch latch = new CountDownLatch(1);
+        SnapshotErrorInjectionUtils.blockOn(latch);
         client.callProcedure("@SnapshotSave", TMPDIR,
                                        TESTNONCE, (byte)0);
 
@@ -1116,8 +1117,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         //
         // Now make sure it is reattempted and works
         //
-        DefaultSnapshotDataTarget.m_simulateBlockedWrite.countDown();
-        DefaultSnapshotDataTarget.m_simulateBlockedWrite = null;
+        latch.countDown();
 
         boolean hadSuccess = false;
         for (int ii = 0; ii < 5; ii++) {
@@ -1173,7 +1173,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         //
         // Take a snapshot that will block snapshots in the system
         //
-        DefaultSnapshotDataTarget.m_simulateBlockedWrite = new CountDownLatch(1);
+        CountDownLatch latch = new CountDownLatch(1);
+        SnapshotErrorInjectionUtils.blockOn(latch);
         client.callProcedure("@SnapshotSave", TMPDIR,
                                        TESTNONCE, (byte)0);
 
@@ -1197,8 +1198,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         // because it has the name of an existing snapshot.
         // No way to tell other then that new snapshots continue to work
         //
-        DefaultSnapshotDataTarget.m_simulateBlockedWrite.countDown();
-        DefaultSnapshotDataTarget.m_simulateBlockedWrite = null;
+        latch.countDown();
 
         Thread.sleep(2000);
 
@@ -2136,8 +2136,6 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         orig_mem = client.callProcedure("@Statistics", "memory", 0).getResults()[0];
         System.out.println("STATS: " + orig_mem.toString());
 
-        DefaultSnapshotDataTarget.m_simulateFullDiskWritingHeader = false;
-
         validateSnapshot(false, TESTNONCE);
 
         results = saveTablesWithDefaultOptions(client, TESTNONCE);
@@ -2367,15 +2365,23 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
             fail("Statistics exception: " + ex.getMessage());
         }
 
-        DefaultSnapshotDataTarget.m_simulateFullDiskWritingHeader = true;
+        SnapshotErrorInjectionUtils.failFirstWrite();
         results = saveTablesWithDefaultOptions(client, TESTNONCE);
         deleteTestFiles(TESTNONCE);
 
+        // Make sure that either the response to the snapshot indicates failure or the status
+        boolean failed = true;
         while (results[0].advanceRow()) {
-            assertTrue(results[0].getString("RESULT").equals("FAILURE"));
+            failed &= results[0].getString("RESULT").equals("FAILURE");
         }
 
-        DefaultSnapshotDataTarget.m_simulateFullDiskWritingHeader = false;
+        if (!failed) {
+            results = client.callProcedure("@Statistics", "SNAPSHOTSTATUS", 0).getResults();
+
+            while (results[0].advanceRow()) {
+                assertEquals("FAILURE", results[0].getString("RESULT"));
+            }
+        }
 
         validateSnapshot(false, TESTNONCE);
 
@@ -2490,7 +2496,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         assertFalse(cluster1CreateTime == cluster3CreateTime);
         assertFalse(cluster2CreateTime == cluster3CreateTime);
 
-        DefaultSnapshotDataTarget.m_simulateFullDiskWritingChunk = true;
+        SnapshotErrorInjectionUtils.failSecondWrite();
 
         org.voltdb.sysprocs.SnapshotRegistry.clear();
         client = getClient();
@@ -2514,7 +2520,6 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         }
         assertTrue(hasFailure);
 
-        DefaultSnapshotDataTarget.m_simulateFullDiskWritingChunk = false;
         //deleteTestFiles(TESTNONCE);
         results = saveTablesWithDefaultOptions(client, "second");
 

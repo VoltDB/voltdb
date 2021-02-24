@@ -73,8 +73,6 @@ public class TestSnapshotsWithFailures extends JUnit4LocalClusterTest {
             assertTrue(tempDir.mkdirs());
         }
         deleteTestFiles(TESTNONCE);
-        DefaultSnapshotDataTarget.m_simulateFullDiskWritingChunk = false;
-        DefaultSnapshotDataTarget.m_simulateFullDiskWritingHeader = false;
         VoltDB.wasCrashCalled = false;
         SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.clear();
         SnapshotSiteProcessor.m_tasksOnSnapshotCompletion.clear();
@@ -95,7 +93,8 @@ public class TestSnapshotsWithFailures extends JUnit4LocalClusterTest {
             c.createConnection("", cluster.port(0));
             verifyPartitionCount(c, 6);
             verifyLiveHostCount(c, 3);
-            DefaultSnapshotDataTarget.m_simulateFullDiskWritingChunk = true;
+
+            SnapshotErrorInjectionUtils.failSecondWrite();
             for (int ii = 0; ii < 500; ii++) {
                 c.callProcedure("P1.insert", ii, fillerBytes);
             }
@@ -105,7 +104,6 @@ public class TestSnapshotsWithFailures extends JUnit4LocalClusterTest {
             validateSnapshot(cluster.getServerSpecificRoot("0") + "/command_log_snapshot", null, true);
             assertTrue(VoltDB.wasCrashCalled);
         } finally {
-            DefaultSnapshotDataTarget.m_simulateFullDiskWritingChunk = false;
             VoltDB.wasCrashCalled = false;
             cleanup();
         }
@@ -125,7 +123,8 @@ public class TestSnapshotsWithFailures extends JUnit4LocalClusterTest {
             c.createConnection("", cluster.port(0));
             verifyPartitionCount(c, 6);
             verifyLiveHostCount(c, 3);
-            DefaultSnapshotDataTarget.m_simulateFullDiskWritingHeader = true;
+
+            SnapshotErrorInjectionUtils.failFirstWrite();
             for (int ii = 0; ii < 500; ii++) {
                 c.callProcedure("P1.insert", ii, fillerBytes);
             }
@@ -135,7 +134,6 @@ public class TestSnapshotsWithFailures extends JUnit4LocalClusterTest {
             validateSnapshot(cluster.getServerSpecificRoot("0") + "/command_log_snapshot", null, false);
             assertTrue(VoltDB.wasCrashCalled);
         } finally {
-            DefaultSnapshotDataTarget.m_simulateFullDiskWritingHeader = false;
             VoltDB.wasCrashCalled = false;
             cleanup();
         }
@@ -151,7 +149,7 @@ public class TestSnapshotsWithFailures extends JUnit4LocalClusterTest {
             c.createConnection("", cluster.port(0));
             verifyPartitionCount(c, 6);
             verifyLiveHostCount(c, 3);
-            DefaultSnapshotDataTarget.m_simulateFullDiskWritingChunk = true;
+            SnapshotErrorInjectionUtils.failSecondWrite();
             for (int ii = 0; ii < 2; ii++) {
                 c.callProcedure("P1.insert", ii, fillerBytes);
             }
@@ -161,14 +159,13 @@ public class TestSnapshotsWithFailures extends JUnit4LocalClusterTest {
             //save snapshot
             VoltTable results = c.callProcedure("@SnapshotSave", TMPDIR, TESTNONCE, (byte) 1).getResults()[0];
             while (results.advanceRow()) {
-                assertTrue(results.getString("RESULT").equals("SUCCESS"));
+                assertEquals("SUCCESS", results.getString("RESULT"));
             }
 
             verifySnapshotStatus(c, "MANUAL", 3, false);
             validateSnapshot(TMPDIR, TESTNONCE, false);
             assertFalse(VoltDB.wasCrashCalled);
         } finally {
-            DefaultSnapshotDataTarget.m_simulateFullDiskWritingChunk = false;
             cleanup();
         }
         deleteTestFiles(TESTNONCE);
@@ -184,7 +181,7 @@ public class TestSnapshotsWithFailures extends JUnit4LocalClusterTest {
             c.createConnection("", cluster.port(0));
             verifyPartitionCount(c, 6);
             verifyLiveHostCount(c, 3);
-            DefaultSnapshotDataTarget.m_simulateFullDiskWritingHeader = true;
+            SnapshotErrorInjectionUtils.failFirstWrite();
             for (int ii = 0; ii < 2; ii++) {
                 c.callProcedure("P1.insert", ii, fillerBytes);
             }
@@ -192,19 +189,34 @@ public class TestSnapshotsWithFailures extends JUnit4LocalClusterTest {
             c.drain();
 
             //save snapshot
-            VoltTable results = c.callProcedure("@SnapshotSave", TMPDIR, TESTNONCE, (byte) 1).getResults()[0];
-            while (results.advanceRow()) {
-                assertTrue(results.getLong("HOST_ID") != 0 || results.getString("RESULT").equals("FAILURE"));
-            }
+            assertSnapshotFailed(c, c.callProcedure("@SnapshotSave", TMPDIR, TESTNONCE, (byte) 1).getResults()[0]);
 
             verifySnapshotStatus(c, "MANUAL", 3, false);
             validateSnapshot(TMPDIR, TESTNONCE, false);
             assertFalse(VoltDB.wasCrashCalled);
         } finally {
-            DefaultSnapshotDataTarget.m_simulateFullDiskWritingHeader = false;
             cleanup();
         }
         deleteTestFiles(TESTNONCE);
+    }
+
+    /**
+     * Assert that either the result from starting the snapshot failed or the status reports failure
+     */
+    private void assertSnapshotFailed(Client client, VoltTable snapshotResult)
+            throws NoConnectionsException, IOException, ProcCallException {
+        boolean failed = true;
+        while (snapshotResult.advanceRow()) {
+            failed &= snapshotResult.getLong("HOST_ID") != 0 || snapshotResult.getString("RESULT").equals("FAILURE");
+        }
+
+        if (!failed) {
+            VoltTable results = client.callProcedure("@Statistics", "SNAPSHOTSTATUS", 0).getResults()[0];
+
+            while (results.advanceRow()) {
+                assertTrue(results.getLong("HOST_ID") != 0 || results.getString("RESULT").equals("FAILURE"));
+            }
+        }
     }
 
     protected void deleteTestFiles(final String nonce) {

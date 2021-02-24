@@ -27,6 +27,7 @@ import static org.junit.Assume.assumeTrue;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
+import java.util.function.UnaryOperator;
 
 import org.junit.BeforeClass;
 import org.voltdb.sysprocs.saverestore.TestTableSaveFile;
@@ -56,7 +57,8 @@ public class TestDirectIoSnapshotDataTarget extends TestTableSaveFile {
             long txnId, long timestamp, int[] version) throws IOException {
 
         NativeSnapshotDataTarget.Factory factory = DirectIoSnapshotDataTarget.factory(file.getParent(), hostId,
-                clusterName, databaseName, numPartitions, partitionIds, txnId, timestamp, version);
+                clusterName, databaseName, numPartitions, partitionIds, txnId, timestamp, version,
+                UnaryOperator.identity());
 
         return factory.create(file.getName(), tableName, isReplicated, schemaBytes);
     }

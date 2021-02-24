@@ -24,7 +24,6 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.List;
 import java.util.concurrent.Callable;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -34,6 +33,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.UnaryOperator;
 
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
 import org.voltcore.logging.Level;
@@ -54,13 +54,6 @@ import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 
 
 public class DefaultSnapshotDataTarget extends NativeSnapshotDataTarget {
-    /*
-     * Make it possible for test code to block a write and thus snapshot completion
-     */
-    public static volatile CountDownLatch m_simulateBlockedWrite = null;
-    public static volatile boolean m_simulateFullDiskWritingHeader = false;
-    public static volatile boolean m_simulateFullDiskWritingChunk = false;
-
     private final File m_file;
     private final FileChannel m_channel;
     private final FileOutputStream m_fos;
@@ -90,10 +83,6 @@ public class DefaultSnapshotDataTarget extends NativeSnapshotDataTarget {
     private final AtomicInteger m_bytesWrittenSinceLastSync = new AtomicInteger(0);
 
     private final ScheduledFuture<?> m_syncTask;
-    /*
-     * Accept a single write even though simulating a full disk is enabled;
-     */
-    private volatile boolean m_acceptOneWrite = false;
 
     private final AtomicInteger m_outstandingWriteTasks = new AtomicInteger(0);
     private final ReentrantLock m_outstandingWriteTasksLock = new ReentrantLock();
@@ -116,42 +105,29 @@ public class DefaultSnapshotDataTarget extends NativeSnapshotDataTarget {
             final byte[] schemaBytes,
             final long txnId,
             final long timestamp,
-            int version[]
+            int version[],
+            UnaryOperator<FileChannel> channelOperator
             ) throws IOException {
         super(isReplicated);
 
         m_file = file;
         m_fos = new FileOutputStream(file);
-        m_channel = m_fos.getChannel();
+        m_channel = channelOperator.apply(m_fos.getChannel());
 
         BBContainer container = serializeHeader(DBBPool::allocateDirect, hostId, clusterName, databaseName, tableName,
                 numPartitions, isReplicated, partitionIds, schemaBytes, txnId, timestamp, version);
-
-        if (m_simulateFullDiskWritingHeader) {
-            container.discard();
-            m_writeException = new IOException("Disk full");
-            m_writeFailed = true;
-            m_fos.close();
-            throw m_writeException;
-        }
 
         /*
          * Be completely sure the write succeeded. If it didn't
          * the disk is probably full or the path is bunk etc.
          */
-        m_acceptOneWrite = true;
-        ListenableFuture<?> writeFuture =
-                write(Callables.returning(container), false);
+        ListenableFuture<?> writeFuture = write(Callables.returning(container), false);
         try {
             writeFuture.get();
         } catch (InterruptedException e) {
             m_fos.close();
             throw new java.io.InterruptedIOException();
         } catch (ExecutionException e) {
-            m_fos.close();
-            throw m_writeException;
-        }
-        if (m_writeFailed) {
             m_fos.close();
             throw m_writeException;
         }
@@ -325,19 +301,6 @@ public class DefaultSnapshotDataTarget extends NativeSnapshotDataTarget {
             public Object call() throws Exception {
                 int permitAcquired = 0;
                 try {
-                    if (m_acceptOneWrite) {
-                        m_acceptOneWrite = false;
-                    } else {
-                        if (m_simulateBlockedWrite != null) {
-                            m_simulateBlockedWrite.await();
-                        }
-                        if (m_simulateFullDiskWritingChunk) {
-                            //Make sure to consume the result of the compression
-                            compressionTaskFinal.get().discard();
-                            throw new IOException("Disk full");
-                        }
-                    }
-
                     final ByteBuffer tupleData = tupleDataCont.b();
                     int totalWritten = 0;
                     if (prependLength) {

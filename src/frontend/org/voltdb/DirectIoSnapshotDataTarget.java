@@ -34,6 +34,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.LinkedTransferQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.UnaryOperator;
 
 import org.voltcore.utils.Bits;
 import org.voltcore.utils.DBBPool;
@@ -113,22 +114,23 @@ class DirectIoSnapshotDataTarget extends NativeSnapshotDataTarget {
      * @return {@link Factory} to create {@link DirectIoSnapshotDataTarget} instances
      */
     public static Factory factory(String directory, int hostId, final String clusterName, final String databaseName,
-            int numPartitions, List<Integer> partitions, long txnId, long timestamp, int[] version) {
+            int numPartitions, List<Integer> partitions, long txnId, long timestamp, int[] version,
+            UnaryOperator<FileChannel> channelOperator) {
         DirectIoSnapshotDataTarget.MemoryPool pool = new DirectIoSnapshotDataTarget.MemoryPool();
 
         return (fileName, tableName, isReplicated, schema) -> new DirectIoSnapshotDataTarget(pool,
                 new VoltFile(directory, fileName).toPath(), hostId, clusterName, databaseName, tableName, numPartitions,
-                isReplicated, partitions, schema, txnId, timestamp, version);
+                isReplicated, partitions, schema, txnId, timestamp, version, channelOperator);
     }
 
     private DirectIoSnapshotDataTarget(MemoryPool pool, Path path, int hostId, String clusterName, String databaseName,
             String tableName, int numPartitions, boolean isReplicated, List<Integer> partitionIds, byte[] schemaBytes,
-            long txnId, long timestamp, int[] version)
+            long txnId, long timestamp, int[] version, UnaryOperator<FileChannel> channelOperator)
             throws IOException {
         super(isReplicated);
         m_pool = pool.reference();
         m_path = path;
-        m_channel = DirectIoFileChannel.open(path);
+        m_channel = channelOperator.apply(DirectIoFileChannel.open(path));
 
         m_firstPage = serializeHeader(DirectIoSnapshotDataTarget::allocateContainer, hostId, clusterName, databaseName,
                 tableName, numPartitions, isReplicated, partitionIds, schemaBytes, txnId, timestamp, version);
@@ -141,9 +143,6 @@ class DirectIoSnapshotDataTarget extends NativeSnapshotDataTarget {
 
         // Don't discard since m_firstPage is kept around until close
         m_currentWrite = new OutstandingWrite(m_firstPage, false);
-
-        m_writeThreadFuture = s_writeExecutor.scheduleAtFixedRate(this::writeOutstandingBuffers,
-                SNAPSHOT_SYNC_FREQUENCY, SNAPSHOT_SYNC_FREQUENCY, TimeUnit.MILLISECONDS);
     }
 
     @Override
@@ -246,7 +245,7 @@ class DirectIoSnapshotDataTarget extends NativeSnapshotDataTarget {
 
             long written = 0;
             do {
-                written += m_channel.write(buffers);
+                written += m_channel.write(buffers, 0, buffers.length);
             } while (written < toWrite);
 
             assert written == toWrite : "Wrote more data than expected: " + written + " vs " + toWrite;

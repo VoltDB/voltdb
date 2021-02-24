@@ -223,7 +223,7 @@ public class TestExportSuite extends TestExportBaseSocketExport {
             client.callProcedure("ExportInsertNoNulls", params);
         }
 
-        String snapshotDir = "/tmp/" + System.getProperty("user.name");
+        String snapshotDir = "obj/release/snapshots/" + getName();
 
         // this blocks until the snapshot is complete
         client.callProcedure("@SnapshotSave", snapshotDir, "testExportPlusSnapshot", (byte) 1).getResults();
@@ -272,7 +272,7 @@ public class TestExportSuite extends TestExportBaseSocketExport {
         additionalEnv.put(ExportDataProcessor.EXPORT_TO_TYPE, "org.voltdb.exportclient.SocketExporter");
 
         final MultiConfigSuiteBuilder builder =
-            new MultiConfigSuiteBuilder(TestExportSuite.class);
+                new MultiConfigSuiteBuilder(TestExportSuite.class, "testExportPlusSnapshot"::equals);
 
         project = new VoltProjectBuilder();
         project.setSecurityEnabled(true, true);

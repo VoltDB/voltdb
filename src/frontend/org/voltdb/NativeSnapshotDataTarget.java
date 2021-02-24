@@ -18,9 +18,11 @@ package org.voltdb;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.function.IntFunction;
+import java.util.function.UnaryOperator;
 import java.util.zip.CRC32;
 
 import org.json_voltpatches.JSONStringer;
@@ -31,6 +33,7 @@ import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.VoltFile;
 
+import com.google_voltpatches.common.annotations.VisibleForTesting;
 import com.google_voltpatches.common.util.concurrent.UnsynchronizedRateLimiter;
 
 public abstract class NativeSnapshotDataTarget implements SnapshotDataTarget {
@@ -54,6 +57,9 @@ public abstract class NativeSnapshotDataTarget implements SnapshotDataTarget {
     private static final int s_staticHeaderSizeAfterSize = s_staticHeaderSize - s_offsetComplete;
 
     static final int[] s_currentVersion = { 0, 0, 0, 2 };
+
+    // Test hook for injecting errors through a FileChanel
+    static volatile UnaryOperator<FileChannel> SNAPSHOT_FILE_CHANEL_OPERATER = UnaryOperator.identity();
 
     private Runnable m_onCloseHandler = null;
     private Runnable m_inProgressHandler = null;
@@ -106,15 +112,33 @@ public abstract class NativeSnapshotDataTarget implements SnapshotDataTarget {
      */
     public static Factory getFactory(String directory, int hostId, final String clusterName,
             final String databaseName, int numPartitions, List<Integer> partitions, long txnId, long timestamp) {
+        // Grab the currently configured operator and replace it with a no-op so only the targets returned by this
+        // factory are affected
+        UnaryOperator<FileChannel> channelOperator = SNAPSHOT_FILE_CHANEL_OPERATER;
+        SNAPSHOT_FILE_CHANEL_OPERATER = UnaryOperator.identity();
+
+        return getFactory(directory, hostId, clusterName, databaseName, numPartitions, partitions, txnId, timestamp,
+                channelOperator);
+    }
+
+    /**
+     * Factory method for tests to allow them to inject misbehaving {@link FileChannel}s into targets
+     *
+     * @see #getFactory(String, int, String, String, int, List, long, long)
+     */
+    @VisibleForTesting
+    public static Factory getFactory(String directory, int hostId, final String clusterName, final String databaseName,
+            int numPartitions, List<Integer> partitions, long txnId, long timestamp,
+            UnaryOperator<FileChannel> channelOperator) {
         // If direct IO is enabled and supported in directory return a direct IO target
         if (s_enableDirectIoSnapshots && DirectIoSnapshotDataTarget.directIoSupported(directory)) {
             return DirectIoSnapshotDataTarget.factory(directory, hostId, clusterName, databaseName, numPartitions,
-                    partitions, txnId, timestamp, s_currentVersion);
+                    partitions, txnId, timestamp, s_currentVersion, channelOperator);
         }
 
         return (fileName, tableName, isReplicated, schema) -> new DefaultSnapshotDataTarget(
                 new VoltFile(directory, fileName), hostId, clusterName, databaseName, tableName, numPartitions,
-                isReplicated, partitions, schema, txnId, timestamp, s_currentVersion);
+                isReplicated, partitions, schema, txnId, timestamp, s_currentVersion, channelOperator);
     }
 
     NativeSnapshotDataTarget(boolean isReplicated) {

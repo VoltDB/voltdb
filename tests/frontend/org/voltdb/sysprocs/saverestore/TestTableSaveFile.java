@@ -32,6 +32,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.UnaryOperator;
 
 import org.junit.After;
 import org.junit.Rule;
@@ -323,6 +324,6 @@ public class TestTableSaveFile {
             String tableName, int numPartitions, boolean isReplicated, List<Integer> partitionIds, byte[] schemaBytes,
             long txnId, long timestamp, int[] version) throws IOException {
         return new DefaultSnapshotDataTarget(file, hostId, clusterName, databaseName, tableName, numPartitions,
-                isReplicated, partitionIds, schemaBytes, txnId, timestamp, version);
+                isReplicated, partitionIds, schemaBytes, txnId, timestamp, version, UnaryOperator.identity());
     }
 }
