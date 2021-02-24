@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2019 VoltDB Inc.
+ * Copyright (C) 2019-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -22,7 +22,8 @@
 namespace voltdb {
 namespace topics {
 
-GroupMember::GroupMember(const GroupTables& tables, const NValue& groupId, const NValue& memberId, int32_t sessionTimeout,
+GroupMember::GroupMember(const GroupTables& tables, const NValue& groupId, const NValue& memberId,
+        const NValue& clientId, const NValue& clientHost, int32_t sessionTimeout,
         int32_t rebalanceTimeout, const NValue& instanceId, const NValue& protocolMetadata,
         const NValue& assignments) :
         GroupOrmBase(tables, groupId), m_memberId(memberId) {
@@ -61,20 +62,19 @@ GroupMember::GroupMember(const GroupTables& tables, const NValue& groupId, const
     setSchema(getTable()->schema());
 }
 
-void GroupMember::update(int32_t sessionTimeout, int32_t rebalanceTimeout, const NValue& instanceId,
-        const NValue& protocolMetadata, const NValue& assignments) {
-    update(ValueFactory::getIntegerValue(sessionTimeout), ValueFactory::getIntegerValue(rebalanceTimeout), instanceId,
-            protocolMetadata, assignments);
+void GroupMember::update(const NValue& clientId, const NValue& clientHost, int32_t sessionTimeout, int32_t rebalanceTimeout,
+        const NValue& instanceId, const NValue& protocolMetadata, const NValue& assignments) {
+    update(clientId, clientHost, ValueFactory::getIntegerValue(sessionTimeout), ValueFactory::getIntegerValue(rebalanceTimeout),
+            instanceId, protocolMetadata, assignments);
 }
 
-void GroupMember::update(const NValue& sessionTimeout, const NValue& rebalanceTimeout, const NValue& instanceId,
-        const NValue& protocolMetadata, const NValue& assignments) {
+void GroupMember::update(const NValue& clientId, const NValue& clientHost, const NValue& sessionTimeout, const NValue& rebalanceTimeout,
+        const NValue& instanceId, const NValue& protocolMetadata, const NValue& assignments) {
     if (isInTable()) {
-        std::vector<NValue> values = { sessionTimeout, rebalanceTimeout, instanceId, protocolMetadata, assignments };
-
-        setNValues(values, GroupMemberTable::Column::SESSION_TIMEOUT);
+        std::vector<NValue> values = { clientId, clientHost, sessionTimeout, rebalanceTimeout, instanceId, protocolMetadata, assignments };
+        setNValues(values, GroupMemberTable::Column::CLIENT_ID);
     } else {
-        std::vector<NValue> values = { getGroupId(), getMemberId(), sessionTimeout, rebalanceTimeout, instanceId,
+        std::vector<NValue> values = { getGroupId(), getMemberId(), clientId, clientHost, sessionTimeout, rebalanceTimeout, instanceId,
                 protocolMetadata, assignments };
 
         setNValues(values);
@@ -82,22 +82,27 @@ void GroupMember::update(const NValue& sessionTimeout, const NValue& rebalanceTi
 }
 
 void GroupMember::update(SerializeInputBE& updateIn) {
+    NValue clientId = readString(updateIn);
+    NValue clientHost = readString(updateIn);
     NValue sessionTimeout = ValueFactory::getIntegerValue(updateIn.readInt());
     NValue rebalanceTimeout = ValueFactory::getIntegerValue(updateIn.readInt());
     NValue instanceId = readString(updateIn);
     NValue protocolMetadata = readBytes(updateIn);
     NValue assignments = readBytes(updateIn);
 
-    update(sessionTimeout, rebalanceTimeout, instanceId, protocolMetadata, assignments);
+    update(clientId, clientHost, sessionTimeout, rebalanceTimeout, instanceId, protocolMetadata, assignments);
 }
 
 int32_t GroupMember::serializedSize() {
-    return getMemberId().serializedSize() + sizeof(int32_t) * 2 + getInstanceId().serializedSize()
+    return getMemberId().serializedSize() + getClientId().serializedSize() + getClientHost().serializedSize()
+            + sizeof(int32_t) * 2 + getInstanceId().serializedSize()
             + getProtocolMetadata().serializedSize() + getAssignments().serializedSize();
 }
 
 void GroupMember::serialize(SerializeOutput& out) {
     getMemberId().serializeTo(out);
+    getClientId().serializeTo(out);
+    getClientHost().serializeTo(out);
     out.writeInt(getSessionTimeout());
     out.writeInt(getRebalanceTimeout());
     getInstanceId().serializeTo(out);

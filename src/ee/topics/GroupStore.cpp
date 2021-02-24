@@ -129,7 +129,7 @@ void GroupStore::fetchOffsets(int16_t requestVersion, const NValue& groupId, Ser
     CheckedSerializeInput checkedIn(topicPartitions);
 
     int topicCount = checkedIn.readInt();
-    if (topicCount == 0) {
+    if (topicCount <= 0) {
         OffsetFetchResponseTopic* responseTopic = nullptr;
 
         GroupOffset::visitAll(*this, groupId, [&response, &responseTopic] (const GroupOffset& offset) {

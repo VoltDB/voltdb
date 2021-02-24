@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2019 VoltDB Inc.
+ * Copyright (C) 2019-2021 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -93,11 +93,13 @@ TEST_F(TopicsTableFactoryTest, TopicsGroupMember) {
     EXPECT_TRUE(table);
     EXPECT_EQ(GroupMemberTable::name, table->name());
     EXPECT_EQ(0, table->partitionColumn());
-    EXPECT_EQ(7, table->schema()->columnCount());
+    EXPECT_EQ(9, table->schema()->columnCount());
 
     const TupleSchema* schema = table->schema();
     EXPECT_EQ(ValueType::tVARCHAR, columnType(schema, GroupMemberTable::Column::GROUP_ID));
     EXPECT_EQ(ValueType::tVARCHAR, columnType(schema, GroupMemberTable::Column::MEMBER_ID));
+    EXPECT_EQ(ValueType::tVARCHAR, columnType(schema, GroupMemberTable::Column::CLIENT_ID));
+    EXPECT_EQ(ValueType::tVARCHAR, columnType(schema, GroupMemberTable::Column::CLIENT_HOST));
     EXPECT_EQ(ValueType::tINTEGER, columnType(schema, GroupMemberTable::Column::SESSION_TIMEOUT));
     EXPECT_EQ(ValueType::tINTEGER, columnType(schema, GroupMemberTable::Column::REBALANCE_TIMEOUT));
     EXPECT_EQ(ValueType::tVARCHAR, columnType(schema, GroupMemberTable::Column::INSTANCE_ID));

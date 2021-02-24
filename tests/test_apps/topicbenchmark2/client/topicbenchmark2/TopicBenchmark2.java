@@ -434,6 +434,8 @@ public class TopicBenchmark2 {
         Properties props = new Properties();
         props.put(ConsumerConfig.GROUP_ID_CONFIG, groupName);
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, m_brokers);
+        // Ensure polling from beginning
+        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         // Use volt max buffer size of 2MB
         props.put(ConsumerConfig.MAX_PARTITION_FETCH_BYTES_CONFIG, "2097152");
         // Use a short rebalance timeout (default is 5 minutes)

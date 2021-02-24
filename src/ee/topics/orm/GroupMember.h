@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2019 VoltDB Inc.
+ * Copyright (C) 2019-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -32,7 +32,8 @@ class GroupMember: public GroupOrmBase {
     friend class Group;
 
 public:
-    GroupMember(const GroupTables& tables, const NValue& groupId, const NValue& memberId, int32_t sessionTimeout,
+    GroupMember(const GroupTables& tables, const NValue& groupId, const NValue& memberId,
+            const NValue& clientId, const NValue& clientHost, int32_t sessionTimeout,
             int32_t rebalanceTimeout, const NValue& instanceId, const NValue& protocolMetadata,
             const NValue& assignments);
 
@@ -41,6 +42,20 @@ public:
      */
     const NValue& getMemberId() const {
         return m_memberId;
+    }
+
+    /**
+     * @return this group member's client id. Type VARCHAR
+     */
+    const NValue getClientId() const {
+        return getNValue(GroupMemberTable::Column::CLIENT_ID);
+    }
+
+    /**
+     * @return this group member's client host. Type VARCHAR
+     */
+    const NValue getClientHost() const {
+        return getNValue(GroupMemberTable::Column::CLIENT_HOST);
     }
 
     /**
@@ -81,8 +96,8 @@ public:
     /**
      * Update used by tests to set all fields in this member
      */
-    void update(int32_t sessionTimeout, int32_t rebalanceTimeout, const NValue& instanceId,
-            const NValue& protocolMetadata, const NValue& assignments);
+    void update( const NValue& clientId, const NValue& clientHost, int32_t sessionTimeout, int32_t rebalanceTimeout,
+            const NValue& instanceId, const NValue& protocolMetadata, const NValue& assignments);
 
 protected:
     /**
@@ -117,7 +132,8 @@ private:
     GroupMember(const GroupTables& tables, TableTuple& original, const NValue& groupId) :
         GroupOrmBase(tables, original, groupId), m_memberId(getNValue(GroupMemberTable::Column::MEMBER_ID)) {}
 
-    void update(const NValue& sessionTimeout, const NValue& rebalanceTimeout, const NValue& instanceId,
+    void update(const NValue& clientId, const NValue& clientHost, const NValue& sessionTimeout,
+            const NValue& rebalanceTimeout, const NValue& instanceId,
             const NValue& protocolMetadata, const NValue& assignments);
 
     // this group members ID. Type VARCHAR

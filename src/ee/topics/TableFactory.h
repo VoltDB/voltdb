@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2019 VoltDB Inc.
+ * Copyright (C) 2019-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -41,7 +41,7 @@ struct GroupMemberTable {
     static const std::string indexName;
 
     enum class Column : int8_t {
-        GROUP_ID = 0, MEMBER_ID, SESSION_TIMEOUT, REBALANCE_TIMEOUT, INSTANCE_ID, PROTOCOL_METADATA, ASSIGNMENTS
+        GROUP_ID = 0, MEMBER_ID, CLIENT_ID, CLIENT_HOST, SESSION_TIMEOUT, REBALANCE_TIMEOUT, INSTANCE_ID, PROTOCOL_METADATA, ASSIGNMENTS
     };
 
     enum class IndexColumn : int8_t {
