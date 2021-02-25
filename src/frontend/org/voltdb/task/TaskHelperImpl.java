@@ -73,7 +73,7 @@ final class TaskHelperImpl implements TaskHelper {
      * @return The scope in which the task will be executing
      */
     @Override
-    public TaskScope getTaskScepe() {
+    public TaskScope getTaskScope() {
         return m_scope;
     }
 

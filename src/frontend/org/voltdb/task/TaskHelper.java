@@ -33,7 +33,7 @@ public interface TaskHelper {
     /**
      * @return The scope in which the task will be executing
      */
-    TaskScope getTaskScepe();
+    TaskScope getTaskScope();
 
     /**
      * Returns the ID of the scope when this helper is passed to an {@code instantiate} method otherwise {@code -1}
