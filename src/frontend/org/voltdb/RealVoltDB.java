@@ -918,7 +918,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 break;
             case LICENSE:
                 connectLicensing();
-                returnStatus = m_licensing.outputLicense() ? 0 : -1;
+                returnStatus = m_licensing.outputLicense(config) ? 0 : -1;
                 break;
         }
         VoltDB.exit(returnStatus);

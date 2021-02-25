@@ -86,7 +86,7 @@ public final class CommunityLicensing implements Licensing {
     }
 
     @Override
-    public boolean outputLicense() {
+    public boolean outputLicense(Configuration config) {
         unsupported();
         return false;
     }

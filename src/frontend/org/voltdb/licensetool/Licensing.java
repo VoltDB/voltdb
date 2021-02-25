@@ -37,7 +37,7 @@ public interface Licensing {
     public void stageLicenseFile();
     public boolean validateLicense(int numberOfNodes, DrRoleType replicationRole, StartAction startAction);
     public void checkLicenseConsistency(ZooKeeper zk);
-    public boolean outputLicense();
+    public boolean outputLicense(Configuration config);
     public String isLicenseChangeAllowed(LicenseApi newLicense, LicenseApi currentLicense);
     public void updateLicenseApi(LicenseApi newApi);
     public String getLicenseSummary();
