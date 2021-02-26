@@ -1848,7 +1848,7 @@ public final class TaskManager {
         }
 
         /**
-         * Method which can be overridden to modify the {@code invocation} prior to the transacation being created
+         * Method which can be overridden to modify the {@code invocation} prior to the transaction being created
          *
          * @param procedure  {@link Procedure} which is to be invoked
          * @param invocation {@link StoredProcedureInvocation} describing how to invoke the procedure

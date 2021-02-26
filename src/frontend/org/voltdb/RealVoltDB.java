@@ -30,7 +30,6 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.UnsupportedEncodingException;
@@ -47,7 +46,6 @@ import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.UnrecoverableKeyException;
 import java.security.cert.CertificateException;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -240,7 +238,6 @@ import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Ordering;
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.hash.Hashing;
-import com.google_voltpatches.common.io.Files;
 import com.google_voltpatches.common.net.HostAndPort;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
@@ -2934,8 +2931,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
             // check the start action for the community edition
             if (m_config.m_startAction == StartAction.JOIN) {
-                consoleLog.error("Start action \"" + m_config.m_startAction.name()
-                        + "\" is not supported in the community edition of VoltDB.");
+                consoleLog.error("VoltDB Community Edition does not support adding nodes to a running cluster. "
+                        + "You must stop, reconfigure, and restart the cluster to increase its size.");
                 shutdownAction = true;
             }
 

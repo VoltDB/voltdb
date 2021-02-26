@@ -155,7 +155,7 @@ protected:
     virtual PersistentTable* getTable() const = 0;
 
     /**
-     * Read a string out of in. This does not copy the data but just refers to the data from in
+     * Read a string out of in. This copies the data from in
      */
     static inline NValue readString(SerializeInputBE& in) {
         int32_t length = in.readInt();
@@ -167,7 +167,7 @@ protected:
     }
 
     /**
-     * Read a byte array from in. This does not copy the data but just refers to the data from in
+     * Read a byte array from in. This copies the data from in
      */
     static inline NValue readBytes(SerializeInputBE& in) {
         int32_t length = in.readInt();

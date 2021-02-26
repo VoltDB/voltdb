@@ -74,7 +74,7 @@ PersistentTable* TableFactory::createGroup(const SystemTableFactory &factory) {
 /*
  * Create a table for tracking topics group members equivalent to
  * CREATE TABLE _topics_group_member (group_id VARCHAR(256 BYTES) NOT NULL, id VARCHAR(36 BYTES) NOT NULL,
- *     client_id VARCHAR(256 BYTES) NOT NULL, client_host VARCHAR(36 BYTES) NOT NULL,
+ *     client_id VARCHAR(256 BYTES) NOT NULL, client_host VARCHAR(256 BYTES) NOT NULL,
  *     session_timeout INTEGER NOT NULL, rebalance_timeout INTEGER NOT NULL, instance_id VARCHAR(256 BYTES),
  *     protocol_metadata VARBINARY(1048576) NOT NULL, assignments VARBINARY(1048576) NOT NULL);
  * PARTITION TABLE topics_group_member ON COLUMN group_id;

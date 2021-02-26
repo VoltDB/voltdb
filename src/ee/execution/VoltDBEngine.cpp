@@ -269,7 +269,7 @@ VoltDBEngine::~VoltDBEngine() {
             m_catalogDelegates.erase(eraseThis->first);
         }
 
-        for (auto entry : m_systemTables) {
+        for (auto& entry : m_systemTables) {
             entry.second->decrementRefcount();
         }
         m_systemTables.clear();
@@ -1934,7 +1934,7 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated, bool fromScrat
         getStatsManager().unregisterStatsSource(STATISTICS_SELECTOR_TYPE_TABLE);
         getStatsManager().unregisterStatsSource(STATISTICS_SELECTOR_TYPE_INDEX);
 
-        for (auto entry : m_systemTables) {
+        for (auto& entry : m_systemTables) {
             m_tables[static_cast<CatalogId>(entry.first)] = entry.second;
         }
     }
