@@ -27,7 +27,9 @@ import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
@@ -46,6 +48,8 @@ import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.kafka.common.PartitionInfo;
+import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -125,6 +129,15 @@ public class TopicBenchmark2 {
 
         @Option(desc = "Topic (default " + TEST_TOPIC + ").")
         String topic = TEST_TOPIC;
+
+        @Option(desc = "Subscribe to groups (default true, if false, use topic/partition assignments")
+        boolean subscribe = true;
+
+        // usegroupids == true means use explicit group ids, otherwise create groupless consumers with explicit assignments.
+        // Transient group members are not supported because the group does not commit its offsets and any member resuming
+        // will read the same rows over and again. We coud refine this mode by maintaining the offsets in memory for this case.
+        @Option(desc = "Use group ids (default true, if false, subscribe must be false, groups must be 1, and no transient members")
+        boolean usegroupids = true;
 
         @Option(desc = "Comma separated list of servers to connect to (using default volt port).")
         String servers = "localhost";
@@ -230,6 +243,8 @@ public class TopicBenchmark2 {
             if (transientmembers > 1 && maxpollsilence <= 30 )
                 exitWithMessageAndUsage("use a maxpollsilence value > 30s when using transient members (minimum recommended 45s");
             if (varcharsize < 10 || varcharsize > 32768) exitWithMessageAndUsage("varcharsize must be > 10 and < 32768");
+            if (!usegroupids && (subscribe || groups > 1 || transientmembers > 0))
+                exitWithMessageAndUsage("when not using group ids, subscribe must be false, groups must be 1 and no transient members");
 
             try {
                 m_verification = Verification.valueOf(verification.toUpperCase());
@@ -442,15 +457,17 @@ public class TopicBenchmark2 {
     KafkaConsumer<Long, Object> getConsumer(String groupName) {
         String sessionTimeout = Long.toString(TimeUnit.SECONDS.toMillis(m_config.sessiontimeout));
         Properties props = new Properties();
-        props.put(ConsumerConfig.GROUP_ID_CONFIG, groupName);
+        if (groupName != null) {
+            props.put(ConsumerConfig.GROUP_ID_CONFIG, groupName);
+            // Use a short rebalance timeout (default is 5 minutes)
+            // Rebalance timeout only configurable via poll interval?
+            props.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, "10000");
+        }
+        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, m_brokers);
         // Ensure polling from beginning
-        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         // Use volt max buffer size of 2MB
         props.put(ConsumerConfig.MAX_PARTITION_FETCH_BYTES_CONFIG, "2097152");
-        // Use a short rebalance timeout (default is 5 minutes)
-        // Rebalance timeout only configurable via poll interval?
-        props.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, "10000");
         props.put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, sessionTimeout);
 
         if (m_config.staticmembers) {
@@ -472,7 +489,7 @@ public class TopicBenchmark2 {
             props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         }
 
-        if (m_createdGroups.add(groupName)) {
+        if (groupName != null && m_createdGroups.add(groupName)) {
             log.info("Joining group " + groupName + ", config = " + props);
         }
         return new KafkaConsumer<Long, Object>(props);
@@ -490,9 +507,14 @@ public class TopicBenchmark2 {
      * @param groupCount        the group count of polled records
      * @param groupVerifier     group verifier or {@code null} if no verification
      * @param maxDurationMs     max duration of this reader in milliseconds or {@code null} if unlimited
+     * @param assigmnents       list of {@link TopicPartition} assigned to this group member
+     *                          or {@code null} if using subscribe
+     *
      * @return {@code true} if polling completed (or in error), {@code false} if polling should be resumed
      */
-    boolean doReads(int id, long maxCount, AtomicLong groupCount, BaseVerifier groupVerifier, Long maxDurationMs) {
+    boolean doReads(int id, long maxCount, AtomicLong groupCount, BaseVerifier groupVerifier, Long maxDurationMs,
+            List<TopicPartition> assignments) {
+
         String groupId = m_config.groupprefix + "-" + id;
         long thId = Thread.currentThread().getId();
 
@@ -510,8 +532,16 @@ public class TopicBenchmark2 {
         long polledCount = 0;
         long lastLogged = 0;
         try {
-            try (KafkaConsumer<Long, Object> consumer = getConsumer(groupId)) {
-                consumer.subscribe(ImmutableList.of(m_config.topic));
+            try (KafkaConsumer<Long, Object> consumer = getConsumer(m_config.usegroupids ? groupId : null)) {
+                if (assignments == null) {
+                    // Subscribe for automatic assignments
+                    consumer.subscribe(ImmutableList.of(m_config.topic));
+                }
+                else {
+                    // Assign topic/partitions
+                    consumer.assign(assignments);
+                }
+
                 while (true) {
                     // Poll records
                     ConsumerRecords<Long, Object> records = consumer.poll(Duration.ofSeconds(1));
@@ -723,6 +753,7 @@ public class TopicBenchmark2 {
                     + " groups to topic " + m_config.topic + ", no groups verifying");
         }
 
+        List<TopicPartition> topicPartitions = getTopicPartitions();
         ArrayList<Thread> readers = new ArrayList<>();
         for (int i = 0; i < m_config.groups; i++) {
 
@@ -735,18 +766,25 @@ public class TopicBenchmark2 {
                 log.info("Subscriber group: " + groupId + " using transient members: " + transients);
             }
 
+            if (topicPartitions != null) {
+                // Shuffle manual assignments for each group
+                Collections.shuffle(topicPartitions);
+            }
+
             final BaseVerifier groupVerifier = verifies ? new LargeVerifier(maxCount) : null;
             final AtomicLong groupCount = new AtomicLong(0);
 
             for (int j = 0; j <  m_config.groupmembers; j++) {
                 final Long transientDurationMs = transients.get(j);
+                final List<TopicPartition> assignments = getTopicPartitionAssignments(topicPartitions, i, j, m_config.groupmembers);
+
                 readers.add(new Thread(new Runnable() {
                     @Override
                     public void run() {
                         // Permanent group members will do one loop, transient group
                         // members may iterate
                         while (!doReads(groupId, maxCount, groupCount, groupVerifier,
-                                transientDurationMs)) {
+                                transientDurationMs, assignments)) {
 
                             if (!isPollResumed(groupId, maxCount, groupCount)) {
                                 break;
@@ -758,6 +796,70 @@ public class TopicBenchmark2 {
         }
         readers.forEach(t -> t.start());
         return readers;
+    }
+
+    /**
+     * @return the list of {@link TopicPartition} for the tested topic, or {@code null} if using subscribe
+     */
+    List<TopicPartition> getTopicPartitions() {
+        if (m_config.subscribe) {
+            return null;
+        }
+        ArrayList<TopicPartition> topicPartitions = new ArrayList<>();
+        try {
+            try (KafkaConsumer<Long, Object> consumer = getConsumer(null)) {
+                List<PartitionInfo> partitionInfos = consumer.partitionsFor(m_config.topic);
+
+                if (partitionInfos.isEmpty()) {
+                    throw new RuntimeException("No partitions for topic " + m_config.topic);
+                }
+                partitionInfos.forEach(pi -> topicPartitions.add(new TopicPartition(pi.topic(), pi.partition())));
+                log.info("Client assigning " + topicPartitions.size() + " partitions: " + topicPartitions);
+            }
+        }
+        catch (Exception e) {
+            exitWithException("Failed to read partitions from topic\n", e, true);
+        }
+        return topicPartitions;
+    }
+
+    /**
+     * Get the list of topic/partitions assigned to this group member, or {@code null} if using subscribe
+     *
+     * @param topicPartitions   list of all {@link TopicPartition}
+     * @param groupId           group identifier
+     * @param memberId          member identifier (index)
+     * @param memberCount       member count in group
+     * @return                  list of assigned {@link TopicPartition} for this group member, or {@code null}
+     */
+    List<TopicPartition> getTopicPartitionAssignments(List<TopicPartition> topicPartitions,
+            int groupId, int memberId, int memberCount) {
+        if (topicPartitions == null) {
+            return null;
+        }
+
+        List<TopicPartition> topicPartitionAssignments = new ArrayList<>();
+        try {
+            int span = topicPartitions.size() / memberCount;
+            if (span == 0) {
+                throw new RuntimeException("Not enough partitions for " + memberCount + " group members");
+            }
+
+            // Spread remainder among members
+            int remainder = topicPartitions.size() % memberCount;
+            if (remainder > 0) {
+                span += 1;
+            }
+            topicPartitionAssignments = topicPartitions.subList(span * memberId,
+                    Math.min(span * (memberId + 1), topicPartitions.size()));
+
+            log.info("Group " + groupId + " member " + memberId + " is assigned "
+                    + topicPartitionAssignments.size() + " partitions: " + topicPartitionAssignments);
+        }
+        catch (Exception e) {
+            exitWithException("Failed to read partitions from topic\n", e, true);
+        }
+        return topicPartitionAssignments;
     }
 
     /**
