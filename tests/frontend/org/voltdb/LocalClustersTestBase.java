@@ -29,6 +29,7 @@ import static org.junit.Assert.assertTrue;
 import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -196,6 +197,7 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
      * @param replicatedTableCount  number of replicated tables to create
      * @throws Exception if an error occurs
      */
+    @Deprecated
     protected void configureClusterAndClient(ClusterConfiguration config, int partitionedTableCount,
             int replicatedTableCount) throws Exception {
         configureClustersAndClients(ImmutableList.of(config), partitionedTableCount, replicatedTableCount);
@@ -215,6 +217,7 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
      * @param replicatedTableCount  number of replicated tables to create
      * @throws Exception if an error occurs
      */
+    @Deprecated
     protected void configureClustersAndClients(List<ClusterConfiguration> configs,
                                                int partitionedTableCount,
                                                int replicatedTableCount) throws Exception {
@@ -222,6 +225,7 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
                 0, ArrayUtils.EMPTY_STRING_ARRAY);
     }
 
+    @Deprecated
     protected void configureClustersAndClients(List<ClusterConfiguration> configs,
                                                int partitionedTableCount,
                                                int replicatedTableCount,
@@ -230,6 +234,7 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
                 0, streamTargets, null);
     }
 
+    @Deprecated
     protected void configureClustersAndClients(List<ClusterConfiguration> configs,
             int partitionedTableCount,
             int replicatedTableCount,
@@ -239,21 +244,58 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
                 topicsCount, streamTargets, null);
     }
 
+    @Deprecated
     protected void configureClustersAndClients(List<ClusterConfiguration> configs,
                                                int partitionedTableCount,
                                                int replicatedTableCount,
                                                int topicsCount,
                                                String[] streamTargets,
                                                ClientConfig clientConfig) throws Exception {
+        configureClustersAndClients(configs, new ClusterSchema().paritionedTables(partitionedTableCount)
+                .replicatedTables(replicatedTableCount).topics(topicsCount).streamTargets(streamTargets),
+                clientConfig);
+    }
+
+    /**
+     * Configure a clusters and corresponding client. A cluster will be created with the results of the constructed
+     * cluster and client are stored in {@link #CLUSTERS_AND_CLIENTS}
+     * <p>
+     * If cluster with {@code config} is already running it will be left running and just the schema will be added to
+     * the running clusters. The creation of clusters can be forced by calling {@link #shutdownAllClustersAndClients()}
+     * prior to calling this method.
+     *
+     * @param config Cluster configuration
+     * @param schema Schema to be created on the clusters
+     * @throws Exception If an error occurs
+     */
+    protected void configureClustersAndClients(List<ClusterConfiguration> configs, ClusterSchema schema)
+            throws Exception {
+        configureClustersAndClients(configs, schema, null);
+    }
+
+    /**
+     * Configure a clusters and corresponding client. A cluster will be created with the results of the constructed
+     * cluster and client are stored in {@link #CLUSTERS_AND_CLIENTS}
+     * <p>
+     * If cluster with {@code config} is already running it will be left running and just the schema will be added to
+     * the running clusters. The creation of clusters can be forced by calling {@link #shutdownAllClustersAndClients()}
+     * prior to calling this method.
+     *
+     * @param config       Cluster configuration
+     * @param schema       Schema to be created on the clusters
+     * @param clientConfig To use when connecting to the clusters
+     * @throws Exception If an error occurs
+     */
+    protected void configureClustersAndClients(List<ClusterConfiguration> configs, ClusterSchema schema,
+            ClientConfig clientConfig) throws Exception {
         if (configs.size() > getMaxClusters()) {
             throw new IllegalArgumentException("Maximum supported clusters is " + getMaxClusters());
         }
 
         if (Objects.equals(CLUSTER_CONFIGURATIONS, configs)) {
-            addSchema(partitionedTableCount, replicatedTableCount, topicsCount, streamTargets);
+            addSchema(schema);
         } else {
-            createClustersAndClientsWithCredentials(configs, partitionedTableCount, replicatedTableCount,
-                    topicsCount, streamTargets, clientConfig);
+            createClustersAndClientsWithCredentials(configs, schema, clientConfig);
         }
     }
 
@@ -345,15 +387,8 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
         return pair.getSecond();
     }
 
-    protected void addSchema(int partitionedTableCount, int replicatedTableCount, String[] streamTargets)
-            throws Exception {
-        addSchema(partitionedTableCount, replicatedTableCount, 0, streamTargets);
-    }
-
-    protected void addSchema(int partitionedTableCount, int replicatedTableCount,
-            int topicsCount, String[] streamTargets)
-            throws Exception {
-        String schemaDDL = createSchemaDDL(partitionedTableCount, replicatedTableCount, topicsCount, streamTargets);
+    protected void addSchema(ClusterSchema schema) throws Exception {
+        String schemaDDL = schema.createSchemaDDL();
 
         if (StringUtils.isNotBlank(schemaDDL)) {
             for (Pair<LocalCluster, Client> clusterAndClient : CLUSTERS_AND_CLIENTS) {
@@ -373,14 +408,10 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
      * @throws Exception
      */
     private void createClustersAndClientsWithCredentials(List<ClusterConfiguration> configs,
-                                                         int partitionedTableCount,
-                                                         int replicatedTableCount,
-                                                         int topicsCount,
-                                                         String[] streamTargets,
+                                                         ClusterSchema schema,
                                                          ClientConfig clientConfig) throws Exception {
         System.out.println("Creating clusters and clients. method: " + m_methodName + " configurations: " + configs
-                + ", partitionedTableCount: " + partitionedTableCount + ", replicatedTableCount: "
-                + replicatedTableCount);
+                + ", " + schema);
 
         shutdownAllClustersAndClients();
 
@@ -394,7 +425,7 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
             DrRoleType drRoleType = config.getDrRole(configs.size());
             try {
                 System.out.println("Creating cluster " + clusterNumber);
-                String schemaDDL = createSchemaDDL(partitionedTableCount, replicatedTableCount, topicsCount, streamTargets);
+                String schemaDDL = schema.createSchemaDDL();
                 lc = LocalCluster.createLocalCluster(schemaDDL, config.siteCount, config.hostCount, config.kfactor,
                         clusterNumber, 11000 + (clusterNumber * 100), clusterNumber == 0 ? 11100 : 11000,
                         m_temporaryFolder.newFolder().getAbsolutePath(), JAR_NAME, drRoleType,
@@ -417,25 +448,6 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
         }
 
         CLUSTER_CONFIGURATIONS.addAll(configs);
-    }
-
-    private String createSchemaDDL(int partitionedTableCount, int replicatedTableCount,
-            int topicsCount, String[] streamTargets) {
-        StringBuffer sb = new StringBuffer();
-        for (int i = 0; i < partitionedTableCount; ++i) {
-            generateTableDDL(i, TableType.PARTITIONED, sb);
-        }
-        for (int i = 0; i < replicatedTableCount; ++i) {
-            generateTableDDL(i, TableType.REPLICATED, sb);
-        }
-        for (int i = 0; i < streamTargets.length; ++i) {
-            generateStreamDDL(streamTargets[i], i, sb);
-        }
-        for (int i = 0; i < topicsCount; ++i) {
-            generateTopicDDL(i, sb);
-        }
-
-        return sb.toString();
     }
 
     protected void generateTableDDL(int tableNum, TableType type, StringBuffer sb) {
@@ -743,6 +755,58 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
         public String toString() {
             return "ClusterConfiguration [siteCount=" + siteCount + ", hostCount=" + hostCount + ", kfactor=" + kfactor
                     + "]";
+        }
+    }
+
+    public class ClusterSchema {
+        int m_partitionedTableCount;
+        int m_replicatedTableCount;
+        int m_topicsCount;
+        String[] m_streamTargets = ArrayUtils.EMPTY_STRING_ARRAY;
+
+        public ClusterSchema paritionedTables(int count) {
+            m_partitionedTableCount = count;
+            return this;
+        }
+
+        public ClusterSchema replicatedTables(int count) {
+            m_replicatedTableCount = count;
+            return this;
+        }
+
+        public ClusterSchema topics(int count) {
+            m_topicsCount = count;
+            return this;
+        }
+
+        public ClusterSchema streamTargets(String... targets) {
+            m_streamTargets = targets;
+            return this;
+        }
+
+        protected String createSchemaDDL() {
+            StringBuffer sb = new StringBuffer();
+            for (int i = 0; i < m_partitionedTableCount; ++i) {
+                generateTableDDL(i, TableType.PARTITIONED, sb);
+            }
+            for (int i = 0; i < m_replicatedTableCount; ++i) {
+                generateTableDDL(i, TableType.REPLICATED, sb);
+            }
+            for (int i = 0; i < m_streamTargets.length; ++i) {
+                generateStreamDDL(m_streamTargets[i], i, sb);
+            }
+            for (int i = 0; i < m_topicsCount; ++i) {
+                generateTopicDDL(i, sb);
+            }
+
+            return sb.toString();
+        }
+
+        @Override
+        public String toString() {
+            return "ClusterSchema [partitionedTableCount=" + m_partitionedTableCount + ", replicatedTableCount="
+                    + m_replicatedTableCount + ", topicsCount=" + m_topicsCount + ", streamTargets="
+                    + Arrays.toString(m_streamTargets) + "]";
         }
     }
 }
