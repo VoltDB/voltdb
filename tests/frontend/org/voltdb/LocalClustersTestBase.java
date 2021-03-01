@@ -227,7 +227,7 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
                                                int replicatedTableCount,
                                                String[] streamTargets) throws Exception {
         configureClustersAndClients(configs, partitionedTableCount, replicatedTableCount,
-                0, streamTargets, "", "");
+                0, streamTargets, null);
     }
 
     protected void configureClustersAndClients(List<ClusterConfiguration> configs,
@@ -236,7 +236,7 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
             int topicsCount,
             String[] streamTargets) throws Exception {
         configureClustersAndClients(configs, partitionedTableCount, replicatedTableCount,
-                topicsCount, streamTargets, "", "");
+                topicsCount, streamTargets, null);
     }
 
     protected void configureClustersAndClients(List<ClusterConfiguration> configs,
@@ -244,20 +244,7 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
                                                int replicatedTableCount,
                                                int topicsCount,
                                                String[] streamTargets,
-                                               String username,
-                                               String password) throws Exception {
-        configureClustersAndClients(configs, partitionedTableCount, replicatedTableCount, topicsCount, streamTargets,
-                username, password, null);
-    }
-
-    protected void configureClustersAndClients(List<ClusterConfiguration> configs,
-            int partitionedTableCount,
-            int replicatedTableCount,
-            int topicsCount,
-            String[] streamTargets,
-            String username,
-            String password,
-            String sslPropsFile) throws Exception {
+                                               ClientConfig clientConfig) throws Exception {
         if (configs.size() > getMaxClusters()) {
             throw new IllegalArgumentException("Maximum supported clusters is " + getMaxClusters());
         }
@@ -266,7 +253,7 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
             addSchema(partitionedTableCount, replicatedTableCount, topicsCount, streamTargets);
         } else {
             createClustersAndClientsWithCredentials(configs, partitionedTableCount, replicatedTableCount,
-                    topicsCount, streamTargets, username, password, sslPropsFile);
+                    topicsCount, streamTargets, clientConfig);
         }
     }
 
@@ -295,14 +282,13 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
     }
 
     protected ClientConfig createClientConfig() {
-        return createClientConfig("", "");
+        return configureClient(new ClientConfig());
     }
 
-    protected ClientConfig createClientConfig(String username, String password) {
-        ClientConfig cc = new ClientConfig(username, password);
-        cc.setProcedureCallTimeout(10 * 60 * 1000); // 10 min
-        cc.setTopologyChangeAware(true);
-        return cc;
+    protected ClientConfig configureClient(ClientConfig clientConfig) {
+        clientConfig.setProcedureCallTimeout(10 * 60 * 1000); // 10 min
+        clientConfig.setTopologyChangeAware(true);
+        return clientConfig;
     }
 
     protected void shutdownCluster(int clusterId) {
@@ -383,8 +369,7 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
      * @param configs               {@link List} of {@link ClusterConfiguration}s. One for each cluster to be created
      * @param partitionedTableCount number of partitioned tables to create
      * @param replicatedTableCount  number of replicated tables to create
-     * @param username              username
-     * @param password              password
+     * @param clientConfig          Used to create client connections to clusters
      * @throws Exception
      */
     private void createClustersAndClientsWithCredentials(List<ClusterConfiguration> configs,
@@ -392,20 +377,14 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
                                                          int replicatedTableCount,
                                                          int topicsCount,
                                                          String[] streamTargets,
-                                                         String username,
-                                                         String password,
-                                                         String sslPropsFile) throws Exception {
+                                                         ClientConfig clientConfig) throws Exception {
         System.out.println("Creating clusters and clients. method: " + m_methodName + " configurations: " + configs
                 + ", partitionedTableCount: " + partitionedTableCount + ", replicatedTableCount: "
                 + replicatedTableCount);
 
         shutdownAllClustersAndClients();
 
-        ClientConfig cc = createClientConfig(username, password);
-        if (sslPropsFile != null) {
-            cc.enableSSL();
-            cc.setTrustStoreConfigFromPropertyFile(sslPropsFile);
-        }
+        clientConfig = configureClient(clientConfig == null ? new ClientConfig() : clientConfig);
 
         int clusterNumber = 0;
         for (ClusterConfiguration config : configs) {
@@ -422,7 +401,7 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
                         false, config.builder, getClass().getSimpleName(), m_methodName, false, ImmutableMap.of());
 
                 System.out.println("Creating client for cluster " + clusterNumber);
-                c = lc.createAdminClient(cc);
+                c = lc.createAdminClient(clientConfig);
             } catch (Throwable t) {
                 shutdown(lc, c);
                 throw t;
