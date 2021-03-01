@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -112,7 +112,6 @@ public class SchemaChangeClient {
     SchemaChangeClient(SchemaChangeConfig config) {
         this.config = config;
         TableHelper.Configuration tableHelperConfig = new TableHelper.Configuration();
-        tableHelperConfig.rand = rand;
         tableHelperConfig.numExtraColumns = addAlternateKey ? 1 : 0;
         // Partitioning is handled here.
         tableHelperConfig.randomPartitioning = TableHelper.RandomPartitioning.CALLER;
@@ -1051,35 +1050,14 @@ public class SchemaChangeClient {
         try {
             cr = client.callProcedure(procName, bytes, null);
             success = true;
-        }
-        catch (NoConnectionsException e) {
-        }
-        catch (ProcCallException e) {
+        } catch (NoConnectionsException e) {
+        } catch (ProcCallException e) {
             log.error(_F("Procedure %s call exception: %s", procName, e.getMessage()));
             cr = e.getClientResponse();
         }
 
-        if (success && cr != null) {
-            switch (cr.getStatus()) {
-                case ClientResponse.SUCCESS:
-                    // hooray!
-                    log.info("Catalog update was reported to be successful");
-                    break;
-                case ClientResponse.CONNECTION_LOST:
-                case ClientResponse.CONNECTION_TIMEOUT:
-                case ClientResponse.RESPONSE_UNKNOWN:
-                case ClientResponse.SERVER_UNAVAILABLE:
-                    // can try again after a break
-                    success = false;
-                    break;
-                case ClientResponse.UNEXPECTED_FAILURE:
-                case ClientResponse.GRACEFUL_FAILURE:
-                case ClientResponse.USER_ABORT:
-                    // should never happen
-                    SchemaChangeUtility.die(false,
-                            "USER_ABORT in procedure call for Catalog update: %s",
-                            ((ClientResponseImpl)cr).toJSONString());
-            }
+        if (success) {
+            success = (checkDDLExecutionResponse(cr) == null);
         }
 
         // Fail hard or allow retries?
@@ -1087,7 +1065,6 @@ public class SchemaChangeClient {
             String msg = (cr != null ? ((ClientResponseImpl)cr).toJSONString() : _F("Unknown %s failure", procName));
             throw new IOException(msg);
         }
-
         return success;
     }
 
@@ -1100,35 +1077,31 @@ public class SchemaChangeClient {
         ClientResponse cr = null;
         try {
             cr = client.callProcedure("@AdHoc", ddl);
-        }
-        catch (NoConnectionsException e) {
+        } catch (NoConnectionsException e) {
             error = e.getLocalizedMessage();
-        }
-        catch (ProcCallException e) {
+        } catch (ProcCallException e) {
             error = _F("Procedure @AdHoc call exception: %s", e.getLocalizedMessage());
             cr = e.getClientResponse();
         }
+        return error != null ? error : checkDDLExecutionResponse(cr);
+    }
 
-        if (error == null && cr != null) {
-            switch (cr.getStatus()) {
-                case ClientResponse.SUCCESS:
-                    // hooray!
-                    log.info("Live DDL execution was reported to be successful");
-                    break;
-                case ClientResponse.CONNECTION_LOST:
-                case ClientResponse.CONNECTION_TIMEOUT:
-                case ClientResponse.RESPONSE_UNKNOWN:
-                case ClientResponse.SERVER_UNAVAILABLE:
-                    // can try again after a break
-                    error = String.format("Communication error: %s", cr.getStatusString());
-                    break;
-                case ClientResponse.UNEXPECTED_FAILURE:
-                case ClientResponse.GRACEFUL_FAILURE:
-                case ClientResponse.USER_ABORT:
-                    // should never happen
-                    SchemaChangeUtility.die(false,
-                            "USER_ABORT in procedure call for live DDL: %s",
-                            ((ClientResponseImpl)cr).toJSONString());
+    private static String checkDDLExecutionResponse(ClientResponse response) {
+        String error = null;
+        if (response != null) {
+            switch (response.getStatus()) {
+            case ClientResponse.SUCCESS:
+                log.info("Live DDL execution was reported to be successful");
+                break;
+            case ClientResponse.CONNECTION_LOST:
+            case ClientResponse.CONNECTION_TIMEOUT:
+            case ClientResponse.RESPONSE_UNKNOWN:
+            case ClientResponse.SERVER_UNAVAILABLE:
+                error = String.format("Communication error: %s", response.getStatusString());
+                break;
+            default:
+                error = String.format("Unexpected error: %s", ((ClientResponseImpl)response).toJSONString());
+                SchemaChangeUtility.die(false, error);
             }
         }
         return error;
