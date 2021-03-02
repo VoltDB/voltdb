@@ -26,17 +26,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.zip.CRC32;
 
 import org.apache.commons.lang3.StringUtils;
+
 import com.google.common.collect.ImmutableMap;
 
 public class PBDUtils {
-
-    /**
-     *  The amount of time a segment can be left open for writing as a topic property in deployment
-     *  Acceptable limit qualifiers (case insensitive):
-     *  "mn" (minutes), "hr" (hours), "dy" (days), "wk" (weeks), "mo" (months), "yr" (years)
-     */
-    public final static String TOPIC_SEGMENT_ROLL_TIME = "topic.segment.roll.time";
-
     public static class ConfigurationException extends Exception {
         private static final long serialVersionUID = 1L;
         ConfigurationException() { super(); }
@@ -116,7 +109,6 @@ public class PBDUtils {
      * @return time in millisecond
      * @throws ConfigurationException
      */
-
     public static long parseTimeValue(String limitStr) throws ConfigurationException {
         return parseLimit(limitStr, s_timeLimitConverter);
     }

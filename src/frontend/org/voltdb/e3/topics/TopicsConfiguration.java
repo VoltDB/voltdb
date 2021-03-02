@@ -93,7 +93,7 @@ public class TopicsConfiguration extends TypedPropertiesBase<TopicsConfiguration
         public static final Entry<Long> COMPACTION_BUFFER_SIZE = new Entry<>("log.cleaner.dedupe.buffer.size",
                 Long.class, 134_217_728L, Entry::mustBePositive);
 
-        public static final Entry<Long> TOPIC_SEGMENT_ROLL_TIME = new SegmentRollTimeEntry(PBDUtils.TOPIC_SEGMENT_ROLL_TIME, TimeUnit.DAYS.toNanos(7));
+        public static final Entry<Long> TOPIC_SEGMENT_ROLL_TIME = new SegmentRollTimeEntry();
 
         private Entry(String propertyName, Class<T> clazz) {
             this(propertyName, clazz, null);
@@ -110,9 +110,12 @@ public class TopicsConfiguration extends TypedPropertiesBase<TopicsConfiguration
         }
     }
 
+    /**
+     * Uses {@link PBDUtils#parseTimeValue(String)} to parse the time configuration value
+     */
     private static class SegmentRollTimeEntry extends Entry<Long> {
-        SegmentRollTimeEntry(String propertyName, Long defValue) {
-            super(propertyName, null, defValue);
+        SegmentRollTimeEntry() {
+            super("log.roll.time", null, TimeUnit.DAYS.toNanos(7));
         }
 
         @Override
