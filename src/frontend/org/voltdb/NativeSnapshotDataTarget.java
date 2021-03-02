@@ -42,7 +42,7 @@ public abstract class NativeSnapshotDataTarget implements SnapshotDataTarget {
     public static final int SNAPSHOT_SYNC_FREQUENCY = Integer.getInteger("SNAPSHOT_SYNC_FREQUENCY", 500);
     public static final int SNAPSHOT_FADVISE_BYTES = Integer.getInteger("SNAPSHOT_FADVISE_BYTES", 1024 * 1024 * 2);
     private static final boolean s_enableDirectIoSnapshots = Boolean
-            .parseBoolean(System.getProperty("SNAPSHOT_DIRECT_IO", Boolean.TRUE.toString()));
+            .parseBoolean(System.getProperty("SNAPSHOT_DIRECT_IO", Boolean.FALSE.toString()));
     private static volatile boolean s_enforceSnapshotRatelimit = true;
     private static final UnsynchronizedRateLimiter s_snapshotRatelimiter;
 
