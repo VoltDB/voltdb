@@ -729,6 +729,11 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         void createSystemTables();
 
+        /*
+         * If a table is in the replicable tables map update the pointer to point to table
+         */
+        void updateReplicableTablePointer(int64_t hash, PersistentTable* table);
+
         // -------------------------------------------------
         // Data Members
         // -------------------------------------------------

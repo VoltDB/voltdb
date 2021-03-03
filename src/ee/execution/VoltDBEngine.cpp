@@ -1978,6 +1978,25 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated, bool fromScrat
         if (persistentTable) {
             stats = persistentTable->getTableStats();
 
+            if (!fromScratch && persistentTable->isDREnabled() && !tcd->materialized()) {
+                // If the tables aren't from scratch make sure to update any replicable table pointers
+                // When from scratch the caller should set the pointers by calling setReplicableTables()
+                int64_t hash = tcd->signatureHashAsLong();
+                if (catTable->isreplicated()) {
+                    if (updateReplicated) {
+                        ExecuteWithAllSitesMemory execAllSites;
+                        for (auto engineIt : execAllSites) {
+                            EngineLocals& curr = engineIt.second;
+                            VoltDBEngine* currEngine = curr.context->getContextEngine();
+                            SynchronizedThreadLock::assumeSpecificSiteContext(curr);
+                            currEngine->updateReplicableTablePointer(hash, persistentTable);
+                        }
+                    }
+                } else if (!updateReplicated) {
+                    updateReplicableTablePointer(hash, persistentTable);
+                }
+            }
+
             // add all of the indexes to the stats source
             std::vector<TableIndex*> const& tindexes = persistentTable->allIndexes();
             if (catTable->isreplicated()) {
@@ -2033,6 +2052,15 @@ void VoltDBEngine::rebuildTableCollections(bool updateReplicated, bool fromScrat
     }
 
     resetDRConflictStreamedTables();
+}
+
+inline void VoltDBEngine::updateReplicableTablePointer(int64_t hash, PersistentTable* table) {
+    for (auto& replicableTables : m_replicableTables) {
+         auto tableHash = replicableTables.second.find(hash);
+         if (tableHash != replicableTables.second.end()) {
+             tableHash->second = table;
+         }
+     }
 }
 
 void VoltDBEngine::swapDRActions(PersistentTable* table1, PersistentTable* table2) {
