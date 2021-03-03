@@ -136,9 +136,11 @@ class TableCatalogDelegate {
         m_table = tb;
     }
 
-    const std::string& signature() { return m_signature; }
+    const std::string& signature() const { return m_signature; }
 
-    const char* signatureHash() { return m_signatureHash; }
+    const char* signatureHash() const { return m_signatureHash; }
+
+    int64_t signatureHashAsLong() const { return *reinterpret_cast<const int64_t*>(signatureHash()); }
 
     /*
      * Returns true if this table is a materialized view

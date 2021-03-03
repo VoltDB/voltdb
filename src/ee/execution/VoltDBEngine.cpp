@@ -2041,8 +2041,8 @@ void VoltDBEngine::swapDRActions(PersistentTable* table1, PersistentTable* table
     vassert(!tcd1->materialized());
     vassert(!tcd2->materialized());
     // Point the Map from signature hash point to the correct persistent tables
-    int64_t hash1 = *reinterpret_cast<const int64_t*>(tcd1->signatureHash());
-    int64_t hash2 = *reinterpret_cast<const int64_t*>(tcd2->signatureHash());
+    int64_t hash1 = tcd1->signatureHashAsLong();
+    int64_t hash2 = tcd2->signatureHashAsLong();
     // Most swap action is already done.
     // But hash(tcd1) is still pointing to old persistent table1, which is now table2.
     for (auto& entry : m_replicableTables) {
@@ -3187,7 +3187,7 @@ int32_t VoltDBEngine::setReplicableTables(int32_t clusterId, const std::vector<s
                 continue;
             }
 
-            int64_t hash = *reinterpret_cast<const int64_t*>(delegate->signatureHash());
+            int64_t hash = delegate->signatureHashAsLong();
             tablesByHash[hash] = table;
         }
 
