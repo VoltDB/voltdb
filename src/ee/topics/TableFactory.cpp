@@ -38,7 +38,9 @@ const std::string GroupOffsetTable::indexName = GroupOffsetTable::name + "_pkey"
 class GroupTableStandalonePredicate : public AbstractExpression {
     NValue eval(const TableTuple* tuple, const TableTuple* unused = nullptr) const override {
         NValue protocol = tuple->getNValue(static_cast<int32_t>(GroupTable::Column::PROTOCOL));
-        return protocol.isNull() ? NValue::getTrue() : NValue::getFalse();
+        int32_t length;
+        ValuePeeker::peekObject_withoutNull(protocol, &length);
+        return length == 0 ? NValue::getTrue() : NValue::getFalse();
     }
 
     std::string debugInfo(const std::string &spacer) const override {
@@ -57,7 +59,7 @@ PersistentTable* TableFactory::createGroup(const SystemTableFactory &factory) {
     std::vector<ValueType> columnTypes = { ValueType::tVARCHAR, ValueType::tTIMESTAMP, ValueType::tINTEGER,
             ValueType::tVARCHAR, ValueType::tVARCHAR };
     std::vector<int32_t> columnSizes = { 256, 0, 0, 36, 256 };
-    std::vector<bool> allowNull = { false, false, false, true, true };
+    std::vector<bool> allowNull = { false, false, false, true, false };
     std::vector<bool> columnInBytes = { true, false, false, true, true };
 
     TupleSchema *schema = TupleSchema::createTupleSchema(columnTypes, columnSizes, allowNull, columnInBytes);

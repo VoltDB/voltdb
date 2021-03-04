@@ -777,6 +777,10 @@ public class TopicBenchmark2 {
             for (int j = 0; j <  m_config.groupmembers; j++) {
                 final Long transientDurationMs = transients.get(j);
                 final List<TopicPartition> assignments = getTopicPartitionAssignments(topicPartitions, i, j, m_config.groupmembers);
+                if (assignments != null && assignments.isEmpty()) {
+                    // No partitions assigned to this member
+                    continue;
+                }
 
                 readers.add(new Thread(new Runnable() {
                     @Override
@@ -840,21 +844,30 @@ public class TopicBenchmark2 {
 
         List<TopicPartition> topicPartitionAssignments = new ArrayList<>();
         try {
+            // Calculate the sublist, spreading remainder among members
             int span = topicPartitions.size() / memberCount;
-            if (span == 0) {
-                throw new RuntimeException("Not enough partitions for " + memberCount + " group members");
-            }
-
-            // Spread remainder among members
             int remainder = topicPartitions.size() % memberCount;
-            if (remainder > 0) {
-                span += 1;
+            int fromIndex = 0;
+            for (int i = 0; i < memberId; i++) {
+                fromIndex += span;
+                if (remainder > 0 && i < remainder) {
+                    fromIndex += 1;
+                }
             }
-            topicPartitionAssignments = topicPartitions.subList(span * memberId,
-                    Math.min(span * (memberId + 1), topicPartitions.size()));
+            int toIndex = fromIndex + span;
+            if (remainder > 0 && memberId < remainder) {
+                toIndex += 1;
+            }
 
-            log.info("Group " + groupId + " member " + memberId + " is assigned "
-                    + topicPartitionAssignments.size() + " partitions: " + topicPartitionAssignments);
+            if (fromIndex == toIndex) {
+                log.info("Group " + groupId + " member " + memberId + " has no partitions assigned ");
+            }
+            else {
+                topicPartitionAssignments = topicPartitions.subList(fromIndex,
+                    Math.min(toIndex, topicPartitions.size()));
+                log.info("Group " + groupId + " member " + memberId + " is assigned "
+                        + topicPartitionAssignments.size() + " partitions: " + topicPartitionAssignments);
+            }
         }
         catch (Exception e) {
             exitWithException("Failed to read partitions from topic\n", e, true);

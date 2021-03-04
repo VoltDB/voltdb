@@ -131,7 +131,8 @@ TEST_F(GroupOrmTest, GroupStandaloneInsert) {
 
     EXPECT_EQ(0, getGroupTable()->activeTupleCount());
 
-    upsertGroup(groupId, 1, 2, ValueFactory::getNullStringValue(), ValueFactory::getNullStringValue());
+    // For standalone group use an empty protocol (not null)
+    upsertGroup(groupId, 1, 2, ValueFactory::getNullStringValue(), ValueFactory::getTempStringValue(""));
     EXPECT_EQ(1, getGroupTable()->activeTupleCount());
     ASSERT_EQ(1, getGroupTable()->index(GroupTable::standaloneGroupIndexName)->getSize());
 
@@ -181,7 +182,7 @@ TEST_F(GroupOrmTest, GroupUpdate) {
 
     // Convert to standalone group and back
     EXPECT_EQ(0, getGroupTable()->index(GroupTable::standaloneGroupIndexName)->getSize());
-    upsertGroup(groupId, timestamp, generationId, leader, ValueFactory::getNullStringValue());
+    upsertGroup(groupId, timestamp, generationId, leader, ValueFactory::getTempStringValue(""));
     EXPECT_EQ(1, getGroupTable()->activeTupleCount());
     EXPECT_EQ(1, getGroupTable()->index(GroupTable::standaloneGroupIndexName)->getSize());
 
@@ -203,7 +204,7 @@ TEST_F(GroupOrmTest, GroupDelete) {
 
     upsertGroup(groupId1, 1, 2, leader, protocol);
     // Create standalone group
-    upsertGroup(groupId2, 1, 2, ValueFactory::getNullStringValue(), ValueFactory::getNullStringValue());
+    upsertGroup(groupId2, 1, 2, ValueFactory::getNullStringValue(), ValueFactory::getTempStringValue(""));
 
     // Delete standalone group
     EXPECT_EQ(1, getGroupTable()->index(GroupTable::standaloneGroupIndexName)->getSize());

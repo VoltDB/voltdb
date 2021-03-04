@@ -220,7 +220,7 @@ TEST_F(GroupStoreTest, CommitOffsets) {
     CommitOffsets offsets;
 
     {
-        Group group(m_groupStore, groupId, 1000, 5, ValueFactory::getNullStringValue(), ValueFactory::getNullStringValue());
+        Group group(m_groupStore, groupId, 1000, 5, ValueFactory::getNullStringValue(), ValueFactory::getTempStringValue("protocol"));
         upsertGroup(group);
     }
 
@@ -261,7 +261,7 @@ TEST_F(GroupStoreTest, FetchOffsets) {
     CommitOffsets offsets;
 
     {
-        Group group(m_groupStore, groupId, 1000, 5, ValueFactory::getNullStringValue(), ValueFactory::getNullStringValue());
+        Group group(m_groupStore, groupId, 1000, 5, ValueFactory::getNullStringValue(), ValueFactory::getTempStringValue("protocol"));
         upsertGroup(group);
     }
 
@@ -522,7 +522,7 @@ TEST_F(GroupStoreTest, BadMessages) {
 
     NValue groupId = ValueFactory::getTempStringValue("groupId");
     {
-        Group group(m_groupStore, groupId, 1000, 5, ValueFactory::getNullStringValue(), ValueFactory::getNullStringValue());
+        Group group(m_groupStore, groupId, 1000, 5, ValueFactory::getNullStringValue(), ValueFactory::getTempStringValue("protocol"));
         upsertGroup(group);
     }
 
@@ -558,8 +558,9 @@ TEST_F(GroupStoreTest, DeleteExpiredOffsets) {
             ValueFactory::getTempStringValue("protocol"));
     upsertGroup(regular);
 
+    // For standalone group use an empty protocol (not null)
     Group standalone(m_groupStore, standaloneGroupId, 1, 2, ValueFactory::getNullStringValue(),
-            ValueFactory::getNullStringValue());
+            ValueFactory::getTempStringValue(""));
     upsertGroup(standalone);
 
     std::vector<NValue> topics = { ValueFactory::getTempStringValue("topic1"), ValueFactory::getTempStringValue(
