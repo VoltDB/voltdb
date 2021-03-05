@@ -22,6 +22,8 @@
  */
 package topicbenchmark2;
 
+import static org.voltdb.e3.topics.TopicsGateway.LOG;
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
@@ -29,6 +31,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -61,6 +64,7 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.serialization.LongDeserializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
+import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
@@ -104,6 +108,9 @@ public class TopicBenchmark2 {
 
     AtomicLong m_rowId = new AtomicLong(0);
     AtomicLong m_successfulInserts = new AtomicLong(0);
+
+    // This variable to tell non-verifying groups to stop polling
+    AtomicLong m_maxInserts = new AtomicLong(Long.MAX_VALUE);
 
     /*
          guard against permanent errors i.e. we define a number of consecutive errors after which we'd bail out of the producer
@@ -220,7 +227,10 @@ public class TopicBenchmark2 {
         String verification = "ALL";
 
         @Option(desc = "Maximum number of consecutive failed producer calls (inserts) before bailing out (default 1000)")
-        long maxfailedinserts = 1000;
+        long maxfailedinserts = Long.MAX_VALUE;
+
+        @Option(desc = "Log error suppression interval, in seconds (default 10).")
+        int logsuppression = 10;
 
         @Override
         public void validate() {
@@ -245,6 +255,7 @@ public class TopicBenchmark2 {
             if (varcharsize < 10 || varcharsize > 32768) exitWithMessageAndUsage("varcharsize must be > 10 and < 32768");
             if (!usegroupids && (subscribe || groups > 1 || transientmembers > 0))
                 exitWithMessageAndUsage("when not using group ids, subscribe must be false, groups must be 1 and no transient members");
+            if (logsuppression <= 0) exitWithMessageAndUsage("logsuppression must be > 0");
 
             try {
                 m_verification = Verification.valueOf(verification.toUpperCase());
@@ -555,10 +566,7 @@ public class TopicBenchmark2 {
                     long elapsed = thisPollTime - lastPollTime;
 
                     // Decide if polling continues
-                    if (m_failedInserts.get() != 0) {
-                        return true;
-                    }
-                    else if (records.count() > 0) {
+                    if (records.count() > 0) {
                         lastPollTime = thisPollTime;
                         polledCount += records.count();
                         lastGroupCount = groupCount.addAndGet(records.count());
@@ -598,16 +606,16 @@ public class TopicBenchmark2 {
                                 + ", dups = " + groupVerifier.duplicates());
                             }
                         }
-                        else if (lastGroupCount >= maxCount) {
-                            // Non-verifying group is done
-                            log.info("Group " + groupId + " thread " + thId + ", polled = " + lastGroupCount);
+                        else if (lastGroupCount >= maxCount || lastGroupCount >= m_maxInserts.get()) {
+                            // Non-verifying group is done - last thread that polled data reports
+                            log.info("Non-verifying group " + groupId + " exiting, polled = " + lastGroupCount);
                             return true;
                         }
                     }
                     else {
                         // No records
                         long gc = groupCount.get();
-                        if (groupVerifier == null && gc >= maxCount) {
+                        if (groupVerifier == null && (gc >= maxCount || gc >= m_maxInserts.get())) {
                             // Non-verifying group is done
                             return true;
                         }
@@ -646,16 +654,16 @@ public class TopicBenchmark2 {
 
     /**
      * Inserts values into the topic: all values have identical sizes
-     *
-     * @throws InterruptedException
-     * @throws NoConnectionsException
      */
     @SuppressWarnings("unchecked")
     void doInserts() {
         long thId = Thread.currentThread().getId();
         RateLimiter rateLimiter = m_config.insertrate > 0 ? RateLimiter.create(m_config.insertrate) : null;
-        long inserts = 0;
+
         AtomicLong completed = new AtomicLong(0);
+        List<Long> failedRowIds = Collections.synchronizedList(new LinkedList<Long>());
+        long rowIdCount = 0;
+
         try {
             Properties props = new Properties();
             props.put("bootstrap.servers", m_brokers);
@@ -674,49 +682,71 @@ public class TopicBenchmark2 {
             }
             KafkaProducer producer = new KafkaProducer(props);
 
-            // Insert records until we've reached the configured count
-            while (inserts < m_config.count) {
+            // Insert records until we've reached the configured count of SUCCESSFUL insertions
+            while (true) {
                 if (rateLimiter != null) {
                     rateLimiter.acquire();
                 }
                 final long start = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
 
-                ProducerRecord<Long, Object> record = null;
-                if (m_config.useavro) {
-                    record = new ProducerRecord<Long, Object>(m_config.topic, m_rowId.getAndIncrement(), m_avroRecord);
+                // Choose the next rowId to produce (may retry failed rowId), or bail, or wait for more completions
+                Long nextRowId = failedRowIds.isEmpty() ? null : failedRowIds.remove(0);
+                if (nextRowId == null) {
+                    long completedNow = completed.get();
+                    if (completedNow == m_config.count) {
+                        log.info("Producer thread " + thId + " completed " + completedNow + " records");
+                        break;
+                    }
+                    else if (rowIdCount == m_config.count) {
+                        // Done, don't produce more than configured, wait for next completions
+                        continue;
+                    }
+                    nextRowId = m_rowId.getAndIncrement();
+                    rowIdCount++;
                 }
                 else {
-                    record = new ProducerRecord<Long, Object>(m_config.topic, m_rowId.getAndIncrement(), m_varChar);
+                    m_failedInserts.decrementAndGet();
                 }
+
+                // Produce record with selected rowId (may re-send a record that previously failed)
+                ProducerRecord<Long, Object> record = null;
+                if (m_config.useavro) {
+                    record = new ProducerRecord<Long, Object>(m_config.topic, nextRowId, m_avroRecord);
+                }
+                else {
+                    record = new ProducerRecord<Long, Object>(m_config.topic, nextRowId, m_varChar);
+                }
+                final Long recordKey = nextRowId;
                 producer.send(record,
                         new Callback() {
                     @Override
                     public void onCompletion(RecordMetadata metadata, Exception e) {
-                        long completedNow = completed.incrementAndGet();
                         long end = TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
                         long elapsedSecs = TimeUnit.MILLISECONDS.toSeconds(end - start);
                         if(e != null) {
-                            log.error("Producer thread " + thId + " failed insert after " + elapsedSecs + " seconds: " + e.getMessage());
+                            // Failed record, add rowId for retry
+                            log.rateLimitedLog(m_config.logsuppression, Level.ERROR, null,
+                                    String.format("Producer thread %d failed inserting: %s",
+                                            thId, e.getMessage()));
+
+                            failedRowIds.add(recordKey);
                             m_failedInserts.incrementAndGet();
                             m_failedConsecutiveInserts.incrementAndGet(); // accumlate failure and check if over the bail out limit
                             if (m_failedConsecutiveInserts.longValue() > m_config.maxfailedinserts) {
                                 log.error("Producer thread exceeds consecutive failure limit: " + m_config.maxfailedinserts);
                                 exitWithException("Producer thread " + thId + " failed inserting into topic\n", e, false);
                             }
-
-                        } else {
+                        }
+                        else {
+                            completed.incrementAndGet();
                             m_successfulInserts.incrementAndGet();
                             m_failedConsecutiveInserts.set(0); // had a successful insert, reset error counter
                             if (elapsedSecs > m_config.insertwarnthreshold) {
                                 log.warn("Producer thread " + thId + " completed insert after " + elapsedSecs + " seconds");
                             }
                         }
-                        if (completedNow == m_config.count) {
-                            log.info("Producer thread " + thId + " completed " + completedNow + " records");
-                        }
                     }
                 });
-                ++inserts;
             }
             producer.close();
         }
@@ -983,12 +1013,15 @@ public class TopicBenchmark2 {
                     log.info("TUPLE_COUNT did not settle in 10 minutes");
                 }
             }
+
+            // Set the max inserts to limit non-verifier polling
+            m_maxInserts.set(m_successfulInserts.get());
         }
         if (m_client != null) {
             m_client.close();
         }
 
-        if (readers != null && m_failedInserts.get() == 0) {
+        if (readers != null) {
             readers.forEach(t -> {
                 try {
                     t.join();
