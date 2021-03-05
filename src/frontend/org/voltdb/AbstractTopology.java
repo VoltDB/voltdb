@@ -1133,16 +1133,30 @@ public class AbstractTopology {
     private static AbstractTopology mutateRestorePartitionsForRecovery(AbstractTopology topology,
             Map<Integer, HostInfo> hostInfos, Set<Integer> missingHosts) {
         Map<Set<Integer>, List<Integer>> restoredPartitionsByHosts = Maps.newHashMap();
+        List<Integer> partitionsRestored = Lists.newArrayList();
+        Boolean[] sphValid = {true};
         hostInfos.forEach((k, v) -> {
             Set<Integer> partitions = v.getRecoveredPartitions();
-            if (!partitions.isEmpty()) {
+            if (partitions.size() != topology.m_sitesPerHost) {
+                sphValid[0] = false;
+            } else {
                 restoredPartitionsByHosts.computeIfAbsent(partitions, p -> new ArrayList<>()).add(k);
+                partitionsRestored.addAll(partitions);
             }
         });
 
-        if (restoredPartitionsByHosts.isEmpty()) {
+        // Do not restore partition assignments if there are nodes without or kfactor + 1 restored partitions
+        if (restoredPartitionsByHosts.isEmpty() || !sphValid[0]) {
             return topology;
         }
+
+        //All partitions must have exact kfactor + 1 replicas
+        boolean kfactorCheck = topology.partitionsById.values().stream().anyMatch(p->
+                Collections.frequency(partitionsRestored, p.id) != (topology.m_replicationFactor + 1));
+        if (kfactorCheck) {
+            return topology;
+        }
+
         Map<Integer, Partition> allPartitions = Maps.newHashMap(topology.partitionsById);
         Map<Integer, Host> hostsById = new TreeMap<>(topology.hostsById);
         for (Map.Entry<Set<Integer>, List<Integer>> entry : restoredPartitionsByHosts.entrySet()) {
@@ -1164,6 +1178,11 @@ public class AbstractTopology {
 
             // all the partitions are on the right hosts or no matching layout found
             if (!restoredHosts.isEmpty() && !matchedHosts.isEmpty()) {
+
+                // exchange partition assignments, one to one.
+                if (restoredHosts.size() != matchedHosts.size()) {
+                    return topology;
+                }
                 // found matching hosts, let us swap
                 for(int i = 0; i < restoredHosts.size(); i++) {
                     Host restoredHost = hostsById.get(restoredHosts.get(i));
