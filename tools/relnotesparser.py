@@ -23,6 +23,8 @@ from xml.dom.minidom import parse
 relnotes = []
 
 def parsefile(filename):
+    global relnotes
+    relnotes = []
     tree = parse(filename)
     #root = tree.getroot()
     # Look for all the "revision=" attributes
@@ -30,6 +32,7 @@ def parsefile(filename):
     return relnotes
 
 def findattribute(xml,attribute, depth):
+    global relnotes
     if depth > 100:
         print "Exiting at depth " + str(depth)
         exit()
