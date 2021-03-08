@@ -40,12 +40,6 @@ import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
-import java.net.URL;
-import java.security.KeyStore;
-import java.security.KeyStoreException;
-import java.security.NoSuchAlgorithmException;
-import java.security.UnrecoverableKeyException;
-import java.security.cert.CertificateException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -83,10 +77,6 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import javax.net.ssl.KeyManagerFactory;
-import javax.net.ssl.SSLException;
-import javax.net.ssl.TrustManagerFactory;
-
 import org.aeonbits.owner.ConfigFactory;
 import org.apache.cassandra_voltpatches.GCInspector;
 import org.apache.commons.lang3.StringUtils;
@@ -102,8 +92,6 @@ import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
-import org.eclipse.jetty.util.security.Password;
-import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -121,7 +109,6 @@ import org.voltcore.utils.OnDemandBinaryLogger;
 import org.voltcore.utils.Pair;
 import org.voltcore.utils.ShutdownHooks;
 import org.voltcore.utils.VersionChecker;
-import org.voltcore.utils.ssl.SSLConfiguration;
 import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKCountdownLatch;
 import org.voltcore.zk.ZKUtil;
@@ -154,7 +141,6 @@ import org.voltdb.compiler.deploymentfile.KeyOrTrustStoreType;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.SecurityType;
-import org.voltdb.compiler.deploymentfile.SslType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.TopicsType;
 import org.voltdb.dr2.DRConsumerStatsBase;
@@ -244,9 +230,7 @@ import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
-import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.OpenSsl;
-import io.netty.handler.ssl.SslContextBuilder;
 
 /**
  * RealVoltDB initializes global server components, like the messaging
@@ -3078,151 +3062,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         m_isBare = flag;
     }
 
-    //TODO: Is there a better place for this ssl setup work and constant defns
-    private void setupSSL(ReadDeploymentResults readDepl) {
-        SslType sslType = readDepl.deployment.getSsl();
-        m_config.m_sslEnable = m_config.m_sslEnable || (sslType != null && sslType.isEnabled());
-        if (m_config.m_sslEnable) {
-            try {
-                hostLog.info("SSL enabled for HTTP. Please point browser to HTTPS URL.");
-                m_config.m_sslExternal = m_config.m_sslExternal || (sslType != null && sslType.isExternal());
-                m_config.m_sslDR = m_config.m_sslDR || (sslType != null && sslType.isDr());
-                m_config.m_sslInternal = m_config.m_sslInternal || (sslType != null && sslType.isInternal());
-                boolean setSslBuilder = m_config.m_sslExternal || m_config.m_sslDR || m_config.m_sslInternal;
-                setupSslContextCreators(sslType, setSslBuilder);
-                if (m_config.m_sslExternal) {
-                    hostLog.info("SSL enabled for admin and client port. Please enable SSL on client.");
-                }
-                if (m_config.m_sslDR) {
-                    hostLog.info("SSL enabled for DR port. Please enable SSL on consumer clusters' DR connections.");
-                }
-                if (m_config.m_sslInternal) {
-                    hostLog.info("SSL enabled for internal inter-node communication.");
-                }
-                CipherExecutor.SERVER.startup();
-            } catch (Exception e) {
-                VoltDB.crashLocalVoltDB("Unable to configure SSL", true, e);
-            }
-        }
-    }
-
-    private String getResourcePath(String resource) {
-        URL res = this.getClass().getResource(resource);
-        return res == null ? resource : res.getPath();
-    }
-
-    private void setupSslContextCreators(SslType sslType, boolean setSslBuilder) {
-        SslContextFactory sslContextFactory = new SslContextFactory.Server();
-        String keyStorePath = getKeyTrustStoreAttribute("javax.net.ssl.keyStore", sslType.getKeystore(), "path");
-        keyStorePath = null == keyStorePath  ? getResourcePath(Constants.DEFAULT_KEYSTORE_RESOURCE):getResourcePath(keyStorePath);
-        if (keyStorePath == null || keyStorePath.trim().isEmpty()) {
-            throw new IllegalArgumentException("A path for the SSL keystore file was not specified.");
-        }
-        if (! new File(keyStorePath).exists()) {
-            throw new IllegalArgumentException("The specified SSL keystore file " + keyStorePath + " was not found.");
-        }
-        sslContextFactory.setKeyStorePath(keyStorePath);
-
-        String keyStorePassword = getKeyTrustStoreAttribute("javax.net.ssl.keyStorePassword", sslType.getKeystore(), "password");
-        if (null == keyStorePassword) {
-            keyStorePassword = Constants.DEFAULT_KEYSTORE_PASSWD;
-        }
-        sslContextFactory.setKeyStorePassword(keyStorePassword);
-
-        String trustStorePath = getKeyTrustStoreAttribute("javax.net.ssl.trustStore", sslType.getTruststore(), "path");
-        trustStorePath = null == trustStorePath  ? getResourcePath(Constants.DEFAULT_TRUSTSTORE_RESOURCE):getResourcePath(trustStorePath);
-        if (trustStorePath == null || trustStorePath.trim().isEmpty()) {
-            throw new IllegalArgumentException("A path for the SSL truststore file was not specified.");
-        }
-        if (! new File(trustStorePath).exists()) {
-            throw new IllegalArgumentException("The specified SSL truststore file " + trustStorePath + " was not found.");
-        }
-        sslContextFactory.setTrustStorePath(trustStorePath);
-
-        String trustStorePassword = getKeyTrustStoreAttribute("javax.net.ssl.trustStorePassword", sslType.getTruststore(), "password");
-        if (null == trustStorePassword) {
-            trustStorePassword = Constants.DEFAULT_TRUSTSTORE_PASSWD;
-        }
-        sslContextFactory.setTrustStorePassword(trustStorePassword);
-
-        // exclude weak ciphers
-        sslContextFactory.setExcludeCipherSuites(SSLConfiguration.EXCLUDED_CIPHERS.toArray(new String[0]));
-        sslContextFactory.setKeyManagerPassword(keyStorePassword);
-
-        m_config.m_sslContextFactory = sslContextFactory;
-
-        if (setSslBuilder) {
-            KeyManagerFactory keyManagerFactory;
-            try (FileInputStream fis = new FileInputStream(keyStorePath)) {
-                keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
-                KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
-                keyStorePassword = deobfuscateIfNeeded(keyStorePassword);
-                keyStore.load(fis, keyStorePassword.toCharArray());
-                keyManagerFactory.init(keyStore, keyStorePassword.toCharArray());
-            } catch (KeyStoreException | NoSuchAlgorithmException | UnrecoverableKeyException | IOException
-                    | CertificateException e) {
-                throw new IllegalArgumentException("Could not initialize KeyManagerFactory", e);
-            }
-
-            TrustManagerFactory trustManagerFactory;
-            try (FileInputStream fis = new FileInputStream(trustStorePath)) {
-                trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
-                KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
-                trustStorePassword = deobfuscateIfNeeded(trustStorePassword);
-                keyStore.load(fis, trustStorePassword.toCharArray());
-                trustManagerFactory.init(keyStore);
-            } catch (NoSuchAlgorithmException | IOException | KeyStoreException | CertificateException e) {
-                throw new IllegalArgumentException("Could not initialize TrustManagerFactory", e);
-            }
-
-            try {
-                m_config.m_sslServerContext = SslContextBuilder.forServer(keyManagerFactory)
-                        .trustManager(trustManagerFactory).ciphers(null, SSLConfiguration.CIPHER_FILTER)
-                        .clientAuth(ClientAuth.NONE).build();
-                m_config.m_sslClientContext = SslContextBuilder.forClient().trustManager(trustManagerFactory)
-                        .ciphers(null, SSLConfiguration.CIPHER_FILTER).clientAuth(ClientAuth.NONE).build();
-            } catch (SSLException e) {
-                throw new IllegalArgumentException("Could not create SslContexts", e);
-            }
-        }
-    }
-
-    private String deobfuscateIfNeeded(String password) {
-        if (password.startsWith(Password.__OBFUSCATE)) {
-            return Password.deobfuscate(password);
-        }
-        return password;
-    }
-
-    private String getKeyTrustStoreAttribute(String sysPropName, KeyOrTrustStoreType store, String valueType) {
-        String sysProp = System.getProperty(sysPropName, "");
-        String result = null;
-
-        // allow leading/trailing blanks for password, not otherwise
-        if (!sysProp.isEmpty()) {
-            if ("password".equals(valueType)) {
-                result = sysProp;
-            } else {
-                String trimmed = sysProp.trim();
-                if (!trimmed.isEmpty()) {
-                    result = trimmed;
-                }
-            }
-        }
-
-        if (store != null) {
-            String value = "path".equals(valueType) ? store.getPath() : store.getPassword();
-            if (result == null) {
-                result = value;
-            }
-            else if (value != null && !value.equals(result)) {
-                hostLog.info(String.format("System property '%s' overrides deployment-file value", sysPropName));
-            }
-        }
-
-        return result;
-    }
-
     /**
      * Start the voltcore HostMessenger. This joins the node
      * to the existing cluster. In the non rejoin case, this
@@ -3288,7 +3127,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             hmconfig.recoveredPartitions = m_config.m_recoveredPartitions;
         }
         //if SSL needs to be enabled for internal communication, SSL context has to be setup before starting HostMessenger
-        setupSSL(readDepl);
+        SslSetup.setupSSL(m_config, readDepl.deployment);
         if (m_config.m_sslInternal) {
             m_messenger = new org.voltcore.messaging.HostMessenger(hmconfig, this, m_config.m_sslServerContext,
                     m_config.m_sslClientContext);
