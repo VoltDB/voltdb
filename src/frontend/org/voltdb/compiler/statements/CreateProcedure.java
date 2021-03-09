@@ -78,6 +78,7 @@ public abstract class CreateProcedure extends StatementProcessor {
                         "Only one PARTITION clause is allowed for CREATE PROCEDURE.");
                 }
                 if (matcher.group(8) != null) {
+                    // Create DIRECTED as a single partition procedure
                     data = new ProcedurePartitionData(true);
                 } else {
                     data = new ProcedurePartitionData(matcher.group(2), matcher.group(3), matcher.group(4),
