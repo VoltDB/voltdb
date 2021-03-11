@@ -27,6 +27,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import java.io.File;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.util.Collections;
@@ -37,12 +38,17 @@ import org.junit.Test;
 import org.voltdb.AdhocDDLTestBase;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.Configuration;
+import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.CatalogDiffEngine;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.RegressionSuite;
+import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;
 
 public class TestDDLFeatures extends AdhocDDLTestBase {
@@ -50,16 +56,37 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
     String catalogJar = "DDLFeature.jar";
     String pathToCatalog = Configuration.getPathToCatalogForTest("DDLFeature.jar");
     String pathToDeployment = Configuration.getPathToCatalogForTest("DDLFeature.xml");
+    private static String snapshotDir = "/tmp/voltdb/backup/";
 
     VoltProjectBuilder builder = new VoltProjectBuilder();
 
     @Before
     public void setUp() throws Exception
     {
+        // Clean up a snapshot taken if any for unchanged update classes test
+        File dir = new File(snapshotDir);
+        try {
+            if (!dir.exists()) {
+                dir.mkdirs();
+            }
+            else {
+                for (File file : dir.listFiles()) {
+                    file.delete();
+                }
+            }
+        } catch (Exception x) {
+            System.exit(-1);
+        }
+
         final URL url = TestDDLFeatures.class.getResource("fullDDL.sql");
         String schemaPath = URLDecoder.decode(url.getPath(), "UTF-8");
         builder.addSchema(schemaPath);
         builder.setUseDDLSchema(true);
+        builder.configureLogging(VoltDB.Configuration.getPathToCatalogForTest("test-snap"),
+                VoltDB.Configuration.getPathToCatalogForTest("cmdlogd"), false, false, 1, 1, 3);
+        builder.setHTTPDPort(-1);
+        builder.setDrNone();
+        builder.setFlushIntervals(2000, 5000, 5000);
 
         boolean success = builder.compile(pathToCatalog);
         assertTrue(success);
@@ -960,4 +987,31 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
         assertEquals(4, indexedColumnCount("GEO"));
     }
 
+// This test will not pass until the deployment file and the first catalog context's catalog are consistent
+// See ENG-20845
+//    @Test
+//    public void testUpdateClasses() throws Exception {
+//        InMemoryJarfile boom = new InMemoryJarfile();
+//        VoltCompiler comp = new VoltCompiler(false);
+//        comp.addClassToJar(boom, org.voltdb_testprocs.updateclasses.InnerClassesTestProc.class);
+//
+//        InMemoryJarfile startingCatalogJar = VoltDB.instance().getCatalogContext().getCatalogJar();
+//        String serializedCatalogString = CatalogUtil.getSerializedCatalogStringFromJar(startingCatalogJar);
+//        System.out.print(serializedCatalogString);
+//        Catalog startingCatalog = new Catalog();
+//        startingCatalog.execute(serializedCatalogString);
+//
+//        m_client.callProcedure("@SnapshotSave", snapshotDir, "FIRST", 1);
+//        m_client.callProcedure("@UpdateClasses", boom.getFullJarBytes(), null);
+//
+//        InMemoryJarfile lastCatalogJar = VoltDB.instance().getCatalogContext().getCatalogJar();
+//        serializedCatalogString = CatalogUtil.getSerializedCatalogStringFromJar(lastCatalogJar);
+//        System.out.print(serializedCatalogString);
+//        Catalog lastCatalog = new Catalog();
+//        lastCatalog.execute(serializedCatalogString);
+//
+//        CatalogDiffEngine diff = new CatalogDiffEngine(startingCatalog, lastCatalog);
+//        String diffCmds = diff.commands();
+//        assertTrue(diffCmds.isEmpty());
+//    }
 }
