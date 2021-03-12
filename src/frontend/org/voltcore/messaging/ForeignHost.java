@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -57,7 +57,7 @@ public class ForeignHost {
     // a pico-network thread serves for intra-cluster traffic.
     private ImmutableList<Subconnection> m_connections = ImmutableList.of();
     // reference to the first object of the connection list
-    private Subconnection m_firstConn;
+    private final Subconnection m_firstConn;
 
     // Remote site id to sub-connection mapping
     volatile ImmutableMap<Long, Subconnection> m_connByHSIds = ImmutableMap.of();
@@ -69,12 +69,12 @@ public class ForeignHost {
     volatile ImmutableMap<Long, Subconnection> m_connBySpecialHSIds = ImmutableMap.of();
 
     // A counter used to uniformly bind remote site ids to sub-connections (if any)
-    private final AtomicInteger m_nextConnection = new AtomicInteger(0);
-    private final AtomicInteger m_nextConnectionForSpecialHSId = new AtomicInteger(0);
+    private int m_nextConnection = 0;
+    private int m_nextConnectionForSpecialHSId = 0;
 
     // Set the default here for TestMessaging, which currently has no VoltDB instance
     private long m_deadHostTimeout;
-    private AtomicLong m_lastMessageMillis = new AtomicLong(Long.MAX_VALUE);
+    private final AtomicLong m_lastMessageMillis = new AtomicLong(Long.MAX_VALUE);
 
     private final AtomicInteger m_deadReportsCount = new AtomicInteger(0);
     private final AtomicInteger m_connectionStoppingCount = new AtomicInteger(0);
@@ -213,11 +213,10 @@ public class ForeignHost {
             return;
         }
 
-        final HashMap<Subconnection, ArrayList<Long>> destinationsPerConn =
-                new HashMap<Subconnection, ArrayList<Long>>();
+        final HashMap<Subconnection, ArrayList<Long>> destinationsPerConn = new HashMap<>();
         if (m_hasMultiConnections) {
             for (long remoteHsId : destinations) {
-                Subconnection c = null;
+                Subconnection c;
                 // fast path
                 // Negative site id is reserved for special purposes, deal them separately.
                 if (remoteHsId < 0) {
@@ -226,17 +225,12 @@ public class ForeignHost {
                     c = m_connByHSIds.get(remoteHsId);
                 }
                 if (c == null) {
-                    // slow path, invoked when this host sends the first message for the destination
-                    if (remoteHsId < 0) {
-                        c = m_connections.get(m_nextConnectionForSpecialHSId.getAndIncrement() % m_connections.size());
-                    } else {
-                        c = m_connections.get(m_nextConnection.getAndIncrement() % m_connections.size());
-                    }
-                    bindConnection(remoteHsId, c);
+                    // slow path
+                    c = bindConnection(remoteHsId);
                 }
                 ArrayList<Long> bundle = destinationsPerConn.get(c);
                 if (bundle == null) {
-                    bundle = new ArrayList<Long>();
+                    bundle = new ArrayList<>();
                     destinationsPerConn.put(c, bundle);
                 }
                 bundle.add(remoteHsId);
@@ -303,25 +297,27 @@ public class ForeignHost {
         }
     }
 
-    private void bindConnection(Long hsId, Subconnection conn) {
+    private Subconnection bindConnection(Long hsId) {
         synchronized (m_connectionLock) {
+            // Negative site id is reserved for special purposes, deal them separately.
+            Subconnection c;
+            ImmutableMap.Builder<Long, Subconnection> b = ImmutableMap.builder();
             if (hsId < 0) {
-                if (m_connBySpecialHSIds.containsKey(hsId)) {
-                    return;
+                if ((c = m_connBySpecialHSIds.get(hsId)) == null) {
+                    c = m_connections.get(++m_nextConnectionForSpecialHSId % m_connections.size());
+                    m_connBySpecialHSIds = b.putAll(m_connBySpecialHSIds)
+                            .put(hsId, c)
+                            .build();
                 }
-                ImmutableMap.Builder<Long, Subconnection> b = ImmutableMap.builder();
-                m_connBySpecialHSIds = b.putAll(m_connBySpecialHSIds)
-                                         .put(hsId, conn)
-                                         .build();
             } else {
-                if (m_connByHSIds.containsKey(hsId)) {
-                    return;
+                if ((c = m_connByHSIds.get(hsId)) == null) {
+                    c = m_connections.get(++m_nextConnection % m_connections.size());
+                    m_connByHSIds = b.putAll(m_connByHSIds)
+                            .put(hsId, c)
+                            .build();
                 }
-                ImmutableMap.Builder<Long, Subconnection> b = ImmutableMap.builder();
-                m_connByHSIds = b.putAll(m_connByHSIds)
-                                 .put(hsId, conn)
-                                 .build();
             }
+            return c;
         }
     }
 
