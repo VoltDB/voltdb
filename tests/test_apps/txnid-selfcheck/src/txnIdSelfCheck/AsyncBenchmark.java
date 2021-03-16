@@ -146,6 +146,10 @@ public class AsyncBenchmark {
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
 
+        @Option(desc = "Enable/Disable topology awareness, default=true")
+        boolean topologyaware = true;
+
+
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
@@ -199,6 +203,11 @@ public class AsyncBenchmark {
         else {
             clientConfig.setMaxTransactionsPerSecond(config.ratelimit / serverCount);
         }
+
+        if (config.topologyaware) {
+              clientConfig.setTopologyChangeAware(true);
+        }
+
         Client client = ClientFactory.createClient(clientConfig);
 
         return client;
