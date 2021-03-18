@@ -56,6 +56,7 @@ import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.ProClass;
 import org.voltdb.utils.VoltTrace;
 
+import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Sets;
@@ -92,7 +93,7 @@ public class MpScheduler extends Scheduler
     // since that's the first point we can be sure is safely agreed on by all nodes.
     // Let the one we can't be sure about linger here.  See ENG-4211 for more.
     long m_repairLogAwaitingTruncate = TransactionInfoBaseMessage.UNUSED_TRUNC_HANDLE;
-
+    private Object m_lock = new Object();
     MpScheduler(int partitionId, List<Long> buddyHSIds, SiteTaskerQueue taskQueue, int leaderId)
     {
         super(partitionId, taskQueue);
@@ -105,12 +106,26 @@ public class MpScheduler extends Scheduler
         m_leaderMigrationMap = Maps.newHashMap();
     }
 
+    private final Supplier<Long> m_buddySupplier = new Supplier<Long>() {
+        @Override
+        public Long get() {
+            //MP reads can be concurrently executed
+            synchronized(m_lock) {
+                Long buddy = m_buddyHSIds.get(m_nextBuddy);
+                m_nextBuddy = (m_nextBuddy + 1) % m_buddyHSIds.size();
+                return buddy;
+            }
+        }
+    };
+
     // reset buddy Hsid list if local sites decommissioned
-    void updateBuddyHSIds(List<Long> buddyHSIds) {
-        m_buddyHSIds = ImmutableList.<Long>builder().addAll(buddyHSIds).build();
-        // We need at least one available sites on the MPI host
-        assert(m_buddyHSIds.size() > 0);
-        m_nextBuddy = 0;
+    public void updateBuddyHSIds(List<Long> buddyHSIds) {
+        synchronized(m_lock) {
+            m_nextBuddy = 0;
+            m_buddyHSIds = ImmutableList.<Long>builder().addAll(buddyHSIds).build();
+            // We need at least one available sites on the MPI host
+            assert(m_buddyHSIds.size() > 0);
+        }
     }
 
     void setMpRoSitePool(MpRoSitePool sitePool)
@@ -378,7 +393,7 @@ public class MpScheduler extends Scheduler
 
                 task = instantiateNpProcedureTask(m_mailbox, procedureName,
                         m_pendingTasks, mp, involvedPartitionMasters,
-                        m_buddyHSIds.get(m_nextBuddy), false, m_leaderId);
+                        m_buddySupplier, false, m_leaderId);
             }
 
             // if cannot figure out the involved partitions, run it as an MP txn
@@ -393,17 +408,16 @@ public class MpScheduler extends Scheduler
 
             task = instantiateNpProcedureTask(m_mailbox, procedureName,
                     m_pendingTasks, mp, involvedPartitionMasters,
-                    m_buddyHSIds.get(m_nextBuddy), false, m_leaderId);
+                    m_buddySupplier, false, m_leaderId);
         }
 
 
         if (task == null) {
             task = MpProcedureTask.create(m_mailbox, procedureName,
                     m_pendingTasks, mp, m_iv2Masters, m_partitionMasters,
-                    m_buddyHSIds.get(m_nextBuddy), false, m_leaderId, false);
+                    m_buddySupplier, false, m_leaderId, false);
         }
 
-        m_nextBuddy = (m_nextBuddy + 1) % m_buddyHSIds.size();
         m_outstandingTxns.put(task.m_txnState.txnId, task.m_txnState);
         m_pendingTasks.offer(task);
     }
@@ -480,7 +494,7 @@ public class MpScheduler extends Scheduler
 
                 task = instantiateNpProcedureTask(m_mailbox, procedureName,
                         m_pendingTasks, mp, involvedPartitionMasters,
-                        m_buddyHSIds.get(m_nextBuddy), true, m_leaderId);
+                        m_buddySupplier, true, m_leaderId);
             }
 
             // if cannot figure out the involved partitions, run it as an MP txn
@@ -489,10 +503,9 @@ public class MpScheduler extends Scheduler
         if (task == null) {
             task = MpProcedureTask.create(m_mailbox, procedureName,
                     m_pendingTasks, mp, m_iv2Masters, m_partitionMasters,
-                    m_buddyHSIds.get(m_nextBuddy), true, m_leaderId, false);
+                    m_buddySupplier, true, m_leaderId, false);
         }
 
-        m_nextBuddy = (m_nextBuddy + 1) % m_buddyHSIds.size();
         m_outstandingTxns.put(task.m_txnState.txnId, task.m_txnState);
         m_pendingTasks.offer(task);
         if (repairLogger.isDebugEnabled()) {
@@ -652,7 +665,7 @@ public class MpScheduler extends Scheduler
                         MiscUtils.isPro() ? ProClass.HANDLER_LOG : ProClass.HANDLER_IGNORE)
                 .errorHandler(tmLog::error)
                 .useConstructorFor(Mailbox.class, String.class, TransactionTaskQueue.class,
-                        Iv2InitiateTaskMessage.class, Map.class, long.class, boolean.class, int.class);
+                        Iv2InitiateTaskMessage.class, Map.class, Supplier.class, boolean.class, int.class);
     }
 
     /**

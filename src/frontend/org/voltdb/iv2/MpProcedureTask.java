@@ -40,6 +40,7 @@ import org.voltdb.rejoin.TaskLog;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltTrace;
 
+import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.collect.Maps;
 
 /**
@@ -63,23 +64,23 @@ public class MpProcedureTask extends ProcedureTask
     final private MpRestartSequenceGenerator m_restartSeqGenerator;
 
     static MpProcedureTask create(Mailbox mailbox, String procName, TransactionTaskQueue queue,
-            Iv2InitiateTaskMessage msg, List<Long> pInitiators, Map<Integer, Long> partitionMasters, long buddyHSId,
+            Iv2InitiateTaskMessage msg, List<Long> pInitiators, Map<Integer, Long> partitionMasters, Supplier<Long> buddySupplier,
             boolean isRestart, int leaderId, boolean nPartTxn) {
         StoredProcedureInvocation spi = msg.getStoredProcedureInvocation();
         return spi != null && spi.isBatchCall()
                 ? new BatchProcedureTask.MpBatch(mailbox, procName, queue, msg, pInitiators, partitionMasters,
-                        buddyHSId, isRestart, leaderId, nPartTxn)
-                : new MpProcedureTask(mailbox, procName, queue, msg, pInitiators, partitionMasters, buddyHSId,
+                        buddySupplier, isRestart, leaderId, nPartTxn)
+                : new MpProcedureTask(mailbox, procName, queue, msg, pInitiators, partitionMasters, buddySupplier,
                         isRestart, leaderId, nPartTxn);
     }
 
     MpProcedureTask(Mailbox mailbox, String procName, TransactionTaskQueue queue,
                   Iv2InitiateTaskMessage msg, List<Long> pInitiators, Map<Integer, Long> partitionMasters,
-                  long buddyHSId, boolean isRestart, int leaderId, boolean nPartTxn)
+                  Supplier<Long> buddySupplier, boolean isRestart, int leaderId, boolean nPartTxn)
     {
         super(mailbox, procName,
               new MpTransactionState(mailbox, msg, pInitiators, partitionMasters,
-                                     buddyHSId, isRestart, nPartTxn),
+                      buddySupplier, isRestart, nPartTxn),
               queue);
         m_isRestart = isRestart;
         m_msg = msg;

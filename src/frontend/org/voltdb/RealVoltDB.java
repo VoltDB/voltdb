@@ -137,7 +137,6 @@ import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.compiler.deploymentfile.DrType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
-import org.voltdb.compiler.deploymentfile.KeyOrTrustStoreType;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.SecurityType;

@@ -54,6 +54,7 @@ import org.voltdb.utils.VoltTableUtil;
 import org.voltdb.utils.VoltTrace;
 
 import com.google_voltpatches.common.base.Preconditions;
+import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.collect.Lists;
 import com.google_voltpatches.common.collect.Maps;
 
@@ -95,7 +96,7 @@ public class MpTransactionState extends TransactionState
 
     final List<Long> m_useHSIds = new ArrayList<Long>();
     final Map<Integer, Long> m_masterHSIds = Maps.newHashMap();
-    long m_buddyHSId;
+    long m_buddyHSId = -1;
     FragmentTaskMessage m_remoteWork = null;
     FragmentTaskMessage m_localWork = null;
     boolean m_haveDistributedInitTask = false;
@@ -104,6 +105,7 @@ public class MpTransactionState extends TransactionState
     int m_fragmentIndex = 0;
     final boolean m_nPartTxn;
     boolean m_haveSentfragment = false;
+    private Supplier<Long> m_buddySupplier;
 
     //Master change from MigratePartitionLeader. The remote dependencies are built before MigratePartitionLeader. After
     //fragment restart, the FragmentResponseMessage will come from the new partition master. The map is used to remove
@@ -116,13 +118,13 @@ public class MpTransactionState extends TransactionState
     MpTransactionState(Mailbox mailbox,
                        TransactionInfoBaseMessage notice,
                        List<Long> useHSIds, Map<Integer, Long> partitionMasters,
-                       long buddyHSId, boolean isRestart, boolean nPartTxn)
+                       Supplier<Long> buddySupplier, boolean isRestart, boolean nPartTxn)
     {
         super(mailbox, notice);
         m_initiationMsg = (Iv2InitiateTaskMessage)notice;
         m_useHSIds.addAll(useHSIds);
         m_masterHSIds.putAll(partitionMasters);
-        m_buddyHSId = buddyHSId;
+        m_buddySupplier = buddySupplier;
         m_isRestart = isRestart;
         m_nPartTxn = nPartTxn;
         m_localPartitionCount = m_masterHSIds.size();
@@ -426,7 +428,9 @@ public class MpTransactionState extends TransactionState
         // satisfied. Clear this defensively. Procedure runner is sloppy with
         // cleaning up if it decides new work is necessary that is local-only.
         m_remoteWork = null;
-
+        if (m_buddyHSId == -1) {
+            m_buddyHSId = m_buddySupplier.get();
+        }
         BorrowTaskMessage borrowmsg = new BorrowTaskMessage(m_localWork);
         m_localWork.setCoordinatorTask(true);
         m_localWork.m_sourceHSId = m_mbox.getHSId();

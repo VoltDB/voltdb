@@ -46,6 +46,8 @@ import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.utils.LogKeys;
 
+import com.google_voltpatches.common.base.Supplier;
+
 /**
  * Really just a container for batch procedure tasks. Since both SP and MP tasks need to have the same re-implementation
  * of {@link ProcedureTask#processInitiateTask(Iv2InitiateTaskMessage, SiteProcedureConnection)} this class provides a
@@ -68,7 +70,7 @@ abstract class BatchProcedureTask {
 
     static class MpBatch extends MpProcedureTask {
         MpBatch(Mailbox mailbox, String procName, TransactionTaskQueue queue, Iv2InitiateTaskMessage msg,
-                List<Long> pInitiators, Map<Integer, Long> partitionMasters, long buddyHSId, boolean isRestart,
+                List<Long> pInitiators, Map<Integer, Long> partitionMasters, Supplier<Long> buddyHSId, boolean isRestart,
                 int leaderId, boolean nPartTxn) {
             super(mailbox, procName, queue, msg, pInitiators, partitionMasters, buddyHSId, isRestart, leaderId,
                     nPartTxn);
