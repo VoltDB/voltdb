@@ -406,13 +406,13 @@ bool IndexScanExecutor::p_execute(const NValueArray &params) {
     //
     // END EXPRESSION
     //
-    AbstractExpression* end_expression = m_node->getEndExpression();
+    AbstractExpression const* end_expression = m_node->getEndExpression();
     if (end_expression != nullptr) {
         VOLT_DEBUG("End Expression:\n%s", end_expression->debug(true).c_str());
     }
 
     // INITIAL EXPRESSION
-    AbstractExpression* initial_expression = m_node->getInitialExpression();
+    AbstractExpression const* initial_expression = m_node->getInitialExpression();
     if (initial_expression != nullptr) {
         VOLT_DEBUG("Initial Expression:\n%s", initial_expression->debug(true).c_str());
     }
@@ -420,7 +420,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params) {
     //
     // SKIP NULL EXPRESSION
     //
-    AbstractExpression* skipNullExpr = m_node->getSkipNullPredicate();
+    AbstractExpression const* skipNullExpr = m_node->getSkipNullPredicate();
     // For reverse scan edge case NULL values and forward scan underflow case.
     if (skipNullExpr != nullptr) {
         VOLT_DEBUG("COUNT NULL Expression:\n%s", skipNullExpr->debug(true).c_str());
@@ -500,6 +500,14 @@ bool IndexScanExecutor::p_execute(const NValueArray &params) {
         }
         if (skip) {
             continue;
+        } else if (inital_expression) {
+            /**
+             * ENG-20904
+             * Evaluate all tuples on initial_expression, until we no
+             * longer need to skip, after which there is no futher need to
+             * evaluate on inital_expression.
+             */
+            initial_expression = nullptr;
         }
         VOLT_TRACE("LOOPING in indexscan: tuple: '%s'\n", tuple.debug("tablename").c_str());
 
@@ -518,7 +526,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params) {
         //
         // First check whether the end_expression is now false
         //
-        if (end_expression != nullptr && !end_expression->eval(&tuple, nullptr).isTrue()) {
+        if (end_expression != nullptr && ! end_expression->eval(&tuple, nullptr).isTrue()) {
             VOLT_TRACE("End Expression evaluated to false, stopping scan");
             break;
         }
@@ -546,13 +554,11 @@ bool IndexScanExecutor::p_execute(const NValueArray &params) {
     return true;
 }
 
-void IndexScanExecutor::outputTuple(CountingPostfilter& postfilter, TableTuple& tuple) {
+void IndexScanExecutor::outputTuple(CountingPostfilter&, TableTuple& tuple) {
     if (m_aggExec != nullptr) {
         m_aggExec->p_execute_tuple(tuple);
-        return;
     } else if (m_insertExec != nullptr) {
         m_insertExec->p_execute_tuple(tuple);
-        return;
     } else {
         //
         // Insert the tuple into our output table
