@@ -928,11 +928,12 @@ public class ProcedureRunner {
         setupTransaction(txnState);
         assert (m_procedure instanceof VoltSystemProcedure);
         VoltSystemProcedure sysproc = (VoltSystemProcedure) m_procedure;
-        return sysproc.executePlanFragment(dependencies, fragmentId, params, m_site.getSystemProcedureExecutionContext());
+        return sysproc.executePlanFragment(dependencies, fragmentId, params,
+                m_site.getSystemProcedureExecutionContext());
     }
 
-    private final void throwIfInfeasibleTypeConversion(SQLStmt stmt, Class<?> argClass, int argInd,
-            VoltType expectedType) {
+    private void throwIfInfeasibleTypeConversion(SQLStmt stmt, Class<?> argClass, int argInd,
+                                                 VoltType expectedType) {
         if (argClass.isArray()) {
             // The statement parameter model doesn't currently support a
             // general concept of an array-typed parameter. Instead, it

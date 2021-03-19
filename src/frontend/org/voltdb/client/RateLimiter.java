@@ -18,6 +18,7 @@
 package org.voltdb.client;
 
 import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -57,11 +58,11 @@ class RateLimiter {
 
     protected long m_currentBlockTotalInternalLatency = 0;
 
-    protected ArrayDeque<Double> m_prevInternalLatencyAvgs = new ArrayDeque<Double>();
+    protected Deque<Double> m_prevInternalLatencyAvgs = new ArrayDeque<>();
 
     protected void autoTuneTargetFromHistory() {
         double recentLatency = 0, mediumTermLatency = 0;
-        if (m_prevInternalLatencyAvgs.size() > 0) {
+        if (! m_prevInternalLatencyAvgs.isEmpty()) {
             int i = 0;
             for (double value : m_prevInternalLatencyAvgs) {
                 if (i < RECENT_HISTORY_SIZE) recentLatency += value;
@@ -72,16 +73,13 @@ class RateLimiter {
             mediumTermLatency /= m_prevInternalLatencyAvgs.size();
         }
 
-        if ((mediumTermLatency > m_latencyTarget) && (recentLatency > m_latencyTarget)) {
+        if (mediumTermLatency > m_latencyTarget && recentLatency > m_latencyTarget) {
             m_maxOutstandingTxns -= Math.max(0.1 * m_maxOutstandingTxns, MINIMUM_MOVEMENT);
-        }
-        else if ((mediumTermLatency < m_latencyTarget) && (recentLatency > m_latencyTarget)) {
+        } else if (mediumTermLatency < m_latencyTarget && recentLatency > m_latencyTarget) {
             --m_maxOutstandingTxns;
-        }
-        else if ((mediumTermLatency > m_latencyTarget) && (recentLatency < m_latencyTarget)) {
+        } else if (mediumTermLatency > m_latencyTarget && recentLatency < m_latencyTarget) {
             m_maxOutstandingTxns++;
-        }
-        else { // if ((mediumTermLatency < m_latencyTarget) && (recentLatency < m_latencyTarget)) {
+        } else { // if ((mediumTermLatency < m_latencyTarget) && (recentLatency < m_latencyTarget)) {
             m_maxOutstandingTxns += Math.max(0.1 * m_maxOutstandingTxns, MINIMUM_MOVEMENT);
         }
 
@@ -181,8 +179,7 @@ class RateLimiter {
                     m_currentBlockTotalInternalLatency += internalLatency;
                 }
             }
-        } else {
-            if (ignoreBackpressure) return;
+        } else if (! ignoreBackpressure) {
             m_outstandingTxnsSemaphore.release();
         }
     }
@@ -194,7 +191,8 @@ class RateLimiter {
      * @param ignoreBackpressure If true, never block.
      * @return The time as measured when the call returns.
      */
-    long sendTxnWithOptionalBlockAndReturnCurrentTime(long timestampNanos, long timeoutNanos, boolean ignoreBackpressure) throws TimeoutException {
+    long sendTxnWithOptionalBlockAndReturnCurrentTime(
+            long timestampNanos, long timeoutNanos, boolean ignoreBackpressure) throws TimeoutException {
         if (m_doesAnyTuning) {
             long timestamp = TimeUnit.NANOSECONDS.toMillis(timestampNanos);
             while (true) {
@@ -207,7 +205,7 @@ class RateLimiter {
 
                     // don't let the time be before the start of the current block
                     // also ensure faketime - m_currentBlockTimestamp is positive
-                    long faketime = timestamp < m_currentBlockTimestamp ? m_currentBlockTimestamp : timestamp;
+                    long faketime = Math.max(timestamp, m_currentBlockTimestamp);
 
                     long targetTxnsPerBlock = m_targetTxnsPerSecond / (1000 / BLOCK_SIZE);
 
@@ -220,9 +218,9 @@ class RateLimiter {
                     assert((expectedTxnsSent >= 1.0) || (targetTxnsPerBlock == 0));
 
                     // if the rate is under target, no problems
-                    if (((m_currentBlockSendCount < expectedTxnsSent) &&
-                         (m_outstandingTxns < m_maxOutstandingTxns)) ||
-                        (ignoreBackpressure == true)) {
+                    if ((m_currentBlockSendCount < expectedTxnsSent &&
+                            m_outstandingTxns < m_maxOutstandingTxns) ||
+                        ignoreBackpressure) {
 
                         // bookkeeping
                         ++m_currentBlockSendCount;
@@ -234,7 +232,9 @@ class RateLimiter {
                 }
 
                 // if the rate is above target, pause for the smallest time possible
-                try { Thread.sleep(1); } catch (InterruptedException e) {}
+                try {
+                    Thread.sleep(1);
+                } catch (InterruptedException ignored) {}
                 timestampNanos = System.nanoTime();
                 timestamp = TimeUnit.NANOSECONDS.toMillis(timestampNanos);
             }
@@ -242,13 +242,13 @@ class RateLimiter {
             if (ignoreBackpressure) return timestampNanos;
             boolean acquired = m_outstandingTxnsSemaphore.tryAcquire();
 
-            if (!acquired) {
+            if (! acquired) {
                 try {
-                    if (!m_outstandingTxnsSemaphore.tryAcquire(timeoutNanos, TimeUnit.NANOSECONDS)) {
-                        throw new TimeoutException();
+                    if (! m_outstandingTxnsSemaphore.tryAcquire(timeoutNanos, TimeUnit.NANOSECONDS)) {
+                        throw new TimeoutException("RateLimiter.sendTxnWithOptionalBlockAndReturnCurrentTime()");
                     }
                 } catch (InterruptedException e) {
-                    Throwables.propagate(e);
+                    Throwables.throwIfUnchecked(e);
                 }
                 return System.nanoTime();
             }

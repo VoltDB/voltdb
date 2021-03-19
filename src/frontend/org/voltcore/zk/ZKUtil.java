@@ -82,8 +82,7 @@ public class ZKUtil {
     /**
      * Helper to produce a valid path from variadic strings.
      */
-    public static String path(String... components)
-    {
+    public static String path(String... components) {
         String path = components[0];
         for (int i=1; i < components.length; i++) {
             path = ZKUtil.joinZKPath(path, components[i]);
@@ -92,17 +91,14 @@ public class ZKUtil {
     }
 
     public static File getUploadAsTempFile( ZooKeeper zk, String path, String prefix) throws Exception {
-        byte data[] = retrieveChunksAsBytes(zk, path, prefix, false).getFirst();
+        byte[] data = retrieveChunksAsBytes(zk, path, prefix, false).getFirst();
         File tempFile = File.createTempFile("foo", "bar");
         tempFile.deleteOnExit();
-        FileOutputStream fos = new FileOutputStream(tempFile);
-        ByteBuffer b = ByteBuffer.wrap(data);
-        try {
+        try (FileOutputStream fos = new FileOutputStream(tempFile)) {
+            ByteBuffer b = ByteBuffer.wrap(data);
             while (b.hasRemaining()) {
                 fos.getChannel().write(b);
             }
-        } finally {
-            fos.close();
         }
         return tempFile;
     }
@@ -128,7 +124,8 @@ public class ZKUtil {
         return true;
     }
 
-    public static void uploadBytesAsChunks(ZooKeeper zk, String node, byte payload[], boolean ephemeral) throws Exception {
+    public static void uploadBytesAsChunks(
+            ZooKeeper zk, String node, byte[] payload, boolean ephemeral) throws Exception {
         ByteBuffer buffer = ByteBuffer.wrap(compressBytes(payload));
         while (buffer.hasRemaining()) {
             int nextChunkSize = Math.min(1024 * 1024, buffer.remaining());
@@ -136,27 +133,27 @@ public class ZKUtil {
             buffer.limit(buffer.position() + nextChunkSize);
             nextChunk.put(buffer);
             buffer.limit(buffer.capacity());
-            zk.create(node, nextChunk.array(), Ids.OPEN_ACL_UNSAFE, ephemeral ? CreateMode.EPHEMERAL_SEQUENTIAL : CreateMode.PERSISTENT_SEQUENTIAL);
+            zk.create(node, nextChunk.array(), Ids.OPEN_ACL_UNSAFE,
+                    ephemeral ? CreateMode.EPHEMERAL_SEQUENTIAL : CreateMode.PERSISTENT_SEQUENTIAL);
         }
-        zk.create(node + "_complete", null, Ids.OPEN_ACL_UNSAFE, ephemeral ? CreateMode.EPHEMERAL : CreateMode.PERSISTENT);
+        zk.create(node + "_complete", null, Ids.OPEN_ACL_UNSAFE,
+                ephemeral ? CreateMode.EPHEMERAL : CreateMode.PERSISTENT);
     }
 
     public static byte[] retrieveChunksAsBytes(ZooKeeper zk, String path, String prefix) throws Exception {
         return retrieveChunksAsBytes(zk, path, prefix, false).getFirst();
     }
 
-    public static Pair<byte[], Integer> retrieveChunksAsBytes(ZooKeeper zk, String path, String prefix, boolean getCRC) throws Exception {
-        TreeSet<String> chunks = new TreeSet<String>();
+    public static Pair<byte[], Integer> retrieveChunksAsBytes(
+            ZooKeeper zk, String path, String prefix, boolean getCRC) throws Exception {
+        TreeSet<String> chunks = new TreeSet<>();
         while (true) {
-            boolean allUploadsComplete = true;
-            if (!chunks.contains(path + "/" + prefix + "_complete")) {
-                allUploadsComplete = false;
-            }
+            boolean allUploadsComplete = chunks.contains(path + "/" + prefix + "_complete");
             if (allUploadsComplete) {
                 break;
             }
 
-            chunks = new TreeSet<String>(zk.getChildren(path, false));
+            chunks = new TreeSet<>(zk.getChildren(path, false));
             for (String chunk : chunks) {
                 for (int ii = 0; ii < chunks.size(); ii++) {
                     if (chunk.startsWith(path + "/" + prefix)) {
@@ -166,7 +163,7 @@ public class ZKUtil {
             }
         }
 
-        byte resultBuffers[][] = new byte[chunks.size() - 1][];
+        byte[][] resultBuffers = new byte[chunks.size() - 1][];
         int ii = 0;
         PureJavaCrc32 crc = getCRC ? new PureJavaCrc32() : null;
         for (String chunk : chunks) {
@@ -183,7 +180,7 @@ public class ZKUtil {
         return Pair.of(decompressBytes(resultBuffers), crc != null ? (int)crc.getValue() : null);
     }
 
-    public static byte[] compressBytes(byte bytes[]) throws IOException {
+    public static byte[] compressBytes(byte[] bytes) throws IOException {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         GZIPOutputStream gos = new GZIPOutputStream(baos);
         gos.write(bytes);
@@ -191,15 +188,15 @@ public class ZKUtil {
         return baos.toByteArray();
     }
 
-    public static byte[] decompressBytes(byte bytess[][]) throws IOException {
+    public static byte[] decompressBytes(byte[][] bytess) throws IOException {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        for (byte bytes[] : bytess) {
+        for (byte[] bytes : bytess) {
             baos.write(bytes);
         }
         ByteArrayInputStream bais = new ByteArrayInputStream(baos.toByteArray());
         baos = new ByteArrayOutputStream();
         GZIPInputStream gis = new GZIPInputStream(bais);
-        byte bytes[] = new byte[1024 * 8];
+        byte[] bytes = new byte[1024 * 8];
         while (true) {
             int read = gis.read(bytes);
             if (read == -1) {
@@ -218,19 +215,16 @@ public class ZKUtil {
         }
     }
 
-    public static final ZooKeeper getClient(String zkAddr, int zkPort, int timeout, Set<Long> verbotenThreads) throws Exception {
+    public static ZooKeeper getClient(
+            String zkAddr, int zkPort, int timeout, Set<Long> verbotenThreads) throws Exception {
         final Semaphore zkConnect = new Semaphore(0);
-        ZooKeeper zk = new ZooKeeper(addressAndPort(zkAddr, zkPort), 2000, new Watcher() {
-            @Override
-            public void process(WatchedEvent event) {
-                if (event.getState() == KeeperState.SyncConnected) {
-                    zkConnect.release();
-                }
+        ZooKeeper zk = new ZooKeeper(addressAndPort(zkAddr, zkPort), 2000, event -> {
+            if (event.getState() == KeeperState.SyncConnected) {
+                zkConnect.release();
             }
-
         },
         verbotenThreads);
-        if (!zkConnect.tryAcquire(timeout, TimeUnit.MILLISECONDS)) {
+        if (! zkConnect.tryAcquire(timeout, TimeUnit.MILLISECONDS)) {
             return null;
         }
         return zk;
@@ -246,12 +240,12 @@ public class ZKUtil {
         return true;
     }
 
-    public static final void mkdirs(ZooKeeper zk, String dirDN) {
+    public static void mkdirs(ZooKeeper zk, String dirDN) {
         ZKUtil.StringCallback callback = asyncMkdirs(zk, dirDN );
         try {
             callback.get();
         } catch (Throwable t) {
-            Throwables.propagate(t);
+            Throwables.throwIfUnchecked(t);
         }
     }
 
@@ -259,18 +253,18 @@ public class ZKUtil {
         return asyncMkdirs( zk, dirDN, null);
     }
 
-    public static ZKUtil.StringCallback asyncMkdirs( ZooKeeper zk, String dirDN, byte payload[]) {
+    public static ZKUtil.StringCallback asyncMkdirs(ZooKeeper zk, String dirDN, byte[] payload) {
         Preconditions.checkArgument(
                 dirDN != null &&
-                ! dirDN.trim().isEmpty() &&
-                ! "/".equals(dirDN) &&
-                dirDN.startsWith("/")
-                );
+                        ! dirDN.trim().isEmpty() &&
+                        ! "/".equals(dirDN) &&
+                        dirDN.startsWith("/")
+        );
 
         StringBuilder dsb = new StringBuilder(128);
         ZKUtil.StringCallback lastCallback = null;
         try {
-            String dirPortions[] = dirDN.substring(1).split("/");
+            String[] dirPortions = dirDN.substring(1).split("/");
             for (int ii = 0; ii < dirPortions.length; ii++) {
                 String dirPortion = dirPortions[ii];
                 lastCallback = new ZKUtil.StringCallback();
@@ -283,16 +277,15 @@ public class ZKUtil {
                         lastCallback,
                         null);
             }
-        }
-        catch (Throwable t) {
-            Throwables.propagate(t);
+        } catch (Throwable t) {
+            Throwables.throwIfUnchecked(t);
         }
         return lastCallback;
     }
 
     public static class StatCallback implements org.apache.zookeeper_voltpatches.AsyncCallback.StatCallback {
         private final CountDownLatch done = new CountDownLatch(1);
-        private Object results[];
+        private Object[] results;
 
 
         public Object[] get() throws InterruptedException, KeeperException {
@@ -333,12 +326,13 @@ public class ZKUtil {
             return payload;
         }
 
-        public T get(long timeout, TimeUnit unit) throws InterruptedException, KeeperException, TimeoutException {
+        public T get(long timeout, TimeUnit unit)
+                throws InterruptedException, KeeperException, TimeoutException {
             if (done.await(timeout, unit)) {
                 checkCode();
                 return payload;
             } else {
-                throw new TimeoutException();
+                throw new TimeoutException("ZKUtil.BaseCallback.get()");
             }
         }
 
@@ -445,22 +439,18 @@ public class ZKUtil {
 
         @Override
         public void process(final WatchedEvent event) {
-           es.execute(new Runnable() {
-               @Override
-               public void run() {
-                   if (canceled) {
-                    return;
-                }
-                   pProcess(event);
-               }
+           es.execute(() -> {
+               if (canceled) {
+                return;
+            }
+               pProcess(event);
            });
         }
 
         abstract protected void pProcess(final WatchedEvent event);
     }
 
-    public static void deleteRecursively(ZooKeeper zk, String dir) throws KeeperException, InterruptedException
-    {
+    public static void deleteRecursively(ZooKeeper zk, String dir) throws KeeperException, InterruptedException {
         try {
             List<String> children = zk.getChildren(dir, false);
             for (String child : children) {
@@ -470,7 +460,8 @@ public class ZKUtil {
         } catch (KeeperException.NoNodeException ignore) {}
     }
 
-    public static void asyncDeleteRecursively(ZooKeeper zk, String dirDN) throws KeeperException, InterruptedException {
+    public static void asyncDeleteRecursively(ZooKeeper zk, String dirDN)
+            throws KeeperException, InterruptedException {
         Preconditions.checkArgument(
                 dirDN != null &&
                 ! dirDN.trim().isEmpty() &&
@@ -504,7 +495,7 @@ public class ZKUtil {
                     for (String child: children) {
                         listing.add(new ListingNode(callbackPair.getSecond(), child));
                     }
-                } catch (KeeperException.NoNodeException ignoreIt) {
+                } catch (KeeperException.NoNodeException ignored) {
                 }
                 itr.remove();
             }
@@ -520,7 +511,7 @@ public class ZKUtil {
         }
         try {
             lastCallback.get();
-        } catch (KeeperException.NoNodeException ignoreIt) {
+        } catch (KeeperException.NoNodeException ignored) {
         }
     }
 
@@ -575,13 +566,10 @@ public class ZKUtil {
                 return false;
             }
             if (node == null) {
-                if (other.node != null) {
-                    return false;
-                }
-            } else if (!node.equals(other.node)) {
-                return false;
+                return other.node == null;
+            } else {
+                return node.equals(other.node);
             }
-            return true;
         }
 
         @Override

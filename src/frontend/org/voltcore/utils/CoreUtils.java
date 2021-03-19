@@ -85,12 +85,7 @@ public class CoreUtils {
     public static final int SMALL_STACK_SIZE = 1024 * 256;
     public static final int MEDIUM_STACK_SIZE = 1024 * 512;
 
-    public static volatile Runnable m_threadLocalDeallocator = new Runnable() {
-        @Override
-        public void run() {
-
-        }
-    };
+    public static volatile Runnable m_threadLocalDeallocator = () -> {};
 
     public static final ExecutorService SAMETHREADEXECUTOR = new ExecutorService() {
 
@@ -121,8 +116,7 @@ public class CoreUtils {
         }
 
         @Override
-        public boolean awaitTermination(long timeout, TimeUnit unit)
-                throws InterruptedException {
+        public boolean awaitTermination(long timeout, TimeUnit unit) {
             return true;
         }
 
@@ -145,20 +139,18 @@ public class CoreUtils {
         @Override
         public Future<?> submit(Runnable task) {
             Preconditions.checkNotNull(task);
-            FutureTask<Object> retval = new FutureTask<Object>(task, null);
+            FutureTask<Object> retval = new FutureTask<>(task, null);
             retval.run();
             return retval;
         }
 
         @Override
-        public <T> List<Future<T>> invokeAll(
-                Collection<? extends Callable<T>> tasks)
-                throws InterruptedException {
+        public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks) {
             Preconditions.checkNotNull(tasks);
-            List<Future<T>> retval = new ArrayList<Future<T>>(tasks.size());
+            List<Future<T>> retval = new ArrayList<>(tasks.size());
             for (Callable<T> c : tasks) {
-                FutureTask<T> ft = new FutureTask<T>(c);
-                retval.add(new FutureTask<T>(c));
+                FutureTask<T> ft = new FutureTask<>(c);
+                retval.add(new FutureTask<>(c));
                 ft.run();
             }
             return retval;
@@ -167,13 +159,13 @@ public class CoreUtils {
         @Override
         public <T> List<Future<T>> invokeAll(
                 Collection<? extends Callable<T>> tasks, long timeout,
-                TimeUnit unit) throws InterruptedException {
+                TimeUnit unit) {
             Preconditions.checkNotNull(tasks);
             Preconditions.checkNotNull(unit);
 
             final long end = System.nanoTime() + unit.toNanos(timeout);
 
-            List<Future<T>> retval = new ArrayList<Future<T>>(tasks.size());
+            List<Future<T>> retval = new ArrayList<>(tasks.size());
             for (Callable<T> c : tasks) {
                 retval.add(new FutureTask<T>(c));
             }
@@ -197,8 +189,7 @@ public class CoreUtils {
         }
 
         @Override
-        public <T> T invokeAny(Collection<? extends Callable<T>> tasks)
-                throws InterruptedException, ExecutionException {
+        public <T> T invokeAny(Collection<? extends Callable<T>> tasks) throws ExecutionException {
             T retval = null;
             Throwable lastException = null;
             boolean haveRetval = false;
@@ -221,14 +212,15 @@ public class CoreUtils {
 
         @Override
         public <T> T invokeAny(Collection<? extends Callable<T>> tasks,
-                long timeout, TimeUnit unit) throws InterruptedException,
-                ExecutionException, TimeoutException {
+                long timeout, TimeUnit unit) throws ExecutionException, TimeoutException {
             final long end = System.nanoTime() + unit.toNanos(timeout);
             T retval = null;
             Throwable lastException = null;
             boolean haveRetval = false;
             for (Callable<T> c : tasks) {
-                if (System.nanoTime() > end) throw new TimeoutException();
+                if (System.nanoTime() > end) {
+                    throw new TimeoutException("CoreUtils.ExecutorService.invokeAny()");
+                }
                 try {
                     retval = c.call();
                     haveRetval = true;
@@ -276,8 +268,7 @@ public class CoreUtils {
         }
 
         @Override
-        public boolean awaitTermination(long timeout, TimeUnit unit)
-                throws InterruptedException {
+        public boolean awaitTermination(long timeout, TimeUnit unit) {
             return true;
         }
 
@@ -307,8 +298,7 @@ public class CoreUtils {
 
         @Override
         public <T> List<Future<T>> invokeAll(
-                Collection<? extends Callable<T>> tasks)
-                throws InterruptedException {
+                Collection<? extends Callable<T>> tasks) {
             Preconditions.checkNotNull(tasks);
             List<Future<T>> retval = new ArrayList<Future<T>>(tasks.size());
             for (Callable<T> c : tasks) {
@@ -322,7 +312,7 @@ public class CoreUtils {
         @Override
         public <T> List<Future<T>> invokeAll(
                 Collection<? extends Callable<T>> tasks, long timeout,
-                TimeUnit unit) throws InterruptedException {
+                TimeUnit unit) {
             Preconditions.checkNotNull(tasks);
             Preconditions.checkNotNull(unit);
 
@@ -352,8 +342,7 @@ public class CoreUtils {
         }
 
         @Override
-        public <T> T invokeAny(Collection<? extends Callable<T>> tasks)
-                throws InterruptedException, ExecutionException {
+        public <T> T invokeAny(Collection<? extends Callable<T>> tasks) throws ExecutionException {
             T retval = null;
             Throwable lastException = null;
             boolean haveRetval = false;
@@ -376,14 +365,15 @@ public class CoreUtils {
 
         @Override
         public <T> T invokeAny(Collection<? extends Callable<T>> tasks,
-                long timeout, TimeUnit unit) throws InterruptedException,
-                ExecutionException, TimeoutException {
+                long timeout, TimeUnit unit) throws ExecutionException, TimeoutException {
             final long end = System.nanoTime() + unit.toNanos(timeout);
             T retval = null;
             Throwable lastException = null;
             boolean haveRetval = false;
             for (Callable<T> c : tasks) {
-                if (System.nanoTime() > end) throw new TimeoutException();
+                if (System.nanoTime() > end) {
+                    throw new TimeoutException("CoreUtils.ListeningExecutorService.invokeAny()");
+                }
                 try {
                     retval = c.call();
                     haveRetval = true;
@@ -481,10 +471,7 @@ public class CoreUtils {
         }
     }
 
-    public static final Runnable EMPTY_RUNNABLE = new Runnable() {
-        @Override
-        public void run() {}
-    };
+    public static final Runnable EMPTY_RUNNABLE = () -> {};
 
     /**
      * Get a single thread executor that caches its thread meaning that the thread will terminate
@@ -507,21 +494,17 @@ public class CoreUtils {
      * Create an unbounded single threaded executor
      */
     public static ExecutorService getSingleThreadExecutor(String name) {
-        ExecutorService ste =
-                new ThreadPoolExecutor(1, 1,
-                        0L, TimeUnit.MILLISECONDS,
-                        new LinkedBlockingQueue<Runnable>(),
-                        CoreUtils.getThreadFactory(null, name, SMALL_STACK_SIZE, false, null));
-        return ste;
+        return new ThreadPoolExecutor(1, 1,
+                0L, TimeUnit.MILLISECONDS,
+                new LinkedBlockingQueue<Runnable>(),
+                CoreUtils.getThreadFactory(null, name, SMALL_STACK_SIZE, false, null));
     }
 
     public static ExecutorService getSingleThreadExecutor(String name, int size) {
-        ExecutorService ste =
-                new ThreadPoolExecutor(1, 1,
-                        0L, TimeUnit.MILLISECONDS,
-                        new LinkedBlockingQueue<Runnable>(),
-                        CoreUtils.getThreadFactory(null, name, size, false, null));
-        return ste;
+        return new ThreadPoolExecutor(1, 1,
+                0L, TimeUnit.MILLISECONDS,
+                new LinkedBlockingQueue<Runnable>(),
+                CoreUtils.getThreadFactory(null, name, size, false, null));
     }
 
     /**
@@ -530,8 +513,7 @@ public class CoreUtils {
     public static ListeningExecutorService getListeningSingleThreadExecutor(String name) {
         ExecutorService ste =
                 new ThreadPoolExecutor(1, 1,
-                        0L, TimeUnit.MILLISECONDS,
-                        new LinkedBlockingQueue<Runnable>(),
+                        0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>(),
                         CoreUtils.getThreadFactory(null, name, SMALL_STACK_SIZE, false, null));
         return MoreExecutors.listeningDecorator(ste);
     }
@@ -539,8 +521,7 @@ public class CoreUtils {
     public static ListeningExecutorService getListeningSingleThreadExecutor(String name, int size) {
         ExecutorService ste =
                 new ThreadPoolExecutor(1, 1,
-                        0L, TimeUnit.MILLISECONDS,
-                        new LinkedBlockingQueue<Runnable>(),
+                        0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>(),
                         CoreUtils.getThreadFactory(null, name, size, false, null));
         return MoreExecutors.listeningDecorator(ste);
     }
@@ -550,9 +531,9 @@ public class CoreUtils {
      * requests are outstanding.
      */
     public static ListeningExecutorService getBoundedSingleThreadExecutor(String name, int capacity) {
-        LinkedBlockingQueue<Runnable> lbq = new LinkedBlockingQueue<Runnable>(capacity);
-        ThreadPoolExecutor tpe =
-                new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, lbq, CoreUtils.getThreadFactory(name));
+        BlockingQueue<Runnable> lbq = new LinkedBlockingQueue<>(capacity);
+        ThreadPoolExecutor tpe = new ThreadPoolExecutor(1, 1, 0L,
+                        TimeUnit.MILLISECONDS, lbq, CoreUtils.getThreadFactory(name));
         return MoreExecutors.listeningDecorator(tpe);
     }
 
@@ -561,30 +542,27 @@ public class CoreUtils {
      * futures.
      */
     public static ScheduledThreadPoolExecutor getScheduledThreadPoolExecutor(String name, int poolSize, int stackSize) {
-        ScheduledThreadPoolExecutor ses = new ScheduledThreadPoolExecutor(poolSize, getThreadFactory(null, name, stackSize, poolSize > 1, null));
+        ScheduledThreadPoolExecutor ses = new ScheduledThreadPoolExecutor(
+                poolSize, getThreadFactory(null, name, stackSize,
+                poolSize > 1, null));
         ses.setContinueExistingPeriodicTasksAfterShutdownPolicy(false);
         ses.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
         return ses;
     }
 
     public static ListeningExecutorService getListeningExecutorService(
-            final String name,
-            final int threads) {
-        return getListeningExecutorService(name, threads, new LinkedTransferQueue<Runnable>(), null);
+            final String name, final int threads) {
+        return getListeningExecutorService(name, threads, new LinkedTransferQueue<>(), null);
     }
 
     public static ListeningExecutorService getListeningExecutorService(
-            final String name,
-            final int coreThreads,
-            final int threads) {
-        return getListeningExecutorService(name, coreThreads, threads, new LinkedTransferQueue<Runnable>(), null);
+            final String name, final int coreThreads, final int threads) {
+        return getListeningExecutorService(name, coreThreads, threads, new LinkedTransferQueue<>(), null);
     }
 
     public static ListeningExecutorService getListeningExecutorService(
-            final String name,
-            final int threads,
-            Queue<String> coreList) {
-        return getListeningExecutorService(name, threads, new LinkedTransferQueue<Runnable>(), coreList);
+            final String name, final int threads, Queue<String> coreList) {
+        return getListeningExecutorService(name, threads, new LinkedTransferQueue<>(), coreList);
     }
 
     public static ListeningExecutorService getListeningExecutorService(
@@ -598,15 +576,14 @@ public class CoreUtils {
         final int threads = threadsTemp;
         if (threads < 1) {
             throw new IllegalArgumentException("Must specify > 0 threads");
-        }
-        if (name == null) {
+        } else if (name == null) {
             throw new IllegalArgumentException("Name cannot be null");
+        } else {
+            return MoreExecutors.listeningDecorator(
+                    new ThreadPoolExecutor(threads, threads, 0L, TimeUnit.MILLISECONDS, queue,
+                            getThreadFactory(null, name, SMALL_STACK_SIZE,
+                                    threads > 1, coreList)));
         }
-        return MoreExecutors.listeningDecorator(
-                new ThreadPoolExecutor(threads, threads,
-                        0L, TimeUnit.MILLISECONDS,
-                        queue,
-                        getThreadFactory(null, name, SMALL_STACK_SIZE, threads > 1 ? true : false, coreList)));
     }
 
     public static ListeningExecutorService getListeningExecutorService(
@@ -617,8 +594,7 @@ public class CoreUtils {
             final Queue<String> coreList) {
         if (coreThreadsTemp < 0) {
             throw new IllegalArgumentException("Must specify >= 0 core threads");
-        }
-        if (coreThreadsTemp > threadsTemp) {
+        } else if (coreThreadsTemp > threadsTemp) {
             throw new IllegalArgumentException("Core threads must be <= threads");
         }
 
@@ -632,15 +608,13 @@ public class CoreUtils {
         final int threads = threadsTemp;
         if (threads < 1) {
             throw new IllegalArgumentException("Must specify > 0 threads");
-        }
-        if (name == null) {
+        } else if (name == null) {
             throw new IllegalArgumentException("Name cannot be null");
+        } else {
+            return MoreExecutors.listeningDecorator(
+                    new ThreadPoolExecutor(coreThreads, threads, 1L, TimeUnit.MINUTES, queue,
+                            getThreadFactory(null, name, SMALL_STACK_SIZE, threads > 1, coreList)));
         }
-        return MoreExecutors.listeningDecorator(
-                new ThreadPoolExecutor(coreThreads, threads,
-                        1L, TimeUnit.MINUTES,
-                        queue,
-                        getThreadFactory(null, name, SMALL_STACK_SIZE, threads > 1 ? true : false, coreList)));
     }
 
     /**
@@ -652,9 +626,10 @@ public class CoreUtils {
      * @param unit: the time unit for the keepAliveTime argument.
      * @param threadFactory: the factory to use when the executor creates a new thread.
      */
-    public static ThreadPoolExecutor getBoundedThreadPoolExecutor(int maxPoolSize, long keepAliveTime, TimeUnit unit, ThreadFactory tFactory) {
+    public static ThreadPoolExecutor getBoundedThreadPoolExecutor(
+            int maxPoolSize, long keepAliveTime, TimeUnit unit, ThreadFactory tFactory) {
         return new ThreadPoolExecutor(0, maxPoolSize, keepAliveTime, unit,
-                                      new SynchronousQueue<Runnable>(), tFactory);
+                                      new SynchronousQueue<>(), tFactory);
     }
 
     /**
@@ -690,15 +665,14 @@ public class CoreUtils {
             }
 
             @Override
-            public boolean awaitTermination(long timeout, TimeUnit unit)
-                    throws InterruptedException {
+            public boolean awaitTermination(long timeout, TimeUnit unit) {
                 return true;
             }
 
             @Override
             public <T> Future<T> submit(Callable<T> task) {
                 Preconditions.checkNotNull(task);
-                FutureTask<T> retval = new FutureTask<T>(task);
+                FutureTask<T> retval = new FutureTask<>(task);
                 taskQueue.offer(retval);
                 return retval;
             }
@@ -706,7 +680,7 @@ public class CoreUtils {
             @Override
             public <T> Future<T> submit(Runnable task, T result) {
                 Preconditions.checkNotNull(task);
-                FutureTask<T> retval = new FutureTask<T>(task, result);
+                FutureTask<T> retval = new FutureTask<>(task, result);
                 taskQueue.offer(retval);
                 return retval;
             }
@@ -720,29 +694,24 @@ public class CoreUtils {
             }
 
             @Override
-            public <T> List<Future<T>> invokeAll(
-                    Collection<? extends Callable<T>> tasks)
-                    throws InterruptedException {
+            public <T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks) {
                 throw new UnsupportedOperationException();
             }
 
             @Override
             public <T> List<Future<T>> invokeAll(
-                    Collection<? extends Callable<T>> tasks, long timeout,
-                    TimeUnit unit) throws InterruptedException {
+                    Collection<? extends Callable<T>> tasks, long timeout, TimeUnit unit) {
                 throw new UnsupportedOperationException();
             }
 
             @Override
-            public <T> T invokeAny(Collection<? extends Callable<T>> tasks)
-                    throws InterruptedException, ExecutionException {
+            public <T> T invokeAny(Collection<? extends Callable<T>> tasks) {
                 throw new UnsupportedOperationException();
             }
 
             @Override
             public <T> T invokeAny(Collection<? extends Callable<T>> tasks,
-                    long timeout, TimeUnit unit) throws InterruptedException,
-                    ExecutionException, TimeoutException {
+                    long timeout, TimeUnit unit) {
                 throw new UnsupportedOperationException();
             }
         };
@@ -794,21 +763,18 @@ public class CoreUtils {
                     coreTemp = coreList.poll();
                 }
                 final String core = coreTemp;
-                Runnable runnable = new Runnable() {
-                    @Override
-                    public void run() {
-                        if (core != null) {
-                            // Remove Affinity for now to make this dependency dissapear from the client.
-                            // Goal is to remove client dependency on this class in the medium term.
-                            //PosixJNAAffinity.INSTANCE.setAffinity(core);
-                        }
-                        try {
-                            r.run();
-                        } catch (Throwable t) {
-                            new VoltLogger("HOST").error("Exception thrown in thread " + threadName, t);
-                        } finally {
-                            m_threadLocalDeallocator.run();
-                        }
+                Runnable runnable = () -> {
+                    if (core != null) {
+                        // Remove Affinity for now to make this dependency dissapear from the client.
+                        // Goal is to remove client dependency on this class in the medium term.
+                        //PosixJNAAffinity.INSTANCE.setAffinity(core);
+                    }
+                    try {
+                        r.run();
+                    } catch (Throwable t) {
+                        new VoltLogger("HOST").error("Exception thrown in thread " + threadName, t);
+                    } finally {
+                        m_threadLocalDeallocator.run();
                     }
                 };
 
@@ -864,34 +830,30 @@ public class CoreUtils {
     }
 
     private static final Supplier<InetAddress> m_localAddressSupplier =
-            Suppliers.memoizeWithExpiration(new Supplier<InetAddress>() {
-                @Override
-                public InetAddress get() {
+            Suppliers.memoizeWithExpiration(() -> {
+                try {
+                    return InetAddress.getLocalHost();
+                } catch (UnknownHostException e) {
                     try {
-                        final InetAddress addr = InetAddress.getLocalHost();
-                        return addr;
-                    } catch (UnknownHostException e) {
-                        try {
-                            Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
-                            if (interfaces == null) {
-                                return null;
-                            }
-                            NetworkInterface intf = interfaces.nextElement();
-                            Enumeration<InetAddress> addresses = intf.getInetAddresses();
-                            while (addresses.hasMoreElements()) {
-                                InetAddress address = addresses.nextElement();
-                                if (address instanceof Inet4Address) {
-                                    return address;
-                                }
-                            }
-                            addresses = intf.getInetAddresses();
-                            if (addresses.hasMoreElements()) {
-                                return addresses.nextElement();
-                            }
-                            return null;
-                        } catch (SocketException e1) {
+                        Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+                        if (interfaces == null) {
                             return null;
                         }
+                        NetworkInterface intf = interfaces.nextElement();
+                        Enumeration<InetAddress> addresses = intf.getInetAddresses();
+                        while (addresses.hasMoreElements()) {
+                            InetAddress address = addresses.nextElement();
+                            if (address instanceof Inet4Address) {
+                                return address;
+                            }
+                        }
+                        addresses = intf.getInetAddresses();
+                        if (addresses.hasMoreElements()) {
+                            return addresses.nextElement();
+                        }
+                        return null;
+                    } catch (SocketException e1) {
+                        return null;
                     }
                 }
             }, 1, TimeUnit.DAYS);
@@ -938,7 +900,7 @@ public class CoreUtils {
     }
 
     public static String hsIdCollectionToString(Collection<Long> ids) {
-        List<String> idstrings = new ArrayList<String>();
+        List<String> idstrings = new ArrayList<>();
         for (Long id : ids) {
             idstrings.add(hsIdToString(id));
         }
@@ -963,7 +925,8 @@ public class CoreUtils {
 
     public static int hsIdToInt(long hsId) {
         int hostId = getHostIdFromHSId(hsId);
-        return Integer.valueOf((hostId > 0 ? String.valueOf(getHostIdFromHSId(hsId)) : "") + String.valueOf(getHostIdFromHSId(hsId)));
+        return Integer.parseInt((hostId > 0 ? String.valueOf(getHostIdFromHSId(hsId)) : "") +
+                getHostIdFromHSId(hsId));
     }
 
     public static <K,V> ImmutableMap<K, ImmutableList<V>> unmodifiableMapCopy(Map<K, List<V>> m) {
@@ -980,7 +943,7 @@ public class CoreUtils {
         }
         try {
             // get the URL/path for the deployment and prep an InputStream
-            InputStream input = null;
+            InputStream input;
             try {
                 URL inputURL = new URL(url);
                 input = inputURL.openStream();
@@ -1088,7 +1051,7 @@ public class CoreUtils {
      * @param maxAttempts It is the number of total attempts including the first one.
      * If the value is 0, that means there is no limit.
      */
-    public static final<T>  ListenableFuture<T> retryHelper(
+    public static<T>  ListenableFuture<T> retryHelper(
             final ScheduledExecutorService ses,
             final ExecutorService es,
             final Callable<T> callable,
@@ -1103,9 +1066,9 @@ public class CoreUtils {
         return future;
     }
 
-    public static final <T> void retryHelper(final ScheduledExecutorService ses, final ExecutorService es,
-            final Callable<T> callable, final long maxAttempts, final long startInterval, final TimeUnit startUnit,
-            final long maxInterval, final TimeUnit maxUnit, final SettableFuture<T> future) {
+    public static <T> void retryHelper(final ScheduledExecutorService ses, final ExecutorService es,
+                                       final Callable<T> callable, final long maxAttempts, final long startInterval, final TimeUnit startUnit,
+                                       final long maxInterval, final TimeUnit maxUnit, final SettableFuture<T> future) {
         Preconditions.checkNotNull(maxUnit);
         Preconditions.checkNotNull(startUnit);
         Preconditions.checkArgument(startUnit.toMillis(startInterval) >= 1);
@@ -1116,23 +1079,20 @@ public class CoreUtils {
         /*
          * Base case with no retry, attempt the task once
          */
-        es.execute(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    future.set(callable.call());
-                } catch (RetryException e) {
-                    //Now schedule a retry
-                    retryHelper(ses, es, callable, maxAttempts - 1, startInterval, startUnit, maxInterval, maxUnit, 0,
-                            future);
-                } catch (Exception e) {
-                    future.setException(e);
-                }
+        es.execute(() -> {
+            try {
+                future.set(callable.call());
+            } catch (RetryException e) {
+                //Now schedule a retry
+                retryHelper(ses, es, callable, maxAttempts - 1, startInterval, startUnit, maxInterval, maxUnit, 0,
+                        future);
+            } catch (Exception e) {
+                future.setException(e);
             }
         });
     }
 
-    private static final <T> void retryHelper(
+    private static<T> void retryHelper(
             final ScheduledExecutorService ses,
             final ExecutorService es,
             final Callable<T> callable,
@@ -1150,31 +1110,26 @@ public class CoreUtils {
 
         long intervalMax = maxUnit.toMillis(maxInterval);
         final long interval = Math.min(intervalMax, startUnit.toMillis(startInterval) * 2);
-        ses.schedule(new Runnable() {
-            @Override
-            public void run() {
-                Runnable task = new Runnable() {
-                    @Override
-                    public void run() {
-                        if (retval.isCancelled()) return;
+        ses.schedule(() -> {
+            Runnable task = () -> {
+                if (retval.isCancelled()) return;
 
-                        try {
-                            retval.set(callable.call());
-                        } catch (RetryException e) {
-                            retryHelper(ses, es, callable, maxAttempts - 1, interval, TimeUnit.MILLISECONDS, maxInterval,  maxUnit, ii + 1, retval);
-                        } catch (Exception e3) {
-                            retval.setException(e3);
-                        }
-                    }
-                };
-                if (ses == es) task.run();
-                else es.execute(task);
-            }
-
+                try {
+                    retval.set(callable.call());
+                } catch (RetryException e) {
+                    retryHelper(ses, es, callable, maxAttempts - 1,
+                            interval, TimeUnit.MILLISECONDS, maxInterval,  maxUnit, ii + 1, retval);
+                } catch (Exception e3) {
+                    retval.setException(e3);
+                }
+            };
+            if (ses == es) task.run();
+            else es.execute(task);
         }, interval, TimeUnit.MILLISECONDS);
     }
 
-    public static final long LOCK_SPIN_MICROSECONDS = TimeUnit.MICROSECONDS.toNanos(Integer.getInteger("LOCK_SPIN_MICROS", 0));
+    public static final long LOCK_SPIN_MICROSECONDS =
+            TimeUnit.MICROSECONDS.toNanos(Integer.getInteger("LOCK_SPIN_MICROS", 0));
 
     /*
      * Spin on a ReentrantLock before blocking. Default behavior is not to spin.
@@ -1204,7 +1159,7 @@ public class CoreUtils {
      */
     public static <T> T queueSpinTake(BlockingQueue<T> queue) throws InterruptedException {
         if (QUEUE_SPIN_MICROSECONDS > 0) {
-            T retval = null;
+            T retval;
             long nanos = -1;
             for (;;) {
                 if ((retval = queue.poll()) != null) return retval;
@@ -1224,14 +1179,12 @@ public class CoreUtils {
      * will not cause the Server harm if they occur while invoking the initializer of a stored
      * procedure or while calling the stored procedure.
      */
-    public static final boolean isStoredProcThrowableFatalToServer(Throwable th) {
+    public static boolean isStoredProcThrowableFatalToServer(Throwable th) {
         if (th instanceof LinkageError || th instanceof AssertionError) {
             return false;
+        } else {
+            return !(th instanceof Exception);
         }
-        if (th instanceof Exception) {
-            return false;
-        }
-        return true;
     };
 
     /**
@@ -1239,16 +1192,13 @@ public class CoreUtils {
      */
     public static <K extends Comparable< ? super K>,V extends Comparable< ? super V>> List<Entry<K,V>>
             sortKeyValuePairByValue(Map<K,V> map) {
-        List<Map.Entry<K,V>> entries = new ArrayList<Map.Entry<K,V>>(map.entrySet());
-        Collections.sort(entries, new Comparator<Map.Entry<K,V>>() {
-            @Override
-            public int compare(Entry<K,V> o1, Entry<K,V> o2) {
-                if (!o1.getValue().equals(o2.getValue())) {
-                    return (o1.getValue()).compareTo(o2.getValue());
-                }
-                return o1.getKey().compareTo(o2.getKey());
+        List<Map.Entry<K,V>> entries = new ArrayList<>(map.entrySet());
+        entries.sort((o1, o2) -> {
+            if (!o1.getValue().equals(o2.getValue())) {
+                return (o1.getValue()).compareTo(o2.getValue());
             }
-        } );
+            return o1.getKey().compareTo(o2.getKey());
+        });
         return entries;
     }
 
@@ -1259,8 +1209,7 @@ public class CoreUtils {
      * @param msg   Message to be printed out beautifully
      * @param level Logging level
      */
-    public static void printAsciiArtLog(VoltLogger vLogger, String msg, Level level)
-    {
+    public static void printAsciiArtLog(VoltLogger vLogger, String msg, Level level) {
         if (vLogger == null || msg == null || level == Level.OFF) { return; }
 
         // Length of stars = msg length, plus 4 for the surrounding "* " and " *"
