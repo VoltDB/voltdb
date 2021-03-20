@@ -500,12 +500,12 @@ bool IndexScanExecutor::p_execute(const NValueArray &params) {
         }
         if (skip) {
             continue;
-        } else if (inital_expression) {
+        } else if (initial_expression) {
             /**
              * ENG-20904
              * Evaluate all tuples on initial_expression, until we no
              * longer need to skip, after which there is no futher need to
-             * evaluate on inital_expression.
+             * evaluate on initial_expression.
              */
             initial_expression = nullptr;
         }
