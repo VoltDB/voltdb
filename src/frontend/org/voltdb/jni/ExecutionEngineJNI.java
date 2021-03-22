@@ -157,6 +157,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             final String hostname,
             final int drClusterId,
             final int defaultDrBufferSize,
+            final boolean drIgnoreConflicts,
+            final int drCrcErrorIgnoreMax,
+            final boolean drCrcErrorIgnoreFatal,
             final int tempTableMemory,
             final HashinatorConfig hashinatorConfig,
             final boolean isLowestSiteId)
@@ -187,6 +190,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                     getStringBytes(hostname),
                     drClusterId,
                     defaultDrBufferSize,
+                    drIgnoreConflicts,
+                    drCrcErrorIgnoreMax,
+                    drCrcErrorIgnoreFatal,
                     tempTableMemory * 1024 * 1024,
                     isLowestSiteId,
                     EE_COMPACTION_THRESHOLD);

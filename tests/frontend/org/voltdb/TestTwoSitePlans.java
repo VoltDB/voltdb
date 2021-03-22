@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -126,6 +126,9 @@ public class TestTwoSitePlans extends TestCase {
                                 "",
                                 0,
                                 64*1024,
+                                false,
+                                -1,
+                                false,
                                 100,
                                 new HashinatorConfig(configBytes, 0, 0), true));
             }
@@ -146,6 +149,9 @@ public class TestTwoSitePlans extends TestCase {
                                 "",
                                 0,
                                 64*1024,
+                                false,
+                                -1,
+                                false,
                                 100,
                                 new HashinatorConfig(configBytes, 0, 0), false));
             }

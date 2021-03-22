@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -236,6 +236,9 @@ public class TestTheHashinator {
                         "",
                         0,
                         64*1024,
+                        false,
+                        -1,
+                        false,
                         100,
                         config, false);
 
@@ -272,6 +275,9 @@ public class TestTheHashinator {
                         "",
                         0,
                         64*1024,
+                        false,
+                        -1,
+                        false,
                         100,
                         hashinatorConfig, false);
 
@@ -347,6 +353,9 @@ public class TestTheHashinator {
                             "",
                             0,
                             64*1024,
+                            false,
+                            -1,
+                            false,
                             100,
                             hashinatorConfig, false);
 
@@ -395,6 +404,9 @@ public class TestTheHashinator {
                         "",
                         0,
                         64*1024,
+                        false,
+                        -1,
+                        false,
                         100,
                         new HashinatorConfig(configBytes, 0, 0), false);
 
@@ -430,7 +442,7 @@ public class TestTheHashinator {
     @Test
     public void testSameLongHash() throws Exception {
         byte configBytes[] = TheHashinator.getConfigureBytes(1);
-        ExecutionEngine ee = new ExecutionEngineJNI(1, 1, 0, -1, 0, "", 0, 64*1024, 100,
+        ExecutionEngine ee = new ExecutionEngineJNI(1, 1, 0, -1, 0, "", 0, 64*1024, false, -1, false, 100,
                 new HashinatorConfig(configBytes, 0, 0), false);
 
         /**
@@ -472,6 +484,9 @@ public class TestTheHashinator {
                         "",
                         0,
                         64*1024,
+                        false,
+                        -1,
+                        false,
                         100,
                         new HashinatorConfig(configBytes, 0, 0), false);
 
@@ -544,6 +559,9 @@ public class TestTheHashinator {
                         "",
                         0,
                         64*1024,
+                        false,
+                        -1,
+                        false,
                         100,
                         new HashinatorConfig(TheHashinator.getConfigureBytes(2), 0, 0), false);
         final byte configBytes[] = TheHashinator.getConfigureBytes(2);
@@ -611,6 +629,9 @@ public class TestTheHashinator {
                         "",
                         0,
                         64*1024,
+                        false,
+                        -1,
+                        false,
                         100,
                         new HashinatorConfig(TheHashinator.getConfigureBytes(6), 0, 0), false);
         for (int i = 0; i < 2500; i++) {

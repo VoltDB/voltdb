@@ -173,6 +173,9 @@ VoltDBEngine::initialize(
         std::string const& hostname,
         int32_t drClusterId,
         int32_t defaultDrBufferSize,
+        bool drIgnoreConflicts,
+        int32_t drCrcErrorIgnoreMax,
+        bool drCrcErrorIgnoreFatal,
         int64_t tempTableMemoryLimit,
         bool isLowestSite,
         int32_t compactionThreshold) {
@@ -201,6 +204,12 @@ VoltDBEngine::initialize(
 
     m_templateSingleLongTable[38] = 1; // row count
     m_templateSingleLongTable[42] = 8; // row size
+
+    if (drIgnoreConflicts) {
+        m_wrapper.enableIgnoreConflicts();
+    }
+    m_wrapper.setCrcErrorIgnoreMax(drCrcErrorIgnoreMax);
+    m_wrapper.setCrcErrorIgnoreFatal(drCrcErrorIgnoreFatal);
 
     // configure DR stream
     m_drStream = new DRTupleStream(partitionId, static_cast<size_t>(defaultDrBufferSize));

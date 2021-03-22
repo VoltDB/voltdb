@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -195,6 +195,12 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
             m_partitionDRGatewayClass,
             "pushDRBuffer",
             "(IJJJJJILorg/voltcore/utils/DBBPool$BBContainer;)J");
+
+    m_reportDRBufferMID = m_jniEnv->GetStaticMethodID(
+            m_partitionDRGatewayClass,
+            "reportDRBuffer",
+            "(ILjava/lang/String;Ljava/nio/ByteBuffer;)V"
+    );
 
     m_pushPoisonPillMID = m_jniEnv->GetStaticMethodID(
             m_partitionDRGatewayClass,
@@ -644,6 +650,28 @@ int64_t JNITopend::pushDRBuffer(int32_t partitionId, DrStreamBlock *block) {
         delete block;
     }
     return retval;
+}
+
+void JNITopend::reportDRBuffer(int32_t partitionId, const char *reason, const char *buffer, size_t length) {
+
+    if (buffer != NULL) {
+        jstring jReason = m_jniEnv->NewStringUTF(reason);
+        if (jReason == NULL) {
+            m_jniEnv->ExceptionDescribe();
+            throw std::exception();
+        }
+        jobject jbuffer = m_jniEnv->NewDirectByteBuffer(const_cast<char *>(buffer), length);
+        if (jbuffer == NULL) {
+            m_jniEnv->ExceptionDescribe();
+            throw std::exception();
+        }
+        m_jniEnv->CallStaticLongMethod(
+                m_partitionDRGatewayClass,
+                m_reportDRBufferMID,
+                partitionId, jReason, jbuffer, length);
+        m_jniEnv->DeleteLocalRef(jbuffer);
+        m_jniEnv->DeleteLocalRef(jReason);
+    }
 }
 
 void JNITopend::pushPoisonPill(int32_t partitionId, std::string& reason, DrStreamBlock *block) {

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -85,6 +85,10 @@ namespace voltdb {
         drBlocks.push_back(boost::shared_ptr<DrStreamBlock>(block));
         data.push_back(boost::shared_array<char>(block->rawPtr()));
         return pushDRBufferRetval;
+    }
+
+    void DummyTopend::reportDRBuffer(int32_t partitionId, const char *reason, const char *buffer, size_t length) {
+        return;
     }
 
     void DummyTopend::pushPoisonPill(int32_t partitionId, std::string& reason, DrStreamBlock *block) {

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -309,19 +309,12 @@ void exportDRConflict(StreamedTable *exportTable,
     }
 }
 
-void validateChecksum(uint32_t checksum, const char *start, const char *end) {
-    uint32_t recalculatedCRC = vdbcrc::crc32cInit();
-    recalculatedCRC = vdbcrc::crc32c( recalculatedCRC, start, (end - 4) - start);
-    recalculatedCRC = vdbcrc::crc32cFinish(recalculatedCRC);
-
-    if (recalculatedCRC != checksum) {
-        throwFatalException("CRC mismatch of DR log data %d and %d", checksum, recalculatedCRC);
-    }
-}
-
 bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, TableTuple *existingTuple,
         const TableTuple *expectedTuple, TableTuple *newTuple, int64_t uniqueId, int32_t remoteClusterId,
-        DRRecordType actionType, DRConflictType deleteConflict, DRConflictType insertConflict) {
+        DRRecordType actionType, DRConflictType deleteConflict, DRConflictType insertConflict, bool m_drIgnoreConflicts) {
+    if (m_drIgnoreConflicts) {
+        return true;
+    }
     if (!engine) {
         return false;
     }
@@ -544,12 +537,12 @@ public:
     /**
      * Skip any remaining logs in a transaction and call BinaryLog::validateEndTxn
      */
-    void skipRecordsAndValidateTxn() {
+    void skipRecordsAndValidateTxn(VoltDBEngine *engine, int *crcErrorCount, int drCrcErrorIgnoreMax, bool drCrcErrorFatal) {
         m_taskInfo.getRawPointer(
                 (m_txnStart + m_txnLen) - (m_taskInfo.getRawPointer() + DRTupleStream::END_RECORD_SIZE));
         DRRecordType __attribute__ ((unused)) type = readRecordType();
         vassert(type = DR_RECORD_END_TXN);
-        validateEndTxn();
+        validateEndTxn(engine, crcErrorCount, drCrcErrorIgnoreMax, drCrcErrorFatal);
     }
 
     /**
@@ -557,7 +550,7 @@ public:
      *
      * Note: DR_RECORD_END_TXN must already have been consumed prior to invoking this method
      */
-    void validateEndTxn() {
+    void validateEndTxn(VoltDBEngine *engine, int *crcErrorCount, int drCrcErrorIgnoreMax, bool drCrcErrorFatal) {
         int64_t tempSequenceNumber = m_taskInfo.readLong();
         if (tempSequenceNumber != m_sequenceNumber) {
             throwFatalException("Closing the wrong transaction inside a binary log segment. Expected %jd but found %jd",
@@ -565,7 +558,34 @@ public:
         }
         uint32_t checksum = m_taskInfo.readInt();
         vassert(m_taskInfo.getRawPointer() == m_txnStart + m_txnLen);
-        validateChecksum(checksum, m_txnStart, m_taskInfo.getRawPointer());
+        validateChecksum(engine, checksum, m_txnStart, m_taskInfo.getRawPointer(), m_txnLen, isReplicatedTableLog(),
+                         crcErrorCount, drCrcErrorIgnoreMax, drCrcErrorFatal);
+    }
+
+    void validateChecksum(VoltDBEngine *engine, uint32_t checksum,
+                          const char *start, const char *end, int32_t txnLength, bool isMultiHash,
+                          int *crcErrorCount, int drCrcErrorIgnoreMax, bool drCrcErrorFatal) {
+        uint32_t recalculatedCRC = vdbcrc::crc32cInit();
+        recalculatedCRC = vdbcrc::crc32c(recalculatedCRC, start, (txnLength - sizeof(recalculatedCRC)));
+        recalculatedCRC = vdbcrc::crc32cFinish(recalculatedCRC);
+
+        if (recalculatedCRC != checksum) {
+            *crcErrorCount = *crcErrorCount + 1;
+            char errMsg[1024];
+            snprintf(errMsg, 1024, "CRC mismatch of DR log data %d and %d details "
+                                   "(ignoreMax=%d) (txnLengthforcrc = %ld, buflenforcrc=%ld, multiHash = %s)",
+                     checksum, recalculatedCRC, drCrcErrorIgnoreMax, (txnLength - sizeof(recalculatedCRC)),
+                     (end - 4) - start, (isMultiHash ? "true" : "false"));
+            ExecutorContext::getPhysicalTopend()->reportDRBuffer(engine->getPartitionId(), errMsg, start, txnLength);
+            if (*crcErrorCount > drCrcErrorIgnoreMax) { // Break replication or fatal
+                if (drCrcErrorFatal) {
+                    throwFatalException("%s", errMsg);
+                } else {
+                    throwSerializableEEException("%s", errMsg);
+                }
+            }
+            // else we commit.
+        }
     }
 
     /**
@@ -648,7 +668,12 @@ private:
     const char *m_logEnd;
 };
 
-BinaryLogSink::BinaryLogSink() {}
+BinaryLogSink::BinaryLogSink() :
+        m_drIgnoreConflicts(false),
+        m_drCrcErrorIgnoreMax(-1),
+        m_drCrcErrorFatal(true),
+        m_crcErrorCount(0) {
+}
 
 // Shared success boolean used when applying binary logs for replicated table
 bool s_replicatedApplySuccess;
@@ -786,7 +811,7 @@ int64_t BinaryLogSink::applyMpTxn(const char *rawLogs, int32_t logCount,
             if (type == DR_RECORD_END_TXN) {
                 vassert(truncateCount == 0);
 
-                logs[i]->validateEndTxn();
+                logs[i]->validateEndTxn(engine, &m_crcErrorCount, m_drCrcErrorIgnoreMax, m_drCrcErrorFatal);
                 ++completedLogs;
             }
         }
@@ -852,7 +877,7 @@ int64_t BinaryLogSink::applyTxn(BinaryLog *log, std::unordered_map<int64_t, Pers
         rowCount += applyRecord(log, type, tables, pool, engine, remoteClusterId, skipRow);
     }
 
-    log->validateEndTxn();
+    log->validateEndTxn(engine, &m_crcErrorCount, m_drCrcErrorIgnoreMax, m_drCrcErrorFatal);
 
     STOP_TIMER(timer, applyLogs, "applied %ld rows from %d uniqueId: %ld, sequenceNumber: %ld", rowCount,
             remoteClusterId, log->m_uniqueId, log->m_sequenceNumber);
@@ -877,7 +902,7 @@ int64_t BinaryLogSink::applyReplicatedTxn(BinaryLog *log, std::unordered_map<int
                 VoltEEExceptionType::VOLT_EE_EXCEPTION_TYPE_REPLICATED_TABLE, msg);
     } else {
         VOLT_TRACE("Skipping applyBinaryLogMP for replicated table");
-        log->skipRecordsAndValidateTxn();
+        log->skipRecordsAndValidateTxn(engine, &m_crcErrorCount, m_drCrcErrorIgnoreMax, m_drCrcErrorFatal);
     }
 
     vassert(!log->m_taskInfo.hasRemaining());
@@ -929,7 +954,7 @@ int64_t BinaryLogSink::applyRecord(
             if (engine->getIsActiveActiveDREnabled()) {
                 if (handleConflict(engine, table, pool, NULL, NULL, const_cast<TableTuple *>(e.getConflictTuple()),
                                    uniqueId, remoteClusterId, DR_RECORD_INSERT, NO_CONFLICT,
-                                   CONFLICT_CONSTRAINT_VIOLATION)) {
+                                   CONFLICT_CONSTRAINT_VIOLATION, m_drIgnoreConflicts)) {
                     break;
                 }
             }
@@ -966,7 +991,7 @@ int64_t BinaryLogSink::applyRecord(
         TableTuple deleteTuple = table->lookupTupleForDR(tempTuple);
         if (deleteTuple.isNullTuple()) {
             if (engine->getIsActiveActiveDREnabled()) {
-                if (handleConflict(engine, table, pool, NULL, &tempTuple, NULL, uniqueId, remoteClusterId, DR_RECORD_DELETE, CONFLICT_EXPECTED_ROW_MISSING, NO_CONFLICT)) {
+                if (handleConflict(engine, table, pool, NULL, &tempTuple, NULL, uniqueId, remoteClusterId, DR_RECORD_DELETE, CONFLICT_EXPECTED_ROW_MISSING, NO_CONFLICT, m_drIgnoreConflicts)) {
                     break;
                 }
             }
@@ -982,7 +1007,7 @@ int64_t BinaryLogSink::applyRecord(
             int64_t remoteTimestamp = ExecutorContext::getDRTimestampFromHiddenNValue(remoteHiddenColumn);
             if (localTimestamp != remoteTimestamp) {
                 // timestamp mismatch conflict
-                if (handleConflict(engine, table, pool, &deleteTuple, &tempTuple, NULL, uniqueId, remoteClusterId, DR_RECORD_DELETE, CONFLICT_EXPECTED_ROW_MISMATCH, NO_CONFLICT)) {
+                if (handleConflict(engine, table, pool, &deleteTuple, &tempTuple, NULL, uniqueId, remoteClusterId, DR_RECORD_DELETE, CONFLICT_EXPECTED_ROW_MISMATCH, NO_CONFLICT, m_drIgnoreConflicts)) {
                     break;
                 }
             }
@@ -1039,7 +1064,7 @@ int64_t BinaryLogSink::applyRecord(
                 if (handleConflict(engine, table, pool, NULL, &expectedTuple,
                                    &tempTuple, uniqueId, remoteClusterId,
                                    DR_RECORD_UPDATE, CONFLICT_EXPECTED_ROW_MISSING,
-                                   NO_CONFLICT)) {
+                                   NO_CONFLICT, m_drIgnoreConflicts)) {
                     break;
                 }
             }
@@ -1057,7 +1082,7 @@ int64_t BinaryLogSink::applyRecord(
                 if (handleConflict(engine, table, pool, &oldTuple, &expectedTuple,
                                    &tempTuple, uniqueId, remoteClusterId,
                                    DR_RECORD_UPDATE, CONFLICT_EXPECTED_ROW_MISMATCH,
-                                   NO_CONFLICT)) {
+                                   NO_CONFLICT, m_drIgnoreConflicts)) {
                     break;
                 }
             }
@@ -1070,7 +1095,7 @@ int64_t BinaryLogSink::applyRecord(
                 if (handleConflict(engine, table, pool, NULL, e.getOriginalTuple(),
                                    const_cast<TableTuple *>(e.getConflictTuple()),
                                    uniqueId, remoteClusterId, DR_RECORD_UPDATE,
-                                   NO_CONFLICT, CONFLICT_CONSTRAINT_VIOLATION)) {
+                                   NO_CONFLICT, CONFLICT_CONSTRAINT_VIOLATION, m_drIgnoreConflicts)) {
                     break;
                 }
             }

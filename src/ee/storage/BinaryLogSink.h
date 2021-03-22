@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -47,7 +47,16 @@ public:
     int64_t apply(const char *logs, std::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool,
             VoltDBEngine *engine, int32_t remoteClusterId, int64_t localUniqueId);
 
+    inline void enableIgnoreConflicts() { m_drIgnoreConflicts = true; }
+    inline void setIgnoreCrcErrorMax(int32_t max) { m_drCrcErrorIgnoreMax = max; }
+    inline void setIgnoreCrcErrorFatal(bool flag) { m_drCrcErrorFatal = flag; }
+
 private:
+    bool m_drIgnoreConflicts;
+    int32_t m_drCrcErrorIgnoreMax;
+    bool m_drCrcErrorFatal;
+    int32_t m_crcErrorCount;
+
     /**
      * Apply all transactions within one log
      */
@@ -78,6 +87,7 @@ private:
     int64_t applyRecord(BinaryLog *log, const DRRecordType type,
             std::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool, VoltDBEngine *engine,
             int32_t remoteClusterId, bool skipRow);
+
 };
 
 

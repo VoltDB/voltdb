@@ -61,6 +61,9 @@ public:
                              "",    // hostname
                              0,     // drClusterId
                              1024,  // defaultDrBufferSize
+                             false,
+                             -1,
+                             false,
                              voltdb::DEFAULT_TEMP_TABLE_MEMORY,
                              true,  // this is the loweest SiteId/PartitionId
                              95);   // compaction threshold

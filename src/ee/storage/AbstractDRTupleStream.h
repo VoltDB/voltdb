@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -54,6 +54,8 @@ public:
     virtual ~AbstractDRTupleStream() {}
 
     void pushStreamBuffer(DrStreamBlock *block);
+
+    void reportDRBuffer(const char *reason, const char *buffer, size_t size);
 
     /** truncate stream back to mark (only virtual for Mock override) */
     inline void rollbackDrTo(size_t mark, size_t drRowCost)

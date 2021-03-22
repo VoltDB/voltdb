@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -52,6 +52,8 @@ public:
 
     int64_t pushDRBuffer(int32_t partitionId, DrStreamBlock *block);
 
+    void reportDRBuffer(int32_t partitionId, const char *reason, const char *buffer, size_t length);
+
     void pushPoisonPill(int32_t partitionId, std::string& reason, DrStreamBlock *block);
 
     int reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, DRRecordType action,
@@ -97,6 +99,7 @@ private:
     jmethodID m_pushDRBufferMID;
     jmethodID m_pushPoisonPillMID;
     jmethodID m_reportDRConflictMID;
+    jmethodID m_reportDRBufferMID;
     jmethodID m_decodeBase64AndDecompressToBytesMID;
     jmethodID m_callJavaUserDefinedFunctionMID;
     jmethodID m_callJavaUserDefinedAggregateStartMID;

@@ -79,6 +79,9 @@ private:
                              "",    // hostname
                              0,     // drClusterId
                              1024,  // defaultDrBufferSize
+                             false,
+                             -1,
+                             false,
                              tempTableMemoryLimitInBytes,
                              true, // this is lowest site/engineId
                              95);   // compaction threshold

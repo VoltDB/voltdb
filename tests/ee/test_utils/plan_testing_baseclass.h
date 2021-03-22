@@ -157,7 +157,7 @@ public:
         m_engine->resetReusedResultOutputBuffer();
         m_engine->resetPerFragmentStatsOutputBuffer();
         int partitionCount = 1;
-        m_engine->initialize(m_cluster_id, m_site_id, 0, partitionCount, 0, "", 0, 1024, voltdb::DEFAULT_TEMP_TABLE_MEMORY, true);
+        m_engine->initialize(m_cluster_id, m_site_id, 0, partitionCount, 0, "", 0, 1024, false, -1, false, voltdb::DEFAULT_TEMP_TABLE_MEMORY, true);
         partitionCount = htonl(partitionCount);
         int tokenCount = htonl(100);
         int partitionId = htonl(0);

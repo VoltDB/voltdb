@@ -151,6 +151,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                         std::string const& hostname,
                         int32_t drClusterId,
                         int32_t defaultDrBufferSize,
+                        bool drIgnoreConflicts,
+                        int32_t drCrcErrorIgnoreMax,
+                        bool drCrcErrorIgnoreFatal,
                         int64_t tempTableMemoryLimit,
                         bool isLowestSiteId,
                         int32_t compactionThreshold = 95);

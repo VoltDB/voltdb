@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -185,6 +185,10 @@ public class PartitionDRGateway implements DurableUniqueIdListener, TransactionC
         failedBufContainer.discard();
     }
 
+    public void onReportDRBuffer(int partitionId, String reason, ByteBuffer failedBuf) {
+        // Dont do anything if DR is enabled we wont come here at all.
+    }
+
     @Override
     public void lastUniqueIdsMadeDurable(long spUniqueId, long mpUniqueId) {}
 
@@ -205,6 +209,14 @@ public class PartitionDRGateway implements DurableUniqueIdListener, TransactionC
         }
         return pdrg.onBinaryDR(lastCommittedSpHandle, partitionId, startSequenceNumber, lastSequenceNumber,
                 lastSpUniqueId, lastMpUniqueId, EventType.values()[eventType], cont);
+    }
+
+    public static void reportDRBuffer(int partitionId, String reason, ByteBuffer buf) {
+        final PartitionDRGateway pdrg = m_partitionDRGateways.get(partitionId);
+        if (pdrg == null) {
+            return;
+        }
+        pdrg.onReportDRBuffer(partitionId, reason, buf);
     }
 
     public static void pushPoisonPill(int partitionId, String reason, BBContainer failedBufContainer) {

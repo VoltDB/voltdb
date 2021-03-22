@@ -128,6 +128,8 @@ public:
 
     int64_t pushDRBuffer(int32_t partitionId, voltdb::DrStreamBlock *block);
 
+    void reportDRBuffer(int32_t partitionId, const char *reason, const char *buffer, size_t length);
+
     void pushPoisonPill(int32_t partitionId, std::string& reason, voltdb::DrStreamBlock *block);
 
     /**
@@ -780,6 +782,9 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
         int hostId;
         int drClusterId;
         int defaultDrBufferSize;
+        int drIgnoreConflicts;
+        int32_t drCrcErrorIgnoreMax;
+        int drCrcErrorIgnoreFatal;
         int64_t logLevels;
         int64_t tempTableMemory;
         int32_t isLowestSiteId;
@@ -799,10 +804,14 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
     cs->hostId = ntohl(cs->hostId);
     cs->drClusterId = ntohl(cs->drClusterId);
     cs->defaultDrBufferSize = ntohl(cs->defaultDrBufferSize);
+    cs->drIgnoreConflicts = ntohl(cs->drIgnoreConflicts);
+    cs->drCrcErrorIgnoreMax = ntohl(cs->drCrcErrorIgnoreMax);
     cs->logLevels = ntohll(cs->logLevels);
     cs->tempTableMemory = ntohll(cs->tempTableMemory);
     cs->isLowestSiteId = ntohl(cs->isLowestSiteId);
     bool isLowestSiteId = cs->isLowestSiteId != 0;
+    bool drIgnoreConflicts = cs->drIgnoreConflicts != 0;
+    bool drCrcErrorIgnoreFatal = cs->drCrcErrorIgnoreFatal != 0;
     cs->hostnameLength = ntohl(cs->hostnameLength);
 
     std::string hostname(cs->data, cs->hostnameLength);
@@ -832,6 +841,9 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
                              hostname,
                              cs->drClusterId,
                              cs->defaultDrBufferSize,
+                             drIgnoreConflicts,
+                             cs->drCrcErrorIgnoreMax,
+                             drCrcErrorIgnoreFatal,
                              cs->tempTableMemory,
                              isLowestSiteId);
         return kErrorCode_Success;
@@ -1971,6 +1983,10 @@ int64_t VoltDBIPC::pushDRBuffer(int32_t partitionId, DrStreamBlock *block) {
         delete block;
     }
     return -1;
+}
+
+void VoltDBIPC::reportDRBuffer(int32_t partitionId, const char *reason, const char *buffer, size_t length) {
+    return;
 }
 
 void VoltDBIPC::pushPoisonPill(int32_t partitionId, std::string& reason, voltdb::DrStreamBlock *block) {

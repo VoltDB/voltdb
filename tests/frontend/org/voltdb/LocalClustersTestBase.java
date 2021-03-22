@@ -31,8 +31,10 @@ import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
@@ -62,9 +64,7 @@ import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.test.utils.RandomTestRule;
 import org.voltdb.utils.VoltFile;
-
 import com.google_voltpatches.common.collect.ImmutableList;
-import com.google_voltpatches.common.collect.ImmutableMap;
 
 public class LocalClustersTestBase extends JUnit4LocalClusterTest {
     static final String JAR_NAME = "lcsmoke.jar";
@@ -430,8 +430,7 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
                 lc = LocalCluster.createLocalCluster(schemaDDL, config.siteCount, config.hostCount, config.kfactor,
                         clusterNumber, 11000 + (clusterNumber * 100), clusterNumber == 0 ? 11100 : 11000,
                         m_temporaryFolder.newFolder().getAbsolutePath(), JAR_NAME, drRoleType,
-                        false, config.builder, getClass().getSimpleName(), m_methodName, false, ImmutableMap.of());
-
+                        false, config.builder, getClass().getSimpleName(), m_methodName, false, config.getConfigurationOverrides());
                 System.out.println("Creating client for cluster " + clusterNumber);
                 c = lc.createAdminClient(clientConfig);
             } catch (Throwable t) {
@@ -703,6 +702,7 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
         final int kfactor;
         final DrRoleType drRoleType;
         final VoltProjectBuilder builder;
+        final Map<String, String> m_props = new HashMap<>();
 
         public ClusterConfiguration(int siteCount) {
             this(siteCount, 1, 0);
@@ -724,6 +724,14 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
             this.kfactor = kfactor;
             this.drRoleType = drRoleType;
             this.builder = builder;
+        }
+
+        public void setConfigurationOverride(String key, String value) {
+            m_props.put(key, value);
+        }
+
+        public Map getConfigurationOverrides() {
+            return Collections.unmodifiableMap(m_props);
         }
 
         @Override

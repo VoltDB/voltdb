@@ -813,6 +813,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         ExecutionEngine eeTemp = null;
         Deployment deploy = m_context.cluster.getDeployment().get("deployment");
         final int defaultDrBufferSize = Integer.getInteger("DR_DEFAULT_BUFFER_SIZE", 512 * 1024); // 512KB
+        final boolean drIgnoreConflicts = Boolean.getBoolean("DR_IGNORE_CONFLICTS");
+        final int drCrcErrorIgnoreMax = Integer.getInteger("DR_IGNORE_CRC_ERROR_MAX", -1);
+        final boolean drCrcErrorIgnoreFatal = Boolean.valueOf(System.getProperty("DR_IGNORE_CRC_ERROR_FATAL", "true"));
+        drLog.info("DR CRC check configuration: Ignore Max=" +
+                drCrcErrorIgnoreMax + " CrcErrorFatal=" + drCrcErrorIgnoreFatal);
         int tempTableMaxSize = deploy.getSystemsettings().get("systemsettings").getTemptablemaxsize();
         if (System.getProperty("TEMP_TABLE_MAX_SIZE") != null) {
             // Allow a system property to override the deployment setting
@@ -833,6 +838,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         hostname,
                         m_context.cluster.getDrclusterid(),
                         defaultDrBufferSize,
+                        drIgnoreConflicts,
+                        drCrcErrorIgnoreMax,
+                        drCrcErrorIgnoreFatal,
                         tempTableMaxSize,
                         hashinatorConfig,
                         m_isLowestSiteId);
@@ -849,6 +857,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         hostname,
                         m_context.cluster.getDrclusterid(),
                         defaultDrBufferSize,
+                        drIgnoreConflicts,
+                        drCrcErrorIgnoreMax,
+                        drCrcErrorIgnoreFatal,
                         tempTableMaxSize,
                         hashinatorConfig,
                         m_isLowestSiteId);
@@ -866,6 +877,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                             hostname,
                             m_context.cluster.getDrclusterid(),
                             defaultDrBufferSize,
+                            drIgnoreConflicts,
+                            drCrcErrorIgnoreMax,
+                            drCrcErrorIgnoreFatal,
                             tempTableMaxSize,
                             m_backend,
                             VoltDB.instance().getConfig().m_ipcPort,

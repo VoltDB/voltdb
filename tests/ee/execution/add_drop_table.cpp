@@ -65,6 +65,9 @@ class AddDropTableTest : public Test {
                              m_hostName,
                              m_drClusterId,
                              1024,
+                             false,
+                             -1,
+                             false,
                              DEFAULT_TEMP_TABLE_MEMORY,
                              true);
         partitionCount = htonl(partitionCount);

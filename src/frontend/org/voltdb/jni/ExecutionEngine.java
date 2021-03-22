@@ -1062,6 +1062,9 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             byte hostname[],
             int drClusterId,
             int defaultDrBufferSize,
+            boolean drIgnoreConflicts,
+            int drCrcErrorIgnoreMax,
+            boolean drCrcErrorIgnoreFatal,
             long tempTableMemory,
             boolean createDrReplicatedStream,
             int compactionThreshold);
