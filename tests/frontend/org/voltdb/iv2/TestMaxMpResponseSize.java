@@ -106,7 +106,6 @@ public class TestMaxMpResponseSize extends JUnit4LocalClusterTest {
 
             ClientConfig config = new ClientConfig();
             config.setTopologyChangeAware(true);
-            config.setClientAffinity(true);
             client = cluster.createClient(config);
 
             AtomicInteger failures = new AtomicInteger();

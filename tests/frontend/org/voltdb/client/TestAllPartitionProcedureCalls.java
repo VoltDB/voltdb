@@ -73,7 +73,6 @@ public class TestAllPartitionProcedureCalls extends JUnit4LocalClusterTest {
         cluster.startUp();
 
         ClientConfig config = new ClientConfig();
-        config.setClientAffinity(false);
         client = ClientFactory.createClient(config);
         client.createConnection("", cluster.port(0));
         load(client, "TABLE_INT_PARTITION");

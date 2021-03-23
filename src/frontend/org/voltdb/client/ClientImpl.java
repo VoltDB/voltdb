@@ -36,8 +36,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
 
-import com.google_voltpatches.common.net.HostAndPort;
-
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.ssl.SSLConfiguration;
 import org.voltdb.ClientResponseImpl;
@@ -49,6 +47,8 @@ import org.voltdb.client.VoltBulkLoader.VoltBulkLoader;
 import org.voltdb.common.Constants;
 import org.voltdb.utils.Encoder;
 
+import com.google_voltpatches.common.net.HostAndPort;
+
 import io.netty.handler.ssl.SslContext;
 
 /**
@@ -57,11 +57,6 @@ import io.netty.handler.ssl.SslContext;
  *  responses.
  */
 public final class ClientImpl implements Client {
-
-    /*
-     * refresh the partition key cache every 1 second
-     */
-    static long PARTITION_KEYS_INFO_REFRESH_FREQUENCY = 1000;
 
     // call initiated by the user use positive handles
     private final AtomicLong m_handle = new AtomicLong(0);
@@ -119,10 +114,6 @@ public final class ClientImpl implements Client {
      */
     ClientImpl(ClientConfig config) {
 
-        if (config.m_topologyChangeAware && !config.m_useClientAffinity) {
-            throw new IllegalArgumentException("The client affinity must be enabled to enable topology awareness.");
-        }
-
         if (config.m_enableSSL) {
             m_sslContext = SSLConfiguration.createClientSslContext(config.m_sslConfig);
         } else {
@@ -133,7 +124,6 @@ public final class ClientImpl implements Client {
                 config.m_heavyweight,
                 config.m_procedureCallTimeoutNanos,
                 config.m_connectionResponseTimeoutMS,
-                config.m_useClientAffinity,
                 config.m_sendReadsToReplicasBytDefaultIfCAEnabled,
                 config.m_subject,
                 m_sslContext);

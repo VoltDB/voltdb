@@ -60,7 +60,6 @@ public class ClientConfig {
     int m_autoTuneTargetInternalLatency = 5;
     long m_procedureCallTimeoutNanos = DEFAULT_PROCEDURE_TIMOUT_NANOS;
     long m_connectionResponseTimeoutMS = DEFAULT_CONNECTION_TIMOUT_MS;
-    boolean m_useClientAffinity = true;
     Subject m_subject = null;
     boolean m_reconnectOnConnectionLoss;
     long m_initialConnectionRetryIntervalMS = DEFAULT_INITIAL_CONNECTION_RETRY_INTERVAL_MS;
@@ -342,17 +341,13 @@ public class ClientConfig {
     }
 
     /**
-     * <p>Attempts to route transactions to the correct master partition improving latency
-     * and throughput</p>
+     * @deprecated client affinity is always {@code true}: transactions are always
+     * routed to the correct master partition improving latency and throughput.
      *
-     * <p>If you are using persistent connections you definitely want this.</p>
-     *
-     * <p>Defaults to TRUE.</p>
-     *
-     * @param on Enable or disable the affinity feature.
+     * @param on unused
      */
+    @Deprecated
     public void setClientAffinity(boolean on) {
-        m_useClientAffinity = on;
     }
 
     /**

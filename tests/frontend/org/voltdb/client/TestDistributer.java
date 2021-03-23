@@ -368,10 +368,13 @@ public class TestDistributer extends TestCase {
             // Create a new distributor with a short connection timeout.
             // Authentication should time out because the server is not
             // reading anything.
-            Distributer dist = new Distributer(false,
-                                               ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
-                                               10,
-                                               false, false, null, null);
+            Distributer dist = new Distributer(
+                    false,
+                    ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
+                    10,
+                    false,
+                    null,
+                    null);
             dist.createConnection("localhost", "", "", 20000, ClientAuthScheme.HASH_SHA1);
 
             fail("Should have timed out");
@@ -480,7 +483,7 @@ public class TestDistributer extends TestCase {
             Distributer dist = new Distributer(false,
                     ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
                     ClientConfig.DEFAULT_CONNECTION_TIMOUT_MS,
-                    false, false, null /* subject */, null);
+                    false, null /* subject */, null);
             dist.addClientStatusListener(csl);
             dist.createConnection("localhost", "", "", 20000, ClientAuthScheme.HASH_SHA1);
             dist.createConnection("localhost", "", "", 20001, ClientAuthScheme.HASH_SHA1);
@@ -509,7 +512,9 @@ public class TestDistributer extends TestCase {
             dist.drain();
             System.err.println("Finished drain.");
 
-            assertEquals(2, volt0.handler.roundTrips.get());
+            // Invocations are round-robin because no hashinator is present
+            // However node 0 gets 4 more invocations to subscribe to topology updates
+            assertEquals(6, volt0.handler.roundTrips.get());
             assertEquals(2, volt1.handler.roundTrips.get());
             assertEquals(2, volt2.handler.roundTrips.get());
 
@@ -550,7 +555,7 @@ public class TestDistributer extends TestCase {
             Distributer dist = new Distributer(false,
                     ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
                     ClientConfig.DEFAULT_CONNECTION_TIMOUT_MS,
-                    false, false, null /* subject */, null);
+                    false, null /* subject */, null);
             dist.addClientStatusListener(csl);
             dist.createConnection("localhost", "", "", 20000, ClientAuthScheme.HASH_SHA1);
             dist.createConnection("localhost", "", "", 20001, ClientAuthScheme.HASH_SHA256);
@@ -579,7 +584,9 @@ public class TestDistributer extends TestCase {
             dist.drain();
             System.err.println("Finished drain.");
 
-            assertEquals(2, volt0.handler.roundTrips.get());
+            // Invocations are round-robin because no hashinator is present
+            // However node 0 gets 4 more invocations to subscribe to topology updates
+            assertEquals(6, volt0.handler.roundTrips.get());
             assertEquals(2, volt1.handler.roundTrips.get());
             assertEquals(2, volt2.handler.roundTrips.get());
 
@@ -638,7 +645,7 @@ public class TestDistributer extends TestCase {
         Distributer dist = new Distributer(false,
                 ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
                 1000 /* One second connection timeout */,
-                false, false, null /* subject */, null);
+                false, null /* subject */, null);
         dist.addClientStatusListener(new TimeoutMonitorCSL());
         dist.createConnection("localhost", "", "", 20000, ClientAuthScheme.HASH_SHA1);
 
@@ -705,7 +712,7 @@ public class TestDistributer extends TestCase {
         Distributer dist = new Distributer(false,
                 ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
                 2000 /* Two seconds connection timeout */,
-                false, false, null /* subject */, null);
+                false, null /* subject */, null);
         dist.addClientStatusListener(new TimeoutMonitorCSL());
         dist.createConnection("localhost", "", "", 20000, ClientAuthScheme.HASH_SHA1);
 
@@ -775,7 +782,7 @@ public class TestDistributer extends TestCase {
         Distributer dist = new Distributer(false,
                 ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
                 30000 /* thirty second connection timeout */,
-                false, false, null /* subject */, null);
+                false, null /* subject */, null);
         dist.createConnection("localhost", "", "", 20000, ClientAuthScheme.HASH_SHA1);
 
         // make sure it connected
@@ -831,7 +838,7 @@ public class TestDistributer extends TestCase {
         Distributer dist = new Distributer( false,
                 ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
                 CONNECTION_TIMEOUT /* six second connection timeout */,
-                false, false, null /* subject */, null);
+                false, null /* subject */, null);
         dist.addClientStatusListener(new TimeoutMonitorCSL());
         long start = System.currentTimeMillis();
         dist.createConnection("localhost", "", "", 20000, ClientAuthScheme.HASH_SHA1);

@@ -46,6 +46,7 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientImpl;
+
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.net.HostAndPort;
@@ -224,7 +225,6 @@ public class VoltDBKafkaPartitioner extends DefaultPartitioner {
         }
 
         ClientConfig clientConfig = new ClientConfig(userName, password);
-        clientConfig.setClientAffinity(true);
         clientConfig.setTopologyChangeAware(true);
 
         boolean sslEnabled = protocol == SecurityProtocol.SSL || protocol == SecurityProtocol.SASL_SSL;

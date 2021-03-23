@@ -465,7 +465,6 @@ public class TestClientFeatures extends TestCase {
         assertEquals(5, dut.m_autoTuneTargetInternalLatency);
         assertEquals(TimeUnit.MINUTES.toNanos(2), dut.m_procedureCallTimeoutNanos);
         assertEquals(TimeUnit.MINUTES.toMillis(2), dut.m_connectionResponseTimeoutMS);
-        assertTrue(dut.m_useClientAffinity);
         assertFalse(dut.m_reconnectOnConnectionLoss);
         assertEquals(TimeUnit.SECONDS.toMillis(1), dut.m_initialConnectionRetryIntervalMS);
         assertEquals(TimeUnit.SECONDS.toMillis(8), dut.m_maxConnectionRetryIntervalMS);

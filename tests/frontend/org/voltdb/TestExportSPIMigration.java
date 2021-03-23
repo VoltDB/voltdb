@@ -102,7 +102,6 @@ public class TestExportSPIMigration extends JUnit4LocalClusterTest
             cluster.startUp(true);
 
             ClientConfig config = new ClientConfig();
-            config.setClientAffinity(true);
             config.setTopologyChangeAware(true);
             config.setConnectionResponseTimeout(4*60*1000);
             config.setProcedureCallTimeout(4*60*1000);

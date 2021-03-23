@@ -19,6 +19,7 @@ package org.voltdb.iv2;
 
 import java.io.IOException;
 
+import org.apache.commons.lang3.StringUtils;
 import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
@@ -261,6 +262,9 @@ public class SpProcedureTask extends ProcedureTask
     {
         StringBuilder sb = new StringBuilder();
         sb.append(getClass().getSimpleName()).append(':');
+        if (!StringUtils.isEmpty(m_procName)) {
+            sb.append("  PROCNAME: ").append(m_procName);
+        }
         sb.append("  TXN ID: ").append(TxnEgo.txnIdToString(getTxnId()));
         sb.append("  SP HANDLE ID: ").append(TxnEgo.txnIdToString(getSpHandle()));
         sb.append("  ON HSID: ").append(CoreUtils.hsIdToString(m_initiator.getHSId()));

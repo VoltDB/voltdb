@@ -94,7 +94,6 @@ class Distributer {
     public static final Long ASYNC_TOPO_HANDLE = PING_HANDLE - 1;
     public static final Long ASYNC_PROC_HANDLE = PING_HANDLE - 2;
     static final long USE_DEFAULT_CLIENT_TIMEOUT = 0;
-    static long PARTITION_KEYS_INFO_REFRESH_FREQUENCY = Long.getLong("PARTITION_KEYS_INFO_REFRESH_FREQUENCY", 1000);
 
     // handles used internally are negative and decrement for each call
     public final AtomicLong m_sysHandle = new AtomicLong(-1);
@@ -114,7 +113,6 @@ class Distributer {
     private int m_nextConnection = 0;
 
     private final boolean m_useMultipleThreads;
-    private final boolean m_useClientAffinity;
     private final boolean m_sendReadsToReplicasBytDefaultIfCAEnabled;
 
     private static final class Procedure {
@@ -822,8 +820,7 @@ class Distributer {
                  * to. If a subscription request was pending, don't handle selecting a new node here
                  * let the callback see the failure and retry
                  */
-                if (m_useClientAffinity &&
-                    m_subscribedConnection == this &&
+                if (m_subscribedConnection == this &&
                     m_subscriptionRequestPending == false &&
                     !m_shutdown.get()) {
                     //Don't subscribe to a new node immediately
@@ -948,14 +945,13 @@ class Distributer {
         this( false,
                 ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
                 ClientConfig.DEFAULT_CONNECTION_TIMOUT_MS,
-                false, false, null, null);
+                false, null, null);
     }
 
     Distributer(
             boolean useMultipleThreads,
             long procedureCallTimeoutNanos,
             long connectionResponseTimeoutMS,
-            boolean useClientAffinity,
             boolean sendReadsToReplicasBytDefault,
             Subject subject,
             SslContext sslContext) {
@@ -973,7 +969,6 @@ class Distributer {
         m_network.start();
         m_procedureCallTimeoutNanos= procedureCallTimeoutNanos;
         m_connectionResponseTimeoutNanos = TimeUnit.MILLISECONDS.toNanos(connectionResponseTimeoutMS);
-        m_useClientAffinity = useClientAffinity;
         m_sendReadsToReplicasBytDefaultIfCAEnabled = sendReadsToReplicasBytDefault;
 
         // schedule the task that looks for timed-out proc calls and connections
@@ -1048,16 +1043,11 @@ class Distributer {
             m_buildString = (String)socketChannelAndInstanceIdAndBuildString[2];
 
             m_connections.add(cxn);
+            m_hostIdToConnection.put(hostId, cxn);
         }
 
-        if (m_useClientAffinity) {
-            synchronized (this) {
-                m_hostIdToConnection.put(hostId, cxn);
-            }
-
-            if (m_subscribedConnection == null) {
-                subscribeToNewNode();
-            }
+        if (m_subscribedConnection == null) {
+            subscribeToNewNode();
         }
     }
 
@@ -1172,7 +1162,7 @@ class Distributer {
              * routing, but backpressure will be managed anyways. This is where we guess partition based on client
              * affinity and known topology (hashinator initialized).
              */
-            if (m_useClientAffinity && (m_hashinator != null)) {
+            if (m_hashinator != null) {
                 final ImmutableSortedMap<String, Procedure> procedures = m_procedureInfo.get();
                 Procedure procedureInfo = null;
                 if (procedures != null) {
@@ -1613,10 +1603,6 @@ class Distributer {
     private void refreshPartitionKeys(boolean topologyUpdate)  {
 
         if (m_shutdown.get()) {
-            return;
-        }
-        long interval = System.currentTimeMillis() - m_lastPartitionKeyFetched.get();
-        if (!m_useClientAffinity && interval < PARTITION_KEYS_INFO_REFRESH_FREQUENCY) {
             return;
         }
 
