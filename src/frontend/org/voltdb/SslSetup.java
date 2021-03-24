@@ -87,6 +87,7 @@ public class SslSetup {
 
                 CipherExecutor.SERVER.startup();
             } catch (Exception e) {
+                m_log.fatal("Exception when attempting to configure SSL", e);
                 VoltDB.crashLocalVoltDB("Unable to configure SSL", true, e);
             }
         }
@@ -155,13 +156,15 @@ public class SslSetup {
 
     private String getStorePath(String sysPropName, KeyOrTrustStoreType store, String defaultResource, String what) {
         String resource = System.getProperty(sysPropName, "").trim();
-        if (resource.isEmpty()) {  // no system property, try deployment file value
-            resource = store.getPath();
-        }
-        else if (store != null) { // prefer system property value over deployment value
-            String value = store.getPath();
-            if (value != null && !value.equals(resource)) {
-                m_log.info(String.format("System property '%s' overrides deployment-file value", sysPropName));
+        if (store != null) {
+            if (resource.isEmpty()) {  // no system property, try deployment file value
+                resource = store.getPath();
+            }
+            else { // prefer system property value over deployment value
+                String value = store.getPath();
+                if (value != null && !value.equals(resource)) {
+                    m_log.info(String.format("System property '%s' overrides deployment-file value", sysPropName));
+                }
             }
         }
         if (resource == null || resource.isEmpty()) {
@@ -180,13 +183,15 @@ public class SslSetup {
 
     private String getStorePassword(String sysPropName, KeyOrTrustStoreType store, String defaultPasswd) {
         String passwd = System.getProperty(sysPropName, "");  // password is not trimmed
-        if (passwd.isEmpty()) {  // no system property, try deployment file value
-            passwd = store.getPassword();
-        }
-        else if (store != null) { // prefer system property value over deployment value
-            String value = store.getPassword();
-            if (value != null && !value.equals(passwd)) {
-                m_log.info(String.format("System property '%s' overrides deployment-file value", sysPropName));
+        if (store != null) {
+            if (passwd.isEmpty()) {  // no system property, try deployment file value
+                passwd = store.getPassword();
+            }
+            else { // prefer system property value over deployment value
+                String value = store.getPassword();
+                if (value != null && !value.equals(passwd)) {
+                    m_log.info(String.format("System property '%s' overrides deployment-file value", sysPropName));
+                }
             }
         }
         if (passwd == null || passwd.isEmpty()) {
