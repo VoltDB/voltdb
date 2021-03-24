@@ -1,3 +1,4 @@
 # These are generated dirs and should not be committed
 server-api
 java-client-api
+procedure-api
