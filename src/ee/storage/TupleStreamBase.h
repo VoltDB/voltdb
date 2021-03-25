@@ -222,6 +222,7 @@ void TupleStreamBase<SB>::pushPendingBlocks()
         {
             //The block is handed off to the topend which is responsible for releasing the
             //memory associated with the block data.
+            block->writeOutHeader();
             pushStreamBuffer(block);
             m_pendingBlocks.pop_front();
         }

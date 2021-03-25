@@ -150,6 +150,11 @@ namespace voltdb
 
         inline void setType(StreamBlockType type) { m_type = type; }
 
+        /**
+         * Write out any extra header metadata before pushing to topend
+         */
+        virtual inline void writeOutHeader() {}
+
     protected:
         char *m_data;
         const size_t m_capacity;
@@ -214,11 +219,6 @@ namespace voltdb
             m_rowCount = seqNo - m_startSequenceNumber;
             StreamBlock::recordCompletedUniqueId(uniqueId);
         }
-
-        /**
-         * Write out any extra header metadata
-         */
-        virtual inline void writeOutHeader() {}
 
     private:
         size_t m_rowCount;
