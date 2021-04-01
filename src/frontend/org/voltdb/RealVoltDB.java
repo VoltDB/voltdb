@@ -168,9 +168,8 @@ import org.voltdb.iv2.TransactionTaskQueue;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.largequery.LargeBlockManager;
-import org.voltdb.licensetool.CommunityLicensing;
-import org.voltdb.licensetool.LicenseApi;
-import org.voltdb.licensetool.Licensing;
+import org.voltdb.licensing.CommunityLicensing;
+import org.voltdb.licensing.Licensing;
 import org.voltdb.messaging.MigratePartitionLeaderMessage;
 import org.voltdb.messaging.VoltDbMessageFactory;
 import org.voltdb.modular.ModuleManager;
@@ -493,17 +492,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private ScheduledThreadPoolExecutor m_periodicPriorityWorkThread;
 
     // Interface to all things license-related
-    Licensing m_licensing;
+    private Licensing m_licensing = new CommunityLicensing();
 
     private void connectLicensing() {
-        if (m_licensing == null) {
-            if (MiscUtils.isPro()) {
-                m_licensing = ProClass.newInstanceOf("org.voltdb.licensetool.ProLicensing",
-                                                     "licensing", ProClass.HANDLER_CRASH);
-            } else {
-                m_licensing = new CommunityLicensing();
-            }
-        }
+        ProClass.newInstanceOf("org.voltdb.licensing.Initializer",
+                               "licensing", ProClass.HANDLER_IGNORE);
     }
 
     private LatencyStats m_latencyStats;
@@ -533,11 +526,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     @Override
     public Licensing getLicensing() {
         return m_licensing;
-    }
-
-    @Override
-    public LicenseApi getLicenseApi() {
-        return m_licensing != null ? m_licensing.getLicenseApi() : null;
     }
 
     @Override
@@ -914,7 +902,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     @Override
     public void initialize(Configuration config) {
         int myPid = CLibrary.getpid();
-        hostLog.info("PID of this Volt process is " + myPid);
         ShutdownHooks.enableServerStopLogging();
         synchronized(m_startAndStopLock) {
             exitAfterMessage = false;
@@ -938,16 +925,18 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_statusTracker = new NodeStateTracker();
             m_voltPid = myPid;
 
-            // Print the ascii art!
-            consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
+            // Print the ascii art, but only on actual start
+            if (config.m_startAction != StartAction.INITIALIZE) {
+                consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
+                hostLog.info("PID of this Volt process is " + myPid);
+            }
+
+            // Read and print build info on the console
+            readBuildInfo();
 
             // Check license availability
             connectLicensing();
-            m_licensing.loadLicenseApi(config);
-
-            // Read build info and print license type on the console
-            String edition = m_licensing.determineEdition();
-            readBuildInfo(edition);
+            m_licensing.readLicenseFile(config);
 
             // Log some facts about the user account: account name,
             // home dir, working dir where Java was started
@@ -1269,13 +1258,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             if (m_joining) {
                 try {
                     int kfactor = m_catalogContext.getDeployment().getCluster().getKfactor();
-                     m_joinCoordinator = ProClass.newInstanceOf("org.voltdb.elastic.ElasticJoinNodeCoordinator", "Elastic",
+                    m_joinCoordinator = ProClass.newInstanceOf("org.voltdb.elastic.ElasticJoinNodeCoordinator", "Elastic",
                             ProClass.HANDLER_LOG, m_messenger, VoltDB.instance().getVoltDBRootPath(), kfactor);
-                     if (!m_licensing.validateLicense(getHostCount() + m_joinCoordinator.getHostsJoining(),
-                            DrRoleType.fromValue(getCatalogContext().getCluster().getDrrole()),
-                            m_config.m_startAction)) {
-                        VoltDB.crashLocalVoltDB("VoltDB license constraints are not met.");
-                    }
+                    m_licensing.validateLicense();
                     if (determination.startAction == StartAction.JOIN && m_joinCoordinator.getHostsJoining() > 1) {
                         String waitMessage = "The join process will begin after a total of "
                                 + m_joinCoordinator.getHostsJoining() + " nodes are added, waiting...";
@@ -1552,7 +1537,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_globalServiceElector.registerService(() -> m_taskManager.promoteToLeader(m_catalogContext));
 
             // DR overflow directory
-            if (getLicenseApi().isDrReplicationAllowed()) {
+            if (m_licensing.isFeatureAllowed("DR")) {
                 m_producerDRGateway = ProClass.newInstanceOf("org.voltdb.dr2.DRProducer", "DR Producer",
                         ProClass.HANDLER_CRASH,
                         new VoltFile(VoltDB.instance().getDROverflowPath()),
@@ -1688,7 +1673,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_clientInterface.schedulePeriodicWorks();
 
             // print out a bunch of useful system info
-            m_licensing.logLicensingInfo();
             logDebuggingInfo(m_config, m_httpPortExtraLogMessage, m_jsonEnabled);
 
             // warn the user on the console if k=0 or if no command logging
@@ -2000,7 +1984,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             // daily maintenance
             EnterpriseMaintenance em = EnterpriseMaintenance.get();
-            if (em != null) { em.dailyMaintenaceTask(); }
+            if (em != null) { em.dailyMaintenanceTask(); }
         }
     }
 
@@ -2387,7 +2371,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
         // other enterprise setup
         EnterpriseMaintenance em = EnterpriseMaintenance.get();
-        if (em != null) { em.setupMaintenaceTasks(); }
+        if (em != null) { em.setupMaintenanceTasks(); }
 
         GCInspector.instance.start(m_periodicPriorityWorkThread, m_gcStats);
     }
@@ -3388,7 +3372,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     @Override
-    public void readBuildInfo(String editionTag) {
+    public void readBuildInfo() {
         String buildInfo[] = extractBuildInfo(hostLog);
         m_versionString = buildInfo[0];
         m_buildString = buildInfo[1];
@@ -3396,7 +3380,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (m_buildString.contains("_")) {
             buildString = m_buildString.split("_", 2)[1];
         }
-        consoleLog.info(String.format("Build: %s %s %s", m_versionString, buildString, editionTag));
+        // the software 'edition' is not the same as the license type
+        String edition = MiscUtils.isPro() ? "Enterprise Edition" : "Community Edition";
+        consoleLog.info(String.format("Build: %s %s %s", m_versionString, buildString, edition));
     }
 
     void logSystemSettingFromCatalogContext() {

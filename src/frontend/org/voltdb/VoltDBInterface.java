@@ -36,8 +36,7 @@ import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.elastic.ElasticService;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
-import org.voltdb.licensetool.LicenseApi;
-import org.voltdb.licensetool.Licensing;
+import org.voltdb.licensing.Licensing;
 import org.voltdb.serdes.AvroSerde;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.snmp.SnmpTrapSender;
@@ -60,7 +59,7 @@ public interface VoltDBInterface
      */
     public void recoveryComplete(String requestId);
 
-    public void readBuildInfo(String editionTag);
+    public void readBuildInfo();
 
     public CommandLog getCommandLog();
     public boolean isRunningWithOldVerbs();
@@ -349,12 +348,6 @@ public interface VoltDBInterface
      * tasks.
      */
     public ListeningExecutorService getComputationService();
-
-    /**
-     * Return the license api. This may be null in community editions!
-     * @return License API based on edition.
-     */
-    public LicenseApi getLicenseApi();
 
     /**
      * Return licensing support object.

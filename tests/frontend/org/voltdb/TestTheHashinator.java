@@ -72,7 +72,7 @@ public class TestTheHashinator {
     public void setUp() {
         ElasticHashinator.DEFAULT_TOTAL_TOKENS = 1024;
         NativeLibraryLoader.loadVoltDB();
-        VoltDB.instance().readBuildInfo("Test");
+        VoltDB.instance().readBuildInfo();
     }
 
     private static Map<Integer, Integer> deserializeElasticConfig(byte[] config) {

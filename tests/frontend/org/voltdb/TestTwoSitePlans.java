@@ -73,7 +73,7 @@ public class TestTwoSitePlans extends TestCase {
     @SuppressWarnings("deprecation")
     @Override
     public void setUp() throws IOException, InterruptedException, ExecutionException {
-        VoltDB.instance().readBuildInfo("Test");
+        VoltDB.instance().readBuildInfo();
 
         // compile a catalog
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();

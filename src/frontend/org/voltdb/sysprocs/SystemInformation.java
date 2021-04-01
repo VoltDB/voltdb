@@ -61,6 +61,7 @@ import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
+import org.voltdb.utils.PlatformProperties;
 import org.voltdb.utils.VoltTableUtil;
 
 /**
@@ -462,6 +463,14 @@ public class SystemInformation extends VoltSystemProcedure
         vt.addRow(hostId, "TOPICSPUBLICINTERFACE", topicsPublicInterface);
         vt.addRow(hostId, "TOPICSPUBLICPORT", Integer.toString(topicsPublicPort));
         vt.addRow(hostId, "TOPICSPORT", Integer.toString(topicsPort));
+
+        // platform properties
+        PlatformProperties pp = PlatformProperties.getPlatformProperties();
+        vt.addRow(hostId, "CPUCORES", Integer.toString(pp.coreCount));
+        vt.addRow(hostId, "CPUTHREADS", Integer.toString(pp.hardwareThreads));
+        vt.addRow(hostId, "MEMORY", Integer.toString(pp.ramInMegabytes) + " MB");
+        vt.addRow(hostId, "KUBERNETES", Boolean.toString(VoltDB.instance().getConfig().runningUnderKubernetes()));
+
         return vt;
     }
 

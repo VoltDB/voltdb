@@ -65,8 +65,7 @@ import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.elastic.ElasticService;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
-import org.voltdb.licensetool.LicenseApi;
-import org.voltdb.licensetool.Licensing;
+import org.voltdb.licensing.Licensing;
 import org.voltdb.serdes.AvroSerde;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.DbSettings;
@@ -483,7 +482,7 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public void readBuildInfo(String editionTag)
+    public void readBuildInfo()
     {
     }
 
@@ -763,166 +762,9 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public LicenseApi getLicenseApi()
-    {
-        return new LicenseApi() {
-            @Override
-            public boolean initializeFromFile(File license) {
-                return true;
-            }
-
-            @Override
-            public boolean isAnyKindOfTrial() {
-                return false;
-            }
-
-            @Override
-            public boolean isProTrial() {
-                return false;
-            }
-
-            @Override
-            public boolean isEnterpriseTrial() {
-                return false;
-            }
-
-            @Override
-            public int maxHostcount() {
-                return Integer.MAX_VALUE;
-            }
-
-            @Override
-            public Calendar expires() {
-                Calendar result = Calendar.getInstance();
-                result.add(Calendar.YEAR, 20); // good enough?
-                return result;
-            }
-
-            @Override
-            public boolean verify() {
-                return true;
-            }
-
-            @Override
-            public boolean isDrReplicationAllowed() {
-                // TestExecutionSite (and probably others)
-                // use MockVoltDB without requiring unique
-                // zmq ports for the DR replicator. Note
-                // that getReplicationActive(), above, is
-                // hardcoded to false, too.
-                return false;
-            }
-
-            @Override
-            public boolean isDrActiveActiveAllowed() {
-                // TestExecutionSite (and probably others)
-                // use MockVoltDB without requiring unique
-                // zmq ports for the DR replicator.
-                return false;
-            }
-
-            @Override
-            public boolean isCommandLoggingAllowed() {
-                return true;
-            }
-
-            @Override
-            public boolean isAWSMarketplace() {
-                return false;
-            }
-
-            @Override
-            public boolean isEnterprise() {
-                return false;
-            }
-
-            @Override
-            public boolean isPro() {
-                return false;
-            }
-
-            @Override
-            public String licensee() {
-                return null;
-            }
-
-            @Override
-            public Calendar issued() {
-                return null;
-            }
-
-            @Override
-            public String note() {
-                return null;
-            }
-
-            @Override
-            public boolean hardExpiration() {
-                return false;
-            }
-
-            @Override
-            public boolean secondaryInitialization() {
-                return true;
-            }
-
-            @Override
-            public String getSignature() {
-                return null;
-            }
-
-            @Override
-            public String getLicenseType() {
-                return null;
-            }
-
-            @Override
-            public boolean isUnrestricted()
-            {
-                return false;
-            }
-
-            @Override
-            public String getIssuerCompany()
-            {
-                return null;
-            }
-
-            @Override
-            public String getIssuerUrl()
-            {
-                return null;
-            }
-
-            @Override
-            public String getIssuerEmail()
-            {
-                return null;
-            }
-
-            @Override
-            public String getIssuerPhone()
-            {
-                return null;
-            }
-
-            @Override
-            public int getVersion()
-            {
-                return 0;
-            }
-
-            @Override
-            public int getScheme()
-            {
-                return 0;
-            }
-        };
-    }
-
-    @Override
     public Licensing getLicensing() {
-        return null;
+        // So far, we have no need to provide this interface
+        throw new UnsupportedOperationException("MockVoltDB.getLicensing called, but is not implemented");
     }
 
     @Override

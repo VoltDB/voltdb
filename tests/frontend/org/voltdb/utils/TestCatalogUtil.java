@@ -1451,6 +1451,7 @@ public class TestCatalogUtil extends TestCase {
         Catalog cat = compiler.compileCatalogFromDDL(x);
 
         String msg = CatalogUtil.compileDeployment(cat, deploymentWithDefault, false);
+        assertNotNull(msg);
         assertTrue(msg.contains("Invalid memory limit"));
     }
 
@@ -1465,7 +1466,7 @@ public class TestCatalogUtil extends TestCase {
                 + "  <systemsettings>"
                 + "    <resourcemonitor>"
                 + "      <disklimit>"
-                + "        <feature name=\"commandlog\" size=\"xx\"/>"
+                + "        <feature name=\"snapshots\" size=\"xx\"/>"
                 + "      </disklimit>"
                 + "    </resourcemonitor>"
                 + "  </systemsettings>"
@@ -1481,6 +1482,7 @@ public class TestCatalogUtil extends TestCase {
         Catalog cat = compiler.compileCatalogFromDDL(x);
 
         String msg = CatalogUtil.compileDeployment(cat, deploymentWithDefault, false);
+        assertNotNull(msg);
         assertTrue(msg.contains("Invalid value"));
     }
 

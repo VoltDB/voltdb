@@ -539,12 +539,7 @@ public class Inits {
             // Make the leader the only license enforcer.
             boolean isLeader = (m_rvdb.m_myHostId == 0);
             if (m_config.m_isEnterprise && isLeader && !m_isRejoin) {
-                if (!m_rvdb.m_licensing.validateLicense(m_rvdb.m_clusterSettings.get().hostcount(),
-                        DrRoleType.fromValue(m_rvdb.getCatalogContext().getCluster().getDrrole()),
-                        m_rvdb.getConfig().m_startAction)) {
-                    // validateLicense logs. Exit call is here for testability.
-                    VoltDB.crashGlobalVoltDB("VoltDB license constraints are not met.", false, null);
-                }
+                m_rvdb.getLicensing().validateLicense();
             }
         }
     }

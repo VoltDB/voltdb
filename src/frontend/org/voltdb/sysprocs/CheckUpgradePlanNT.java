@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -34,7 +34,7 @@ import org.voltdb.VoltType;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
-import org.voltdb.licensetool.LicenseApi;
+import org.voltdb.licensing.Licensing;
 import org.voltdb.utils.CatalogUtil;
 
 /*
@@ -112,8 +112,8 @@ public class CheckUpgradePlanNT extends VoltNTSystemProcedure {
         }
 
         private static String validateXDCRRequirement() {
-            LicenseApi licenseApi = VoltDB.instance().getLicenseApi();
-            if (!licenseApi.isDrActiveActiveAllowed()) {
+            Licensing lic = VoltDB.instance().getLicensing();
+            if (!lic.isFeatureAllowed("XDCR")) {
                 return "Target VoltDB cluster doesn't have a valid XDCR license.";
             }
 

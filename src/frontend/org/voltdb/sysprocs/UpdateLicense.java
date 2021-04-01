@@ -31,6 +31,7 @@ import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.HostMessenger;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDBInterface;
 import org.voltdb.VoltNTSystemProcedure;
@@ -40,8 +41,8 @@ import org.voltdb.VoltType;
 import org.voltdb.VoltZK;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.common.Constants;
-import org.voltdb.licensetool.LicenseApi;
-import org.voltdb.licensetool.Licensing;
+import org.voltdb.licensing.Licensing;
+import org.voltdb.utils.MiscUtils;
 
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.io.Files;
@@ -50,121 +51,179 @@ public class UpdateLicense extends VoltNTSystemProcedure {
 
     private final static String tmpFileName = ".tmpLicense";
     private final static VoltLogger log = new VoltLogger("HOST");
+    private final static boolean requireCompleteCluster = true;
 
-    //
+    private static VoltTable resultTable() {
+        return new VoltTable(new VoltTable.ColumnInfo("STATUS", VoltType.BIGINT),
+                             new VoltTable.ColumnInfo("ERR_MSG", VoltType.STRING));
+    }
+
     // @LicenseValidation
     //
-    // On every host:
-    //      Write the new license to a temporary file,
-    //      Check the expiration date,
-    //      Check if the changes are allowed,
-    //      return the result.
+    // On every host, write the new license to a temporary file,
+    // check update validity, and return the result.
+    //
     public static class LicenseValidation extends VoltNTSystemProcedure {
         public VoltTable run(byte[] licenseBytes) {
             VoltDBInterface voltdb = VoltDB.instance();
-            VoltTable vt = constructResultTable();
+
             // Write the bytes into a temporary file in voltdb root
             File tmpLicense = new File(voltdb.getVoltDBRootPath(), tmpFileName);
             try {
                 Files.write(licenseBytes, tmpLicense);
             } catch (IOException e) {
-                return constructFailureResponse(vt, "Failed to write the new license to disk: " + e.getMessage(), null);
-            }
-            // validate the license format and signature
-
-            LicenseApi newLicense = voltdb.getLicensing().createLicenseApi(tmpLicense.getAbsolutePath());
-            if (newLicense == null) {
-                return constructFailureResponse(vt, "Invalid license format", tmpLicense);
-            }
-            // Has the new license expired already?
-            Calendar today = Calendar.getInstance();
-            if (newLicense.expires().before(today)) {
-                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
-                return constructFailureResponse(vt,
-                        "Failed to update the license because new license expires at " +
-                                sdf.format(newLicense.expires().getTime()),
-                        tmpLicense);
+                return failTable("Failed to write the new license to disk: " + e.getMessage(), null);
             }
 
-            // Are the changes allowed?
-            LicenseApi currentLicense = voltdb.getLicensing().getLicenseApi();
-            String error = voltdb.getLicensing().isLicenseChangeAllowed(newLicense, currentLicense);
+            // Validate the license format, check whether it can be applied
+            String error= voltdb.getLicensing().prepareLicenseUpdate(tmpLicense.getAbsolutePath());
             if (error != null) {
-                return constructFailureResponse(vt, error, tmpLicense);
+                return failTable(error, tmpLicense);
             }
-            vt.addRow(VoltSystemProcedure.STATUS_OK, "");
-            return vt;
+
+            // OK so far
+            return successTable();
         }
     }
 
-    //
     // @LiveLicenseUpdate
     //
-    // On every host:
-    //      Rename the temporary file under voltdbroot to license.xml,
-    //      Update the license api,
-    //      Return the result.
+    // On every host: rename the file to its final name, switch
+    // to the new API instance, and return the result.
+    //
     public static class LiveLicenseUpdate extends VoltNTSystemProcedure {
         public VoltTable run() {
             VoltDBInterface voltdb = VoltDB.instance();
-            VoltTable vt = constructResultTable();
+
+            // Check our temporary file still exists
             File tmpLicense = new File(voltdb.getVoltDBRootPath(), tmpFileName);
             if (!tmpLicense.exists()) {
-                return constructFailureResponse(vt, "File not found: " + tmpLicense.getAbsolutePath(), null);
+                return failTable("The temporary licence file created earlier no longer exists: " + tmpLicense, null);
             }
-            File licenseF = new File(voltdb.getVoltDBRootPath(), Constants.LICENSE_FILE_NAME);
-            tmpLicense.renameTo(licenseF);
-            LicenseApi newLicense = voltdb.getLicensing().createLicenseApi(licenseF.getAbsolutePath());
-            if (newLicense == null) { // new license bad, old license already gone: double plus ungood
-                return constructFailureResponse(vt, "Invalid license format", licenseF);
+
+            // Apply the update
+            String error = voltdb.getLicensing().applyLicenseUpdate(tmpLicense.getAbsolutePath());
+            if (error != null) {
+                return failTable(error, tmpLicense);
             }
-            voltdb.getLicensing().updateLicenseApi(newLicense);
-            vt.addRow(VoltSystemProcedure.STATUS_OK, "");
-            return vt;
+
+            // Complete
+            return successTable();
         }
     }
 
-    private static VoltTable constructResultTable() {
-        return new VoltTable(
-                new VoltTable.ColumnInfo("STATUS", VoltType.BIGINT),
-                new VoltTable.ColumnInfo("ERR_MSG", VoltType.STRING));
-    }
-
-    private static VoltTable constructFailureResponse(VoltTable vt, String err, File tmpFile) {
-        log.info(err);
+    // Failure response from one of the two above procs
+    private static VoltTable failTable(String error, File tmpFile) {
+        log.warn(error);
         if (tmpFile != null) {
             tmpFile.delete();
         }
-        vt.addRow(VoltSystemProcedure.STATUS_FAILURE, err);
+        VoltTable vt = resultTable();
+        vt.addRow(VoltSystemProcedure.STATUS_FAILURE, error);
         return vt;
     }
 
-    private void addToReport(Map<String, Set<Integer>> report, int hostId, String err) {
-        Set<Integer> reporters = report.get(err);
-        if (reporters == null) {
-            reporters = new HashSet<Integer>();
-        }
-        reporters.add(hostId);
-        report.put(err, reporters);
+    // Success response from ditto
+    private static VoltTable successTable() {
+        VoltTable vt = resultTable();
+        vt.addRow(VoltSystemProcedure.STATUS_OK, "SUCCESS");
+        return vt;
     }
 
+    // Entry point for UpdateLicense
+    public VoltTable[] run(byte[] licenseBytes) throws InterruptedException, ExecutionException {
+        if (!MiscUtils.isPro()) {
+            return failResponse("Not supported in Community Edition");
+        }
+
+        log.info("Received user request to update database license.");
+        VoltDBInterface voltdb = VoltDB.instance();
+
+        final HostMessenger hm = voltdb.getHostMessenger();
+        final ZooKeeper zk = hm.getZK();
+        String errMsg = VoltZK.createActionBlocker(zk, VoltZK.licenseUpdateInProgress, CreateMode.EPHEMERAL,
+                                                   log, "live license update" );
+        if (errMsg != null) {
+            return failResponse(errMsg);
+        }
+
+        try {
+            // Initial check before we do any real work; we may or may not
+            // support partial updates, but even if we do, we warn the user
+            if (!voltdb.isClusterComplete()) {
+                if (requireCompleteCluster) {
+                    return failResponse("Updating the license requires all cluster members to be operational in the cluster. " +
+                                        "Please rejoin missing members to the cluster and retry the license update");
+                }
+                log.warn("Updating license with some nodes not operational");
+            }
+            final int liveCount1 = hm.getLiveHostIds().size();
+
+            // Validate the new license on every host
+            Map<Integer, ClientResponse> result;
+            result = callNTProcedureOnAllHosts("@LicenseValidation", licenseBytes).get();
+            String err = checkResult(result);
+            if (err != null) {
+                return failResponse(err);
+            }
+
+            // Any change in number of hosts? this is a little kludgy
+            // but it's a useful check on our own operation.
+            final int liveCount2 = hm.getLiveHostIds().size();
+            if (liveCount2 != liveCount1) {
+                String msg = String.format("Live host count changed from %d to %d while preparing to update license",
+                                           liveCount1, liveCount2);
+                if (requireCompleteCluster) {
+                    return failResponse(msg);
+                }
+                log.warn(msg);
+            }
+
+            // Update the new license file on every host
+            result = callNTProcedureOnAllHosts("@LiveLicenseUpdate").get();
+            err = checkResult(result);
+            if (err != null) {
+                return failResponse(err);
+            }
+
+            // If this fails we're in trouble
+            try {
+                zk.setData(VoltZK.license, licenseBytes, -1);
+            } catch (Exception ex) {
+                return failResponse("Unable to upload the new license to ZK");
+            }
+
+            return successResponse();
+        } finally {
+            VoltZK.removeActionBlocker(zk, VoltZK.licenseUpdateInProgress, log);
+        }
+    }
+
+    // Handles the result from execution of subordinate sysprocs on
+    // all live hosts.
     private String checkResult(Map<Integer, ClientResponse> results) {
         Map<String, Set<Integer>> errorReport = Maps.newHashMap();
+
+        // Collect unique error messages and track their host ids
         for (Entry<Integer, ClientResponse> e : results.entrySet()) {
+            // Request failed to execute?
             if (e.getValue().getStatus() != ClientResponse.SUCCESS) {
                 String err = "Unexpected failure: status " + e.getValue().getStatus();
                 addToReport(errorReport, e.getKey(), err);
             }
-
-            VoltTable nodeResult = e.getValue().getResults()[0];
-            while (nodeResult.advanceRow()) {
-                if (nodeResult.getLong("STATUS") != VoltSystemProcedure.STATUS_OK) {
-                    String err = nodeResult.getString("ERR_MSG");
-                    addToReport(errorReport, e.getKey(), err);
+            // Request returned failure message? (only one row expected)
+            VoltTable[] resultArray= e.getValue().getResults();
+            if (resultArray.length > 0) {
+                VoltTable nodeResult = resultArray[0];
+                while (nodeResult.advanceRow()) {
+                    if (nodeResult.getLong("STATUS") != VoltSystemProcedure.STATUS_OK) {
+                        String err = nodeResult.getString("ERR_MSG");
+                        addToReport(errorReport, e.getKey(), err);
+                    }
                 }
             }
         }
-        // aggregate same type of error into one row
+        // Build single multiline string for result
         if (!errorReport.isEmpty()) {
             StringBuilder sb = new StringBuilder();
             for (Entry<String, Set<Integer>> e : errorReport.entrySet()) {
@@ -175,49 +234,29 @@ public class UpdateLicense extends VoltNTSystemProcedure {
         return null;
     }
 
-    public VoltTable[] run(byte[] licenseBytes) throws InterruptedException, ExecutionException {
-        log.info("Received user request to update database license.");
-        VoltTable vt = constructResultTable();
-
-        final ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
-        String errMsg = VoltZK.createActionBlocker(zk, VoltZK.licenseUpdateInProgress, CreateMode.EPHEMERAL,
-                log, "live license update" );
-        if (errMsg != null) {
-            log.info(errMsg);
-            vt.addRow(VoltSystemProcedure.STATUS_FAILURE, errMsg);
-            return new VoltTable[] { vt };
+    // Builds map of error message to host ids
+    private void addToReport(Map<String, Set<Integer>> report, int hostId, String err) {
+        Set<Integer> reporters = report.get(err);
+        if (reporters == null) {
+            reporters = new HashSet<>();
         }
+        reporters.add(hostId);
+        report.put(err, reporters);
+    }
 
-        try {
-            // validate the new license on every host
-            Map<Integer, ClientResponse> result;
-            result = callNTProcedureOnAllHosts("@LicenseValidation", licenseBytes).get();
-            String err = checkResult(result);
-            if (err != null) {
-                vt.addRow(VoltSystemProcedure.STATUS_FAILURE, err);
-                return new VoltTable[] { vt };
-            }
+    // Failure from UpdateLicense itself
+    private static VoltTable[] failResponse(String error) {
+        log.warn(error);
+        VoltTable vt = resultTable();
+        vt.addRow(VoltSystemProcedure.STATUS_FAILURE, error );
+        return new VoltTable[] { vt };
+    }
 
-            // update the new license on every host
-            result = callNTProcedureOnAllHosts("@LiveLicenseUpdate").get();
-            err = checkResult(result);
-            if (err != null) {
-                vt.addRow(VoltSystemProcedure.STATUS_FAILURE, err);
-                return new VoltTable[] { vt };
-            }
-            try {
-                zk.setData(VoltZK.license, licenseBytes, -1);
-            } catch (KeeperException | InterruptedException e) {
-                vt.addRow(VoltSystemProcedure.STATUS_FAILURE, "Unable to upload the new license to ZK");
-                return new VoltTable[] { vt };
-            }
-
-            log.info("License updated successfully.");
-            vt.addRow(VoltSystemProcedure.STATUS_OK, "SUCCESS");
-            return new VoltTable[] { vt };
-        } finally {
-            VoltZK.removeActionBlocker(zk, VoltZK.licenseUpdateInProgress, log);
-        }
-
+    // Success of UpdateLicense itself
+    private static VoltTable[] successResponse() {
+        log.info("License updated successfully.");
+        VoltTable vt = resultTable();
+        vt.addRow(VoltSystemProcedure.STATUS_OK, "SUCCESS");
+        return new VoltTable[] { vt };
     }
 }

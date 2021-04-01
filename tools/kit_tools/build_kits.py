@@ -137,14 +137,16 @@ def buildEnterprise(version):
 #downloads for internal use only
 
 # Must be called after buildEnterprise has been done
+# Modified for V3 license format
 def makeTrialLicense(licensee, days=30, dr_and_xdcr="true", nodes=12):
     timestring = datetime.datetime.now().strftime("%Y-%m-%d-%H%M%S")
     filename = 'trial_' + timestring + '.xml'
+    drtype = 'XDCR' if dr_and_xdcr else 'none'
     with cd(builddir + "/pro"):
         run("ant -f licensetool.xml createlicense \
-        -Dfilename=%s -Dlicensetype=t -Dhardexpire=true \
-        -DallowDrReplication=%s -DallowDrActiveActive=%s\
-        -Dlicensedays=%d -Dlicensee='%s'" % (filename, dr_and_xdcr, dr_and_xdcr, days, licensee))
+        -Dfilename=%s -Dlicensetype='Trial' -DisTrial=true \
+        -DdrType=%s -Dlicensedays=%d -Dlicensee='%s' \
+        -Dnote='VoltDB Internal Use Only'" % (filename, drtype, days, licensee))
         return filename
 
 ################################################

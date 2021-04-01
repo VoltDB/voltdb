@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -210,7 +210,7 @@ public class ServerThread extends Thread {
      */
     public static String getTestLicensePath() {
         // magic license stored in the voltdb enterprise code
-        URL resource = ServerThread.class.getResource("valid_dr_active_subscription.xml");
+        URL resource = ServerThread.class.getResource("legacy_valid_dr_active_subscription.xml");
 
         // in the community edition, any non-empty string
         // should work fine here, as it won't be checked

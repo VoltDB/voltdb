@@ -587,7 +587,7 @@ public class TestFragmentProgressUpdate extends TestCase {
         final long NODE_ID = 1;
 
         super.setUp();
-        VoltDB.instance().readBuildInfo("Test");
+        VoltDB.instance().readBuildInfo();
         m_warehousedata = new VoltTable(
                 new VoltTable.ColumnInfo("W_ID", VoltType.SMALLINT),
                 new VoltTable.ColumnInfo("W_NAME", VoltType.STRING),

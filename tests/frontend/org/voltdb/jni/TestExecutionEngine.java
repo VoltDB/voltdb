@@ -460,7 +460,7 @@ public class TestExecutionEngine extends TestCase {
     @Override
     protected void setUp() throws Exception {
         super.setUp();
-        VoltDB.instance().readBuildInfo("Test");
+        VoltDB.instance().readBuildInfo();
         m_catalog = TPCCProjectBuilder.getTPCCSchemaCatalog();
         m_twoSiteCatalog = TPCCProjectBuilder.getTPCCSchemaCatalogMultiSite(2);
     }

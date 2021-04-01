@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -25,7 +25,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.compiler.deploymentfile.DiskLimitType;
 import org.voltdb.compiler.deploymentfile.FeatureNameType;
-import org.voltdb.licensetool.LicenseApi;
+import org.voltdb.licensing.Licensing;
 import org.voltdb.snmp.FaultFacility;
 import org.voltdb.snmp.SnmpTrapSender;
 import org.voltdb.snmp.ThresholdType;
@@ -158,23 +158,19 @@ public class DiskResourceChecker
 
     private boolean isSupportedFeature(FeatureNameType featureName)
     {
-        LicenseApi licenseApi = VoltDB.instance().getLicenseApi();
-        if (licenseApi==null) { // this is null when compile deployment is called at startup.
-                                // Ignore at that point. This will be checked later.
-            return true;
-        }
         switch(featureName)
         {
         case COMMANDLOG:
         case COMMANDLOGSNAPSHOT:
-            return licenseApi.isCommandLoggingAllowed();
+            return VoltDB.instance().getLicensing().isFeatureAllowed("CMDLOG");
         case DROVERFLOW:
-            return licenseApi.isDrReplicationAllowed();
+            return VoltDB.instance().getLicensing().isFeatureAllowed("DR");
         case SNAPSHOTS:
         case EXPORTOVERFLOW:
         case TOPICSDATA:
             return true;
-        default: return false;
+        default:
+            return false;
         }
     }
 

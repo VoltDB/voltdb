@@ -15,31 +15,35 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.licensetool;
+package org.voltdb.licensing;
 
-import org.voltdb.StartAction;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable;
-import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 
 /**
- * This interface has miscellaneous routines in support of license
- * handling. It has separate implementations for community and
- * enterprise builds.
+ * This interface supplies miscellaneous methods in support of
+ * license handling. It has separate implementations for
+ * community and enterprise builds.
  */
 public interface Licensing {
-    public LicenseApi getLicenseApi();
-    public void loadLicenseApi(Configuration config);
-    public LicenseApi createLicenseApi(String pathToLicense);
-    public String determineEdition();
+    // VoltDB initialization
+    public void readLicenseFile(Configuration config);
     public void logLicensingInfo();
     public void stageLicenseFile();
-    public boolean validateLicense(int numberOfNodes, DrRoleType replicationRole, StartAction startAction);
+    public void validateLicense();
     public void checkLicenseConsistency(ZooKeeper zk);
+    // for 'get license' CLI command
     public boolean outputLicense(Configuration config);
-    public String isLicenseChangeAllowed(LicenseApi newLicense, LicenseApi currentLicense);
-    public void updateLicenseApi(LicenseApi newApi);
+    // used by @SystemInformation
     public String getLicenseSummary();
     public void populateLicenseInfo(VoltTable results);
+    // used by @UpdateLicense
+    public String prepareLicenseUpdate(String newLicenceFile);
+    public String applyLicenseUpdate(String newLicenceFile);
+    // general information
+    public String getLicenseType();
+    public boolean isTrialLicense();
+    public String getLicensee();
+    public boolean isFeatureAllowed(String feature);
 }
