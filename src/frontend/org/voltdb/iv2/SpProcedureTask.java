@@ -135,6 +135,11 @@ public class SpProcedureTask extends ProcedureTask
         if (txnState.m_initiationMsg != null && !(txnState.m_initiationMsg.isForReplica())) {
             response.setExecutedOnPreviousLeader(true);
         }
+
+        // Note: this call will re-queue the response to the site tasker queue,
+        // thus delaying the transmission of the response behind other tasks, e.g
+        // other invocations. Trying to deliver the response immediately to the network
+        // does not improve latencies. See ENG-21040.
         m_initiator.deliver(response);
         if (EXEC_TRACE_ENABLED) {
             execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
