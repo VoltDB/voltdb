@@ -3080,6 +3080,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 .addAllowed(m_config.m_enableAdd)
                 .safeMode(m_config.m_safeMode)
                 .terminusNonce(getTerminusNonce())
+                .licenseHash(m_licensing.getLicenseHash())
                 .missingHostCount(m_config.m_missingHostCount)
                 .build();
 

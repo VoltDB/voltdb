@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -23,8 +23,10 @@ import static com.google_voltpatches.common.base.Predicates.equalTo;
 import static com.google_voltpatches.common.base.Predicates.not;
 
 import java.net.InetAddress;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
@@ -71,7 +73,7 @@ import com.google_voltpatches.common.net.InternetDomainName;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
 /**
- * The VoltDB implementation of {@link JoinAcceptor} that piggy backs the mesh
+ * The VoltDB implementation of {@link JoinAcceptor} that piggybacks the mesh
  * establishment messages to determine if connecting nodes are compatible, and
  * if they are, it determines the voltdb start action from the information
  * gathered from other connecting nodes.
@@ -91,10 +93,12 @@ public class MeshProber implements JoinAcceptor {
     private static final String START_ACTION = "startAction";
     private static final String ENTERPRISE = "enterprise";
     private static final String TERMINUS_NONCE = "terminusNonce";
+    private static final String LICENSE_HASH = "licenseHash";
     private static final String MISSING_HOST_COUNT = "missingHostCount";
 
     private static final VoltLogger m_networkLog = new VoltLogger("NETWORK");
     public static final String MESH_ONE_REJOIN_MSG = "Only one host can rejoin at a time. Host";
+
     /**
      * Helper method that takes a comma delimited list of host specs, validates it,
      * and converts it to a set of valid coordinators
@@ -197,6 +201,7 @@ public class MeshProber implements JoinAcceptor {
     protected final boolean m_addAllowed;
     protected final boolean m_safeMode;
     protected final String m_terminusNonce;
+    protected final String m_licenseHash;
     protected final int m_missingHostCount;
     protected final HostCriteriaRef m_hostCriteria = new HostCriteriaRef();
     /*
@@ -211,7 +216,7 @@ public class MeshProber implements JoinAcceptor {
             boolean bare, UUID configHash, Supplier<Integer> hostCountSupplier,
             int kFactor, boolean paused, Supplier<NodeState> nodeStateSupplier,
             boolean addAllowed, boolean safeMode, String terminusNonce,
-            int missingHostCount) {
+            String licenseHash, int missingHostCount) {
 
         checkArgument(versionChecker != null, "version checker is null");
         checkArgument(configHash != null, "config hash is null");
@@ -227,6 +232,7 @@ public class MeshProber implements JoinAcceptor {
                 hostCountSupplier.get(), coordinators.size());
         checkArgument(terminusNonce == null || !terminusNonce.trim().isEmpty(),
                 "terminus should not be blank");
+        checkArgument(licenseHash != null, "license signature is null");
 
         this.m_coordinators = ImmutableSortedSet.copyOf(coordinators);
         this.m_versionChecker = versionChecker;
@@ -241,6 +247,7 @@ public class MeshProber implements JoinAcceptor {
         this.m_addAllowed = addAllowed;
         this.m_safeMode = safeMode;
         this.m_terminusNonce = terminusNonce;
+        this.m_licenseHash = licenseHash;
         this.m_missingHostCount = missingHostCount;
 
         this.m_meshHash = Digester.md5AsUUID("hostCount="+ hostCountSupplier.get() + '|' + this.m_coordinators.toString());
@@ -312,24 +319,16 @@ public class MeshProber implements JoinAcceptor {
         return m_terminusNonce;
     }
 
+    public String getLicenseHash() {
+        return m_licenseHash;
+    }
+
     public int getmissingHostCount() {
         return m_missingHostCount;
     }
 
     public HostCriteria asHostCriteria() {
-        return new HostCriteria(
-                m_paused,
-                m_configHash,
-                m_meshHash,
-                m_enterprise,
-                m_startAction,
-                m_bare,
-                m_hostCountSupplier.get(),
-                m_nodeStateSupplier.get(),
-                m_addAllowed,
-                m_safeMode,
-                m_terminusNonce
-                );
+        return asHostCriteria(m_paused);
     }
 
     public HostCriteria asHostCriteria(boolean paused) {
@@ -344,7 +343,8 @@ public class MeshProber implements JoinAcceptor {
                 m_nodeStateSupplier.get(),
                 m_addAllowed,
                 m_safeMode,
-                m_terminusNonce
+                m_terminusNonce,
+                m_licenseHash
                 );
     }
 
@@ -389,12 +389,11 @@ public class MeshProber implements JoinAcceptor {
         checkArgument(jo != null, "json object is null");
 
         if (!HostCriteria.hasCriteria(jo)) {
-            return new JoinAcceptor.PleaDecision(
-                    String.format("Joining node version %s is incompatible with this node verion %s",
-                            jo.optString(SocketJoiner.VERSION_STRING,"(unknown)"),
-                            m_versionChecker.getVersionString()),
-                    false,
-                    false);
+            String error = String.format("Joining node version %s is incompatible with this node version %s",
+                                         jo.optString(SocketJoiner.VERSION_STRING,"(unknown)"),
+                                         m_versionChecker.getVersionString());
+            m_networkLog.warn(String.format("Rejecting mesh plea from host id %d: %s", hostId, error));
+            return new JoinAcceptor.PleaDecision(error, false, false);
         }
 
         HostCriteria hc = new HostCriteria(jo);
@@ -402,13 +401,14 @@ public class MeshProber implements JoinAcceptor {
 
         // host criteria must be strictly compatible only if no node is operational (i.e.
         // when the cluster is forming anew)
-        if (   !getNodeState().operational()
+        if (!getNodeState().operational()
             && !hostCriteria.values().stream().anyMatch(c->c.getNodeState().operational())) {
             List<String> incompatibilities = asHostCriteria().listIncompatibilities(hc);
             if (!incompatibilities.isEmpty()) {
                 Joiner joiner = Joiner.on("\n    ").skipNulls();
                 String error = "Incompatible joining criteria:\n    "
                         + joiner.join(incompatibilities);
+                m_networkLog.warn(String.format("Rejecting mesh plea from host id %d: %s", hostId, error));
                 return new JoinAcceptor.PleaDecision(error, false, false);
             }
             return new JoinAcceptor.PleaDecision(null, true, false);
@@ -526,6 +526,7 @@ public class MeshProber implements JoinAcceptor {
         int unmeshed = 0;
         int operational = 0;
         int haveTerminus = 0;
+        int noLicenseCount = 0;
         int hostCount = getHostCount();
         int missingHostCount = getmissingHostCount();
 
@@ -536,6 +537,7 @@ public class MeshProber implements JoinAcceptor {
         boolean safemode = isSafeMode();
 
         final NavigableSet<String> terminusNonces = new TreeSet<>();
+        final Set<String> licenseHashes = new TreeSet<>();
 
         for (HostCriteria c: hostCriteria.values()) {
             if (c.getNodeState().operational()) {
@@ -556,6 +558,12 @@ public class MeshProber implements JoinAcceptor {
             if (c.getTerminusNonce() != null) {
                 terminusNonces.add(c.getTerminusNonce());
                 ++haveTerminus;
+            }
+            String licHash = c.getLicenseHash();
+            if (licHash != null && !licHash.equals(HostCriteria.NO_LICENSE)) {
+                licenseHashes.add(licHash);
+            } else {
+                ++noLicenseCount;
             }
         }
         int expectedHostCount = hostCount - missingHostCount;
@@ -599,16 +607,26 @@ public class MeshProber implements JoinAcceptor {
             return;
         }
 
+        if (m_enterprise && noLicenseCount > 0) { // only community edition is supposed to have no license
+            org.voltdb.VoltDB.crashLocalVoltDB("One or more nodes failed to present a license, "
+                    + "cannot proceed with cluster startup.");
+        }
+
+        boolean licenseMismatch = licenseHashes.size() > 1;
+        boolean failOnLicenseMismatch = true;
+
         StartAction determination = isBare() ?
                   StartAction.CREATE
                 : StartAction.RECOVER;
 
         if (operational > 0 && operational < hostCount) { // rejoin
             determination = StartAction.LIVE_REJOIN;
+            failOnLicenseMismatch = false; // we'll get update from cluster
         } else if (operational > 0 && operational == hostCount) { // join
             if (isAddAllowed()) {
                 hostCount = hostCount + ksafety; // kfactor + 1
                 determination = StartAction.JOIN;
+                failOnLicenseMismatch = false; // update from cluster
             } else {
                 org.voltdb.VoltDB.crashLocalVoltDB("Node is not allowed to rejoin an already complete cluster");
                 return;
@@ -622,6 +640,15 @@ public class MeshProber implements JoinAcceptor {
                     + bare + " nodes have no command logs, while "
                     + (unmeshed - bare) + " nodes have them");
             return;
+        }
+
+        if (licenseMismatch && failOnLicenseMismatch) {
+            // This means we got here with mismatched licenses on create/recover, but that should not happen,
+            // since the join acceptor (considerMeshPlea, above) rejects mismatched licenses in that case.
+            String error = String.format("Detected multiple licenses in cluster, cannot proceed with %s", determination);
+            m_networkLog.error(error);
+            m_networkLog.error(licenseUseSummary(hostCriteria));
+            org.voltdb.VoltDB.crashLocalVoltDB(error);
         }
 
         final Determination dtrm = new Determination(determination, hostCount, paused, terminusNonce);
@@ -646,6 +673,31 @@ public class MeshProber implements JoinAcceptor {
     public void abortDetermination() {
         m_probedDetermination.set(new Determination(null,-1, false, null));
     }
+
+    private static String licenseUseSummary(Map<Integer, HostCriteria> hostCriteria) {
+        // Build map from license hash to list of hosts reporting that hash
+        Map<String, ArrayList<Integer>> hashToHost = new HashMap<>();
+        for (Map.Entry<Integer, HostCriteria> ent : hostCriteria.entrySet()) {
+            Integer hostId = ent.getKey();
+            String licHash = ent.getValue().getLicenseHash();
+            ArrayList<Integer> list = hashToHost.get(licHash);
+            if (list == null) {
+                hashToHost.put(licHash, (list = new ArrayList<>()));
+            }
+            list.add(hostId);
+        }
+        // Now stringify the resulting map for printing
+        StringBuilder sb = new StringBuilder("License use by host id:");
+        for (Map.Entry<String,ArrayList<Integer>> ent : hashToHost.entrySet()) {
+            ArrayList ids = ent.getValue();
+            sb.append("\n    License ")
+              .append(ent.getKey())
+              .append(ids.size() == 1 ? " on host " : " on hosts ")
+              .append(ids);
+        }
+        return sb.toString();
+    }
+
     @Generated("by eclipse's equals and hashCode source generators")
     @Override
     public String toString() {
@@ -676,6 +728,7 @@ public class MeshProber implements JoinAcceptor {
         jw.keySymbolValuePair(ADD_ALLOWED, m_addAllowed);
         jw.keySymbolValuePair(SAFE_MODE, m_safeMode);
         jw.keySymbolValuePair(TERMINUS_NONCE, m_terminusNonce);
+        jw.keySymbolValuePair(LICENSE_HASH, m_licenseHash);
         jw.keySymbolValuePair(MISSING_HOST_COUNT, m_missingHostCount);
 
         jw.endObject();
@@ -779,6 +832,7 @@ public class MeshProber implements JoinAcceptor {
         protected boolean m_addAllowed = false;
         protected boolean m_safeMode = false;
         protected String m_terminusNonce = null;
+        protected String m_licenseHash = null;
         protected int m_missingHostCount = 0;
 
         protected Builder() {
@@ -798,6 +852,7 @@ public class MeshProber implements JoinAcceptor {
             m_addAllowed = o.m_addAllowed;
             m_safeMode = o.m_safeMode;
             m_terminusNonce = o.m_terminusNonce;
+            m_licenseHash = o.m_licenseHash;
             m_missingHostCount = o.m_missingHostCount;
             return this;
         }
@@ -885,6 +940,11 @@ public class MeshProber implements JoinAcceptor {
             return this;
         }
 
+        public Builder licenseHash(String licenseHash) {
+            m_licenseHash = licenseHash;
+            return this;
+        }
+
         public Builder missingHostCount(int missingHostCount) {
             m_missingHostCount = missingHostCount;
             return this;
@@ -908,6 +968,7 @@ public class MeshProber implements JoinAcceptor {
                     m_addAllowed,
                     m_safeMode,
                     m_terminusNonce,
+                    m_licenseHash,
                     m_missingHostCount
                     );
         }

@@ -46,4 +46,5 @@ public interface Licensing {
     public boolean isTrialLicense();
     public String getLicensee();
     public boolean isFeatureAllowed(String feature);
+    public String getLicenseHash();
 }

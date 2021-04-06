@@ -99,12 +99,17 @@ public final class CommunityLicensing implements Licensing {
 
     @Override
     public String getLicensee() {
-        return  "VoltDB Community Edition User";
+        return "VoltDB Community Edition User";
     }
 
     @Override
     public boolean isFeatureAllowed(String feature) {
         return false;
+    }
+
+    @Override
+    public String getLicenseHash() {
+        return "";
     }
 
     private void unsupported() {

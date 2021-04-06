@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -33,8 +33,12 @@ import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
 
 /**
- *  It is a data transfer object (DTO) that snapshots a subset of {@link MeshProber}
- *  fields, and is passed around in initial mesh requests.
+ *  The HostCriteria is a data transfer object (DTO) that snapshots a subset of
+ *  {@link MeshProber} fields, and is passed around in initial mesh requests.
+ *
+ *  Be aware that some fields may become stale once the database is running, for
+ *  example the configHash and licenseHash. Operationally this does not matter,
+ *  since we demand those fields match only on mesh creation.
  */
 public class HostCriteria {
 
@@ -49,8 +53,10 @@ public class HostCriteria {
     public final static String ADD_ALLOWED = "addAllowed";
     public final static String SAFE_MODE = "safeMode";
     public final static String TERMINUS_NONCE = "terminusNonce";
+    public final static String LICENSE_HASH = "licenseHash";
 
     public final static UUID UNDEFINED = new UUID(0L,0L);
+    public final static String NO_LICENSE = ""; // the value used for community edition
 
     /**
      * It checks whether the given {@link JSONObject} contains the
@@ -71,7 +77,8 @@ public class HostCriteria {
                 && jo.has(START_ACTION) && jo.getString(START_ACTION) != null && !jo.getString(START_ACTION).trim().isEmpty()
                 && jo.has(NODE_STATE) && jo.getString(NODE_STATE) != null && !jo.getString(NODE_STATE).trim().isEmpty()
                 && jo.has(HOST_COUNT) && jo.getInt(HOST_COUNT) > 0
-                && (jo.optString(TERMINUS_NONCE, null) == null || !jo.optString(TERMINUS_NONCE).trim().isEmpty());
+                && (jo.optString(TERMINUS_NONCE, null) == null || !jo.optString(TERMINUS_NONCE).trim().isEmpty())
+                && jo.has(LICENSE_HASH) && jo.getString(LICENSE_HASH) != null;
         } catch (JSONException e) {
             return false;
         }
@@ -92,6 +99,7 @@ public class HostCriteria {
     protected final boolean m_addAllowed;
     protected final boolean m_safeMode;
     protected final String m_terminusNonce;
+    protected final String m_licenseHash;
 
     public HostCriteria(JSONObject jo) {
         checkArgument(jo != null, "json object is null");
@@ -106,18 +114,20 @@ public class HostCriteria {
         m_addAllowed = jo.optBoolean(ADD_ALLOWED, false);
         m_safeMode = jo.optBoolean(SAFE_MODE, false);
         m_terminusNonce = jo.optString(TERMINUS_NONCE, null);
+        m_licenseHash = jo.optString(LICENSE_HASH, NO_LICENSE);
     }
 
     public HostCriteria(boolean paused, UUID configHash, UUID meshHash,
             boolean enterprise, StartAction startAction, boolean bare,
             int hostCount, NodeState nodeState, boolean addAllowed,
-            boolean safeMode, String terminusNonce) {
+            boolean safeMode, String terminusNonce, String licenseHash) {
         checkArgument(configHash != null, "config hash is null");
         checkArgument(meshHash != null, "mesh hash is null");
         checkArgument(startAction != null, "start action is null");
         checkArgument(hostCount > 0, "host count %s is less then one", hostCount);
         checkArgument(terminusNonce == null || !terminusNonce.trim().isEmpty(),
                 "terminus should not be blank");
+        checkArgument(licenseHash != null, "license hash is null");
 
         m_paused = paused;
         m_configHash = configHash;
@@ -130,6 +140,7 @@ public class HostCriteria {
         m_addAllowed = addAllowed;
         m_safeMode = safeMode;
         m_terminusNonce = terminusNonce;
+        m_licenseHash = licenseHash;
     }
 
     public boolean isPaused() {
@@ -179,6 +190,10 @@ public class HostCriteria {
         return m_terminusNonce;
     }
 
+    public String getLicenseHash() {
+        return m_licenseHash;
+    }
+
     public JSONObject appendTo(JSONObject jo) {
         checkArgument(jo != null, "json object is null");
         try {
@@ -193,6 +208,7 @@ public class HostCriteria {
             jo.put(ADD_ALLOWED, m_addAllowed);
             jo.put(SAFE_MODE, m_safeMode);
             jo.put(TERMINUS_NONCE, m_terminusNonce);
+            jo.put(LICENSE_HASH, m_licenseHash);
         } catch (JSONException e) {
             Throwables.propagate(e);
         }
@@ -204,7 +220,7 @@ public class HostCriteria {
     }
 
     public List<String> listIncompatibilities(HostCriteria o) {
-        checkArgument(o != null, "cant check compatibility against a null host criteria");
+        checkArgument(o != null, "can't check compatibility against a null host criteria");
         ImmutableList.Builder<String> ilb = ImmutableList.builder();
         if (o.isUndefined()) {
             ilb.add("Joining node has incompatible version");
@@ -228,12 +244,14 @@ public class HostCriteria {
         if (!m_configHash.equals(o.m_configHash)) {
             ilb.add("Servers are initialized with deployment options that do not match");
         }
-        if (   m_terminusNonce != null
+        if (m_terminusNonce != null
             && o.m_terminusNonce != null
-            && !m_terminusNonce.equals(o.m_terminusNonce))
-        {
-            ilb.add("Servers have different startup snapshots nonces: "
+            && !m_terminusNonce.equals(o.m_terminusNonce)) {
+            ilb.add("Servers have different startup snapshot nonces: "
                     + m_terminusNonce + " vs. " + o.m_terminusNonce);
+        }
+        if (!m_licenseHash.equals(o.m_licenseHash)) {
+            ilb.add("Servers have different licenses");
         }
         return ilb.build();
     }
@@ -253,6 +271,8 @@ public class HostCriteria {
                 + ((m_meshHash == null) ? 0 : m_meshHash.hashCode());
         result = prime * result
                 + ((m_terminusNonce == null) ? 0 : m_terminusNonce.hashCode());
+        result = prime * result
+            + ((m_licenseHash == null) ? 0 : m_licenseHash.hashCode());
         result = prime * result + (m_paused ? 1231 : 1237);
         result = prime * result
                 + ((m_startAction == null) ? 0 : m_startAction.hashCode());
@@ -295,6 +315,11 @@ public class HostCriteria {
                 return false;
         } else if (!m_terminusNonce.equals(other.m_terminusNonce))
             return false;
+        if (m_licenseHash == null) {
+            if (other.m_licenseHash != null)
+                return false;
+        } else if (!m_licenseHash.equals(other.m_licenseHash))
+            return false;
         if (m_paused != other.m_paused)
             return false;
         if (m_startAction != other.m_startAction)
@@ -311,6 +336,8 @@ public class HostCriteria {
                 + ", startAction=" + m_startAction + ", bare=" + m_bare
                 + ", hostCount=" + m_hostCount + ", nodeState=" + m_nodeState
                 + ", addAllowed=" + m_addAllowed + ", safeMode=" + m_safeMode
-                + ", terminusNonce=" + m_terminusNonce + "]";
+                + ", terminusNonce=" + m_terminusNonce
+                + ", licenseHash=" + (NO_LICENSE.equals(m_licenseHash) ? "none" : m_licenseHash)
+                + "]";
     }
 }
