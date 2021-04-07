@@ -95,6 +95,8 @@ public class MeshProber implements JoinAcceptor {
     private static final String TERMINUS_NONCE = "terminusNonce";
     private static final String LICENSE_HASH = "licenseHash";
     private static final String MISSING_HOST_COUNT = "missingHostCount";
+    private static final String NO_LICENSE = HostCriteria.NO_LICENSE; // for community edition
+    private static final String TEST_LICENSE_HASH = "NOT_A_LICENSE_HASH"; // for some unit tests
 
     private static final VoltLogger m_networkLog = new VoltLogger("NETWORK");
     public static final String MESH_ONE_REJOIN_MSG = "Only one host can rejoin at a time. Host";
@@ -491,7 +493,7 @@ public class MeshProber implements JoinAcceptor {
         ImmutableMap.Builder<Integer, HostCriteria> hcb = ImmutableMap.builder();
         for (Map.Entry<Integer, JSONObject> e: jos.entrySet()) {
             HostCriteria hc = new HostCriteria(e.getValue());
-            checkArgument(!hc.isUndefined(), "json boject for host id %s does not contain prober fields", e.getKey());
+            checkArgument(!hc.isUndefined(), "json object for host id %s does not contain prober fields", e.getKey());
             hcb.put(e.getKey(), hc);
         }
         Map<Integer, HostCriteria> additions = hcb.build();
@@ -560,7 +562,7 @@ public class MeshProber implements JoinAcceptor {
                 ++haveTerminus;
             }
             String licHash = c.getLicenseHash();
-            if (licHash != null && !licHash.equals(HostCriteria.NO_LICENSE)) {
+            if (licHash != null && !licHash.equals(NO_LICENSE)) {
                 licenseHashes.add(licHash);
             } else {
                 ++noLicenseCount;
@@ -608,8 +610,12 @@ public class MeshProber implements JoinAcceptor {
         }
 
         if (m_enterprise && noLicenseCount > 0) { // only community edition is supposed to have no license
-            org.voltdb.VoltDB.crashLocalVoltDB("One or more nodes failed to present a license, "
-                    + "cannot proceed with cluster startup.");
+            org.voltdb.VoltDB.crashLocalVoltDB("This is the Enterprise edition, but one or more nodes failed " +
+                                               "to present a license: cannot proceed with cluster startup.");
+        }
+
+        if (licenseHashes.contains(TEST_LICENSE_HASH)) { // this is safe, and is just for unit testing
+            m_networkLog.info("One or more nodes detected using unit-test license hash");
         }
 
         boolean licenseMismatch = licenseHashes.size() > 1;
@@ -953,6 +959,18 @@ public class MeshProber implements JoinAcceptor {
         public MeshProber build() {
             if (m_hostCountSupplier == null && m_coordinators != null) {
                 m_hostCountSupplier = Suppliers.ofInstance(m_coordinators.size());
+            }
+            if (m_licenseHash == null) {
+                // Logically we ought to default to 'no license'. But production code
+                // explicitly sets 'no license' when it means it. For the benefit of
+                // unit tests of the mesh in a pro-repo build, we will default to a
+                // test license hash.
+                if (m_enterprise) {
+                    m_licenseHash = TEST_LICENSE_HASH;
+                    m_networkLog.info("Defaulting to unit-test license hash when building MeshProber");
+                } else {
+                    m_licenseHash = NO_LICENSE;
+                }
             }
             return new MeshProber(
                     m_coordinators,

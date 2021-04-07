@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -1230,7 +1230,7 @@ public class TestHostMessenger {
             fail("did not crash on whole cluster rejoin attempt");
         } catch (AssertionError pass) {
             assertTrue(VoltDB.wasCrashCalled);
-            assertTrue(VoltDB.crashMessage.contains("have different startup snapshots nonces"));
+            assertTrue(VoltDB.crashMessage.contains("have different startup snapshot nonces"));
         }
     }
 
@@ -1334,7 +1334,7 @@ public class TestHostMessenger {
             fail("did not crash on whole cluster rejoin attempt");
         } catch (AssertionError pass) {
             assertTrue(VoltDB.wasCrashCalled);
-            assertTrue(VoltDB.crashMessage.contains("is incompatible with this node verion"));
+            assertTrue(VoltDB.crashMessage.contains("is incompatible with this node version"));
         }
     }
 
