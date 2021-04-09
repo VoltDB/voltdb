@@ -234,7 +234,7 @@ public class MeshProber implements JoinAcceptor {
                 hostCountSupplier.get(), coordinators.size());
         checkArgument(terminusNonce == null || !terminusNonce.trim().isEmpty(),
                 "terminus should not be blank");
-        checkArgument(licenseHash != null, "license signature is null");
+        checkArgument(licenseHash != null, "license hash is null");
 
         this.m_coordinators = ImmutableSortedSet.copyOf(coordinators);
         this.m_versionChecker = versionChecker;
