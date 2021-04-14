@@ -64,12 +64,19 @@ public class updateReplicated extends VoltProcedure
         }
 
         // rid in the table should be smaller than the current rid
+        /* ENG-21049 , this can be caused by the client sending transactions out of order
+        after a rejoin, so this isn't a valid test
+        */
+        previousResult.advanceRow();
+        /*
         if (previousResult.advanceRow() && previousResult.getLong("rid") >= rid) {
+
             setAppStatusCode((byte) AbortStatus.OUT_OF_ORDER.ordinal());
             throw new VoltAbortException("updateReplicated may be executed out of order, " +
                                          "previous rid " + previousResult.getLong("rid") +
                                          " >= current rid " + rid);
         }
+        */
 
         voltQueueSQL(insertStmt, EXPECT_SCALAR_MATCH(1), txnId, uniqueId, rid, previousResult.getLong("cnt"));
         voltExecuteSQL();
