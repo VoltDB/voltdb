@@ -65,7 +65,7 @@ public class AsyncBenchmark {
     static final String CONTESTANT_NAMES_CSV =
             "Edwina Burnam,Tabatha Gehling,Kelly Clauss,Jessie Alloway," +
             "Alana Bregman,Jessie Eichman,Allie Rogalski,Nita Coster," +
-            "Kurt Walser,Ericka Dieter,Loraine NygrenTania Mattioli";
+            "Kurt Walser,Ericka Dieter,Loraine Nygren,Tania Mattioli";
 
     // handy, rather than typing this out several times
     static final String HORIZONTAL_RULE =
