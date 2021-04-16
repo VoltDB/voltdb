@@ -120,13 +120,11 @@ public final class ClientImpl implements Client {
             m_sslContext = null;
         }
 
-        m_distributer = new Distributer(
-                config.m_heavyweight,
-                config.m_procedureCallTimeoutNanos,
-                config.m_connectionResponseTimeoutMS,
-                config.m_sendReadsToReplicasBytDefaultIfCAEnabled,
-                config.m_subject,
-                m_sslContext);
+        m_distributer = new Distributer(config.m_heavyweight,
+                                        config.m_procedureCallTimeoutNanos,
+                                        config.m_connectionResponseTimeoutMS,
+                                        config.m_subject,
+                                        m_sslContext);
         m_distributer.addClientStatusListener(m_listener);
         String username = config.m_username;
         if (config.m_subject != null) {

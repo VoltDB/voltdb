@@ -64,7 +64,6 @@ public class ClientConfig {
     boolean m_reconnectOnConnectionLoss;
     long m_initialConnectionRetryIntervalMS = DEFAULT_INITIAL_CONNECTION_RETRY_INTERVAL_MS;
     long m_maxConnectionRetryIntervalMS = DEFAULT_MAX_CONNECTION_RETRY_INTERVAL_MS;
-    boolean m_sendReadsToReplicasBytDefaultIfCAEnabled = false;
     SslConfig m_sslConfig;
     boolean m_topologyChangeAware = false;
     boolean m_enableSSL = false;
@@ -360,20 +359,12 @@ public class ClientConfig {
     }
 
     /**
-     * <p>By default, reads are sent to the leader replica for each partition. This
-     * is usually optimal for the default read consistency value, SAFE. If you are
-     * using FAST reads, enabling this setting will load balance reads amongst
-     * partition replicas, often increasing throughput and decreasing latency.</p>
+     * @deprecated since reads must always be sent to the leader.
      *
-     * <p>Note: consistency modality SAFE/FAST is obsolete and no longer supported.
-     *</p>
-     *
-     * <p>Defaults to FALSE. Has no effect if Client Affinity is disabled.</p>
-     *
-     * @param on Enable or disable sending reads to replicas.
+     * @param on unused
      */
+    @Deprecated
     public void setSendReadsToReplicasByDefault(boolean on) {
-        m_sendReadsToReplicasBytDefaultIfCAEnabled = on;
     }
 
     /**

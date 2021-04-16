@@ -113,7 +113,6 @@ class Distributer {
     private int m_nextConnection = 0;
 
     private final boolean m_useMultipleThreads;
-    private final boolean m_sendReadsToReplicasBytDefaultIfCAEnabled;
 
     private static final class Procedure {
         final static int PARAMETER_NONE = -1;
@@ -133,7 +132,7 @@ class Distributer {
     }
 
     private final Map<Integer, NodeConnection> m_partitionMasters = new HashMap<>();
-    private final Map<Integer, NodeConnection[]> m_partitionReplicas = new HashMap<>();
+    private final Map<Integer, NodeConnection[]> m_partitionReplicas = new HashMap<>(); // we may not need this
     private final Map<Integer, NodeConnection> m_hostIdToConnection = new HashMap<>();
     private final AtomicReference<ImmutableSortedMap<String, Procedure>> m_procedureInfo =
                                 new AtomicReference<ImmutableSortedMap<String, Procedure>>();
@@ -942,19 +941,18 @@ class Distributer {
     }
 
     Distributer() {
-        this( false,
-                ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
-                ClientConfig.DEFAULT_CONNECTION_TIMOUT_MS,
-                false, null, null);
+        this(false,
+             ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
+             ClientConfig.DEFAULT_CONNECTION_TIMOUT_MS,
+             null,
+             null);
     }
 
-    Distributer(
-            boolean useMultipleThreads,
-            long procedureCallTimeoutNanos,
-            long connectionResponseTimeoutMS,
-            boolean sendReadsToReplicasBytDefault,
-            Subject subject,
-            SslContext sslContext) {
+    Distributer(boolean useMultipleThreads,
+                long procedureCallTimeoutNanos,
+                long connectionResponseTimeoutMS,
+                Subject subject,
+                SslContext sslContext) {
         m_useMultipleThreads = useMultipleThreads;
         m_sslContext = sslContext;
         if (m_sslContext != null) {
@@ -969,7 +967,6 @@ class Distributer {
         m_network.start();
         m_procedureCallTimeoutNanos= procedureCallTimeoutNanos;
         m_connectionResponseTimeoutNanos = TimeUnit.MILLISECONDS.toNanos(connectionResponseTimeoutMS);
-        m_sendReadsToReplicasBytDefaultIfCAEnabled = sendReadsToReplicasBytDefault;
 
         // schedule the task that looks for timed-out proc calls and connections
         m_timeoutReaperHandle = m_ex.scheduleAtFixedRate(new CallExpiration(), 1, 1, TimeUnit.SECONDS);
@@ -1182,31 +1179,7 @@ class Distributer {
                                 procedureInfo.partitionParameterType,
                                 invocation.getPartitionParamValue(procedureInfo.partitionParameter));
                     }
-                    /*
-                     * If the procedure is read only and single part and the user wants it, load balance across replicas
-                     * This is probably slower for SAFE consistency.
-                     */
-                    if (!procedureInfo.multiPart && procedureInfo.readOnly && m_sendReadsToReplicasBytDefaultIfCAEnabled) {
-                        NodeConnection partitionReplicas[] = m_partitionReplicas.get(hashedPartition);
-                        if (partitionReplicas != null && partitionReplicas.length > 0) {
-                            cxn = partitionReplicas[ThreadLocalRandom.current().nextInt(partitionReplicas.length)];
-                            if (cxn.hadBackPressure()) {
-                                //See if there is one without backpressure, make sure it's still connected
-                                for (NodeConnection nc : partitionReplicas) {
-                                    if (!nc.hadBackPressure() && nc.m_isConnected) {
-                                        cxn = nc;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                    } else {
-                        /*
-                         * For writes or SAFE reads, this is the best way to go
-                         */
-                        cxn = m_partitionMasters.get(hashedPartition);
-
-                    }
+                    cxn = m_partitionMasters.get(hashedPartition);
                 } else if (invocation.hasPartitionDestination()) {
                     cxn = m_partitionMasters.get(hashedPartition);
                 }
