@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2020 VoltDB Inc.
+ * Copyright (C) 2020-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -184,6 +184,12 @@ public class TopicProperties extends TypedPropertiesBase<TopicProperties.Key<?>>
         public static final Key<JsonSchemaPolicy> CONFIG_JSON_SCHEMA = new TopicProperties.EnumKey<>(
                 "config.json.schema", JsonSchemaPolicy.NONE);
 
+        public static final Key<List<String>> CONFIG_JSON_PRODUCER_ATTRIBUTES = new JsonAttributesKey(
+                "config.json.producer.attributes", ImmutableList.of());
+
+        public static final Key<List<String>> CONFIG_JSON_CONSUMER_ATTRIBUTES = new JsonAttributesKey(
+                "config.json.consumer.attributes", ImmutableList.of());
+
         // Avro properties
         public static final Key<TimestampPrecision> CONFIG_AVRO_TIMESTAMP = new TopicProperties.EnumKey<>(
                 "config.avro.timestamp", TimestampPrecision.MICROSECONDS);
@@ -298,7 +304,7 @@ public class TopicProperties extends TypedPropertiesBase<TopicProperties.Key<?>>
     }
 
     /**
-     * Key for a property with a simple CSV of column names a value
+     * Key for a property with a simple CSV of column names for a value: columns are converted to uppercase
      */
     private static class ColumnsKey extends Key<List<String>> {
         private static final Splitter s_commaSplitter = Splitter.on(',').trimResults().omitEmptyStrings();
@@ -310,6 +316,42 @@ public class TopicProperties extends TypedPropertiesBase<TopicProperties.Key<?>>
         @Override
         protected List<String> parseValue(String strValue) {
             return ImmutableList.copyOf(Iterables.transform(s_commaSplitter.split(strValue), String::toUpperCase));
+        }
+    }
+
+    /**
+     * Key for a property a CSV list of JSON attributes
+     */
+    private static class JsonAttributesKey extends Key<List<String>> {
+        private CSVParser m_parser = new CSVParser();
+
+        JsonAttributesKey(String name, List<String> defValue) {
+            super(name, null, defValue, null);
+        }
+
+        @Override
+        protected List<String> parseValue(String strValue) {
+            ImmutableList.Builder<String> bldr = ImmutableList.builder();
+            try {
+                List<Object> values = m_parser.parseLineList(strValue);
+                if (values != null) {
+                    for (Object value : values) {
+                        if (value == null) {
+                            throw new RuntimeException("null JSON key");
+                        }
+                        else if (value instanceof String) {
+                            bldr.add((String) value);
+                        }
+                        else {
+                            throw new RuntimeException("JSON key must be a string");
+                        }
+                    }
+                }
+            }
+            catch (Exception ex) {
+                throw new IllegalArgumentException(ex);
+            }
+            return bldr.build();
         }
     }
 
