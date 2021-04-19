@@ -964,6 +964,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 } else if (m_runningState.isRejoining()){
                     SiteTasker task = m_pendingSiteTasks.take();
                     task.runForRejoin(getSiteProcedureConnection(), m_rejoinTaskLog);
+                } else if (m_runningState.isDecommissioning()) {
+                    Thread.currentThread().join();
                 }
             }
         }
