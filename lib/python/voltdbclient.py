@@ -518,7 +518,7 @@ class FastSerializer:
                     if version != self.AUTH_HANDSHAKE_VERSION or status != self.AUTH_HANDSHAKE:
                         raise RuntimeError("Authentication failed.")
 
-                    in_token = self.readVarbinaryContent(self.read_buffer.remaining()).tostring()
+                    in_token = self.readVarbinaryContent(self.read_buffer.remaining()).tobytes()
                     out_token = ctx.step(in_token)
 
                 try:
@@ -596,7 +596,7 @@ class FastSerializer:
         if self.dump_file != None:
             self.dump_file.write(self.wbuf)
             self.dump_file.write(b"\n")
-        self.socket.sendall(self.wbuf.tostring())
+        self.socket.sendall(self.wbuf.tobytes())
         self.wbuf = array.array('B')
 
     def bufferForRead(self):
@@ -815,9 +815,8 @@ class FastSerializer:
         if value == None:
             val = self.__class__.NULL_FLOAT_INDICATOR
         else:
-            val = value
-        val = float(value)
-        ba = bytearray(struct.pack(self.float64Type(1), value))
+            val = float(value)
+        ba = bytearray(struct.pack(self.float64Type(1), val))
         self.wbuf.extend(ba)
 
     # string
