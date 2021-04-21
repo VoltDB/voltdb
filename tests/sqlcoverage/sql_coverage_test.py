@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 # This file is part of VoltDB.
 # Copyright (C) 2008-2020 VoltDB Inc.
@@ -36,9 +36,9 @@ import os.path
 import imp
 import re
 import traceback
-from voltdbclient import *
+from voltdbclientpy2 import *
 from optparse import OptionParser
-from Query import VoltQueryClient
+from QueryPy2 import VoltQueryClient
 from SQLCoverageReport import generate_summary
 from SQLCoverageReport import Reproduce
 from SQLGenerator import SQLGenerator

@@ -24,7 +24,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import sys
-from voltdbclient import *
+from voltdbclientpy2 import *
 
 client = FastSerializer("localhost", 21212)
 proc = VoltProcedure(client, "@ProfCtl", [FastSerializer.VOLTTYPE_STRING])

@@ -1,6 +1,5 @@
-#!/usr/bin/env python
 # This file is part of VoltDB.
-# Copyright (C) 2008-2020 VoltDB Inc.
+# Copyright (C) 2008-2021 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -52,7 +51,7 @@ def status(runner):
                 doStatus(runner, available_hosts)
 
                 time.sleep(5)  # used to be runner.opts.interval, default as 2 seconds
-        except KeyboardInterrupt, e:
+        except KeyboardInterrupt as e:
             pass # don't care
     else:
         doStatus(runner, available_hosts)
@@ -92,7 +91,7 @@ def doStatus(runner, available_hosts):
 
     if runner.opts.dr:
         # repeat the process to discover remote cluster.
-        for clusterId, remoteCluster in clusterInfo.remoteclusters_by_id.items():
+        for clusterId, remoteCluster in list(clusterInfo.remoteclusters_by_id.items()):
             for remoteHost in remoteCluster.members:
                 hostname = remoteHost.split(':')[0]
                 try:
@@ -107,7 +106,7 @@ def doStatus(runner, available_hosts):
                     else:
                         printPlainSummary(clusterInfo)
                     break
-                except Exception, e:
+                except Exception as e:
                     pass  # ignore it
 
 def getClusterInfo(runner, available_hosts, clearHostCache):
@@ -127,12 +126,12 @@ def getClusterInfo(runner, available_hosts, clearHostCache):
     for tuple in response.table(0).tuples():
         hosts.update(tuple[0], tuple[1], tuple[2])
 
-    for hostId, hostInfo in hosts.hosts_by_id.items():
+    for hostId, hostInfo in list(hosts.hosts_by_id.items()):
         if hostInfo.hostname not in available_hosts:
             available_hosts.append(hostInfo.hostname + ":" + str(hostInfo.clientport))
 
     # get current version and root directory from an arbitrary node
-    host = hosts.hosts_by_id.itervalues().next()
+    host = next(iter(hosts.hosts_by_id.values()))
 
     # ClusterId in @SystemInformation is added in v7.2, so must check the version of target cluster to make it work properly.
     version = host.version
@@ -157,7 +156,7 @@ def getClusterInfo(runner, available_hosts, clearHostCache):
 
 
     cluster = Cluster(int(clusterId), version, int(kfactor), int(fullClusterSize), uptime)
-    for hostId, hostInfo in hosts.hosts_by_id.items():
+    for hostId, hostInfo in list(hosts.hosts_by_id.items()):
         cluster.add_member(hostId, hostInfo.hostname)
 
     # number of live clients connect to the cluster
@@ -269,13 +268,13 @@ def printPlainSummary(cluster):
 
     # print host info
     hostHeader = '{:>8}{:>16}'.format("HostId", "Host Name")
-    for clusterId, remoteCluster in cluster.remoteclusters_by_id.items():
+    for clusterId, remoteCluster in list(cluster.remoteclusters_by_id.items()):
         hostHeader += '{:>20}'.format("Cluster " + str(clusterId) + " (" + remoteCluster.status + ")")
 
     rows = list()
-    for hostId, hostname in cluster.hosts_by_id.items():
+    for hostId, hostname in list(cluster.hosts_by_id.items()):
         row = "{:>8}{:>16}".format(hostId, hostname)
-        for clusterId, remoteCluster in cluster.remoteclusters_by_id.items():
+        for clusterId, remoteCluster in list(cluster.remoteclusters_by_id.items()):
             # use get() to avoid keyError when node is shut down
             row += '{:>17} s'.format(remoteCluster.producer_max_latency.get(hostname + str(clusterId), ''))
         rows.append(row)
@@ -296,7 +295,7 @@ def printPlainSummary(cluster):
 def printJSONSummary(cluster):
 
     remoteClusterInfos = []
-    for clusterId, remoteCluster in cluster.remoteclusters_by_id.items():
+    for clusterId, remoteCluster in list(cluster.remoteclusters_by_id.items()):
         clusterInfo = {
             "clusterId": clusterId,
             "state": remoteCluster.status,
@@ -305,9 +304,9 @@ def printJSONSummary(cluster):
         remoteClusterInfos.append(clusterInfo)
 
     members = []
-    for hostId, hostname in cluster.hosts_by_id.items():
+    for hostId, hostname in list(cluster.hosts_by_id.items()):
         latencies = []
-        for clusterId, remoteCluster in cluster.remoteclusters_by_id.items():
+        for clusterId, remoteCluster in list(cluster.remoteclusters_by_id.items()):
             latency = {
                 "clusterId": clusterId,
                 "delay": remoteCluster.producer_max_latency[hostname + str(clusterId)]
@@ -340,4 +339,4 @@ def printJSONSummary(cluster):
         body["elastic_progress"] = cluster.percentage_moved
 
     jsonStr = json.dumps(body)
-    print jsonStr
+    print(jsonStr)

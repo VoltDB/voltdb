@@ -24,11 +24,15 @@
 #  See http://blog.kevinastone.com/generate-your-tests.html for
 #  a detailed walkthrough the process of dynamic unittest generation
 
+import sys
+
+if sys.hexversion < 0x03060000:
+    raise Exception("Python version 3.6 or greater is required.")
+
 import os
 import random
 import re
 import subprocess
-import sys
 import xmlrunner
 import unittest
 from optparse import OptionParser
@@ -38,23 +42,20 @@ random.seed()
 # verbs contains verb to version (denote old cli version 1)
 volt_support_version = [1, 2]
 
-volt_verbs = {'create': 1,
-              'recover': 1,
-              'rejoin': 1,
-              'add': 1,
-              'init': 2,
-              'start': 2,
-             }
+# regular verbs only here. more-or-less, if the python
+# 'voltdb' commands does not run the actual voltdb server,
+# it won't work in this list. see volt_irregular_verbs.
+volt_verbs = {'init': 2,
+              'start': 2}
 
-volt_verbs_mapping = {'create': 'create',
-                      'recover': 'recover',
-                      'rejoin': 'live rejoin',
-                      'add': 'add',
-                      'init': 'initialize',
-                      'start': 'probe',
+
+volt_verbs_mapping = {'check': 'check',
+                      'collect': 'collect',
                       'get': 'get',
-                      }
-
+                      'init': 'initialize',
+                      'mask': 'mask',
+                      'start': 'probe',
+                      'stop': 'stop'}
 
 # create all the options
 class Opt:
@@ -104,87 +105,33 @@ output = Opt('output', 'file', str, 2)
 schema = Opt('schema', 'schema', str, 2)
 classes = Opt('classes', 'classes', str, 2)
 
+prefix = Opt('prefix', 'prefix', str, 2)
+dryrun = Opt('dry-run', 'dry-run', None, 2)
+skipheapdump = Opt('skip-heap-dump', 'skip-heap-dump', None, 2)
+days = Opt('days', 'days', int, 2)
+
+
 # negative opt
 unknown = Opt('unknown', None, None, 0)
 
-volt_opts = {'create': [admin,
-                        client,
-                        drpublic,
-                        externalinterface,
-                        http,
-                        internal,
-                        internalinterface,
-                        publicinterface,
-                        replication,
-                        zookeeper,
-                        deployment,
-                        force,
-                        placementgroup,
-                        host,
-                        licensefile,
-                        pause,
-                        replica,
-                        topicsport,
-                        topicspublic],
-
-             'recover': [admin,
-                         client,
-                         drpublic,
-                         externalinterface,
-                         http,
-                         internal,
-                         internalinterface,
-                         publicinterface,
-                         replication,
-                         zookeeper,
-                         deployment,
-                         placementgroup,
-                         host,
-                         licensefile,
-                         pause,
-                         replica,
-                         topicsport,
-                         topicspublic],
-
-             'rejoin': [admin,
-                        client,
-                        drpublic,
-                        externalinterface,
-                        http,
-                        internal,
-                        internalinterface,
-                        publicinterface,
-                        replication,
-                        zookeeper,
-                        deployment,
-                        placementgroup,
-                        licensefile,
-                        topicsport,
-                        topicspublic],
-
-             'add': [admin,
-                     client,
-                     drpublic,
-                     externalinterface,
-                     http,
-                     internal,
-                     internalinterface,
-                     publicinterface,
-                     replication,
-                     zookeeper,
-                     deployment,
-                     placementgroup,
-                     licensefile,
-                     topicsport,
-                     topicspublic],
-
+volt_opts = {'check': [],
+             'collect': [prefix,
+                         output,
+                         dryrun,
+                         skipheapdump,
+                         days,
+                         voltdbroot,
+                         force],
+             'get': [voltdbroot,
+                     force,
+                     output],
              'init': [config,
                       voltdbroot,
                       force,
-                      schema,
                       classes,
-                      licensefile],
-
+                      licensefile,
+                      schema],
+             'mask': [],
              'start': [admin,
                        client,
                        drpublic,
@@ -194,7 +141,9 @@ volt_opts = {'create': [admin,
                        internalinterface,
                        publicinterface,
                        replication,
+                       topicsport,
                        zookeeper,
+                       add,
                        hostcount,
                        voltdbroot,
                        placementgroup,
@@ -203,38 +152,40 @@ volt_opts = {'create': [admin,
                        missing,
                        pause,
                        replica,
-                       add,
                        topicsport,
                        topicspublic],
+             'stop': [host],
              }
 
-volt_opts_mandatory = {'create': [],
-                       'recover': [],
-                       'rejoin': [host],
-                       'add': [host],
+volt_opts_mandatory = {'check': [],
+                       'collect': [],
+                       'get': [],
                        'init': [],
+                       'mask': [],
                        'start': [],
-                       }
+                       'stop': []}
 
 volt_opts_negative = [unknown]
+
 # additional output cli
-volt_verbs_output = {'create': ' [ CATALOG ]',
-                     'recover': '',
-                     'rejoin': '',
-                     'add': '',
+
+volt_verbs_output = {'check': '',
+                     'collect': ' VOLTDBROOT',
+                     'get': ' RESOURCE',
                      'init': '',
-                     'start': ''
-                     }
+                     'mask': ' DEPLOYMENTFILE ...',
+                     'start': '',
+                     'stop': ''}
 
 # some verbs will generate default opts to java command line
-volt_opts_default = {
-    'create': {placementgroup.javaname: '0', host.javaname: 'localhost:3021'},
-    'recover': {placementgroup.javaname: '0', host.javaname: 'localhost:3021'},
-    'rejoin': {placementgroup.javaname: '0'},
-    'add': {placementgroup.javaname: '0'},
-    'init': {},
-    'start': {placementgroup.javaname: '0', mesh.javaname: "\"\""}
-}
+
+volt_opts_default = {'check': {},
+                     'collect': {},
+                     'get': {},
+                     'init': {},
+                     'mask': {},
+                     'start': {placementgroup.javaname: '0', mesh.javaname: "\"\""},
+                     'stop': {}}
 
 # regular expression for pre-process the actual output before comparison
 ignore = "^(Exec:|Run:) (?P<java_path>.+?)(java) (?P<java_opts>.+?) (-classpath) (?P<classpath>.+?) (org.voltdb.VoltDB)";
@@ -255,8 +206,9 @@ option_ignore = ['version', 'help', 'verbose', 'background', 'ignore', 'blocking
 # voltdb get and others use positional arguments so their
 # tests can't use the same pattern as "voltdb start|init|..."
 # model data for the irregular (voltdb get) family
-volt_irregular_verbs = { "get": 2,}
+volt_irregular_verbs = { "get": 2, }
 get = Opt("get", "get", str, 2)
+mask = Opt("mask", "mask", str, 2)
 irr_classes = Opt("classes", "classes", str, 2)
 voltdbrootdir = Opt("--dir somedir", "getvoltdbroot somedir", str, 2)
 otheroot = Opt("otheroot", "getvoltdbroot otheroot", str, 2)
@@ -271,9 +223,12 @@ verbs = [ get, ]
 objects = [ deployment, schema, irr_classes ]  # required
 options = [ voltdbrootdir, out, "none", ]
 
+# TODO: add other irregular verbs
+# check, collect, mask, stop
+# above structures do not seem sufficiently general
+
 class TestsContainer(unittest.TestCase):
     longMessage = True
-
 
 def make_test_function(haddiffs, description):
     def test(self):
@@ -301,19 +256,23 @@ def run_voltcli(verb, opts, reportout=None, cmd=['voltdb'], mode=['--dry-run'], 
                             cwd=cwd,
                             env=environ)
     stdout, stderr = proc.communicate()
+    if stdout:
+        stdout = stdout.decode("utf-8")
+    if stderr:
+        stderr = stderr.decode("utf-8")
     return stdout, stderr
 
 
 def compare_result(stdout, stderr, verb, opts, reportout, expectedOut=None, expectedErr=None):
     output_str = sanitize(stdout).strip()
-    description = "Generate java command line:\n\t" + output_str + "\nTest Passed!\n\n"
+    description = "Generated java command line:\n\t" + output_str + "\nTest Passed!\n\n"
     if expectedOut:
         haddiffs = False
         if expectedOut != stdout:
-            description = "Generate stdout:\n" + stdout + "\n" + "does not match expected:\n" + expectedOut + "\nTest Failed!\n\n"
+            description = "Generated stdout:\n" + stdout + "\n" + "does not match expected:\n" + expectedOut + "\nTest Failed!\n\n"
             haddiffs = True
         else:
-            description = "Generate expected stdout:\n" + stdout + "Test Passed!\n\n"
+            description = "Generated expected stdout:\n" + stdout + "Test Passed!\n\n"
         reportout.write(description)
         return haddiffs, description
 
@@ -321,9 +280,9 @@ def compare_result(stdout, stderr, verb, opts, reportout, expectedOut=None, expe
         haddiffs = False
         if stderr != expectedErr:
             haddiffs = True
-            description = "Generate stderr:\n" + stderr + "\n" + "doest not match expected:\n" + expectedErr + "\nTest Failed!\n\n"
+            description = "Generated stderr:\n" + stderr + "\n" + "doest not match expected:\n" + expectedErr + "\nTest Failed!\n\n"
         else:
-            description = "Generate expected stderr:\n" + stderr + "Test Passed!\n\n"
+            description = "Generated expected stderr:\n" + stderr + "Test Passed!\n\n"
         reportout.write(description)
         return haddiffs, description
 
@@ -331,15 +290,15 @@ def compare_result(stdout, stderr, verb, opts, reportout, expectedOut=None, expe
 
     # match the verbs
     # if output_str.find(verb) == -1:
-    if output_str.find(verb) == -1:
-        description = "Generate java command line:\n\t" + output_str + "\n" + "does not contain expected verb:\n" + verb + "\nTest Failed!\n\n"
+    if output_str.lower().find(verb) == -1:
+        description = "Generated java command line:\n\t" + output_str + "\n" + "does not contain expected verb:\n" + verb + "\nTest Failed!\n\n"
         reportout.write(description)
         return True, description
 
     # match the opts
     output_tokens = output_str.lstrip(verb).split()
     expected_tokens = []
-    for k, v in opts.items():
+    for k, v in list(opts.items()):
         if v:
             expected_tokens.extend([k, v])
         else:
@@ -403,7 +362,7 @@ def gen_config(mandatory_opts, all_ops, count, expected_opts={}):
         opts.append(o)
     return opts, expected_opts
 
-# Test JAVA HEAP (VOLTDB_HEAPMAX) and Java Runtime Options(VOLTDB_OTPS) can be override
+# Test JAVA HEAP (VOLTDB_HEAPMAX) and Java Runtime Options(VOLTDB_OTPS) can be overridden
 def test_java_opts_override(verb = 'start', reportout = None):
     haddiffs = False
     override_env = dict(os.environ.copy(), **volt_override)
@@ -412,7 +371,7 @@ def test_java_opts_override(verb = 'start', reportout = None):
     if m is None:
         raise RuntimeError("No matches found in: '%s'" % stdout)
     matched_java_opts = m.group('java_opts')
-    reportout.write("Given: " + " ".join([k + '=' + v for k, v in volt_override.items()]) + "\n" +
+    reportout.write("Given: " + " ".join([k + '=' + v for k, v in list(volt_override.items())]) + "\n" +
                     "Got JVM Options: " + matched_java_opts + "\n")
     if 'VOLTDB_HEAPMAX' in volt_override:
         if '-Xmx{}m'.format(volt_override['VOLTDB_HEAPMAX']) in matched_java_opts:
@@ -463,7 +422,7 @@ def compare_irregular(actual, expected, reportout):
         False means "no differences", aka match
         True means "differences", aka doesn't match
     """
-    description = "Generate java command line:\n\t" + actual
+    description = "Generated java command line:\n\t" + actual
     if actual.strip() == " ".join(expected).strip():
         description += "\nTest Passed!\n\n"
         haddiffs = False
@@ -489,7 +448,7 @@ def do_main():
     haddiffs = test_irregular_verbs(reportout=reportout)
 
     try:
-        for verb, version in volt_verbs.items():
+        for verb, version in list(volt_verbs.items()):
             if not (version in volt_support_version):
                 continue
 
@@ -500,7 +459,7 @@ def do_main():
             covered_opts = [opt.pyname for opt in volt_opts_mandatory[verb] + volt_opts[verb]]
             untested_opts = set(available_opts) - set(option_ignore) - set(covered_opts)
             if untested_opts:
-                description = "Uncovered option(s) for " + verb + " : [" + " ".join(untested_opts) + "]\n"
+                description = "Uncovered option(s) for " + verb + " : [" + " ".join(untested_opts) + "]\nCoverage Failed!\n\n"
                 reportout.write(description)
                 haddiffs = True
 
@@ -531,11 +490,11 @@ def do_main():
         unittest.main(testRunner=xmlrunner.XMLTestRunner(output='test-reports'))
         # unittest.main(verbosity=2)
     finally:
-        print "Summary report written to file://" + os.path.abspath(options.report_file)
+        print("Summary report written to file://" + os.path.abspath(options.report_file))
         if haddiffs:
             sys.exit("One or more voltverbstest script failures or errors was detected.")
         else:
-            print "All verb test covered and passed!"
+            print("All verb tests passed, all verb options covered!")
 
 
 if __name__ == "__main__":

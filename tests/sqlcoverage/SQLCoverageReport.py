@@ -35,7 +35,7 @@ from optparse import OptionParser
 from os.path import basename, isfile
 from shutil import copyfile
 from time import mktime
-from voltdbclient import VoltColumn, VoltTable, FastSerializer
+from voltdbclientpy2 import VoltColumn, VoltTable, FastSerializer
 
 __quiet = True
 

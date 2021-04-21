@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2020 VoltDB Inc.
+# Copyright (C) 2008-2021 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -13,10 +13,12 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
+
 import sys
 import time
 import voltdbclient
 
+from functools import reduce
 
 def check_exporter(runner):
     runner.info('Completing outstanding exporter transactions...')
@@ -90,10 +92,10 @@ def monitorDRProducerStatisticsProgress(lastPartitionMin, lastPartitionMax, curr
     currentTime = time.time()
     timeout = runner.opts.timeout
     # any stats progress?
-    partitionMinProgressed = cmp(lastPartitionMin, currentPartitionMin)
-    partitionMaxprogressed = cmp(lastPartitionMax, currentPartitionMax)
+    partitionMinProgressed = (lastPartitionMin != currentPartitionMin)
+    partitionMaxProgressed = (lastPartitionMax != currentPartitionMax)
     # stats moved
-    if partitionMinProgressed <> 0 or partitionMaxprogressed <> 0:
+    if partitionMinProgressed or partitionMaxProgressed:
         return currentTime
 
     timeSinceLastUpdate = currentTime - lastUpdatedTime
@@ -321,7 +323,7 @@ def check_dr_consumer(runner):
         notifyInterval -= 1
         currentValidationParams = dict()
         for r in resp.table(1).tuples():
-            if r[8] <> r[9]:
+            if r[8] != r[9]:
                 outstanding += 1
                 currentValidationParams[str(r[1]) + '-' + str(r[5])] = "%s-%s" % (r[8], r[9])
                 if notifyInterval == 0:
@@ -416,7 +418,7 @@ def monitorStatisticsProgress(lastUpdatedParams, currentParams, lastUpdatedTime,
 def check_partition_leaders_on_host(runner, hostid):
     lastUpdatedTime = time.time()
     notifyInterval = 10
-    lastValidationParamms = [sys.maxint]
+    lastValidationParamms = [sys.maxsize]
     while True:
         resp = get_stats(runner, 'TOPO')
         if len(resp.table(0).tuples()) == 0:
@@ -449,7 +451,7 @@ def check_partition_leaders_on_host(runner, hostid):
 def check_export_mastership_on_host(runner, hostid):
     lastUpdatedTime = time.time()
     notifyInterval = 10
-    lastValidationParamms = [sys.maxint]
+    lastValidationParamms = [sys.maxsize]
     while True:
         resp = get_stats(runner, 'EXPORT')
         if len(resp.table(0).tuples()) == 0:

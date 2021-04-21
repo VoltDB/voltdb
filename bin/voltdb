@@ -1,7 +1,7 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2020 VoltDB Inc.
+# Copyright (C) 2008-2021 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -33,18 +33,22 @@
 # from version.txt in the script's parent directory. It can be copied to other
 # names, and also to other locations if the path-building is adjusted. The
 # description should also be changed if re-used for another base command.
+
 import sys
 import os
+import traceback
+
 try:
-    # ensure version 2.7+ of python
-    if sys.version_info[0] == 2 and sys.version_info[1] < 7:
+    # ensure version 3.6+ of python
+    if sys.hexversion < 0x03060000:
         for dir in os.environ['PATH'].split(':'):
-            for name in ['python2.7']:
+            for n in range(6, 12): # future-proofing but not too far
+                name = 'python3.%d' % n
                 path = os.path.join(dir, name)
                 if os.path.isfile(path):
-                    print 'Re-running with %s...' % path
+                    print('Restarting with %s ...' % path)
                     os.execv(path, [path] + sys.argv)
-        sys.stderr.write("This script requires Python 2.7 or newer. Please install " +
+        sys.stderr.write("This script requires Python 3.6 or newer. Please install " +
                          "a more recent Python release and retry.\n")
         sys.exit(-1)
 
@@ -66,8 +70,9 @@ try:
     sys.path.insert(0, os.path.join(base_dir, 'lib', 'python'))
     from voltcli import runner
 # Be selective about exceptions to avoid masking load-time library exceptions.
-except (IOError, OSError, ImportError), e:
+except (IOError, OSError, ImportError) as e:
     sys.stderr.write('Exception (%s): %s\n' % (e.__class__.__name__, str(e)))
+    traceback.print_exc()
     sys.exit(1)
 # Avoid using ~/.voltdb for state files since it's used by VEM.
 runner.main(cmd_name, cmd_dir, version, description,

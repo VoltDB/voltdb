@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2020 VoltDB Inc.
+# Copyright (C) 2008-2021 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -17,7 +17,8 @@
 __author__ = 'scooper'
 
 import sys
-from voltdbclient import *
+
+import voltdbclient
 from voltcli import cli
 from voltcli import environment
 from voltcli import utility
@@ -341,7 +342,7 @@ class VerbSpace(object):
         self.VOLT        = VOLT
         self.scan_dirs   = scan_dirs
         self.verbs       = verbs
-        self.verb_names  = self.verbs.keys()
+        self.verb_names  = list(self.verbs.keys())
         self.verb_names.sort()
 
 #===============================================================================
@@ -481,14 +482,14 @@ class ServerBundle(JavaBundle):
     def go(self, verb, runner):
         if self.check_environment_config:
             incompatible_options = checkconfig.test_hard_requirements()
-            for k,v in  incompatible_options.items():
+            for k,v in  list(incompatible_options.items()):
                 state = v[0]
                 if state == 'PASS' :
                     pass
                 elif state == "WARN":
                     utility.warning(v[1])
                 elif state == 'FAIL' :
-                    if k in checkconfig.skippableRequirements.keys() and runner.opts.skip_requirements and checkconfig.skippableRequirements[k] in runner.opts.skip_requirements:
+                    if k in list(checkconfig.skippableRequirements.keys()) and runner.opts.skip_requirements and checkconfig.skippableRequirements[k] in runner.opts.skip_requirements:
                         utility.warning(v[1])
                     else:
                         utility.abort(v[1])

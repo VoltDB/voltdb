@@ -1,6 +1,6 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python2
 # This file is part of VoltDB.
-# Copyright (C) 2008-2021 VoltDB Inc.
+# Copyright (C) 2008-2020 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -16,11 +16,10 @@
 # along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
 
 import sys
-if sys.hexversion < 0x03060000:
-    more = ""
-    if sys.hexVersion < 0x03000000:
-        more = " Use QueryPy2 for Python 2.x."
-    raise Exception("Python version 3.6 or greater is required." + more)
+if sys.hexversion < 0x02050000:
+    raise Exception("Python version 2.5 or greater is required.")
+if sys.hexversion >= 0x03000000:
+    raise Exception("Use Query.py for Python version 3 support.")
 
 import cmd
 import socket
@@ -32,11 +31,11 @@ from datetime import datetime
 # no special handling needed
 try:
     from sslutils import FastSerializer
-    from voltdbclient import ReadBuffer, VoltColumn, VoltTable, VoltException, VoltResponse, VoltProcedure
+    from voltdbclientp2 import ReadBuffer, VoltColumn, VoltTable, VoltException, VoltResponse, VoltProcedure
     supportSSL = True
 except ImportError:
-    print("Import errors. No sslutils.")
-    from voltdbclient import ReadBuffer, VoltColumn, VoltTable, VoltException, VoltResponse, VoltProcedure, FastSerializer
+    print "Import errors. No sslutils."
+    from voltdbclientpy2 import ReadBuffer, VoltColumn, VoltTable, VoltException, VoltResponse, VoltProcedure, FastSerializer
     supportSSL = False
 
 class VoltQueryClient(cmd.Cmd):
@@ -118,8 +117,6 @@ class VoltQueryClient(cmd.Cmd):
 
         self.promote = VoltProcedure(self.fs, "@Promote")
 
-        self.ping = VoltProcedure(self.fs, "@Ping")
-
         self.response = None
 
     def __safe_call(self, proc, params = None, response = True, timeout = None):
@@ -130,7 +127,7 @@ class VoltQueryClient(cmd.Cmd):
 
         try:
             return proc.call(params, response, timeout)
-        except IOError as err:
+        except IOError, err:
             self.safe_print("Error: %s" % (err))
             if not response:
                 raise
@@ -151,7 +148,7 @@ class VoltQueryClient(cmd.Cmd):
     def precmd(self, command):
         if self.fs == None:
             self.safe_print("Not connected to any server, please connect first")
-        return command
+        return command.decode("utf-8")
 
     def prepare_params(self, procedure, command):
         params = []
@@ -171,8 +168,8 @@ class VoltQueryClient(cmd.Cmd):
         if not self.__quiet:
             for i in var:
                 if i != None:
-                    print(i, end=' ')
-            print()
+                    print i,
+            print
 
     def set_quiet(self, quiet):
         self.__quiet = quiet
@@ -256,7 +253,7 @@ Get the statistics:
                                              [args[0], args[1], int(args[2])],
                                              timeout = self.__timeout)
         else:
-            print(args)
+            print args
             self.response = self.__safe_call(self.snapshotsavejson,
                                              args,
                                              timeout = self.__timeout)
@@ -392,19 +389,20 @@ Get the statistics:
         if len(args) != 2:
             return self.help_updatecatalog()
 
-        if not os.path.isfile(args[0]) or not os.path.isfile(args[1]):
+        if(not os.path.isfile(args[0]) or not os.path.isfile(args[1])):
             # args[0] is the catalog jar file
             # args[1] is the deployment xml file
-            print("Either file '%s' does not exist or file '%s' does not exist." % (args[0],args[1]), file=sys.stderr);
+            print >> sys.stderr, "Either file '%s' doesnot exist OR file '%s' doesnot exist!!" \
+                    (args[0],args[1])
             exit(1)
 
         xmlf = open(args[1], "r")
         xmlcntnts = xmlf.read()
-#       print("xmlcntnts = #%s#" % xmlcntnts)
+#       print "xmlcntnts = #%s#" % xmlcntnts
         jarf = open(args[0], "r")
         jarcntnts = jarf.read()
         hexJarcntnts = jarcntnts.encode('hex_codec')
-#       print("hexJarcntnts = #%s#" % hexJarcntnts)
+#       print "hexJarcntnts = #%s#" % hexJarcntnts
 
         self.safe_print("Updating the application catalog")
         self.response = self.__safe_call(self.updatecatalog,
@@ -496,18 +494,18 @@ Get the statistics:
                     try:
                         self.response = self.__safe_call(self.%s, self.prepare_params(self.%s, command), timeout = self.__timeout)
                         self.safe_print(self.response)
-                    except SyntaxError as strerr:
+                    except SyntaxError, strerr:
                         self.safe_print(strerr)
                    """ % (method_name, parsed[0], proc_name, proc_name)
             tmp = {}
-            exec(code.strip(), tmp)
+            exec code.strip() in tmp
             setattr(self.__class__, "do_" + parsed[0], tmp[method_name])
 
             setattr(self.__class__, proc_name,
                     VoltProcedure(self.fs, parsed[0],
                                   [self.__class__.TYPES[i]
                                    for i in parsed[1:]]))
-        except KeyError as strerr:
+        except KeyError, strerr:
             self.safe_print("Unsupported type", strerr)
             self.help_define()
 
@@ -518,14 +516,8 @@ Get the statistics:
         self.safe_print()
         self.safe_print("Supported types", self.__class__.TYPES.keys())
 
-    def do_ping(self, command):
-        if self.fs == None:
-            return
-        self.response = self.__safe_call(self.ping, timeout = self.__timeout)
-        self.safe_print(self.response)
-
 def help(program_name):
-    print(program_name, "hostname port [dump=filename] [command]")
+    print program_name, "hostname port [dump=filename] [command]"
 
 if __name__ == "__main__":
     # TODO Add SSL arguments to command line & its help

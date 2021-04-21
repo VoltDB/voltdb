@@ -30,7 +30,7 @@ import time
 import datetime
 from math import ceil
 from sys import maxint
-from voltdbclient import * # for VoltDB types
+from voltdbclientpy2 import * # for VoltDB types
 from optparse import OptionParser # for use in standalone test mode
 # Need these to print non-ascii characters:
 import codecs

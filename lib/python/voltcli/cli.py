@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2020 VoltDB Inc.
+# Copyright (C) 2008-2021 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -18,6 +18,7 @@ import sys
 import os
 import optparse
 import copy
+from functools import total_ordering
 
 from voltcli import utility
 
@@ -27,6 +28,7 @@ from voltcli import utility
 # externally as module attributes.
 
 #===============================================================================
+@total_ordering
 class BaseOption(object):
 #===============================================================================
     """
@@ -67,21 +69,35 @@ class BaseOption(object):
         return '%s(%s/%s %s)' % (self.__class__.__name__,
                                  self.short_opt, self.long_opt, self.kwargs)
 
-    def __cmp__(self, other):
+    def __eq__(self, other):
+        if self.short_opt and self.long_opt and other.short_opt and other.long_opt:
+            if (self.short_opt.lower() == other.short_opt.lower() and
+                self.long_opt.lower() == other.long_opt.lower()):
+                return True
+        return False
+
+    def __ne__(self, other):
+        if self.short_opt and self.long_opt and other.short_opt and other.long_opt:
+            if (self.short_opt.lower() == other.short_opt.lower() and
+                self.long_opt.lower() == other.long_opt.lower()):
+                return False
+        return True
+
+    def __lt__(self, other):
         # Sort options by lowercase letter or word, depending on which is available.
         if self.short_opt:
             if other.short_opt:
-                return cmp(self.short_opt.lower(), other.short_opt.lower())
-            return 1
+                return self.short_opt.lower() < other.short_opt.lower()
+            return False
         if other.short_opt:
-            return -1
+            return True
         if self.long_opt:
             if other.long_opt:
-                return cmp(self.long_opt.lower(), other.long_opt.lower())
-            return 1
+                return self.long_opt.lower() < other.long_opt.lower()
+            return False
         if other.long_opt:
-            return -1
-        return 0
+            return True
+        return False
 
     def has_value(self):
         return (not 'action' in self.kwargs or self.kwargs['action'] == 'store')
@@ -213,7 +229,7 @@ class BaseArgument(object):
         self.optional = utility.kwargs_get_boolean(kwargs, 'optional', default=False)
         # A max_count value of None is interpreted as infinity.
         if self.max_count is None:
-            self.max_count = sys.maxint
+            self.max_count = sys.maxsize
     def get(self, value):
         utility.abort('BaseArgument subclass must implement a get(value) method: %s'
                             % self.__class__.__name__)
@@ -234,7 +250,7 @@ class IntegerArgument(BaseArgument):
     def get(self, value):
         try:
             return int(value)
-        except ValueError, e:
+        except ValueError as e:
             raise ArgumentException('%s value is not a valid integer: %s'
                                         % (self.name.upper(), str(value)))
 
@@ -325,7 +341,7 @@ class CLIParser(ExtendedHelpOptionParser):
         self.prog         = prog
         self.verb         = None
         self.verbs        = verbs
-        self.verb_names   = verbs.keys()
+        self.verb_names   = list(verbs.keys())
         self.base_options = base_options
         self.verb_names.sort()
         self.base_options.sort()
@@ -349,7 +365,7 @@ class CLIParser(ExtendedHelpOptionParser):
         for option in verb.iter_options():
             try:
                 self.add_option(*option.get_option_names(), **option.kwargs)
-            except Exception, e:
+            except Exception as e:
                 utility.abort('Exception initializing options for verb "%s".' % verb.name, e)
 
     def process_verb_options(self, verb, opts):
@@ -403,7 +419,7 @@ class CLIParser(ExtendedHelpOptionParser):
                     for v in args[iarg:]:
                         try:
                             value.append(arg.get(v))
-                        except ArgumentException, e:
+                        except ArgumentException as e:
                             exceptions.append(e)
                     iarg = len(args)
                 elif len(args) > 0:
@@ -411,7 +427,7 @@ class CLIParser(ExtendedHelpOptionParser):
                     # Pass through argument class get() for validation, conversion, etc..
                     try:
                         value = arg.get(args[iarg])
-                    except ArgumentException, e:
+                    except ArgumentException as e:
                         exceptions.append(e)
                     iarg += 1
                 if value is not None or arg.min_count == 0:
@@ -603,7 +619,7 @@ class CLISpec(object):
 
     def __str__(self):
         s = 'CLISpec: [\n'
-        keys = self._kwargs.keys()
+        keys = list(self._kwargs.keys())
         keys.sort()
         for key in keys:
             s += '   %s: %s\n' % (key, utility.to_display_string(self._kwargs[key]))

@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2020 VoltDB Inc.
+# Copyright (C) 2008-2021 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -20,7 +20,7 @@ def release(runner):
     columns = [VOLT.FastSerializer.VOLTTYPE_STRING, VOLT.FastSerializer.VOLTTYPE_STRING]
     params = [runner.opts.topic, "release"]
     response = runner.call_proc('@TopicControl', columns, params)
-    print response.table(0).format_table(caption = 'Topic Release Results')
+    print(response.table(0).format_table(caption = 'Topic Release Results'))
 
 @VOLT.Multi_Command(
     bundles = VOLT.AdminBundle(),

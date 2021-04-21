@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2020 VoltDB Inc.
+# Copyright (C) 2008-2021 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -19,6 +19,7 @@ import subprocess
 import sys
 import os.path
 import os
+
 from voltcli import utility
 
 # Helper functions
@@ -27,7 +28,7 @@ def _check_thp_file(file_pattern, file_prefix):
     filename = file_pattern.format(file_prefix)
     if not os.path.isfile(filename):
         return None
-    with file(filename) as f:
+    with open(filename) as f:
         if '[always]' in f.read():
             return True
     return False
@@ -60,14 +61,14 @@ def _check_segmentation_offload():
         generic-receive-offload settings
     """
     results = []
-    tokenDevs = subprocess.Popen("ip link | grep -B 1 ether", stdout=subprocess.PIPE, shell=True).stdout.read().split('\n')[:-1][0::2]
-    for d in map(lambda x: x.split(':'), tokenDevs):
+    tokenDevs = subprocess.Popen("ip link | grep -B 1 ether", stdout=subprocess.PIPE, shell=True).stdout.read().decode("utf-8").split('\n')[:-1][0::2]
+    for d in [x.split(':') for x in tokenDevs]:
         if len(d) < 2:
             continue
         dev = d[1].strip()
         tcpSeg = False
         genRec = False
-        features = subprocess.Popen("ethtool --show-offload " + dev, stdout=subprocess.PIPE, shell=True).stdout.read().split('\n')
+        features = subprocess.Popen("ethtool --show-offload " + dev, stdout=subprocess.PIPE, shell=True).stdout.read().decode("utf-8").split('\n')
         for f in features:
             if "tcp-segmentation-offload" in f:
                 tcpSeg = f.split()[1] == "off"
@@ -80,37 +81,80 @@ def _check_segmentation_offload():
 
 def test_os_release(output):
     supported = False
-    distInfo = ('', '', '')
-    formatString = "{0} release {1} {2}"
-    if platform.system() == "Linux":
-        output['OS'] = ["PASS", "Linux"]
-        distInfo = platform.dist()
-        supported = False
-        if distInfo[0] in ("centos", "redhat", "rhel"):
-            releaseNum = ".".join(distInfo[1].split(".")[0:2]) # release goes to 3 parts in Centos/Redhat 7.x(.y)
-            if releaseNum >= "7.0":
-                supported = True
-        elif "ubuntu" in distInfo[0].lower():
-            if distInfo[1] in ("14.04", "16.04", "18.04"):
-                supported = True
-        elif not distInfo[0]: # empty in our k8s image (adoptopenjdk/openjdk11:alpine-slim)
-            release = platform.release()
-            distInfo = ("Unspecified", release, "")
-            supported = True # not validating release
-    elif platform.system() == "Darwin":
-        output["OS"] = ["PASS", "MacOS X"]
-        version = platform.uname()[2]
-        distInfo = ("MacOS X", version, "") # on Mac, platform.dist() is empty
-        if version >= "10.8.0":
-            supported = True
+    osName = platform.system()
+    osVersion = None
+    note = None
+    if osName == 'Linux':
+        output['OS'] = ['PASS', 'Linux']
+        distro = distro_info()
+        if distro:
+            osId, osName, osVersion = distro
+            if osId == 'ubuntu':
+                supported = osVersion in ['14.04', '16.04', '18.04']
+                note = 'needs 14.04/16.04/18.04'
+            elif osId in ['centos', 'redhat', 'rhel']:
+                supported = version_number(osVersion, 0) >= 7
+                note = 'needs 7.0 or later'
+            elif osId == 'alpine':
+                supported = version_number(osVersion, 0) == 3 and version_number(osVersion, 1) >= 8;
+                note = 'needs 3.8 or later'
+            else:
+                note = 'needs Ubuntu or RedHat/CentOS'
+        else:
+            note = 'unknown distribution'
+    elif osName == 'Darwin':
+        output['OS'] = ['PASS', 'MacOS X']
+        osName = 'MacOS X'
+        osVersion = platform.uname().release
+        supported = osVersion >= '10.8.0'
+        note = 'needs 10.8.0 or later'
     else:
-        output['OS'] = ["WARN", "Only supports Linux based platforms"]
-        output['OS release'] = ["WARN", "Supported distributions are Ubuntu 14.04/16.04/18.04 and RedHat/CentOS 7.0 or later"]
+        output['OS'] = ['WARN', 'Unsupported platform ' + osName + ' (needs Linux-based system)']
     if supported:
-        output['OS release'] = ["PASS", formatString.format(*distInfo)]
-    elif 'OS release' not in output:
-        formatString = "Unsupported release: " + formatString
-        output['OS release'] = ["WARN", formatString.format(*distInfo)]
+        output['OS release'] = ['PASS', osName + ' ' + osVersion]
+    else:
+        fail = 'Unsupported release ' + osName
+        if osVersion:
+            fail += ' ' + osVersion
+        if note:
+            fail += ' (' + note + ')'
+        output['OS release'] = ['WARN', fail]
+
+def distro_info():
+    # Try Python LSB module as it has the best-looking content
+    try:
+        import lsb_release
+        info = lsb_release.get_distro_information()
+        return (info['ID'].lower(), info['ID'], info['RELEASE'])
+    except Exception:
+        pass
+    # Not got that? Try os-release file
+    try:
+        with open('/etc/os-release') as file:
+            info = { kv[0]: kv[1].strip('"') for kv in
+                     ( line.strip().split('=',1) for line in file )
+                     if len(kv) == 2 }
+        if '.' not in info['VERSION_ID']:  # redhat: single digit
+            v2 = lsb_release_by_command()
+            if v2: info['VERSION_ID'] = v2
+        return (info['ID'], info['NAME'], info['VERSION_ID'])
+    except Exception:
+        pass
+    return None
+
+def lsb_release_by_command():
+    try:
+        ver = subprocess.run(['lsb_release', '-sr'], timeout=2.0, check=True,
+                             stdout=subprocess.PIPE, encoding='utf-8')
+        return ver.stdout.strip()
+    except Exception:
+        return None
+
+def version_number(str, n):
+    try:
+        return int(str.split('.')[n])
+    except Exception:
+        return 0
 
 def test_64bit_os(output):
     if platform.machine().endswith('64'):
@@ -119,11 +163,11 @@ def test_64bit_os(output):
         output['64 bit'] = ["FAIL", "64-bit Linux-based operating system is required to run VoltDB"]
 
 def test_host_memory(output):
-    hostMemory = subprocess.Popen("free | grep 'Mem' | tr -s ' ' | cut -d' ' -f2 ", stdout=subprocess.PIPE, shell=True).stdout.read().rstrip('\n')
+    hostMemory = subprocess.Popen("free | grep 'Mem' | tr -s ' ' | cut -d' ' -f2 ", stdout=subprocess.PIPE, shell=True).stdout.read().decode("utf-8").rstrip('\n')
     if int(hostMemory) >= 4194304:
         output['Memory'] = ["PASS", hostMemory]
         if int(hostMemory) >= 67108864:
-            mmapCount = subprocess.Popen("cat /proc/sys/vm/max_map_count", stdout=subprocess.PIPE, shell=True).stdout.read().rstrip('\n')
+            mmapCount = subprocess.Popen("cat /proc/sys/vm/max_map_count", stdout=subprocess.PIPE, shell=True).stdout.read().decode("utf-8").rstrip('\n')
             if int(mmapCount) >= 1048576:
                 output['MemoryMapCount'] = ["PASS", "Virtual memory max map count is " + mmapCount]
             else:
@@ -133,7 +177,7 @@ def test_host_memory(output):
         output['Memory'] = ["WARN", "Recommended memory is at least 4194304 kB but was " + hostMemory + " kB"]
 
 def test_ntp(output):
-    numOfRunningNTP = subprocess.Popen("ps -ef | grep 'ntpd ' | grep -cv grep", stdout=subprocess.PIPE, shell=True).stdout.read().rstrip('\n')
+    numOfRunningNTP = subprocess.Popen("ps -ef | grep 'ntpd ' | grep -cv grep", stdout=subprocess.PIPE, shell=True).stdout.read().decode("utf-8").rstrip('\n')
     returnCodeForNTPD = os.system("which ntpd >/dev/null 2>&1")
     if numOfRunningNTP == '1':
         output['NTP'] = ["PASS", "NTP is installed and running"]
@@ -154,7 +198,7 @@ def test_java_version(output):
         jar = utility.find_in_path('jar')
     if not java:
         utility.abort('Could not find java in environment, set JAVA_HOME or put java in the path.')
-    javaVersion = utility.get_java_version(javaHome=java, verbose=True)
+    javaVersion = utility.get_java_version(javaHome=java, verbose=True).decode("utf-8")
     if '1.8.' in javaVersion or '11.' in javaVersion:
         output['Java'] = ["PASS", javaVersion.strip()]
     elif len(javaVersion) > 0:
@@ -164,15 +208,18 @@ def test_java_version(output):
 
 def test_python_version(output):
     pythonVersion = "Python " + str(sys.version_info[0]) + '.' + str(sys.version_info[1]) + '.' + str(sys.version_info[2])
-    if sys.version_info[0] == 2 and sys.version_info[1] < 6:
+    if sys.hexversion < 0x03060000:
         for dir in os.environ['PATH'].split(':'):
-            for name in ('python2.7', 'python2.6'):
+            # Hunt for some python 3.x (but not too far into future versions), though if
+            # we're running from 'voltdb check' we are already running under python 3.
+            for n in range(6, 12):
+                name = 'python3.%d' % n
                 path = os.path.join(dir, name)
                 if os.path.exists(path):
-                    pythonVersion = subprocess.Popen(path + " --version", stdout=subprocess.PIPE, shell=True).stdout.read()
+                    pythonVersion = subprocess.Popen(path + " --version", stdout=subprocess.PIPE, shell=True).stdout.read().decode("utf-8")
                     break
             else:
-                output['Python'] = ["FAIL", "VoltDB requires Python 2.6 or newer."]
+                output['Python'] = ["FAIL", "VoltDB requires Python 3.6 or newer."]
                 return
     output['Python'] = ["PASS", pythonVersion]
 
@@ -190,7 +237,7 @@ def test_thp_config(output):
         output['TransparentHugePage'] = ["PASS", "Transparent huge pages not set to always"]
 
 def test_swap(output):
-    swaponFiles = subprocess.Popen("cat /proc/swaps", stdout=subprocess.PIPE, shell=True).stdout.read().split('\n')[1:-1]
+    swaponFiles = subprocess.Popen("cat /proc/swaps", stdout=subprocess.PIPE, shell=True).stdout.read().decode("utf-8").split('\n')[1:-1]
     if len(swaponFiles) > 0:
         swaponList = []
         for x in swaponFiles:
@@ -202,11 +249,11 @@ def test_swap(output):
         output['Swapoff'] = ["PASS", "Swap is off"]
 
 def test_swappinness(output):
-    swappiness = subprocess.Popen("cat /proc/sys/vm/swappiness", stdout=subprocess.PIPE, shell=True).stdout.read().rstrip('\n')
+    swappiness = subprocess.Popen("cat /proc/sys/vm/swappiness", stdout=subprocess.PIPE, shell=True).stdout.read().decode("utf-8").rstrip('\n')
     output['Swappiness'] = ["PASS" if int(swappiness) == 0 else "WARN", "Swappiness is set to " + swappiness]
 
 def test_vm_overcommit(output):
-    oc = subprocess.Popen("cat /proc/sys/vm/overcommit_memory", stdout=subprocess.PIPE, shell=True).stdout.read().rstrip('\n')
+    oc = subprocess.Popen("cat /proc/sys/vm/overcommit_memory", stdout=subprocess.PIPE, shell=True).stdout.read().decode("utf-8").rstrip('\n')
     if int(oc) == 1:
         output['MemoryOvercommit'] = ["PASS", "Virtual memory overcommit is enabled"]
     else:
@@ -228,7 +275,7 @@ def test_segmentation_offload(output):
             output['GenRecOffload_'+dev] = ["WARN", "Generic receive offload is recommended to be disabled, but is currently enabled for " + dev]
 
 def test_tcp_retries2(output):
-    tcpretries2=subprocess.Popen("sysctl  net.ipv4.tcp_retries2 | cut -d'=' -f2", stdout=subprocess.PIPE, shell=True).stdout.read().strip()
+    tcpretries2=subprocess.Popen("sysctl  net.ipv4.tcp_retries2 | cut -d'=' -f2", stdout=subprocess.PIPE, shell=True).stdout.read().decode("utf-8").strip()
     if int(tcpretries2) >= 8:
         output['TCP Retries2'] = ["PASS", "net.ipv4.tcp_retries2 is set to " + tcpretries2]
     else:

@@ -39,7 +39,7 @@ import subprocess
 import time
 import array
 
-from voltdbclient import *
+from voltdbclientpy2 import *
 
 SERVER_NAME = "EchoServer"
 decimal.getcontext().prec = 19

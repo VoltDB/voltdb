@@ -17,7 +17,7 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
-from voltdbclient import *
+from voltdbclientpy2 import *
 from operator import itemgetter, attrgetter
 import numpy
 from mpl_toolkits.axes_grid.anchored_artists import AnchoredText

@@ -30,7 +30,7 @@ import sys
 import time
 
 sys.path.append(os.path.join(os.path.dirname(sys.path[0]),"lib","python"))
-import voltdbclient
+import voltdbclientpy2
 
 def print_usage():
     # replaces the standard argparse-generated usage to include definitions of the output columns
@@ -67,7 +67,7 @@ parser.add_argument('-f', '--frequency', help='Frequency of gathering statistics
 parser.add_argument('-d', '--duration', help='Duration of gathering statistics in minutes (default = 30)', type=int, default=30)
 args = parser.parse_args()
 
-client = voltdbclient.FastSerializer(args.server, args.port, False, args.username, args.password)
+client = voltdbclientpy2.FastSerializer(args.server, args.port, False, args.username, args.password)
 
 # procedure call response error handling
 def check_response(response):
@@ -91,8 +91,8 @@ def check_response(response):
         exit(-1)
 
 # define procedure calls
-proc_stats = voltdbclient.VoltProcedure( client, "@Statistics", [voltdbclient.FastSerializer.VOLTTYPE_STRING,voltdbclient.FastSerializer.VOLTTYPE_INTEGER] )
-proc_catalog = voltdbclient.VoltProcedure( client, "@SystemCatalog", [voltdbclient.FastSerializer.VOLTTYPE_STRING] )
+proc_stats = voltdbclientpy2.VoltProcedure( client, "@Statistics", [voltdbclientpy2.FastSerializer.VOLTTYPE_STRING,voltdbclientpy2.FastSerializer.VOLTTYPE_INTEGER] )
+proc_catalog = voltdbclientpy2.VoltProcedure( client, "@SystemCatalog", [voltdbclientpy2.FastSerializer.VOLTTYPE_STRING] )
 
 # function to get short name of procedure
 def get_proc_name(procname):

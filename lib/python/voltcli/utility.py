@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2020 VoltDB Inc.
+# Copyright (C) 2008-2021 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -24,16 +24,17 @@ import subprocess
 import glob
 import copy
 import inspect
-import ConfigParser
+import configparser
 import zipfile
 import re
 import pkgutil
 import binascii
 import stat
-import daemon
 import signal
 import textwrap
 import string
+
+from voltcli import daemon
 
 #===============================================================================
 class Global:
@@ -79,7 +80,7 @@ def set_state_directory(directory):
     if not os.path.exists(directory):
         try:
             os.makedirs(directory)
-        except (OSError, IOError), e:
+        except (OSError, IOError) as e:
             abort('Error creating state directory "%s".' % directory, e)
     Global.state_directory = os.path.expandvars(os.path.expanduser(directory))
 
@@ -208,8 +209,8 @@ def abort(*msgs, **kwargs):
     :Keywords:
     return_code: integer result returned to the OS (default=1)
     """
-    keys = kwargs.keys()
-    bad_keywords = [k for k in kwargs.keys() if k != 'return_code']
+    keys = list(kwargs.keys())
+    bad_keywords = [k for k in list(kwargs.keys()) if k != 'return_code']
     if bad_keywords:
         warning('Bad keyword(s) passed to abort(): %s' % ' '.join(bad_keywords))
     return_code = kwargs.get('return_code', 1)
@@ -290,14 +291,14 @@ class PythonSourceFinder(object):
                     try:
                         manifest_raw = pkgutil.get_data(scan_loc.package, Global.manifest_path)
                         self.manifests[scan_loc.package] = manifest_raw.split('\n')
-                    except (IOError, OSError), e:
+                    except (IOError, OSError) as e:
                         abort('Failed to load package %s.' % Global.manifest_path, e)
                 for path in self.manifests[scan_loc.package]:
                     if os.path.dirname(path) == scan_loc.path and path.endswith('.py'):
                         debug('Executing package module "%s"...' % path)
                         try:
                             code = pkgutil.get_data(scan_loc.package, path)
-                        except (IOError, OSError), e:
+                        except (IOError, OSError) as e:
                             abort('Failed to load package resource "%s".' % path, e)
                         syms_tmp = copy.copy(syms)
                         exec(code, syms_tmp)
@@ -305,7 +306,7 @@ class PythonSourceFinder(object):
                 for modpath in glob.glob(os.path.join(scan_loc.path, '*.py')):
                     debug('Executing module "%s"...' % modpath)
                     syms_tmp = copy.copy(syms)
-                    execfile(modpath, syms_tmp)
+                    exec(compile(open(modpath, "rb").read(), modpath, 'exec'), syms_tmp)
 
 #===============================================================================
 def normalize_list(items, width, filler = None):
@@ -518,7 +519,7 @@ def pipe_cmd(*args):
         for line in iter(proc.stdout.readline, ''):
             yield line.rstrip()
         proc.stdout.close()
-    except Exception, e:
+    except Exception as e:
         warning('Exception running command: %s' % ' '.join(args), e)
 
 #===============================================================================
@@ -575,19 +576,19 @@ class Daemonizer(daemon.Daemon):
             if os.path.exists(path):
                 try:
                     os.remove(path)
-                except (IOError, OSError), e:
+                except (IOError, OSError) as e:
                     abort('Unable to remove the existing output file "%s".' % path, e)
         try:
             info('Starting %s in the background...' % (self.description), [
                     'Output files are in "%s".' % self.output_dir
                 ])
             self.start(*args)
-        except daemon.Daemon.AlreadyRunningException, e:
+        except daemon.Daemon.AlreadyRunningException as e:
             abort('A %s background process appears to be running.' % self.description, (
                      'Process ID (PID): %d' % e.pid,
                      'PID file: %s' % e.pidfile),
                   'Please stop the process and try again.')
-        except (IOError, OSError), e:
+        except (IOError, OSError) as e:
             abort('Unable to start the %s background process.' % self.description, e)
 
     def stop_daemon(self, kill_signal=signal.SIGTERM):
@@ -597,13 +598,13 @@ class Daemonizer(daemon.Daemon):
         try:
             daemon.Daemon.stop(self, kill_signal=kill_signal)
             info("%s (process ID %d) was stopped." % (self.description, self.pid))
-        except daemon.Daemon.NotRunningException, e:
+        except daemon.Daemon.NotRunningException as e:
             if e.pid != -1:
                 addendum = ' as process ID %d' % e.pid
             else:
                 addendum = ''
             abort('%s is no longer running%s.' % (self.description, addendum))
-        except (IOError, OSError), e:
+        except (IOError, OSError) as e:
             abort('Unable to stop the %s background process.' % self.description, e)
 
     def on_started(self, *args_in):
@@ -614,7 +615,7 @@ class Daemonizer(daemon.Daemon):
         args = [str(arg).replace('"', '') for arg in args_in]
         try:
             os.execvp(args[0], args)
-        except (OSError, IOError), e:
+        except (OSError, IOError) as e:
             abort('Failed to exec:', args, e)
 
     def get_running(self):
@@ -639,7 +640,7 @@ class Daemonizer(daemon.Daemon):
                 try:
                     info('Deleting stale PID file "%s"...' % path)
                     os.remove(path)
-                except (OSError, IOError), e:
+                except (OSError, IOError) as e:
                     warning('Failed to delete PID file "%s".' % path, e)
 
 #===============================================================================
@@ -745,7 +746,7 @@ class Zipper(object):
                 if preamble:
                     self.output_file.write(preamble)
                 self.output_zip = zipfile.ZipFile(self.output_file, 'w', zipfile.ZIP_DEFLATED)
-            except (IOError, OSError), e:
+            except (IOError, OSError) as e:
                 self._abort('Failed to open for writing.', e)
 
     def close(self, make_executable = False):
@@ -753,7 +754,7 @@ class Zipper(object):
             # Write the manifest.
             try:
                 self.output_zip.writestr(Global.manifest_path, '\n'.join(self.manifest))
-            except (IOError, OSError), e:
+            except (IOError, OSError) as e:
                 self._abort('Failed to write %s.' % Global.manifest_path, e)
             self.output_zip.close()
             self.output_file.close()
@@ -761,7 +762,7 @@ class Zipper(object):
                 mode = os.stat(self.output_path).st_mode
                 try:
                     os.chmod(self.output_path, mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-                except (IOError, OSError), e:
+                except (IOError, OSError) as e:
                     self._abort('Failed to add executable permission.', e)
 
     def add_file(self, path_in, path_out):
@@ -776,7 +777,7 @@ class Zipper(object):
                 if self.output_zip:
                     self.output_zip.write(path_in, path_out)
                     self.manifest.append(path_out)
-            except (IOError, OSError), e:
+            except (IOError, OSError) as e:
                 self._abort('Failed to write file "%s".' % path_out, e)
 
     def add_file_from_string(self, s, path_out):
@@ -785,7 +786,7 @@ class Zipper(object):
             try:
                 self.output_zip.writestr(path_out, s)
                 self.manifest.append(path_out)
-            except (IOError, OSError), e:
+            except (IOError, OSError) as e:
                 self._abort('Failed to write string to file "%s".' % path_out, e)
 
     def add_directory(self, path_in, dst, excludes = []):
@@ -847,7 +848,7 @@ def get_java_version(javaHome="java", verbose=False):
         if verbose:
             return out
         for version in ('11.0', '1.8', '1.7'):
-            if version in out:
+            if version in out.decode("utf-8"):
                 return version
         return ""
     except (OSError):
@@ -862,8 +863,8 @@ def is_pro_version(voltdb_jar):
     """
     try:
         zf = zipfile.ZipFile(voltdb_jar, 'r')
-    except (IOError, OSError), e:
-        print 'Error reading zip file "%s".' % voltdb_jar, e
+    except (IOError, OSError) as e:
+        print('Error reading zip file "%s".' % voltdb_jar, e)
         return False
     try:
         for ze in zf.infolist():
@@ -921,7 +922,7 @@ def dict_to_sorted_pairs(d):
     """
     Convert a dictionary to a list of key/value pairs sorted by key.
     """
-    keys = d.keys()
+    keys = list(d.keys())
     keys.sort()
     results = []
     for key in keys:
@@ -1125,7 +1126,7 @@ class File(object):
             if dir and not os.path.exists(dir):
                 try:
                     os.makedirs(dir)
-                except (IOError, OSError), e:
+                except (IOError, OSError) as e:
                     self._abort('Unable to create directory "%s".' % dir)
         self.f = self._open()
     def read(self):
@@ -1139,14 +1140,15 @@ class File(object):
         try:
             try:
                 return f.read()
-            except (IOError, OSError), e:
+            except (IOError, OSError) as e:
                 self._abort('Read error.', e)
         finally:
             # Close locally-opened file.
             if self.f is None:
                 f.close()
     def read_hex(self):
-        return binascii.hexlify(self.read())
+        content = self.read()
+        return binascii.hexlify(content.encode())
     def write(self, s):
         if self.mode != 'w':
             self._abort('File is not open for writing in call to write().')
@@ -1154,7 +1156,7 @@ class File(object):
             self._abort('File was not opened in call to write().')
         try:
             self.f.write(s)
-        except (IOError, OSError), e:
+        except (IOError, OSError) as e:
             self._abort('Write error.', e)
     def close(self):
         if self.f:
@@ -1162,7 +1164,7 @@ class File(object):
     def _open(self):
         try:
             return open(self.path, self.mode)
-        except (IOError, OSError), e:
+        except (IOError, OSError) as e:
             self._abort('File open error.', e)
     def _abort(self, msg, e = None):
         msgs = ['''File("%s",'%s'): %s''' % (self.path, self.mode, msg)]
@@ -1208,7 +1210,7 @@ class FileGenerator(object):
         finally:
             tgt_file.close()
         if permissions is not None:
-            os.chmod(tgt, 0755)
+            os.chmod(tgt, 0o755)
 
     def custom(self, tgt, callback):
         info('Generating "%s"...' % tgt)
@@ -1229,7 +1231,7 @@ class INIConfigManager(object):
     """
 
     def load(self, path):
-        parser = ConfigParser.SafeConfigParser()
+        parser = configparser.SafeConfigParser()
         parser.read(path)
         d = dict()
         for section in parser.sections():
@@ -1238,8 +1240,8 @@ class INIConfigManager(object):
         return d
 
     def save(self, path, d):
-        parser = ConfigParser.SafeConfigParser()
-        keys = d.keys()
+        parser = configparser.SafeConfigParser()
+        keys = list(d.keys())
         keys.sort()
         cur_section = None
         for key in keys:

@@ -43,7 +43,7 @@
 
 from collections import defaultdict
 
-from voltdbclient import *
+from voltdbclientpy2 import *
 
 
 class VoltExecutor(object):

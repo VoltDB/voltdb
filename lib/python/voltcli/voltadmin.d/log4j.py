@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2020 VoltDB Inc.
+# Copyright (C) 2008-2021 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -32,7 +32,7 @@ def log4j(runner):
             '@UpdateLogging',
             [VOLT.FastSerializer.VOLTTYPE_STRING],
             [xml_text])
-        print response
+        print(response)
     finally:
         log4j_file.close()
 

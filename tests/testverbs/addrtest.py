@@ -87,7 +87,7 @@ def report(msg):
     print(msg);
 
 def main():
-    print(sys.argv)
+    print((sys.argv))
 
     # These are all legitimate address expressions
     test_parse('127.0.0.1:21212', None, '127.0.0.1', 21212)

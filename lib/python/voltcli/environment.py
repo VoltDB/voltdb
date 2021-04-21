@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2020 VoltDB Inc.
+# Copyright (C) 2008-2021 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -104,7 +104,7 @@ if not [opt for opt in java_opts if opt.startswith('-Xmx')]:
 
 # Find the temp directory which is going to be used by java
 tmpDir = '/tmp'
-for opt in filter(lambda o: o.startswith('-Djava.io.tmpdir='), java_opts):
+for opt in [o for o in java_opts if o.startswith('-Djava.io.tmpdir=')]:
     tmpDir = opt.split('=', 1)[1]
 
 # Set common options now.

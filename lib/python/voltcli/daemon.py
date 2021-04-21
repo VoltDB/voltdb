@@ -1,6 +1,5 @@
-#!/usr/bin/env python
 # This file is part of VoltDB.
-# Copyright (C) 2008-2020 VoltDB Inc.
+# Copyright (C) 2008-2021 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -127,7 +126,7 @@ class Daemon(object):
             if self.pid > 0:
                 # exit first parent
                 sys.exit(0)
-        except OSError, e:
+        except OSError as e:
             sys.stderr.write("fork #1 failed: %d (%s)\n" % (e.errno, e.strerror))
             sys.exit(1)
 
@@ -141,21 +140,21 @@ class Daemon(object):
             if self.pid > 0:
                 # exit from second parent
                 sys.exit(0)
-        except OSError, e:
+        except OSError as e:
             sys.stderr.write("fork #2 failed: %d (%s)\n" % (e.errno, e.strerror))
             sys.exit(1)
 
         # redirect standard file descriptors
-        si = file(self.stdin, 'r')
-        so = file(self.stdout, 'a+')
-        se = file(self.stderr, 'a+', 0)
+        si = open(self.stdin, 'r')
+        so = open(self.stdout, 'a+')
+        se = open(self.stderr, 'a+')
 
         self.pid = os.getpid()
         sys.stdout.write('Background process started with process ID %d.\n' % self.pid)
         sys.stdout.flush()
 
         if self.pidfile:
-            file(self.pidfile,'w+').write("%d\n" % self.pid)
+            open(self.pidfile,'w+').write("%d\n" % self.pid)
 
         atexit.register(self.delete_pid_file)
         os.dup2(si.fileno(), sys.stdin.fileno())
@@ -170,7 +169,7 @@ class Daemon(object):
         if os.path.exists(self.pidfile):
             try:
                 os.remove(self.pidfile)
-            except (IOError, OSError), e:
+            except (IOError, OSError) as e:
                 raise Daemon.DeletePIDFileException(self, e)
             return True
         return False
@@ -199,7 +198,7 @@ class Daemon(object):
                 while 1:
                     os.kill(self.pid, kill_signal)
                     time.sleep(1.0)
-            except OSError, err:
+            except OSError as err:
                 if str(err).find("No such process") > 0:
                     if self.delete_pid_file():
                         return
@@ -229,10 +228,10 @@ def read_pid_file(pidfile):
     pid = -1
     if os.path.exists(pidfile):
         try:
-            pf = file(pidfile,'r')
+            pf = open(pidfile,'r')
             pid = int(pf.read().strip())
             pf.close()
-        except (IOError, ValueError), e:
+        except (IOError, ValueError) as e:
             pid = -1
     return pid
 

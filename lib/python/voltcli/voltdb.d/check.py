@@ -1,6 +1,5 @@
-#!/usr/bin/env python
 # This file is part of VoltDB.
-# Copyright (C) 2008-2020 VoltDB Inc.
+# Copyright (C) 2008-2021 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -36,13 +35,13 @@ def displayResults():
             fails += 1
         elif val[0] == "WARN":
             warns += 1
-        print "Status: %-25s %-8s %-9s" % ( key, val[0], val[1] )
+        print("Status: %-25s %-8s %-9s" % ( key, val[0], val[1] ))
     if fails > 0:
-        print "\nCheck FAILED. Please review."
+        print("\nCheck FAILED. Please review.")
     elif warns > 0:
-        print "\nCheck completed with " + str(warns) + " WARNINGS."
+        print("\nCheck completed with " + str(warns) + " WARNINGS.")
     else:
-        print "\nCheck completed successfully."
+        print("\nCheck completed successfully.")
 
 @VOLT.Command(
     description = 'Check system properties.'

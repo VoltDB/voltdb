@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2020 VoltDB Inc.
+# Copyright (C) 2008-2021 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -15,7 +15,7 @@
 # along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
 
 import os
-import urllib
+import urllib.request, urllib.parse, urllib.error
 import sys
 
 @VOLT.Command(
@@ -44,7 +44,7 @@ def save(runner):
     uri = None
     dir_specified = False
     if runner.opts.directory is not None:
-        uri = 'file://%s' % urllib.quote(runner.opts.directory)
+        uri = 'file://%s' % urllib.parse.quote(runner.opts.directory)
         dir_specified = True
 
     nonce = None
@@ -90,6 +90,6 @@ def save(runner):
                                 ['{%s}' % (','.join(raw_json_opts))])
     res_table = response.table(0)
     has_failure = any([t[3] != 'SUCCESS' for t in res_table.tuples()])
-    print res_table.format_table(caption = 'Snapshot Save Results')
+    print(res_table.format_table(caption = 'Snapshot Save Results'))
     if has_failure:
         sys.exit(1)

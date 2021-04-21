@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2020 VoltDB Inc.
+# Copyright (C) 2008-2021 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -20,9 +20,7 @@ from voltcli import utility
 @VOLT.Command(
     description = 'Stop a VoltDB server daemon.',
     options = [
-        VOLT.StringOption('-H', '--host', 'host',
-            'HOST[:PORT] (default HOST=localhost, PORT=3021)',
-            default='localhost:3021'),
+        VOLT.StringOption('-H', '--host', 'host', 'the HOST[:PORT] identifying the server'),
         # Keep the -I/--instance option hidden for now.
         VOLT.IntegerOption('-I', '--instance', 'instance',
             #'specify an instance number for multiple servers on the same host'),

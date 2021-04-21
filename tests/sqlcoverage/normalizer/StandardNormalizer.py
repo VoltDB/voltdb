@@ -37,7 +37,7 @@ from binascii import hexlify
 from NotANormalizer import NotANormalizer
 from SortNulls import SortNulls
 from SQLCoverageReport import generate_html_reports
-from voltdbclient import FastSerializer
+from voltdbclientpy2 import FastSerializer
 
 # lame, but it matches at least up to 6 ORDER BY columns
 __EXPR = re.compile(r"ORDER BY\s+((\w+\.)?(?P<column_1>\w+)(\s+\w+)?)"

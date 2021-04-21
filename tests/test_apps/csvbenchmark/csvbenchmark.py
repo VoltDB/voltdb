@@ -32,7 +32,7 @@ import random
 from subprocess import Popen,PIPE
 import shlex
 import datetime
-from voltdbclient import FastSerializer, VoltProcedure
+from voltdbclientpy2 import FastSerializer, VoltProcedure
 import time
 
 CSVLOADER = "bin/csvloader"

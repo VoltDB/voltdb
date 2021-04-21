@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2020 VoltDB Inc.
+# Copyright (C) 2008-2021 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -19,18 +19,18 @@ import datetime
 
 def show_snapshots(runner):
     response = checkstats.get_stats(runner, "SnapshotSummary")
-    print response.table(0).format_table(caption = 'Snapshot Summary')
+    print(response.table(0).format_table(caption = 'Snapshot Summary'))
 
 def show_license(runner):
     response = runner.call_proc('@SystemInformation',
                                 [VOLT.FastSerializer.VOLTTYPE_STRING],
                                 ['LICENSE'])
-    print response.table(0).format_table(caption = 'License Information')
+    print(response.table(0).format_table(caption = 'License Information'))
     for tuple in response.table(0).tuples():
         if tuple[0] == 'EXPIRATION':
             expiration = datetime.datetime.strptime(tuple[1], "%a %b %d, %Y")
             daysUntilExpiration = expiration - datetime.datetime.today()
-            print "License expires on " + tuple[1] + " (" + str(daysUntilExpiration.days) + " days remaining)."
+            print("License expires on " + tuple[1] + " (" + str(daysUntilExpiration.days) + " days remaining).")
 
 
 @VOLT.Multi_Command(

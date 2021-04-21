@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2020 VoltDB Inc.
+# Copyright (C) 2008-2021 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
 
-import urllib
+import urllib.request, urllib.parse, urllib.error
 
 @VOLT.Command(
     bundles = VOLT.AdminBundle(),
@@ -37,7 +37,7 @@ import urllib
 def restore(runner):
     nonce = runner.opts.nonce.replace('"', '\\"')
     if runner.opts.tables and runner.opts.skip_tables:
-        print 'Cannot specify both --tables and --skiptables.'
+        print('Cannot specify both --tables and --skiptables.')
         return
     if runner.opts.hashinator:
         hashinator = 'true'
@@ -50,6 +50,6 @@ def restore(runner):
         json_opts = ['{path:"%s",nonce:"%s",hashinator:"%s",skiptables: %s}' % (runner.opts.directory, nonce, hashinator, runner.opts.skip_tables)]
     runner.verbose_info('@SnapshotRestore "%s"' % json_opts)
     columns = [VOLT.FastSerializer.VOLTTYPE_STRING]
-    print 'voltadmin: Snapshot restore has been started. Check the server logs for ongoing status of the restore operation.'
+    print('voltadmin: Snapshot restore has been started. Check the server logs for ongoing status of the restore operation.')
     response = runner.call_proc('@SnapshotRestore', columns, json_opts)
-    print response.table(0).format_table(caption = 'Snapshot Restore Results')
+    print(response.table(0).format_table(caption = 'Snapshot Restore Results'))

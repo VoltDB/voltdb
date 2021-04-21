@@ -16,7 +16,7 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
-from voltdbclient import *
+from voltdbclientpy2 import *
 import numpy as np
 import csv
 import time

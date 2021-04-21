@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2020 VoltDB Inc.
+# Copyright (C) 2008-2021 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -41,7 +41,7 @@ def jstack(runner):
         response = runner.call_proc('@JStack',
                                     [VOLT.FastSerializer.VOLTTYPE_INTEGER],
                                     [hsId])
-        print response
+        print(response)
         if response.status() != 1:  # not SUCCESS
             sys.exit(1)
 

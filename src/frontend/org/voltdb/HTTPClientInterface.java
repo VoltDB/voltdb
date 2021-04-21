@@ -440,12 +440,17 @@ public class HTTPClientInterface {
                         validAuthHeader = true;
                     }
                 } else if (schemeAndHandle[0].equalsIgnoreCase("basic")) {
-                    String unpw = new String(Base64.decode(schemeAndHandle[1]));
-                    String up[] = unpw.split(":");
-                    if (up.length == 2) {
-                        username = up[0];
-                        password = up[1];
-                        validAuthHeader = true;
+                    try {
+                        String unpw = new String(Base64.decode(schemeAndHandle[1]));
+                        String up[] = unpw.split(":");
+                        if (up.length == 2) {
+                            username = up[0];
+                            password = up[1];
+                            validAuthHeader = true;
+                        }
+                    } catch (Exception ex) {
+                        m_rate_limited_log.log(EstTime.currentTimeMillis(), Level.WARN, null,
+                                               "Malformed base64 string in basic-auth header");
                     }
                 }
             }

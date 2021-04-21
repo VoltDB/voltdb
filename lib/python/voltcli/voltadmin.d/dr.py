@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2020 VoltDB Inc.
+# Copyright (C) 2008-2021 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -109,7 +109,7 @@ def getOwnClusterId(runner):
         hosts.update(tuple[0], tuple[1], tuple[2])
 
     # get current version and root directory from an arbitrary node
-    host = hosts.hosts_by_id.itervalues().next()
+    host = next(iter(hosts.hosts_by_id.values()))
 
     # ClusterId in @SystemInformation is added in v7.2, so must check the version of target cluster to make it work properly.
     version = host.version

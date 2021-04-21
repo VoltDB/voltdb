@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2020 VoltDB Inc.
+# Copyright (C) 2008-2021 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -17,22 +17,22 @@
 from voltcli import utility
 
 def validate_partitioning(runner):
-    print 'Validating partitioning...'
+    print('Validating partitioning...')
     columns = [VOLT.FastSerializer.VOLTTYPE_VARBINARY]
     response = runner.call_proc('@ValidatePartitioning', columns, [None])
     mispartitioned_tuples = sum([t[4] for t in response.table(0).tuples()])
     total_hashes = response.table(1).tuple_count()
     mismatched_hashes = total_hashes - sum([t[3] for t in response.table(1).tuples()])
-    print ''
+    print('')
     if mispartitioned_tuples == 0 and mismatched_hashes == 0:
-        print 'Partitioning is correct.'
+        print('Partitioning is correct.')
     if runner.opts.full or mispartitioned_tuples != 0 or mismatched_hashes != 0:
         if mispartitioned_tuples > 0:
-            print 'Mispartitioned tuples: %d' % mispartitioned_tuples
+            print('Mispartitioned tuples: %d' % mispartitioned_tuples)
         if mismatched_hashes != 0:
-            print 'Mismatched hashes: %d' % (response.table(1).tuple_count() - mismatched_hashes)
-        print response.table(0).format_table(caption='Partition Validation Results')
-        print response.table(1).format_table(caption='Hash Validation Results')
+            print('Mismatched hashes: %d' % (response.table(1).tuple_count() - mismatched_hashes))
+        print(response.table(0).format_table(caption='Partition Validation Results'))
+        print(response.table(1).format_table(caption='Hash Validation Results'))
 
 @VOLT.Command(
     bundles = VOLT.AdminBundle(),

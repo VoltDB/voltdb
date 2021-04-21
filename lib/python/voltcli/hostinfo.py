@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2020 VoltDB Inc.
+# Copyright (C) 2008-2021 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -62,7 +62,7 @@ class Hosts(object):
         """
         connection_host = None
         target_host = None
-        for host in self.hosts_by_id.values():
+        for host in list(self.hosts_by_id.values()):
             if (host.hostname == host_name or host.ipaddress == host_name) and host.internalport == port:
                 target_host = host
             elif connection_host is None:
@@ -76,14 +76,14 @@ class Hosts(object):
         Find an arbitrary host that isn't the one being stopped.
         """
         connection_host = None
-        for host in self.hosts_by_id.values():
+        for host in list(self.hosts_by_id.values()):
             if host.hostname not in host_names:
                 connection_host = host
                 break
         return connection_host
 
     def get_host(self, host_name):
-        for host in self.hosts_by_id.values():
+        for host in list(self.hosts_by_id.values()):
             if host.hostname == host_name:
                 return host
         return None

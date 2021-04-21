@@ -1,6 +1,5 @@
-#!/usr/bin/env python
 # This file is part of VoltDB.
-# Copyright (C) 2008-2020 VoltDB Inc.
+# Copyright (C) 2008-2021 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -20,8 +19,9 @@ from voltcli.hostinfo import Hosts
 from voltcli import checkstats
 from xml.etree import ElementTree
 from collections import defaultdict
-from urllib2 import Request, urlopen, URLError
-import cStringIO
+from urllib.request import Request, urlopen
+from urllib.error import URLError
+import io
 import base64
 import os
 import sys
@@ -29,7 +29,7 @@ import subprocess
 try:
     import ssl
     ssl_available = True
-except ImportError, e:
+except ImportError as e:
     ssl_available = False
     ssl_exception = e
 
@@ -63,11 +63,12 @@ def basicCheck(runner):
         hosts.update(tuple[0], tuple[1], tuple[2])
 
     # get current version and root directory from an arbitrary node
-    host = hosts.hosts_by_id.itervalues().next();
+    host = next(iter(hosts.hosts_by_id.values()));
     fullClusterSize = int(host.fullclustersize)
     if len(hosts.hosts_by_id) < fullClusterSize:
-        runner.abort("Current cluster needs %d more node(s) to achieve full K-safety. Online upgrade is not supported in partial K-safety cluster."
-                     % (fullClusterSize - len(hosts.hosts_by_id)))
+        delta = fullClusterSize - len(hosts.hosts_by_id)
+        runner.abort("Current cluster needs %d more node%s to achieve full K-safety. Online upgrade is not supported in partial K-safety cluster."
+                     % (delta, "" if delta == 1 else "s"))
 
     if fullClusterSize % 2 == 1 and runner.opts.newNode is None:
         runner.abort("The cluster has odd number of nodes, plan_upgrade needs an extra node to generate the instructions")
@@ -79,7 +80,7 @@ def basicCheck(runner):
         if result is not None:
             runner.abort("Failed to resolve host {0}:{1}.".format(runner.opts.newNode, result))
 
-    host = hosts.hosts_by_id.itervalues().next();
+    host = next(iter(hosts.hosts_by_id.values()));
     currentVersion = host.version
 
     # get k-factor from @SystemInformation
@@ -98,7 +99,7 @@ def basicCheck(runner):
 
     # N = 1, abort with error message
     if fullClusterSize == 1:
-        runner.abort("Current cluster doesn't have enough node to perform online upgrade, at least two nodes are required")
+        runner.abort("Current cluster doesn't have enough nodes to perform online upgrade, at least two nodes are required")
 
     response = checkstats.get_stats(runner, "DRROLE")
     clusterIds = []
@@ -137,8 +138,8 @@ def basicCheck(runner):
     if warnings != "":
         runner.warning(warnings[:-1])  # get rid of last '\n'
 
-    print '[1/4] Passed new VoltDB kit version check.'
-    print '[2/4] Passed new VoltDB root path existence check.'
+    print('[1/4] Passed new VoltDB kit version check.')
+    print('[2/4] Passed new VoltDB root path existence check.')
 
     return hosts, kfactor, clusterIds
 
@@ -158,7 +159,7 @@ def generateCommands(runner, hosts, kfactor, clusterIds):
         printout += post_upgrade_deploy
     if os.path.isfile(new_cluster_deploy):
         printout += " " + new_cluster_deploy
-    print printout
+    print(printout)
 
     # 2 generate schema file
     step += 1
@@ -199,10 +200,10 @@ def generateCommands(runner, hosts, kfactor, clusterIds):
     generateNodeRejoinCommand(runner.opts, surviveSet, leadersString, files, hostcount / 2, step)
 
     cleanup(runner.opts, files, newNodeF)
-    print '[4/4] Generated online upgrade plan: upgrade-plan.txt'
+    print('[4/4] Generated online upgrade plan: upgrade-plan.txt')
 
 def generateSchemaFileCommand(runner, hosts, files, step):
-    host = hosts.hosts_by_id.itervalues().next();
+    host = next(iter(hosts.hosts_by_id.values()));
 
     command1 = '#instruction# get schema file: voltdb get --dir=%s --output=%s schema\n' %(host.voltdbroot, os.path.join(runner.opts.newRoot, 'description.sql'))
     command2 = '#instruction# get procedure classes file: voltdb get --dir=%s --output=%s classes\n' %(host.voltdbroot, os.path.join(runner.opts.newRoot, 'procedure.jar'))
@@ -236,8 +237,8 @@ def generateDeploymentFile(runner, hosts, surviveSet, killSet, clusterIds, post_
         warningForDeploy = "Warn: Absolute paths in generated deployment file are commented out to avoid accidentally damage to your original cluster's artifact. Please review the file before use.\n"
 
     # generate instructions to copy deployment file to individual node
-    for hostId, hostInfo in hosts.hosts_by_id.items():
-        file = cStringIO.StringIO()
+    for hostId, hostInfo in list(hosts.hosts_by_id.items()):
+        file = io.StringIO()
         writeHeader(file, "Upgrade Plan for server {0}".format(getHostnameOrIp(hostInfo)))
         files[getKey(hostInfo)] = file
         if hostInfo in killSet:
@@ -258,7 +259,7 @@ def generateDeploymentFile(runner, hosts, surviveSet, killSet, clusterIds, post_
 
     newNodeF = None
     if runner.opts.newNode is not None:
-        newNodeF = cStringIO.StringIO()
+        newNodeF = io.StringIO()
         writeHeader(newNodeF, "Upgrade Plan for server {0}".format(runner.opts.newNode))
         writeCommands(newNodeF,
                       'Step %d: copy deployment file' % step,
@@ -267,7 +268,7 @@ def generateDeploymentFile(runner, hosts, surviveSet, killSet, clusterIds, post_
     return files, newNodeF
 
 def generateStopNodeCommand(hosts, survivor, killSet, files, step):
-    for hostId, hostInfo in hosts.hosts_by_id.items():
+    for hostId, hostInfo in list(hosts.hosts_by_id.items()):
         if hostInfo in killSet:
             writeCommands(files[getKey(hostInfo)],
                           'Step %d: stop node' % step,
@@ -369,7 +370,7 @@ def generateDRResetCommand(runner, survivor, victim, clusterIds, files, step):
                     remoteTopo[remote_cluster_id] = covering_host
 
         # assume remote cluster use the same admin port
-        for clusterId, covering_host in remoteTopo.items():
+        for clusterId, covering_host in list(remoteTopo.items()):
             command += 'voltadmin dr reset --cluster=%s -H %s:%d --force\n' % (survivor.clusterid, covering_host.split(":")[0], survivor.adminport)
         for clusterId in range(1, 127):
             if clusterId not in clusterIds:
@@ -401,7 +402,7 @@ def cleanup(opts, files, newNodeF):
     upgradePlan.write("2. The steps for each server are listed separately.\n")
     upgradePlan.write("3. For each step (0, 1, 2, etc.), execute that step on all servers to which it applies before moving on to the next step.\n\n")
 
-    for key, file in files.items():
+    for key, file in list(files.items()):
         upgradePlan.write(file.getvalue() + '\n')
         file.close()
 
@@ -416,7 +417,7 @@ def pickNodeToKill(hosts, kfactor, expectation):
     victims = []
     survivors = []
     if kfactor >= expectation:
-        for hostId, hostInfo in hosts.hosts_by_id.items():
+        for hostId, hostInfo in list(hosts.hosts_by_id.items()):
             if len(victims) < expectation:
                 victims.append(hostInfo)
             else:
@@ -425,10 +426,10 @@ def pickNodeToKill(hosts, kfactor, expectation):
 
     # partition group case
     partitionGroup = defaultdict(list)
-    for hostId, hostInfo in hosts.hosts_by_id.items():
+    for hostId, hostInfo in list(hosts.hosts_by_id.items()):
         partitions = hostInfo['partitiongroup']
         partitionGroup[partitions].append(hostInfo)
-    for hostInfos in partitionGroup.values():
+    for hostInfos in list(partitionGroup.values()):
         count = 0
         while count < kfactor:
             victims.append(hostInfos.pop())
@@ -472,28 +473,33 @@ def getCurrentDeploymentFile(runner, host):
         protocol = "https://"
         tlsv = None
         try:
-            tlsv = ssl.PROTOCOL_TLSv1_2
-        except AttributeError, e:
-            print "WARNING: This version of python does not support TLSv1.2, upgrade to one that does"
-            tlsv = ssl.PROTOCOL_TLSv1
+            tlsv = ssl.PROTOCOL_TLS
+        except AttributeError as e:
+            # We should never see this, given voltadmin has ensured we're running 3.6+
+            print("ERROR: Python does not define PROTOCOL_TLS. Needs Python 3.6 or later.")
+            runner.abort("Unable to get deployment file from %s" % (getHostnameOrIp(host)))
         if ssl_available:
             sslContext = ssl.SSLContext(tlsv)
         else:
-            print "ERROR: To use SSL functionality please Install the Python ssl module."
+            print("ERROR: To use TLS/SSL functionality please install the Python 'ssl' module.")
             raise ssl_exception
     url = protocol + getHostnameOrIp(host) + ':' + str(host.httpport) + '/deployment/download/'
     request = Request(url)
-    base64string = base64.b64encode('%s:%s' % (runner.opts.username, runner.opts.password))
+    auth = '%s:%s' % (runner.opts.username, runner.opts.password)
+    base64string = base64.b64encode(auth.encode()).decode()
     request.add_header("Authorization", "Basic %s" % base64string)
     try:
         if sslContext is None:
             response = urlopen(request)
         else:
             response = urlopen(request, context=sslContext)
-    except URLError, e:
+    except URLError as e:
         runner.abort("Failed to get deployment file from %s " % (getHostnameOrIp(host)))
 
-    return response.read()
+    deployment = response.read()
+    if len(deployment) == 0:
+        print("WARNING: Deployment file from %s is empty" %  (getHostnameOrIp(host)))
+    return deployment.decode()
 
 # Only stand-alone cluster needs it
 def createDeploymentForOriginalCluster(runner, xmlString, drSource, post_upgrade_deploy):
@@ -625,7 +631,7 @@ def prettyprint(elem, level=0):
 def checkNewNode(hostname):
     try:
         subprocess.call(["ping", "-c 1", hostname], stdout=open(os.devnull, 'wb'))
-    except Exception, e:
+    except Exception as e:
         return e
 
     return None
