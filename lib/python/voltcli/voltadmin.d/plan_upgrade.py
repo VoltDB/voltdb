@@ -476,7 +476,7 @@ def getCurrentDeploymentFile(runner, host):
             tlsv = ssl.PROTOCOL_TLS
         except AttributeError as e:
             # We should never see this, given voltadmin has ensured we're running 3.6+
-            print("ERROR: Python does not define PROTOCOL_TLS. Needs Python 3.6 or later.")
+            print("ERROR: Python does not define PROTOCOL_TLS. Python version 3.6 or greater is required.")
             runner.abort("Unable to get deployment file from %s" % (getHostnameOrIp(host)))
         if ssl_available:
             sslContext = ssl.SSLContext(tlsv)
