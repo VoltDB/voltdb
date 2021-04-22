@@ -81,7 +81,7 @@ public class MpScheduler extends Scheduler
     // Leader migrated from one site to another
     private final Map<Long, Long> m_leaderMigrationMap;
 
-    private int m_nextBuddy = 0;
+    private volatile int m_nextBuddy = 0;
     //Generator of pre-IV2ish timestamp based unique IDs
     private final UniqueIdGenerator m_uniqueIdGenerator;
     final private MpTransactionTaskQueue m_pendingTasks;
