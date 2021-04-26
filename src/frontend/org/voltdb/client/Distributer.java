@@ -240,6 +240,7 @@ class Distributer {
             }
         }
     }
+
     /**
      * Handles @Subscribe response
      */
@@ -319,6 +320,9 @@ class Distributer {
         }
     }
 
+    /**
+     * Handles timed-out procedure calls
+     */
     class CallExpiration implements Runnable {
         @Override
         public void run() {
@@ -350,9 +354,9 @@ class Distributer {
                     }
 
                     // for each outstanding procedure
-                    for (final Map.Entry<Long, CallbackBookeeping> e : c.m_callbacks.entrySet()) {
+                    for (final Map.Entry<Long, CallbackBookkeeping> e : c.m_callbacks.entrySet()) {
                         final long handle = e.getKey();
-                        final CallbackBookeeping cb = e.getValue();
+                        final CallbackBookkeeping cb = e.getValue();
 
                         // if the timeout is expired, call the callback and remove the
                         // bookeeping data
@@ -392,8 +396,11 @@ class Distributer {
         return false;
     }
 
-    class CallbackBookeeping {
-        public CallbackBookeeping(long timestampNanos, ProcedureCallback callback, String name, long timeoutNanos, boolean ignoreBackpressure) {
+    /**
+     * Holds book-keeping data for in-progress transactpions.
+     */
+    class CallbackBookkeeping {
+        public CallbackBookkeeping(long timestampNanos, ProcedureCallback callback, String name, long timeoutNanos, boolean ignoreBackpressure) {
             assert(callback != null);
             this.timestampNanos = timestampNanos;
             this.callback = callback;
@@ -409,9 +416,24 @@ class Distributer {
         boolean ignoreBackpressure;
     }
 
+    /**
+     * Node connection - represents a single connection to a VoltDB cluster.
+     * Manages addition of work queues representing procedure calls.
+     *
+     * A createWork call may block in the rate limiter awaiting permission
+     * to send, based on either a simple outstanding transaction count, or
+     * else consideration of the transaction send rate.
+     *
+     * Backpressure:
+     *
+     * Transactions are queued in the lower-level connection. If the queue length
+     * gets too large, or TCP cannot accept more data, the distributer is notified
+     * of backpressure starting. When the length drops down again the distributer
+     * is notified of backpressure ending.
+     */
     class NodeConnection extends VoltProtocolHandler implements org.voltcore.network.QueueMonitor {
         private final AtomicInteger m_callbacksToInvoke = new AtomicInteger(0);
-        private final ConcurrentMap<Long, CallbackBookeeping> m_callbacks = new ConcurrentHashMap<>();
+        private final ConcurrentMap<Long, CallbackBookkeeping> m_callbacks = new ConcurrentHashMap<>();
         private final NonBlockingHashMap<String, ClientStats> m_stats = new NonBlockingHashMap<>();
         private Connection m_connection;
         private volatile boolean m_isConnected = true;
@@ -423,88 +445,76 @@ class Distributer {
         public NodeConnection(long ids[]) {}
 
         /*
-         * NodeConnection uses ignoreBackpressure to get rate limiter to not
-         * apply any permit tracking or rate limits to transactions that should
-         * never be rejected such as those submitted from within a callback thread or
-         * generated internally
+         * Create work, possibly blocking in rate limiter.
+         * 'ignoreBackpressure' can be true. to get rate limiter to not apply any permit tracking
+         * or rate limits to transactions that should never be rejected, such as those submitted
+         * from within a callback thread, or generated internally
          */
-        public void createWork(final long nowNanos, long handle, String name, ByteBuffer c,
-                ProcedureCallback callback, boolean ignoreBackpressure, long timeoutNanos) {
+        public void createWork(final long nowNanos, long handle, String name, ByteBuffer buffer,
+              ProcedureCallback callback, boolean ignoreBackpressure, long timeoutNanos) {
             assert(callback != null);
+            if (timeoutNanos == Distributer.USE_DEFAULT_CLIENT_TIMEOUT) {
+                timeoutNanos = m_procedureCallTimeoutNanos;
+            }
 
-            //How long from the starting point in time to wait to get this stuff done
-            timeoutNanos = (timeoutNanos == Distributer.USE_DEFAULT_CLIENT_TIMEOUT) ? m_procedureCallTimeoutNanos : timeoutNanos;
-
-            //Trigger the timeout at this point in time no matter what
-            final long timeoutTime = nowNanos + timeoutNanos;
-
-            //What was the time after the rate limiter returned
-            //Will be the same as timeoutNanos if it didn't block
+            // Do rate limiting or check for max outstanding related backpressure in
+            // the rate limiter, which can block. If it blocks we can still get a timeout
+            // exception, to give prompt timeouts.
             long afterRateLimitNanos = 0;
-
-            /*
-             * Do rate limiting or check for max outstanding related backpressure in
-             * the rate limiter which can block. If it blocks we can still get a timeout
-             * exception to give prompt timeouts
-             */
             try {
-                afterRateLimitNanos = m_rateLimiter.sendTxnWithOptionalBlockAndReturnCurrentTime(
-                        nowNanos, timeoutNanos, ignoreBackpressure);
-            } catch (TimeoutException e) {
-                /*
-                 * It's possible we need to timeout because it took too long to get
-                 * the transaction out on the wire due to max outstanding
-                 */
-                final long deltaNanos = Math.max(1, System.nanoTime() - nowNanos);
+                afterRateLimitNanos = m_rateLimiter.prepareToSendTransaction(nowNanos, timeoutNanos,
+                                                                             ignoreBackpressure);
+            } catch (TimeoutException | InterruptedException e) {
+                // We timed out waiting for permission to send the transaction out on the wire,
+                // due to max outstanding
+                afterRateLimitNanos = System.nanoTime();
+                long deltaNanos = Math.max(1, afterRateLimitNanos - nowNanos);
+                // TODO - this incorrectly results in decrementing an outstanding txn count that
+                // was never incremented (existing bug, not induced by current code changes)
                 invokeCallbackWithTimeout(name, callback, deltaNanos, afterRateLimitNanos, timeoutNanos, handle, ignoreBackpressure);
                 return;
             }
 
-            assert(m_callbacks.containsKey(handle) == false);
-
-            //Drain needs to know when all callbacks have been invoked
+            // Drain needs to know when all callbacks have been invoked
             final int callbacksToInvoke = m_callbacksToInvoke.incrementAndGet();
             assert(callbacksToInvoke >= 0);
 
-            //Optimistically submit the task
-            m_callbacks.put(handle, new CallbackBookeeping(nowNanos, callback, name, timeoutNanos, ignoreBackpressure));
+            // Optimistically submit the task
+            assert(!m_callbacks.containsKey(handle));
+            m_callbacks.put(handle, new CallbackBookkeeping(nowNanos, callback, name, timeoutNanos, ignoreBackpressure));
 
-            //Schedule the timeout to fire relative to the amount of time
-            //spent getting to this point. Might fire immediately
-            //some of the time, but that is fine
-            final long timeoutRemaining = timeoutTime - afterRateLimitNanos;
-
-            //Schedule an individual timeout if necessary
-            //If it is a long op, don't bother scheduling a discrete timeout
+            // Schedule an individual timeout if necessary
+            // If it is a long op, don't bother scheduling a discrete timeout
             if (timeoutNanos < TimeUnit.SECONDS.toNanos(1) && !isLongOp(name)) {
+                final long timeoutRemaining = nowNanos + timeoutNanos- afterRateLimitNanos;
                 submitDiscreteTimeoutTask(handle, Math.max(0, timeoutRemaining));
             }
 
-            //Check for disconnect
-            if (!m_isConnected) {
-                //Check if the disconnect or expiration already handled the callback
-                if (m_callbacks.remove(handle) == null) {
-                    return;
-                }
-                final ClientResponse r = new ClientResponseImpl(
-                        ClientResponse.CONNECTION_LOST, new VoltTable[0],
-                        "Connection to database host (" + m_connection.getHostnameAndIPAndPort() +
-                ") was lost before a response was received");
+            // Check actually connected before enqueing. This may flag backpressure
+            // in the connection, based on the size of the queue, but the message
+            // is still queued. We'll see the backpressure on the next request.
+            if (m_isConnected) {
+                m_connection.writeStream().enqueue(buffer);
+                return;
+            }
+
+            // Check if the disconnect or expiration already handled the callback
+            if (m_callbacks.remove(handle) != null) {
+                String msg = String.format("Connection to database host (%s) was lost before a response was received",
+                                           m_connection.getHostnameAndIPAndPort());
+                ClientResponse resp = new ClientResponseImpl(ClientResponse.CONNECTION_LOST, new VoltTable[0], msg);
                 try {
-                    callback.clientCallback(r);
+                    callback.clientCallback(resp);
                 } catch (Exception e) {
-                    uncaughtException(callback, r, e);
+                    uncaughtException(callback, resp, e);
                 }
 
-                //Drain needs to know when all callbacks have been invoked
+                // Drain needs to know when all callbacks have been invoked
                 final int remainingToInvoke = m_callbacksToInvoke.decrementAndGet();
                 assert(remainingToInvoke >= 0);
 
-                //for bookkeeping, but it feels dishonest to call this here
+                // For bookkeeping, but it feels dishonest to call this here
                 m_rateLimiter.transactionResponseReceived(nowNanos, -1, ignoreBackpressure);
-                return;
-            } else {
-                m_connection.writeStream().enqueue(c);
             }
         }
 
@@ -535,7 +545,7 @@ class Distributer {
         void handleTimedoutCallback(long handle, long nowNanos) {
             //Callback doesn't have to be there, it may have already
             //received a response or been expired by the periodic expiration task, or a discrete expiration task
-            final CallbackBookeeping cb = m_callbacks.remove(handle);
+            final CallbackBookkeeping cb = m_callbacks.remove(handle);
 
             //It was handled during the race
             if (cb == null) {
@@ -581,6 +591,9 @@ class Distributer {
             updateStatsForTimeout(procName, r.getClientRoundtripNanos(), r.getClusterRoundtrip());
         }
 
+        /*
+         * Sends a ping on the underlying connection, bypassing rate limits, etc.
+         */
         void sendPing() {
             ProcedureInvocation invocation = new ProcedureInvocation(PING_HANDLE, "@Ping");
             ByteBuffer buf = ByteBuffer.allocate(4 + invocation.getSerializedSize());
@@ -595,6 +608,9 @@ class Distributer {
             m_outstandingPing = true;
         }
 
+        /*
+         * Updates procedure stats after timeout
+         */
         private void updateStatsForTimeout(
                 final String procName,
                 final long roundTripNanos,
@@ -607,7 +623,7 @@ class Distributer {
             });
         }
 
-        /**
+        /*
          * Update the procedures statistics
          * @param procName Name of procedure being updated
          * @param clusterRoundTrip round trip measured within the VoltDB cluster
@@ -635,6 +651,9 @@ class Distributer {
             stats.update(roundTripNanos, clusterRoundTrip, abort, failure, timeout);
         }
 
+        /**
+         * Response handler
+         */
         @Override
         public void handleMessage(ByteBuffer buf, Connection c) {
             long nowNanos = System.nanoTime();
@@ -681,7 +700,7 @@ class Distributer {
 
             //Race with expiration thread to be the first to remove the callback
             //from the map and process it
-            final CallbackBookeeping stuff = m_callbacks.remove(response.getClientHandle());
+            final CallbackBookkeeping stuff = m_callbacks.remove(response.getClientHandle());
 
             // presumably (hopefully) this is a response for a timed-out message
             if (stuff == null) {
@@ -735,15 +754,26 @@ class Distributer {
             }
         }
 
+        /**
+         * Get maximum read size for connection (basically unlimited)
+         */
         @Override
         public int getMaxRead() {
             return Integer.MAX_VALUE;
         }
 
+        /**
+         * Did the underlying connection report back pressure?
+         */
         public boolean hadBackPressure() {
             return m_connection.writeStream().hadBackPressure();
         }
 
+
+        /**
+         * Update NodeConnection with new connection, and notify
+         * all listeners
+         */
         public void setConnection(Connection c) {
             m_connection = c;
             for (ClientStatusListenerExt listener : m_listeners) {
@@ -753,6 +783,9 @@ class Distributer {
             }
         }
 
+        /**
+         * Shut down this connection
+         */
         @Override
         public void stopping(Connection c) {
             super.stopping(c);
@@ -846,12 +879,12 @@ class Distributer {
                         ClientResponse.CONNECTION_LOST, new VoltTable[0],
                         "Connection to database host (" + m_connection.getHostnameAndIPAndPort() +
                 ") was lost before a response was received");
-            for (Map.Entry<Long, CallbackBookeeping> e : m_callbacks.entrySet()) {
+            for (Map.Entry<Long, CallbackBookkeeping> e : m_callbacks.entrySet()) {
                 //Check for race with other threads
                 if (m_callbacks.remove(e.getKey()) == null) {
                     continue;
                 }
-                final CallbackBookeeping callBk = e.getValue();
+                final CallbackBookkeeping callBk = e.getValue();
                 try {
                     callBk.callback.clientCallback(r);
                 }
@@ -867,6 +900,11 @@ class Distributer {
             }
         }
 
+        /*
+         * Called during port setup to create a runnable callback
+         * which will eventually be called from the write stream.
+         * Callback immediately reports end of back pressure to client.
+         */
         @Override
         public Runnable offBackPressure() {
             return new Runnable() {
@@ -886,11 +924,21 @@ class Distributer {
             };
         }
 
+        /*
+         * Called during port setup to create a runnable callback
+         * which will eventually be called from the write stream.
+         * Callback does nothing; backpressure is reported to client
+         * from 'next' call to queue.
+         */
         @Override
         public Runnable onBackPressure() {
             return null;
         }
 
+        /*
+         * Queue-length monitor, called by write stream to determine
+         * backpressure.
+         */
         @Override
         public QueueMonitor writestreamMonitor() {
             return this;
@@ -902,17 +950,20 @@ class Distributer {
         @Override
         public boolean queue(int bytes) {
             m_queuedBytes += bytes;
-            if (m_queuedBytes > m_maxQueuedBytes) {
-                return true;
-            }
-            return false;
+            return (m_queuedBytes > m_maxQueuedBytes);
         }
 
+        /*
+         * Remote server address for this connection
+         */
         public InetSocketAddress getSocketAddress() {
             return m_connection.getRemoteSocketAddress();
         }
     }
 
+    /*
+     * Drains all work for this connection
+     */
     void drain() throws InterruptedException {
         boolean more;
         long sleep = 500;
@@ -939,6 +990,10 @@ class Distributer {
             }
         } while(more);
     }
+
+    ////////////////////////////////////////
+    // The actual distributer starts here
+    ///////////////////////////////////////
 
     Distributer() {
         this(false,
@@ -973,6 +1028,9 @@ class Distributer {
         m_subject = subject;
     }
 
+    /*
+     * Add new connection with plaintext password
+     */
     void createConnection(String host, String program, String password, int port, ClientAuthScheme scheme)
     throws UnknownHostException, IOException
     {
@@ -980,6 +1038,9 @@ class Distributer {
         createConnectionWithHashedCredentials(host, program, hashedPassword, port, scheme);
     }
 
+    /*
+     * Add new connection with hashed password
+     */
     void createConnectionWithHashedCredentials(String host, String program, byte[] hashedPassword, int port, ClientAuthScheme scheme)
     throws UnknownHostException, IOException
     {
@@ -1117,8 +1178,11 @@ class Distributer {
     }
 
     /**
-     * Queue invocation on first node connection without backpressure. If there is none with without backpressure
-     * then return false and don't queue the invocation
+     * Queue invocation on first node connection without backpressure. If there is none with
+     * without backpressure, then return false and don't queue the invocation.
+     *
+     * The 'ignoreBackpressure' option allows bypassing backpressure restrictions.
+     *
      * @param invocation
      * @param cb
      * @param ignoreBackpressure If true the invocation will be queued even if there is backpressure
@@ -1127,134 +1191,155 @@ class Distributer {
      * @return True if the message was queued and false if the message was not queued due to backpressure
      * @throws NoConnectionsException
      */
-    boolean queue(
-            ProcedureInvocation invocation,
-            ProcedureCallback cb,
-            final boolean ignoreBackpressure, final long nowNanos, final long timeoutNanos)
-            throws NoConnectionsException {
-        // Shutting down, no more tasks
-        if (m_shutdown.get()) {
-            return false;
-        }
-
+    boolean queue(ProcedureInvocation invocation,
+                  ProcedureCallback cb,
+                  final boolean ignoreBackpressure,
+                  final long nowNanos,
+                  final long timeoutNanos) throws NoConnectionsException {
         assert(invocation != null);
         assert(cb != null);
-
-        NodeConnection cxn = null;
-        boolean backpressure = true;
-
-        /*
-         * Synchronization is necessary to ensure that m_connections is not modified
-         * as well as to ensure that backpressure is reported correctly
-         */
-        synchronized (this) {
-            final int totalConnections = m_connections.size();
-
-            if (totalConnections == 0) {
-                throw new NoConnectionsException("No connections.");
-            }
-
-            /*
-             * Check if the master for the partition is known. No back pressure check to ensure correct
-             * routing, but backpressure will be managed anyways. This is where we guess partition based on client
-             * affinity and known topology (hashinator initialized).
-             */
-            if (m_hashinator != null) {
-                final ImmutableSortedMap<String, Procedure> procedures = m_procedureInfo.get();
-                Procedure procedureInfo = null;
-                if (procedures != null) {
-                    procedureInfo = procedures.get(invocation.getProcName());
-                }
-                Integer hashedPartition = invocation.getPartitionDestination();
-
-                if (procedureInfo != null) {
-                    hashedPartition = Constants.MP_INIT_PID;
-                    if (invocation.hasPartitionDestination()) {
-                        hashedPartition = invocation.getPartitionDestination();
-                    } else if (!procedureInfo.multiPart && procedureInfo.partitionParameter != Procedure.PARAMETER_NONE
-                            // User may have passed too few parameters to allow dispatching.
-                            // Avoid an indexing error here to fall through to the proper ProcCallException.
-                            && procedureInfo.partitionParameter < invocation.getPassedParamCount()) {
-                        hashedPartition = m_hashinator.getHashedPartitionForParameter(
-                                procedureInfo.partitionParameterType,
-                                invocation.getPartitionParamValue(procedureInfo.partitionParameter));
-                    }
-                    cxn = m_partitionMasters.get(hashedPartition);
-                } else if (invocation.hasPartitionDestination()) {
-                    cxn = m_partitionMasters.get(hashedPartition);
-                }
-
-                if (cxn != null) {
-                    if (!cxn.m_isConnected) {
-                        // Would be nice to log something here
-                        // Client affinity picked a connection that was actually disconnected. Reset to null
-                        // and let the round-robin choice pick a connection
-                        cxn = null;
-                    } else if (!cxn.hadBackPressure() || ignoreBackpressure) {
-                        backpressure = false;
-                    }
-                }
-
-                ClientAffinityStats stats = m_clientAffinityStats.get(hashedPartition);
-                if (stats == null) {
-                    stats = new ClientAffinityStats(hashedPartition, 0, 0, 0, 0);
-                    m_clientAffinityStats.put(hashedPartition, stats);
-                }
-                if (cxn != null) {
-                    if (procedureInfo != null && procedureInfo.readOnly) {
-                        stats.addAffinityRead();
-                    }
-                    else {
-                        stats.addAffinityWrite();
-                    }
-                }
-                // account these here because we lose the partition ID and procedure info once we
-                // bust out of this scope.
-                else {
-                    if (procedureInfo != null && procedureInfo.readOnly) {
-                        stats.addRrRead();
-                    }
-                    else {
-                        stats.addRrWrite();
-                    }
-                }
-            }
-            if (cxn == null) {
-                for (int i=0; i < totalConnections; ++i) {
-                    cxn = m_connections.get(Math.abs(++m_nextConnection % totalConnections));
-                    if (!cxn.hadBackPressure() || ignoreBackpressure) {
-                        // serialize and queue the invocation
-                        backpressure = false;
-                        break;
-                    }
-                }
-            }
-
-            if (backpressure) {
-                cxn = null;
-                for (ClientStatusListenerExt s : m_listeners) {
-                    s.backpressure(true);
-                }
-            }
+        if (m_shutdown.get()) {
+            return false; // no more tasks
         }
 
-        /*
-         * Do the heavy weight serialization outside the synchronized block.
-         * createWork synchronizes on an individual connection which allows for more concurrency
-         */
-        if (cxn != null) {
-            ByteBuffer buf = null;
-            try {
-                buf = serializeSPI(invocation);
-            } catch (Exception e) {
-                Throwables.propagate(e);
+        CxnStatsData statsData = new CxnStatsData();
+        NodeConnection cxn = findCxnForQueue(invocation, ignoreBackpressure, statsData);
+        if (cxn == null) {
+            if (m_topologyChangeAware) {
+                createConnectionsUponTopologyChange();
             }
-            cxn.createWork(nowNanos, invocation.getHandle(), invocation.getProcName(), buf, cb, ignoreBackpressure, timeoutNanos);
+            return false; // backpressured
         }
+
+        ByteBuffer buf = null;
+        try {
+            buf = serializeSPI(invocation);
+        } catch (Exception e) {
+            Throwables.propagate(e);
+        }
+
+        updateAffinityStats(statsData);
+
+        // createWork may block in the rate limiter, and always queues
+        // the invocaton before returning
+        cxn.createWork(nowNanos, invocation.getHandle(), invocation.getProcName(),
+                       buf, cb, ignoreBackpressure, timeoutNanos);
         if (m_topologyChangeAware) {
             createConnectionsUponTopologyChange();
         }
-        return !backpressure;
+        return true;
+    }
+
+    /*
+     * Locates an un-backpressured connection for the above 'queue'
+     * methods. Null return implies backpressure (and not ignored)
+     *
+     * Synchronization is necessary to ensure that m_connections is not modified
+     * as well as to ensure that backpressure is reported correctly
+     */
+    private synchronized NodeConnection findCxnForQueue(ProcedureInvocation invocation,
+                                                        boolean ignoreBackpressure,
+                                                        CxnStatsData statsData) throws NoConnectionsException {
+        final int totalConnections = m_connections.size();
+        if (totalConnections == 0) {
+            throw new NoConnectionsException("No connections.");
+        }
+
+        NodeConnection cxn = null;
+        statsData.stats = null;
+
+        // Check if the master for the partition is known. No back pressure check, to ensure correct
+        // routing, but backpressure will be managed anyways. This is where we guess partition based
+        // on client affinity and known topology (hashinator initialized).
+        if (m_hashinator != null) {
+            final ImmutableSortedMap<String, Procedure> procedures = m_procedureInfo.get();
+            Procedure procedureInfo = null;
+            if (procedures != null) {
+                procedureInfo = procedures.get(invocation.getProcName());
+            }
+            Integer hashedPartition = invocation.getPartitionDestination();
+
+            if (procedureInfo != null) {
+                hashedPartition = Constants.MP_INIT_PID;
+                if (invocation.hasPartitionDestination()) {
+                    hashedPartition = invocation.getPartitionDestination();
+                } else if (!procedureInfo.multiPart && procedureInfo.partitionParameter != Procedure.PARAMETER_NONE
+                           && procedureInfo.partitionParameter < invocation.getPassedParamCount()) {
+                    // User may have passed too few parameters to allow dispatching.
+                    // Avoid an indexing error here to fall through to the proper ProcCallException.
+                    hashedPartition =
+                        m_hashinator.getHashedPartitionForParameter(procedureInfo.partitionParameterType,
+                                                                    invocation.getPartitionParamValue(procedureInfo.partitionParameter));
+                }
+                cxn = m_partitionMasters.get(hashedPartition);
+            } else if (invocation.hasPartitionDestination()) {
+                cxn = m_partitionMasters.get(hashedPartition);
+            }
+
+            if (cxn != null && !cxn.m_isConnected) {
+                // Client affinity picked a connection that was actually disconnected.
+                // Reset to null and let the round-robin choice pick a connection
+                cxn = null;
+            }
+
+            // Return affinity stats data for updating when we actually
+            // decide to send the transaction
+            ClientAffinityStats stats = m_clientAffinityStats.get(hashedPartition);
+            if (stats == null) {
+                stats = new ClientAffinityStats(hashedPartition, 0, 0, 0, 0);
+                m_clientAffinityStats.put(hashedPartition, stats);
+            }
+            statsData.stats = stats;
+            statsData.readOnly = (procedureInfo != null && procedureInfo.readOnly);
+            statsData.roundRobin = (cxn == null);
+        }
+
+        // No connection found using hashinator: use round-robin
+        for (int i=0; cxn==null && i<totalConnections; ++i) {
+            NodeConnection tmpCxn = m_connections.get(Math.abs(++m_nextConnection % totalConnections)); // TODO: why 'abs' ?
+            if (!tmpCxn.hadBackPressure() || ignoreBackpressure) {
+                cxn = tmpCxn;
+            }
+        }
+
+        // Still no unbackpressured connection? Report backpressure while
+        // still under Distributer sync
+        if (cxn == null) {
+            for (ClientStatusListenerExt s : m_listeners) {
+                s.backpressure(true);
+            }
+        }
+        return cxn;
+    }
+
+   /**
+     * Does affinity-stats accounting once we know we're going to send
+     * a transaction on the connection found by FindCxnForQueue
+     */
+    private void updateAffinityStats(CxnStatsData data) {
+        if (data.stats != null) {
+            synchronized (data.stats) {
+                if (data.roundRobin) {
+                    if (data.readOnly) {
+                        data.stats.addRrRead();
+                    } else {
+                        data.stats.addRrWrite();
+                    }
+                } else {
+                    if (data.readOnly) {
+                        data.stats.addAffinityRead();
+                    } else {
+                        data.stats.addAffinityWrite();
+                    }
+                }
+            }
+        }
+    }
+
+    private static class CxnStatsData {
+        ClientAffinityStats stats;
+        boolean readOnly;
+        boolean roundRobin;
     }
 
     /**

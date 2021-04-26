@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -353,8 +353,9 @@ public interface Client {
 
     /**
      * <p>The default behavior for queueing of asynchronous procedure invocations is to block until
-     * it is possible to queue the invocation. If blocking is set to false callProcedure will always return
-     * immediately if it is not possible to queue the procedure invocation due to backpressure.</p>
+     * it is possible to queue the invocation. If blocking is set to false, an async callProcedure
+     * will always return immediately if it is not possible to queue the procedure invocation due
+     * to backpressure. There is no effect on the synchronous variants of callProcedure.</p>
      *
      * @param blocking Whether you want procedure calls to block on backpressure.
      * @deprecated The non-blocking feature set is untested and has questionable utility. If it is something you need contact us.
@@ -363,8 +364,8 @@ public interface Client {
     public void configureBlocking(boolean blocking);
 
     /**
-     * <p>Will {@link #callProcedure(ProcedureCallback, String, Object...)} will return
-     * immediately if a an async procedure invocation could not be queued due to backpressure.</p>
+     * <p>Will {@link #callProcedure(ProcedureCallback, String, Object...)} block
+     * if an async procedure invocation could not be queued due to backpressure?</p>
      *
      * @return true if {@link #callProcedure(ProcedureCallback, String, Object...)} will
      * block until backpressure ceases and false otherwise.

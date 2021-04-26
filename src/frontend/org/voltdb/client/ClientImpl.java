@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -231,55 +231,50 @@ public final class ClientImpl implements Client {
     }
 
     /**
-     * Synchronously invoke a procedure call blocking until a result is available.
+     * Synchronously invoke a procedure call blocking until a result is available,
+     * with default procedure timeout and no batch timeout.
+     *
      * @param procName class name (not qualified by package) of the procedure to execute.
      * @param parameters vararg list of procedure's parameter values.
-     * @return array of VoltTable results.
+     * @return ClientResponse for execution.
      * @throws org.voltdb.client.ProcCallException
      * @throws NoConnectionsException
      */
     @Override
-    public final ClientResponse callProcedure(String procName, Object... parameters)
-            throws IOException, NoConnectionsException, ProcCallException {
+    public final ClientResponse callProcedure(String procName,
+                                              Object... parameters)
+        throws IOException, NoConnectionsException, ProcCallException {
         return callProcedureWithClientTimeoutImpl(BatchTimeoutOverrideType.NO_TIMEOUT, procName,
                 Distributer.USE_DEFAULT_CLIENT_TIMEOUT, TimeUnit.SECONDS, parameters);
     }
 
     /**
-     * Synchronously invoke a procedure call blocking until a result is available.
+     * Synchronously invoke a procedure call blocking until a result is available,
+     * with default procedure timeout.
+     *
      * @param batchTimeout procedure invocation batch timeout.
      * @param procName class name (not qualified by package) of the procedure to execute.
      * @param parameters vararg list of procedure's parameter values.
-     * @return array of VoltTable results.
+     * @return ClientResponse for execution.
      * @throws org.voltdb.client.ProcCallException
      * @throws NoConnectionsException
      */
     @Override
-    public ClientResponse callProcedureWithTimeout(
-            int batchTimeout,
-            String procName,
-            Object... parameters) throws IOException, NoConnectionsException, ProcCallException {
-        return callProcedureWithClientTimeout(batchTimeout, procName,
+    public ClientResponse callProcedureWithTimeout(int batchTimeout,
+                                                   String procName,
+                                                   Object... parameters)
+        throws IOException, NoConnectionsException, ProcCallException {
+        return callProcedureWithClientTimeoutImpl(batchTimeout, procName,
                 Distributer.USE_DEFAULT_CLIENT_TIMEOUT, TimeUnit.SECONDS, parameters);
     }
 
     /**
-     * Same as the namesake without allPartition option.
-     */
-    public ClientResponse callProcedureWithClientTimeout(
-            int batchTimeout,
-            String procName,
-            long clientTimeout,
-            TimeUnit unit,
-            Object... parameters) throws IOException, ProcCallException {
-        return callProcedureWithClientTimeoutImpl(batchTimeout, procName, clientTimeout, unit, parameters);
-    }
-
-    /**
-     * Synchronously invoke a procedure call blocking until a result is available.
+     * Synchronously invoke a procedure call blocking until a result is available,
+     * with caller-specified procedure timeout.
+     *
+     * NOTE: not in Client interface. WHY?
      *
      * @param batchTimeout procedure invocation batch timeout.
-     * @param allPartition whether this is an all-partition invocation
      * @param procName class name (not qualified by package) of the procedure to execute.
      * @param clientTimeout timeout for the procedure
      * @param unit TimeUnit of procedure timeout
@@ -288,95 +283,127 @@ public final class ClientImpl implements Client {
      * @throws org.voltdb.client.ProcCallException
      * @throws NoConnectionsException
      */
-    protected ClientResponse callProcedureWithClientTimeoutImpl(
-            int batchTimeout,
-            String procName,
-            long clientTimeout,
-            TimeUnit unit,
-            Object... parameters) throws IOException, NoConnectionsException, ProcCallException {
+    public ClientResponse callProcedureWithClientTimeout(int batchTimeout,
+                                                         String procName,
+                                                         long clientTimeout,
+                                                         TimeUnit unit,
+                                                         Object... parameters)
+        throws IOException, NoConnectionsException, ProcCallException {
+        return callProcedureWithClientTimeoutImpl(batchTimeout, procName, clientTimeout, unit, parameters);
+    }
+
+    /**
+     * Synchronously invoke a procedure call blocking until a result is available.
+     * Common implementation.
+     *
+     * @param batchTimeout procedure invocation batch timeout.
+     * @param procName class name (not qualified by package) of the procedure to execute.
+     * @param clientTimeout timeout for the procedure
+     * @param unit TimeUnit of procedure timeout
+     * @param parameters vararg list of procedure's parameter values.
+     * @return ClientResponse for execution.
+     * @throws org.voltdb.client.ProcCallException
+     * @throws NoConnectionsException
+     */
+    private ClientResponse callProcedureWithClientTimeoutImpl(int batchTimeout,
+                                                              String procName,
+                                                              long clientTimeout,
+                                                              TimeUnit unit,
+                                                              Object... parameters)
+        throws IOException, NoConnectionsException, ProcCallException {
         long handle = m_handle.getAndIncrement();
-        ProcedureInvocation invocation
-                = new ProcedureInvocation(handle, batchTimeout, -1, procName, parameters);
+        ProcedureInvocation invocation = new ProcedureInvocation(handle, batchTimeout,
+                                                                 -1, procName, parameters);
         long nanos = unit.toNanos(clientTimeout);
         return internalSyncCallProcedure(nanos, invocation);
     }
 
     /**
      * Asynchronously invoke a procedure call.
+     *
      * @param callback TransactionCallback that will be invoked with procedure results.
      * @param procName class name (not qualified by package) of the procedure to execute.
      * @param parameters vararg list of procedure's parameter values.
      * @return True if the procedure was queued and false otherwise
      */
     @Override
-    public final boolean callProcedure(
-            ProcedureCallback callback,
-            String procName,
-            Object... parameters) throws IOException {
+    public final boolean callProcedure(ProcedureCallback callback,
+                                       String procName,
+                                       Object... parameters) throws IOException {
         //Time unit doesn't matter in this case since the timeout isn't being specified
-        return callProcedureWithClientTimeout(callback, BatchTimeoutOverrideType.NO_TIMEOUT, procName,
-                Distributer.USE_DEFAULT_CLIENT_TIMEOUT, TimeUnit.NANOSECONDS, parameters);
+        return callProcedureWithClientTimeout(callback,
+                                              BatchTimeoutOverrideType.NO_TIMEOUT, -1,
+                                              procName,
+                                              Distributer.USE_DEFAULT_CLIENT_TIMEOUT, TimeUnit.NANOSECONDS,
+                                              parameters);
     }
 
     /**
-     * Asynchronously invoke a procedure call with timeout.
-     * @param callback TransactionCallback that will be invoked with procedure results.
-     * @param batchTimeout procedure invocation batch timeout.
-     * @param procName class name (not qualified by package) of the procedure to execute.
-     * @param parameters vararg list of procedure's parameter values.
-     * @return True if the procedure was queued and false otherwise
-     */
-    @Override
-    public final boolean callProcedureWithTimeout(
-            ProcedureCallback callback,
-            int batchTimeout,
-            String procName,
-            Object... parameters) throws IOException {
-        //Time unit doesn't matter in this case since the timeout isn't being specifie
-        return callProcedureWithClientTimeout(
-                callback,
-                batchTimeout,
-                -1,
-                procName,
-                Distributer.USE_DEFAULT_CLIENT_TIMEOUT,
-                TimeUnit.NANOSECONDS,
-                parameters);
-    }
-
-    /**
-     * Same as the namesake without allPartition option.
-     */
-    public boolean callProcedureWithClientTimeout(
-            ProcedureCallback callback,
-            int batchTimeout,
-            String procName,
-            long clientTimeout,
-            TimeUnit clientTimeoutUnit,
-            Object... parameters) throws IOException {
-        return callProcedureWithClientTimeout(
-                callback, batchTimeout, -1, procName, clientTimeout, clientTimeoutUnit, parameters);
-    }
-
-    /**
-     * Asynchronously invoke a procedure call.
+     * Asynchronously invoke a procedure call with specified batch timeout.
      *
      * @param callback TransactionCallback that will be invoked with procedure results.
      * @param batchTimeout procedure invocation batch timeout.
      * @param procName class name (not qualified by package) of the procedure to execute.
-     * @param timeout timeout for the procedure
-     * @param allPartition whether this is an all-partition invocation
+     * @param parameters vararg list of procedure's parameter values.
+     * @return True if the procedure was queued and false otherwise
+     */
+    @Override
+    public final boolean callProcedureWithTimeout(ProcedureCallback callback,
+                                                  int batchTimeout,
+                                                  String procName,
+                                                  Object... parameters) throws IOException {
+        //Time unit doesn't matter in this case since the timeout isn't being specified
+        return callProcedureWithClientTimeout(callback,
+                                              batchTimeout, -1,
+                                              procName,
+                                              Distributer.USE_DEFAULT_CLIENT_TIMEOUT, TimeUnit.NANOSECONDS,
+                                              parameters);
+    }
+
+    /**
+     * Asynchronously invoke a procedure call with specified batch and query timeouts.
+     *
+     * NOTE: not in Client interface. WHY?
+     *
+     * @param callback TransactionCallback that will be invoked with procedure results.
+     * @param batchTimeout procedure invocation batch timeout.
+     * @param procName class name (not qualified by package) of the procedure to execute.
+     * @param clientTimeout query timeout
+     * @param clientTimeoutUnit units for query timeout
+     * @param parameters vararg list of procedure's parameter values.
+     * @return True if the procedure was queued and false otherwise
+     */
+    public boolean callProcedureWithClientTimeout(ProcedureCallback callback,
+                                                  int batchTimeout,
+                                                  String procName,
+                                                  long clientTimeout,
+                                                  TimeUnit clientTimeoutUnit,
+                                                  Object... parameters) throws IOException {
+        return callProcedureWithClientTimeout(callback,
+                                              batchTimeout, -1,
+                                              procName, clientTimeout, clientTimeoutUnit,
+                                              parameters);
+    }
+
+    /**
+     * Asynchronously invoke a procedure call. Common implementation.
+     *
+     * @param callback TransactionCallback that will be invoked with procedure results.
+     * @param batchTimeout procedure invocation batch timeout.
+     * @param partitionDestination or -1
+     * @param procName class name (not qualified by package) of the procedure to execute.
+     * @param clientTimeout timeout for the procedure
      * @param unit TimeUnit of procedure timeout
      * @param parameters vararg list of procedure's parameter values.
      * @return True if the procedure was queued and false otherwise
      */
-    public boolean callProcedureWithClientTimeout(
-            ProcedureCallback callback,
-            int batchTimeout,
-            int partitionDestination,
-            String procName,
-            long clientTimeout,
-            TimeUnit clientTimeoutUnit,
-            Object... parameters) throws IOException {
+    public boolean callProcedureWithClientTimeout(ProcedureCallback callback,
+                                                  int batchTimeout,
+                                                  int partitionDestination,
+                                                  String procName,
+                                                  long clientTimeout,
+                                                  TimeUnit clientTimeoutUnit,
+                                                  Object... parameters) throws IOException {
         if (callback instanceof ProcedureArgumentCacher) {
             ((ProcedureArgumentCacher) callback).setArgs(parameters);
         }
@@ -416,16 +443,22 @@ public final class ClientImpl implements Client {
         return callProcedure(callback, procName, parameters);
     }
 
-    private final ClientResponse internalSyncCallProcedure(
-            long clientTimeoutNanos,
-            ProcedureInvocation invocation) throws ProcCallException, IOException {
+    /**
+     * Implementation of synchronous procedure call.
+     *
+     * @param clientTimeoutNanos timeout on this query
+     * @param invocation the procedure to call
+     */
+    private final ClientResponse internalSyncCallProcedure(long clientTimeoutNanos,
+                                                           ProcedureInvocation invocation)
+        throws ProcCallException, IOException {
 
         if (m_isShutdown) {
             throw new NoConnectionsException("Client instance is shutdown");
         }
 
         if (m_blessedThreadIds.contains(Thread.currentThread().getId())) {
-            throw new IOException("Can't invoke a procedure synchronously from with the client callback thread " +
+            throw new IOException("Can't invoke a procedure synchronously from within the client callback thread " +
                     " without deadlocking the client library");
         }
 
@@ -453,37 +486,40 @@ public final class ClientImpl implements Client {
         return cb.getResponse();
     }
 
-    private final boolean internalAsyncCallProcedure(
-            ProcedureCallback callback,
-            long clientTimeoutNanos,
-            ProcedureInvocation invocation) throws IOException {
-        assert( ! m_isShutdown);
+    /**
+     * Implementation of asynchronous procedure call.
+     *
+     * @param callback completion callback
+     * @param clientTimeoutNanos timeout on this query
+     * @param invocation the procedure to call
+     */
+    private final boolean internalAsyncCallProcedure(ProcedureCallback callback,
+                                                     long clientTimeoutNanos,
+                                                     ProcedureInvocation invocation) throws IOException {
+        assert(!m_isShutdown);
         assert(callback != null);
 
         final long nowNanos = System.nanoTime();
-        //Blessed threads (the ones that invoke callbacks) are not subject to backpressure
-        boolean isBlessed = m_blessedThreadIds.contains(Thread.currentThread().getId());
-        while (!m_distributer.queue(invocation, callback, isBlessed, nowNanos, clientTimeoutNanos)) {
-            if ( ! m_blockingQueue) {
-                return false;
-            }
 
-            /*
-             * Wait on backpressure honoring the timeout settings
-             */
+        // Blessed threads (the ones that invoke callbacks) are not subject to backpressure
+        boolean isBlessed = m_blessedThreadIds.contains(Thread.currentThread().getId());
+
+        while (!m_distributer.queue(invocation, callback, isBlessed, nowNanos, clientTimeoutNanos)) {
+
+            // Wait on backpressure, honoring the timeout settings
             final long delta = Math.max(1, System.nanoTime() - nowNanos);
-            final long timeout =
-                    clientTimeoutNanos == Distributer.USE_DEFAULT_CLIENT_TIMEOUT ?
-                            m_distributer.getProcedureTimeoutNanos() : clientTimeoutNanos;
+            final long timeout = clientTimeoutNanos == Distributer.USE_DEFAULT_CLIENT_TIMEOUT ?
+                m_distributer.getProcedureTimeoutNanos() :
+                clientTimeoutNanos;
+
             try {
                 if (backpressureBarrier(nowNanos, timeout - delta)) {
-                    final ClientResponse response = new ClientResponseImpl(
-                            ClientResponse.CONNECTION_TIMEOUT,
-                            ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
-                            "",
-                            new VoltTable[0],
-                            String.format("No response received in the allotted time (set to %d ms).",
-                                    TimeUnit.NANOSECONDS.toMillis(clientTimeoutNanos)));
+                    final ClientResponse response = new ClientResponseImpl(ClientResponse.CONNECTION_TIMEOUT,
+                                                                           ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
+                                                                           "",
+                                                                           new VoltTable[0],
+                                                                           String.format("No response received in the allotted time (set to %d ms).",
+                                                                                         TimeUnit.NANOSECONDS.toMillis(clientTimeoutNanos)));
                     try {
                         callback.clientCallback(response);
                     }
@@ -496,6 +532,7 @@ public final class ClientImpl implements Client {
                 throw new java.io.InterruptedIOException("Interrupted while invoking procedure asynchronously");
             }
         }
+
         return true;
     }
 
@@ -527,6 +564,10 @@ public final class ClientImpl implements Client {
         return params;
     }
 
+    /**
+     * Update application catalog. Deprecated in client API but still
+     * used elsewhere in VoltDB.
+     */
     @Override
     public ClientResponse updateApplicationCatalog(File catalogPath, File deploymentPath)
     throws IOException, ProcCallException {
@@ -542,6 +583,10 @@ public final class ClientImpl implements Client {
         return callProcedure(callback, "@UpdateApplicationCatalog", params);
     }
 
+    /**
+     * Update classes. Deprecated in client API but still
+     * used elsewhere in VoltDB.
+     */
     @Override
     public ClientResponse updateClasses(File jarPath, String classesToDelete)
     throws IOException, ProcCallException {
@@ -563,13 +608,16 @@ public final class ClientImpl implements Client {
         return callProcedure(callback, "@UpdateClasses", jarbytes, classesToDelete);
     }
 
+    /**
+     * Drain active transactions from client
+     */
     @Override
     public void drain() throws InterruptedException {
         if (m_isShutdown) {
             return;
         }
         if (m_blessedThreadIds.contains(Thread.currentThread().getId())) {
-            throw new RuntimeException("Can't invoke backpressureBarrier from within the client callback thread " +
+            throw new RuntimeException("Can't invoke drain from within the client callback thread " +
                     " without deadlocking the client library");
         }
         m_distributer.drain();
@@ -583,7 +631,7 @@ public final class ClientImpl implements Client {
     @Override
     public void close() throws InterruptedException {
         if (m_blessedThreadIds.contains(Thread.currentThread().getId())) {
-            throw new RuntimeException("Can't invoke backpressureBarrier from within the client callback thread " +
+            throw new RuntimeException("Can't invoke close from within the client callback thread " +
                     " without deadlocking the client library");
         }
         m_isShutdown = true;
@@ -608,17 +656,23 @@ public final class ClientImpl implements Client {
         ClientFactory.decreaseClientNum();
     }
 
+     /**
+     * Block calling thread until there is no backpressure.
+     */
     @Override
     public void backpressureBarrier() throws InterruptedException {
-        backpressureBarrier( 0, 0);
+        backpressureBarrier(0, 0);
     }
 
     /**
-     * Wait on backpressure with a timeout. Returns true on timeout, false otherwise.
-     * Timeout nanos is the initial timeout quantity which will be adjusted to reflect remaining
-     * time on spurious wakeups
+     * Wait on backpressure with a timeout. Not part of public API, but exposed
+     * for test code.
+     *
+     * @param start time request processing started (nanoseconds since epoch), 0 for no timeout
+     * @param timeoutNanos initial timeout value, ignored if start is 0
+     * @return true on timeout, false otherwise (i.e., reflects last known state of backpressure)
      */
-    public boolean backpressureBarrier(final long start, long timeoutNanos) throws InterruptedException {
+    boolean backpressureBarrier(final long start, long timeoutNanos) throws InterruptedException {
         if (m_isShutdown) {
             return false;
         }
@@ -685,11 +739,16 @@ public final class ClientImpl implements Client {
         }
     }
 
+    /*
+     * Internal listener for client events. Handles loss of connection
+     * and backpressure.
+     */
     class InternalClientStatusListener extends ClientStatusListenerExt {
 
         boolean m_useAdminPort = false;
         boolean m_adminPortChecked = false;
         AtomicInteger connectionTaskCount = new AtomicInteger(0);
+
         @Override
         public void backpressure(boolean status) {
             synchronized (m_backpressureLock) {
@@ -704,7 +763,7 @@ public final class ClientImpl implements Client {
 
         @Override
         public void connectionLost(String hostname, int port, int connectionsLeft,
-                ClientStatusListenerExt.DisconnectCause cause) {
+                                   ClientStatusListenerExt.DisconnectCause cause) {
             if (connectionsLeft == 0) {
                 //Wake up client and let it attempt to queue work
                 //and then fail with a NoConnectionsException
@@ -771,6 +830,7 @@ public final class ClientImpl implements Client {
                         (host != null) ? host.m_clientPort : -1, status);
             }
         }
+
         void retryConnectionCreationIfNeeded(int failCount) {
             if (failCount == 0) {
                 try {
