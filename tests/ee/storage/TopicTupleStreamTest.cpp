@@ -505,7 +505,7 @@ TEST_F(TopicTupleStreamTest, MultiColumnAvroEncoder) {
         // validate entries see AvroEncoderTest for avro format layout
         ASSERT_TRUE(readAndValidateRecord(in, 0, 0,
                 [](SerializeInputBE *in) { return in == nullptr; },
-                [this](SerializeInputBE *in) {
+                [this, valueSchemaId](SerializeInputBE *in) {
                         ASSERT_TRUE(in, false);
                         ASSERT_EQ(0, in->readByte(), false);
                         ASSERT_EQ(valueSchemaId, in->readInt(), false);
@@ -520,7 +520,7 @@ TEST_F(TopicTupleStreamTest, MultiColumnAvroEncoder) {
                         return true; }));
         ASSERT_TRUE(readAndValidateRecord(in, timestamp2 - timestamp1, 1,
                 [](SerializeInputBE *in) { return in == nullptr; },
-                [this](SerializeInputBE *in) {
+                [this, valueSchemaId](SerializeInputBE *in) {
                         ASSERT_TRUE(in, false);
                         ASSERT_EQ(0, in->readByte(), false);
                         ASSERT_EQ(valueSchemaId, in->readInt(), false);
@@ -568,7 +568,7 @@ TEST_F(TopicTupleStreamTest, MultiColumnAvroEncoder) {
 
         // validate entries see AvroEncoderTest for avro format layout
         ASSERT_TRUE(readAndValidateRecord(in, 0, 0,
-                [this](SerializeInputBE *in) {
+                [this, keySchemaId](SerializeInputBE *in) {
                         ASSERT_TRUE(in, false);
                         ASSERT_EQ(0, in->readByte(), false);
                         ASSERT_EQ(keySchemaId, in->readInt(), false);
@@ -576,7 +576,7 @@ TEST_F(TopicTupleStreamTest, MultiColumnAvroEncoder) {
                         ASSERT_EQ(3, readAvroDouble(*in), false);
                         ASSERT_EQ(0, in->remaining(), false);
                         return true; },
-                [this](SerializeInputBE *in) {
+                [this, valueSchemaId](SerializeInputBE *in) {
                         ASSERT_TRUE(in, false);
                         ASSERT_EQ(0, in->readByte(), false);
                         ASSERT_EQ(valueSchemaId, in->readInt(), false);
@@ -588,7 +588,7 @@ TEST_F(TopicTupleStreamTest, MultiColumnAvroEncoder) {
                         ASSERT_EQ(0, in->remaining(), false);
                         return true; }));
         ASSERT_TRUE(readAndValidateRecord(in, timestamp2 - timestamp1, 1,
-                [this](SerializeInputBE *in) {
+                [this, keySchemaId](SerializeInputBE *in) {
                         ASSERT_TRUE(in, false);
                         ASSERT_EQ(0, in->readByte(), false);
                         ASSERT_EQ(keySchemaId, in->readInt(), false);
@@ -596,7 +596,7 @@ TEST_F(TopicTupleStreamTest, MultiColumnAvroEncoder) {
                         ASSERT_EQ(8, readAvroDouble(*in), false);
                         ASSERT_EQ(0, in->remaining(), false);
                         return true; },
-                [this](SerializeInputBE *in) {
+                [this, valueSchemaId](SerializeInputBE *in) {
                         ASSERT_TRUE(in, false);
                         ASSERT_EQ(0, in->readByte(), false);
                         ASSERT_EQ(valueSchemaId, in->readInt(), false);

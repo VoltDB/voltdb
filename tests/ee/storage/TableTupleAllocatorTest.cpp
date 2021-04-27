@@ -2187,7 +2187,7 @@ TEST_F(TableTupleAllocatorTest, TestSimulateDuplicateSnapshotRead_mt) {
     };
     // snapshot thread that validates. Synchronized perfectly
     // with deleting thread on each advancement
-    auto const snapshot_thread = [&iter, this] () {
+    auto const snapshot_thread = [&iter, this, BigNumTuples] () {
         auto iterating_counter = 0lu;
         while (! iter->drained()) {
             ASSERT_EQ(iterating_counter, Gen::of(reinterpret_cast<unsigned char*>(**iter)));
