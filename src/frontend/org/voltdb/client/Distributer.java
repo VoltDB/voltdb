@@ -89,10 +89,14 @@ import jsr166y.ThreadLocalRandom;
  */
 class Distributer {
 
+    private static final long PING_HANDLE = Long.MAX_VALUE;
+    private static final Long ASYNC_TOPO_HANDLE = PING_HANDLE - 1;
+    private static final Long ASYNC_PROC_HANDLE = PING_HANDLE - 2;
+
+    // Would be private and final except: unit tests
     static int RESUBSCRIPTION_DELAY_MS = Integer.getInteger("RESUBSCRIPTION_DELAY_MS", 10000);
-    static final long PING_HANDLE = Long.MAX_VALUE;
-    public static final Long ASYNC_TOPO_HANDLE = PING_HANDLE - 1;
-    public static final Long ASYNC_PROC_HANDLE = PING_HANDLE - 2;
+
+    // Package access: used by client implementation
     static final long USE_DEFAULT_CLIENT_TIMEOUT = 0;
 
     // handles used internally are negative and decrement for each call
@@ -149,7 +153,8 @@ class Distributer {
     private final long m_connectionResponseTimeoutNanos;
     private final Map<Integer, ClientAffinityStats> m_clientAffinityStats = new HashMap<>();
 
-    public final RateLimiter m_rateLimiter = new RateLimiter();
+    // Package access for client implementation
+    final RateLimiter m_rateLimiter = new RateLimiter();
 
     private final AtomicReference<ImmutableSet<Integer>> m_unconnectedHosts = new AtomicReference<ImmutableSet<Integer>>();
     private AtomicBoolean m_createConnectionUponTopoChangeInProgress = new AtomicBoolean(false);
@@ -158,7 +163,7 @@ class Distributer {
     private final ScheduledExecutorService m_ex =
         Executors.newSingleThreadScheduledExecutor(
                 CoreUtils.getThreadFactory("VoltDB Client Reaper Thread"));
-    ScheduledFuture<?> m_timeoutReaperHandle;
+    private ScheduledFuture<?> m_timeoutReaperHandle;
 
     /**
      * Server's instances id. Unique for the cluster
@@ -192,7 +197,7 @@ class Distributer {
     /**
      * Handles topology updates for client affinity
      */
-    class TopoUpdateCallback implements ProcedureCallback {
+    private class TopoUpdateCallback implements ProcedureCallback {
 
         @Override
         public void clientCallback(ClientResponse clientResponse) throws Exception {
@@ -216,9 +221,9 @@ class Distributer {
     /**
      * Handles partition updates for client affinity
      */
-    class PartitionUpdateCallback implements ProcedureCallback {
+    private class PartitionUpdateCallback implements ProcedureCallback {
 
-        final CountDownLatch m_latch;
+        private final CountDownLatch m_latch;
 
         PartitionUpdateCallback(CountDownLatch latch) {
             m_latch = latch;
@@ -244,14 +249,14 @@ class Distributer {
     /**
      * Handles @Subscribe response
      */
-    class SubscribeCallback implements ProcedureCallback {
+    private class SubscribeCallback implements ProcedureCallback {
 
         @Override
         public void clientCallback(ClientResponse response) throws Exception {
             if (m_shutdown.get()) {
                 return;
             }
-            //Pre 4.1 clusers don't know about subscribe, don't stress over it.
+            //Pre 4.1 clusters don't know about subscribe, don't stress over it.
             if (response.getStatusString() != null &&
                 response.getStatusString().contains("@Subscribe was not found")) {
                 synchronized (Distributer.this) {
@@ -296,7 +301,7 @@ class Distributer {
     /**
      * Handles procedure updates for client affinity
      */
-    class ProcUpdateCallback implements ProcedureCallback {
+    private class ProcUpdateCallback implements ProcedureCallback {
 
         @Override
         public void clientCallback(ClientResponse clientResponse) throws Exception {
@@ -323,7 +328,7 @@ class Distributer {
     /**
      * Handles timed-out procedure calls
      */
-    class CallExpiration implements Runnable {
+    private class CallExpiration implements Runnable {
         @Override
         public void run() {
             try {
@@ -399,7 +404,7 @@ class Distributer {
     /**
      * Holds book-keeping data for in-progress transactpions.
      */
-    class CallbackBookkeeping {
+    private class CallbackBookkeeping {
         public CallbackBookkeeping(long timestampNanos, ProcedureCallback callback, String name, long timeoutNanos, boolean ignoreBackpressure) {
             assert(callback != null);
             this.timestampNanos = timestampNanos;
@@ -431,7 +436,7 @@ class Distributer {
      * of backpressure starting. When the length drops down again the distributer
      * is notified of backpressure ending.
      */
-    class NodeConnection extends VoltProtocolHandler implements org.voltcore.network.QueueMonitor {
+    private class NodeConnection extends VoltProtocolHandler implements org.voltcore.network.QueueMonitor {
         private final AtomicInteger m_callbacksToInvoke = new AtomicInteger(0);
         private final ConcurrentMap<Long, CallbackBookkeeping> m_callbacks = new ConcurrentHashMap<>();
         private final NonBlockingHashMap<String, ClientStats> m_stats = new NonBlockingHashMap<>();
@@ -553,7 +558,6 @@ class Distributer {
             }
 
             final long deltaNanos = Math.max(1, nowNanos - cb.timestampNanos);
-
             invokeCallbackWithTimeout(cb.name, cb.callback, deltaNanos, nowNanos, cb.procedureTimeoutNanos, handle, cb.ignoreBackpressure);
         }
 
@@ -661,8 +665,8 @@ class Distributer {
             try {
                 response.initFromBuffer(buf);
             } catch (IOException e1) {
-                // TODO Auto-generated catch block
                 e1.printStackTrace();
+                // TODO: return here?
             }
 
             // track the timestamp of the most recent read on this connection
@@ -674,7 +678,9 @@ class Distributer {
             if (handle == PING_HANDLE) {
                 m_outstandingPing = false;
                 return;
-            } else if (handle == ASYNC_TOPO_HANDLE) {
+            }
+
+            if (handle == ASYNC_TOPO_HANDLE) {
                 /*
                  * Really didn't want to add this block because it is not DRY
                  * for the exception handling, but trying to set + reset the async topo callback
@@ -686,9 +692,10 @@ class Distributer {
                 } catch (Exception e) {
                     uncaughtException(cb, response, e);
                 }
-
                 return;
-            } else if (handle == ASYNC_PROC_HANDLE) {
+            }
+
+            if (handle == ASYNC_PROC_HANDLE) {
                 ProcedureCallback cb = new ProcUpdateCallback();
                 try {
                     cb.clientCallback(response);
@@ -1457,12 +1464,12 @@ class Distributer {
         return m_clusterInstanceId;
     }
 
-    /**
+    /** TODO
      * Not exposed to users for the moment.
-     */
-    public synchronized void resetInstanceId() {
+    synchronized void resetInstanceId() {
         m_clusterInstanceId = null;
     }
+     */
 
     public String getBuildString() {
         return m_buildString;

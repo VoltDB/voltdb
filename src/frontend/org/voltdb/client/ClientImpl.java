@@ -19,9 +19,9 @@ package org.voltdb.client;
 
 import java.io.File;
 import java.io.FileWriter;
+import java.io.InterruptedIOException;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,8 +33,10 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
+
+import com.google_voltpatches.common.net.HostAndPort;
+import io.netty.handler.ssl.SslContext;
 
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.ssl.SSLConfiguration;
@@ -47,9 +49,6 @@ import org.voltdb.client.VoltBulkLoader.VoltBulkLoader;
 import org.voltdb.common.Constants;
 import org.voltdb.utils.Encoder;
 
-import com.google_voltpatches.common.net.HostAndPort;
-
-import io.netty.handler.ssl.SslContext;
 
 /**
  *  A client that connects to one or more nodes in a VoltCluster
@@ -57,62 +56,75 @@ import io.netty.handler.ssl.SslContext;
  *  responses.
  */
 public final class ClientImpl implements Client {
+    private static final Logger LOG = Logger.getLogger(ClientImpl.class.getName());
 
-    // call initiated by the user use positive handles
+    // Global instance of null callback for performance (we only need one)
+    private static final ProcedureCallback NULL_CALLBACK = new NullCallback();
+
+    // Calls initiated by the user use positive handles
     private final AtomicLong m_handle = new AtomicLong(0);
 
-    /*
-     * Username and password as set by createConnection. Used
-     * to ensure that the same credentials are used every time
-     * with that inconsistent API.
-     */
-    // stored credentials
-    private boolean m_credentialsSet = false;
-    private final ReentrantLock m_credentialComparisonLock =
-            new ReentrantLock();
-    private String m_createConnectionUsername = null;
-    private byte[] m_hashedPassword = null;
-    private int m_passwordHashCode = 0;
-    final InternalClientStatusListener m_listener = new InternalClientStatusListener();
-    ClientStatusListenerExt m_clientStatusListener = null;
-
-    private ScheduledExecutorService m_ex = null;
-    /*
-     * Username and password as set by the constructor.
-     */
+    // Username and password as set from config
     private final String m_username;
-    private final byte m_passwordHash[];
+    private final byte[] m_passwordHash;
     private final ClientAuthScheme m_hashScheme;
+
+    // SSL context (null if not using SSL)
     private final SslContext m_sslContext;
 
+    // Mux/demux connections to cluster
+    private final Distributer m_distributer;
 
-    /**
-     * These threads belong to the network thread pool
-     * that invokes callbacks. These threads are "blessed"
-     * and should never experience backpressure. This ensures that the
-     * network thread pool doesn't block when queuing procedures from
-     * a callback.
-     */
+    // For reconnect on connection loss (null if not enabled)
+    private final ReconnectStatusListener m_reconnectStatusListener;
+
+    // Execution service for topology-change-aware clients
+    private final ScheduledExecutorService m_ex;
+
+    // Our own status listener - package access for unit test
+    final InternalClientStatusListener m_listener = new InternalClientStatusListener();
+
+    // User's status listener
+    private final ClientStatusListenerExt m_clientStatusListener;
+
+    // Flow control mechanisms.
+    // Threads belonging to the network thread pool that invokes callbacks are "blessed"
+    // and should never experience backpressure. This ensures that the network thread
+    // pool doesn't block when queuing procedures from a callback.
+    private final Object m_backpressureLock = new Object();
     private final CopyOnWriteArrayList<Long> m_blessedThreadIds = new CopyOnWriteArrayList<>();
+    private boolean m_backpressure = false;
+    private boolean m_blockingQueue = true;
 
-    private BulkLoaderState m_vblGlobals = new BulkLoaderState(this);
+    // For bulk-loader use
+    private final BulkLoaderState m_vblGlobals = new BulkLoaderState(this);
 
-    // global instance of null callback for performance (you only need one)
-    private static final ProcedureCallback NULL_CALLBACK = new NullCallback();
+    // Client shutdown flag
+    private volatile boolean m_isShutdown;
+
 
     /****************************************************
                         Public API
      ****************************************************/
 
-    private volatile boolean m_isShutdown = false;
-
     /**
      * Create a new client without any initial connections.
-     * Also provide a hint indicating the expected serialized size of
-     * most outgoing procedure invocations. This helps size initial allocations
-     * for serializing network writes
      */
     ClientImpl(ClientConfig config) {
+
+        String username = config.m_username;
+        if (config.m_subject != null) {
+            username = ClientConfig.getUserNameFromSubject(config.m_subject);
+        }
+        m_username = username;
+
+        m_hashScheme = config.m_hashScheme;
+        if (config.m_cleartext) {
+            String passwd = config.m_password != null ? config.m_password : "";
+            m_passwordHash = ConnectionUtil.getHashedPassword(m_hashScheme, passwd);
+        } else {
+            m_passwordHash = Encoder.hexDecode(config.m_password);
+        }
 
         if (config.m_enableSSL) {
             m_sslContext = SSLConfiguration.createClientSslContext(config.m_sslConfig);
@@ -126,108 +138,45 @@ public final class ClientImpl implements Client {
                                         config.m_subject,
                                         m_sslContext);
         m_distributer.addClientStatusListener(m_listener);
-        String username = config.m_username;
-        if (config.m_subject != null) {
-            username = ClientConfig.getUserNameFromSubject(config.m_subject);
-        }
-        m_username = username;
+
         m_distributer.setTopologyChangeAware(config.m_topologyChangeAware);
         if (config.m_topologyChangeAware) {
             m_ex = Executors.newSingleThreadScheduledExecutor(CoreUtils.getThreadFactory("Topoaware thread"));
+        } else {
+            m_ex = null;
         }
 
         if (config.m_reconnectOnConnectionLoss) {
             m_reconnectStatusListener = new ReconnectStatusListener(this,
-                    config.m_initialConnectionRetryIntervalMS, config.m_maxConnectionRetryIntervalMS);
+                                                                    config.m_initialConnectionRetryIntervalMS,
+                                                                    config.m_maxConnectionRetryIntervalMS);
             m_distributer.addClientStatusListener(m_reconnectStatusListener);
         } else {
             m_reconnectStatusListener = null;
         }
 
-        m_hashScheme = config.m_hashScheme;
-        if (config.m_cleartext) {
-            m_passwordHash = ConnectionUtil.getHashedPassword(m_hashScheme, config.m_password);
-        } else {
-            m_passwordHash = Encoder.hexDecode(config.m_password);
-        }
         if (config.m_listener != null) {
             m_distributer.addClientStatusListener(config.m_listener);
-            m_clientStatusListener = config.m_listener;
         }
+        m_clientStatusListener = config.m_listener;
 
-        assert(config.m_maxOutstandingTxns > 0);
-        m_blessedThreadIds.addAll(m_distributer.getThreadIds());
         if (config.m_autoTune) {
-            m_distributer.m_rateLimiter.enableAutoTuning(
-                    config.m_autoTuneTargetInternalLatency);
+            m_distributer.m_rateLimiter.enableAutoTuning(config.m_autoTuneTargetInternalLatency);
         }
         else {
-            m_distributer.m_rateLimiter.setLimits(
-                    config.m_maxTransactionsPerSecond, config.m_maxOutstandingTxns);
+            assert(config.m_maxOutstandingTxns > 0);
+            m_distributer.m_rateLimiter.setLimits(config.m_maxTransactionsPerSecond,
+                                                  config.m_maxOutstandingTxns);
         }
+
+        m_blessedThreadIds.addAll(m_distributer.getThreadIds());
     }
 
-    private boolean verifyCredentialsAreAlwaysTheSame(String username, byte[] hashedPassword) {
-        assert(username != null);
-        m_credentialComparisonLock.lock();
-        try {
-            if (m_credentialsSet == false) {
-                m_credentialsSet = true;
-                m_createConnectionUsername = username;
-                if (hashedPassword != null) {
-                    m_hashedPassword = Arrays.copyOf(hashedPassword, hashedPassword.length);
-                    m_passwordHashCode = Arrays.hashCode(hashedPassword);
-                }
-                return true;
-            }
-            else {
-                if (!m_createConnectionUsername.equals(username)) {
-                    return false;
-                }
-                if (hashedPassword == null) {
-                    return m_hashedPassword == null;
-                } else {
-                    for (int i = 0; i < hashedPassword.length; i++) {
-                        if (hashedPassword[i] != m_hashedPassword[i]) {
-                            return false;
-                        }
-                    }
-                }
-                return true;
-            }
-        } finally {
-            m_credentialComparisonLock.unlock();
-        }
-    }
-
-    public String getUsername() {
-        return m_createConnectionUsername;
-    }
-
-    public int getPasswordHashCode() {
-        return m_passwordHashCode;
-    }
-
+    /**
+     * Not in public API; used by unit test
+     */
     public SslContext getSSLContext() {
         return m_sslContext;
-    }
-
-    public void createConnectionWithHashedCredentials(
-            String host,
-            int port,
-            String program,
-            byte[] hashedPassword) throws IOException {
-        if (m_isShutdown) {
-            throw new IOException("Client instance is shutdown");
-        }
-        final String subProgram = (program == null) ? "" : program;
-        final byte[] subPassword = (hashedPassword == null) ? ConnectionUtil.getHashedPassword(m_hashScheme, "") : hashedPassword;
-
-        if (!verifyCredentialsAreAlwaysTheSame(subProgram, subPassword)) {
-            throw new IOException("New connection authorization credentials do not match previous credentials for client.");
-        }
-
-        m_distributer.createConnectionWithHashedCredentials(host, subProgram, subPassword, port, m_hashScheme);
     }
 
     /**
@@ -237,15 +186,16 @@ public final class ClientImpl implements Client {
      * @param procName class name (not qualified by package) of the procedure to execute.
      * @param parameters vararg list of procedure's parameter values.
      * @return ClientResponse for execution.
-     * @throws org.voltdb.client.ProcCallException
-     * @throws NoConnectionsException
      */
     @Override
     public final ClientResponse callProcedure(String procName,
                                               Object... parameters)
         throws IOException, NoConnectionsException, ProcCallException {
-        return callProcedureWithClientTimeoutImpl(BatchTimeoutOverrideType.NO_TIMEOUT, procName,
-                Distributer.USE_DEFAULT_CLIENT_TIMEOUT, TimeUnit.SECONDS, parameters);
+        return callProcedureWithClientTimeoutImpl(BatchTimeoutOverrideType.NO_TIMEOUT,
+                                                  procName,
+                                                  Distributer.USE_DEFAULT_CLIENT_TIMEOUT,
+                                                  TimeUnit.SECONDS,
+                                                  parameters);
     }
 
     /**
@@ -256,16 +206,17 @@ public final class ClientImpl implements Client {
      * @param procName class name (not qualified by package) of the procedure to execute.
      * @param parameters vararg list of procedure's parameter values.
      * @return ClientResponse for execution.
-     * @throws org.voltdb.client.ProcCallException
-     * @throws NoConnectionsException
      */
     @Override
     public ClientResponse callProcedureWithTimeout(int batchTimeout,
                                                    String procName,
                                                    Object... parameters)
         throws IOException, NoConnectionsException, ProcCallException {
-        return callProcedureWithClientTimeoutImpl(batchTimeout, procName,
-                Distributer.USE_DEFAULT_CLIENT_TIMEOUT, TimeUnit.SECONDS, parameters);
+        return callProcedureWithClientTimeoutImpl(batchTimeout,
+                                                  procName,
+                                                  Distributer.USE_DEFAULT_CLIENT_TIMEOUT,
+                                                  TimeUnit.SECONDS,
+                                                  parameters);
     }
 
     /**
@@ -280,8 +231,6 @@ public final class ClientImpl implements Client {
      * @param unit TimeUnit of procedure timeout
      * @param parameters vararg list of procedure's parameter values.
      * @return ClientResponse for execution.
-     * @throws org.voltdb.client.ProcCallException
-     * @throws NoConnectionsException
      */
     public ClientResponse callProcedureWithClientTimeout(int batchTimeout,
                                                          String procName,
@@ -289,7 +238,11 @@ public final class ClientImpl implements Client {
                                                          TimeUnit unit,
                                                          Object... parameters)
         throws IOException, NoConnectionsException, ProcCallException {
-        return callProcedureWithClientTimeoutImpl(batchTimeout, procName, clientTimeout, unit, parameters);
+        return callProcedureWithClientTimeoutImpl(batchTimeout,
+                                                  procName,
+                                                  clientTimeout,
+                                                  unit,
+                                                  parameters);
     }
 
     /**
@@ -302,8 +255,6 @@ public final class ClientImpl implements Client {
      * @param unit TimeUnit of procedure timeout
      * @param parameters vararg list of procedure's parameter values.
      * @return ClientResponse for execution.
-     * @throws org.voltdb.client.ProcCallException
-     * @throws NoConnectionsException
      */
     private ClientResponse callProcedureWithClientTimeoutImpl(int batchTimeout,
                                                               String procName,
@@ -332,9 +283,11 @@ public final class ClientImpl implements Client {
                                        Object... parameters) throws IOException {
         //Time unit doesn't matter in this case since the timeout isn't being specified
         return callProcedureWithClientTimeout(callback,
-                                              BatchTimeoutOverrideType.NO_TIMEOUT, -1,
+                                              BatchTimeoutOverrideType.NO_TIMEOUT,
+                                              -1,
                                               procName,
-                                              Distributer.USE_DEFAULT_CLIENT_TIMEOUT, TimeUnit.NANOSECONDS,
+                                              Distributer.USE_DEFAULT_CLIENT_TIMEOUT,
+                                              TimeUnit.NANOSECONDS,
                                               parameters);
     }
 
@@ -354,9 +307,11 @@ public final class ClientImpl implements Client {
                                                   Object... parameters) throws IOException {
         //Time unit doesn't matter in this case since the timeout isn't being specified
         return callProcedureWithClientTimeout(callback,
-                                              batchTimeout, -1,
+                                              batchTimeout,
+                                              -1,
                                               procName,
-                                              Distributer.USE_DEFAULT_CLIENT_TIMEOUT, TimeUnit.NANOSECONDS,
+                                              Distributer.USE_DEFAULT_CLIENT_TIMEOUT,
+                                              TimeUnit.NANOSECONDS,
                                               parameters);
     }
 
@@ -380,8 +335,11 @@ public final class ClientImpl implements Client {
                                                   TimeUnit clientTimeoutUnit,
                                                   Object... parameters) throws IOException {
         return callProcedureWithClientTimeout(callback,
-                                              batchTimeout, -1,
-                                              procName, clientTimeout, clientTimeoutUnit,
+                                              batchTimeout,
+                                              -1,
+                                              procName,
+                                              clientTimeout,
+                                              clientTimeoutUnit,
                                               parameters);
     }
 
@@ -409,9 +367,9 @@ public final class ClientImpl implements Client {
         }
 
         long handle = m_handle.getAndIncrement();
-        ProcedureInvocation invocation
-                = new ProcedureInvocation(handle, batchTimeout, partitionDestination, procName, parameters);
-
+        ProcedureInvocation invocation = new ProcedureInvocation(handle, batchTimeout,
+                                                                 partitionDestination,
+                                                                 procName, parameters);
         if (m_isShutdown) {
             return false;
         }
@@ -423,6 +381,9 @@ public final class ClientImpl implements Client {
         return internalAsyncCallProcedure(callback, clientTimeoutUnit.toNanos(clientTimeout), invocation);
     }
 
+    /**
+     * TODO remove
+     */
     @Deprecated
     @Override
     public int calculateInvocationSerializedSize(
@@ -433,6 +394,9 @@ public final class ClientImpl implements Client {
         return invocation.getSerializedSize();
     }
 
+    /**
+     * TODO remove
+     */
     @Deprecated
     @Override
     public final boolean callProcedure(
@@ -466,19 +430,18 @@ public final class ClientImpl implements Client {
 
         boolean success = internalAsyncCallProcedure(cb, clientTimeoutNanos, invocation);
         if (!success) {
-            final ClientResponseImpl r = new ClientResponseImpl(
-                    ClientResponse.GRACEFUL_FAILURE,
-                    ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
-                    "",
-                    new VoltTable[0],
-                    "Unable to queue client request.");
+            final ClientResponseImpl r = new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE,
+                                                                ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
+                                                                "",
+                                                                new VoltTable[0],
+                                                                "Unable to queue client request.");
             throw new ProcCallException(r);
         }
 
         try {
             cb.waitForResponse();
         } catch (final InterruptedException e) {
-            throw new java.io.InterruptedIOException("Interrupted while waiting for response");
+            throw new InterruptedIOException("Interrupted while waiting for response");
         }
         if (cb.getResponse().getStatus() != ClientResponse.SUCCESS) {
             throw new ProcCallException(cb.getResponse());
@@ -514,12 +477,12 @@ public final class ClientImpl implements Client {
 
             try {
                 if (backpressureBarrier(nowNanos, timeout - delta)) {
-                    final ClientResponse response = new ClientResponseImpl(ClientResponse.CONNECTION_TIMEOUT,
-                                                                           ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
-                                                                           "",
-                                                                           new VoltTable[0],
-                                                                           String.format("No response received in the allotted time (set to %d ms).",
-                                                                                         TimeUnit.NANOSECONDS.toMillis(clientTimeoutNanos)));
+                    ClientResponse response = new ClientResponseImpl(ClientResponse.CONNECTION_TIMEOUT,
+                                                                     ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
+                                                                     "",
+                                                                     new VoltTable[0],
+                                                                     String.format("No response received in the allotted time (set to %d ms).",
+                                                                                   TimeUnit.NANOSECONDS.toMillis(clientTimeoutNanos)));
                     try {
                         callback.clientCallback(response);
                     }
@@ -529,7 +492,7 @@ public final class ClientImpl implements Client {
                 }
             }
             catch (InterruptedException e) {
-                throw new java.io.InterruptedIOException("Interrupted while invoking procedure asynchronously");
+                throw new InterruptedIOException("Interrupted while invoking procedure asynchronously");
             }
         }
 
@@ -544,7 +507,6 @@ public final class ClientImpl implements Client {
      * @param catalogPath
      * @param deploymentPath
      * @return Parameters that can be passed to UpdateApplicationCatalog
-     * @throws IOException If either of the files cannot be read
      */
     private Object[] getUpdateCatalogParams(File catalogPath, File deploymentPath)
     throws IOException {
@@ -584,8 +546,7 @@ public final class ClientImpl implements Client {
     }
 
     /**
-     * Update classes. Deprecated in client API but still
-     * used elsewhere in VoltDB.
+     * Update classes
      */
     @Override
     public ClientResponse updateClasses(File jarPath, String classesToDelete)
@@ -626,7 +587,6 @@ public final class ClientImpl implements Client {
     /**
      * Shutdown the client closing all network connections and release
      * all memory resources.
-     * @throws InterruptedException
      */
     @Override
     public void close() throws InterruptedException {
@@ -717,11 +677,15 @@ public final class ClientImpl implements Client {
         return false;
     }
 
-    class HostConfig {
+    /*
+     * Convenient class holding details of single host
+     */
+    private class HostConfig {
         String m_ipAddress;
         String m_hostName;
         int m_clientPort;
         int m_adminPort;
+
         void setValue(String param, String value) {
             if ("IPADDRESS".equalsIgnoreCase(param)) {
                 m_ipAddress = value;
@@ -742,12 +706,14 @@ public final class ClientImpl implements Client {
     /*
      * Internal listener for client events. Handles loss of connection
      * and backpressure.
+     *
+     * Package access: used by Distributer.
      */
     class InternalClientStatusListener extends ClientStatusListenerExt {
 
-        boolean m_useAdminPort = false;
-        boolean m_adminPortChecked = false;
-        AtomicInteger connectionTaskCount = new AtomicInteger(0);
+        private boolean m_useAdminPort = false;
+        private boolean m_adminPortChecked = false;
+        private AtomicInteger connectionTaskCount = new AtomicInteger(0);
 
         @Override
         public void backpressure(boolean status) {
@@ -824,7 +790,7 @@ public final class ClientImpl implements Client {
          * @param host HostConfig with IP address and port
          * @param status The status of connection creation
          */
-        void nofifyClientConnectionCreation(HostConfig host, ClientStatusListenerExt.AutoConnectionStatus status) {
+        void notifyClientConnectionCreation(HostConfig host, ClientStatusListenerExt.AutoConnectionStatus status) {
             if (m_clientStatusListener != null) {
                 m_clientStatusListener.connectionCreated((host != null) ? host.m_hostName : "",
                         (host != null) ? host.m_clientPort : -1, status);
@@ -836,7 +802,7 @@ public final class ClientImpl implements Client {
                 try {
                     m_distributer.setCreateConnectionsUponTopologyChangeComplete();
                 } catch (Exception e) {
-                    nofifyClientConnectionCreation(null, ClientStatusListenerExt.AutoConnectionStatus.UNABLE_TO_CONNECT);
+                    notifyClientConnectionCreation(null, ClientStatusListenerExt.AutoConnectionStatus.UNABLE_TO_CONNECT);
                 }
             } else if (connectionTaskCount.get() < 2) {
                 //if there are tasks in the queue, do not need schedule again since all the tasks do the same job
@@ -846,21 +812,27 @@ public final class ClientImpl implements Client {
 
         /**
          * find all the host which have not been connected to the client via @SystemInformation
-         * and make connections
+         * and make connections (called from Distributer)
          */
         public void createConnectionsUponTopologyChange() {
             m_ex.execute(new CreateConnectionTask(this, connectionTaskCount));
         }
     }
 
-    class CreateConnectionTask implements Runnable {
+    /*
+     * Asynchronously create connection, used for topology-aware clients.
+     * Runs in thread managed by ScheduledServiceExecutor.
+     */
+    private class CreateConnectionTask implements Runnable {
         final InternalClientStatusListener listener;
         final AtomicInteger connectionTaskCount;
-        public CreateConnectionTask(InternalClientStatusListener listener, AtomicInteger connectionTaskCount ) {
+
+        CreateConnectionTask(InternalClientStatusListener listener, AtomicInteger connectionTaskCount ) {
             this.listener = listener;
             this.connectionTaskCount = connectionTaskCount;
             connectionTaskCount.incrementAndGet();
         }
+
         @Override
         public void run() {
             int failCount = 0;
@@ -872,18 +844,18 @@ public final class ClientImpl implements Client {
                         HostConfig config = entry.getValue();
                         try {
                             createConnection(config.m_ipAddress,config.getPort(listener.m_useAdminPort));
-                            listener.nofifyClientConnectionCreation(config, ClientStatusListenerExt.AutoConnectionStatus.SUCCESS);
+                            listener.notifyClientConnectionCreation(config, ClientStatusListenerExt.AutoConnectionStatus.SUCCESS);
                         } catch (Exception e) {
-                            listener.nofifyClientConnectionCreation(config, ClientStatusListenerExt.AutoConnectionStatus.UNABLE_TO_CONNECT);
+                            listener.notifyClientConnectionCreation(config, ClientStatusListenerExt.AutoConnectionStatus.UNABLE_TO_CONNECT);
                             failCount++;
                         }
                     }
                 } else {
-                    listener.nofifyClientConnectionCreation(null, ClientStatusListenerExt.AutoConnectionStatus.UNABLE_TO_QUERY_TOPOLOGY);
+                    listener.notifyClientConnectionCreation(null, ClientStatusListenerExt.AutoConnectionStatus.UNABLE_TO_QUERY_TOPOLOGY);
                     failCount++;
                 }
             } catch (Exception e) {
-                listener.nofifyClientConnectionCreation(null, ClientStatusListenerExt.AutoConnectionStatus.UNABLE_TO_QUERY_TOPOLOGY);
+                listener.notifyClientConnectionCreation(null, ClientStatusListenerExt.AutoConnectionStatus.UNABLE_TO_QUERY_TOPOLOGY);
                 failCount++;
             } finally {
                 connectionTaskCount.decrementAndGet();
@@ -891,20 +863,11 @@ public final class ClientImpl implements Client {
             }
         }
     }
-     /****************************************************
+
+
+    /****************************************************
                         Implementation
      ****************************************************/
-
-
-
-    static final Logger LOG = Logger.getLogger(ClientImpl.class.getName());  // Logger shared by client package.
-    private final Distributer m_distributer;                             // de/multiplexes connections to a cluster
-    private final Object m_backpressureLock = new Object();
-    private boolean m_backpressure = false;
-
-    private boolean m_blockingQueue = true;
-
-    private final ReconnectStatusListener m_reconnectStatusListener;
 
     @Override
     public void configureBlocking(boolean blocking) {
@@ -919,13 +882,6 @@ public final class ClientImpl implements Client {
     @Override
     public Object[] getInstanceId() {
         return m_distributer.getInstanceId();
-    }
-
-    /**
-     * Not exposed to users for the moment.
-     */
-    public void resetInstanceId() {
-        m_distributer.resetInstanceId();
     }
 
     @Override
@@ -945,21 +901,20 @@ public final class ClientImpl implements Client {
 
     @Override
     public void createConnection(String host) throws IOException {
-        if (m_username == null) {
-            throw new IllegalStateException("Attempted to use createConnection(String host) " +
-                    "with a client that wasn't constructed with a username and password specified");
-        }
         HostAndPort hp = parseHostAndPort(host);
-        createConnectionWithHashedCredentials(hp.getHost(), hp.getPort(), m_username, m_passwordHash);
+        createConnection(hp.getHost(), hp.getPort());
     }
 
     @Override
     public void createConnection(String host, int port) throws IOException {
         if (m_username == null) {
-            throw new IllegalStateException("Attempted to use createConnection(String host) " +
-                    "with a client that wasn't constructed with a username and password specified");
+            throw new IllegalStateException("Attempted to use createConnection() with a client" +
+                                            " that wasn't constructed with a username and password specified");
         }
-        createConnectionWithHashedCredentials(host, port, m_username, m_passwordHash);
+        if (m_isShutdown) {
+            throw new IOException("Client instance is shutdown");
+        }
+        m_distributer.createConnectionWithHashedCredentials(host, m_username, m_passwordHash, port, m_hashScheme);
     }
 
     @Override
@@ -980,7 +935,7 @@ public final class ClientImpl implements Client {
     @Override
     public void writeSummaryCSV(String statsRowName, ClientStats stats, String path) throws IOException {
         // don't do anything (be silent) if empty path
-        if ((path == null) || (path.length() == 0)) {
+        if (path == null || path.length() == 0) {
             return;
         }
 
@@ -1005,17 +960,17 @@ public final class ClientImpl implements Client {
         fw.close();
     }
 
-    //Hidden method to check if Hashinator is initialized.
+    // Hidden method to check if Hashinator is initialized.
     public boolean isHashinatorInitialized() {
         return m_distributer.isHashinatorInitialized();
     }
 
-    //Hidden method for getPartitionForParameter
+    // Hidden method for getPartitionForParameter
     public long getPartitionForParameter(byte typeValue, Object value) {
         return m_distributer.getPartitionForParameter(typeValue, value);
     }
 
-    //Hidden method for getPartitionForParameter
+    // Hidden method for getPartitionForParameter
     public long getPartitionForParameter(byte[] bytes) {
         return m_distributer.getPartitionForParameter(bytes);
     }
@@ -1151,7 +1106,7 @@ public final class ClientImpl implements Client {
     /**
      * Procedure call back for async callAllPartitionProcedure
      */
-    class OnePartitionProcedureCallback implements ProcedureCallback {
+    private class OnePartitionProcedureCallback implements ProcedureCallback {
 
         final ClientResponseWithPartitionKey[] m_responses;
         final int m_index;
@@ -1165,7 +1120,7 @@ public final class ClientImpl implements Client {
          * @param index  The index for PartitionClientResponse
          * @param responses The final result array
          */
-        public OnePartitionProcedureCallback(AtomicInteger counter, Object partitionKey, int index,
+        OnePartitionProcedureCallback(AtomicInteger counter, Object partitionKey, int index,
                   ClientResponseWithPartitionKey[] responses, AllPartitionProcedureCallback cb) {
             m_partitionCounter = counter;
             m_partitionKey = partitionKey;
@@ -1182,8 +1137,7 @@ public final class ClientImpl implements Client {
             }
         }
 
-        public void exceptionCallback(Exception e) throws Exception {
-
+        void exceptionCallback(Exception e) throws Exception {
             if ( e instanceof ProcCallException) {
                 ProcCallException pe = (ProcCallException)e;
                 m_responses[m_index] = new ClientResponseWithPartitionKey(m_partitionKey, pe.getClientResponse());
@@ -1212,13 +1166,14 @@ public final class ClientImpl implements Client {
         SyncAllPartitionProcedureCallback(CountDownLatch latch)  {
             m_latch = latch;
         }
-         @Override
+
+        @Override
         public void clientCallback(ClientResponseWithPartitionKey[] clientResponse) throws Exception {
              m_responses = clientResponse;
              m_latch.countDown();
         }
 
-        public ClientResponseWithPartitionKey[] getResponse() {
+        ClientResponseWithPartitionKey[] getResponse() {
             return m_responses;
         }
     }
