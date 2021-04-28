@@ -602,16 +602,10 @@ public class VoltZK {
     }
 
     public static boolean removeActionBlocker(ZooKeeper zk, String node, VoltLogger log) {
-        if (log != null) {
-            log.info("Removing action blocker " + node);
-        }
         try {
             zk.delete(node, -1);
         } catch (KeeperException e) {
             if (e.code() == KeeperException.Code.NONODE) {
-                if (log != null) {
-                    log.info("Action blocker " + node + " does not exist.");
-                }
                 return true;
             }
             if (log != null) {

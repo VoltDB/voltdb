@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -187,7 +187,7 @@ public class LeaderAppointer implements Promotable
                     }
                 }
                 if (children.size() == replicaCount) {
-                    m_currentLeader = assignLeader(m_partitionId, Long.MAX_VALUE, updatedHSIds);
+                    m_currentLeader = assignLeader(m_partitionId, Long.MAX_VALUE, updatedHSIds, false);
                 } else {
                     tmLog.info(WHOMIM + "Waiting on " + ((m_kfactor + 1) - children.size()) + " more nodes " +
                             "for k-safety before startup");
@@ -217,6 +217,7 @@ public class LeaderAppointer implements Promotable
                 }
                 // If we survived the above gauntlet of fail, appoint a new leader for this partition.
                 Long supposedNewLeader = m_iv2appointees.get(m_partitionId);
+                boolean isMigrateRequested = m_iv2appointees.isMigratePartitionLeaderRequested(m_partitionId);
                 if (missingHSIds.contains(m_currentLeader)) {
 
                     // Cluster is or about to enter master-only mode after hash mismatch is detected
@@ -231,7 +232,7 @@ public class LeaderAppointer implements Promotable
                     // When a promotion is in progress and the site in promotion is not on the failed hosts, should not
                     // do another promotion.
                     if (m_currentLeader == supposedNewLeader || missingHSIds.contains(supposedNewLeader)) {
-                        m_currentLeader = assignLeader(m_partitionId, m_currentLeader, updatedHSIds);
+                        m_currentLeader = assignLeader(m_partitionId, m_currentLeader, updatedHSIds, isMigrateRequested);
                         if (tmLog.isDebugEnabled()) {
                             tmLog.debug(WHOMIM + "Determining new leader when missing for partition " + m_partitionId +
                                     " current leader:" + CoreUtils.hsIdToString(currentLeader) +
@@ -243,7 +244,6 @@ public class LeaderAppointer implements Promotable
                     // When leader migration kicks in and the host for new partition leader fails before the partition completes promotion,
                     // then, the partition leader stays on the old host and  m_currentLeader won't match
                     // its appointee. The old leader won't go through the repair process as needed.
-                    boolean isMigrateRequested = m_iv2appointees.isMigratePartitionLeaderRequested(m_partitionId);
                     if (m_currentLeader != supposedNewLeader && missingHSIds.contains(supposedNewLeader) && isMigrateRequested) {
                         String masterPair = Long.toString(m_currentLeader) + "/" + Long.toString(m_currentLeader);
                         try {
@@ -258,7 +258,7 @@ public class LeaderAppointer implements Promotable
                 // elect a leader.
                 if (m_currentLeader == Long.MAX_VALUE && !updatedHSIds.isEmpty()) {
                     final long currentLeader = m_currentLeader;
-                    m_currentLeader = assignLeader(m_partitionId, Long.MAX_VALUE, updatedHSIds);
+                    m_currentLeader = assignLeader(m_partitionId, Long.MAX_VALUE, updatedHSIds, isMigrateRequested);
                     if (tmLog.isDebugEnabled()) {
                         tmLog.debug(WHOMIM + "Determining new leader with no leader yet for partition " + m_partitionId +
                                 " current leader:" + CoreUtils.hsIdToString(currentLeader) +
@@ -271,7 +271,7 @@ public class LeaderAppointer implements Promotable
             m_replicas.addAll(updatedHSIds);
         }
 
-        private long assignLeader(int partitionId, long prevLeader, List<Long> children)
+        private long assignLeader(int partitionId, long prevLeader, List<Long> children, boolean isMigrateRequested)
         {
             // We used masterHostId = -1 as a way to force the leader choice to be
             // the first replica in the list, if we don't have some other mechanism
@@ -287,12 +287,6 @@ public class LeaderAppointer implements Promotable
                             + CoreUtils.hsIdCollectionToString(children) + "]");
                 }
                 newLeaderHostId = -1;
-                if (!m_isLeaderMigrated) {
-                    // MP repair process will follow upon partition leader promotions.
-                    // Add a blocker to block uac or elastic operations when MP repair is in progress.
-                    // The blocker will be removed when the last MpRepairTask is executed.
-                    VoltZK.createActionBlocker(m_zk, VoltZK.mpRepairInProgress, CreateMode.PERSISTENT, tmLog, "MP Repair");
-                }
             }
 
             long masterHSId = children.get(0);
@@ -303,6 +297,13 @@ public class LeaderAppointer implements Promotable
                 }
             }
 
+            if (m_isLeader && !isMigrateRequested && m_state.get() != AppointerState.CLUSTER_START) {
+                // MP repair process will follow upon partition leader promotions.
+                // Add a blocker to block uac or elastic operations when MP repair is in progress.
+                // The blocker will be removed when the last MpRepairTask is executed.
+                VoltZK.createActionBlocker(m_zk, VoltZK.mpRepairInProgress, CreateMode.PERSISTENT, tmLog, "MP Repair from partition " + m_partitionId);
+            }
+
             // If the current leader is appointed via leader migration, then re-appoint it if possible
             if (m_isLeaderMigrated && m_previousLeader != Long.MAX_VALUE && children.contains(m_previousLeader)) {
                 masterHSId = m_previousLeader;
@@ -310,7 +311,7 @@ public class LeaderAppointer implements Promotable
                         partitionId + " was appointed via leader migration.");
             }
 
-            tmLog.info(WHOMIM + "Appointing HSId " + CoreUtils.hsIdToString(masterHSId) + " as leader for partition " + partitionId +
+            tmLog.info(WHOMIM + " Appointing HSId " + CoreUtils.hsIdToString(masterHSId) + " as leader for partition " + partitionId +
                     " Previous Leader:" + ((prevLeader == Long.MAX_VALUE) ? " none" :
                         CoreUtils.hsIdToString(prevLeader)));
 
@@ -346,7 +347,8 @@ public class LeaderAppointer implements Promotable
             } else {
                 // update partition call backs with correct current leaders after MigratePartitionLeader
                 for (Entry<Integer, LeaderCallBackInfo> entry: cache.entrySet()) {
-                    updatePartitionLeader(entry.getKey(), entry.getValue().m_HSId, entry.getValue().m_isMigratePartitionLeaderRequested);
+                    updatePartitionLeader(entry.getKey(), entry.getValue().m_HSId,
+                               entry.getValue().m_isMigratePartitionLeaderRequested);
                 }
             }
         }
@@ -797,7 +799,7 @@ public class LeaderAppointer implements Promotable
      * @param partitionId  partition id
      * @param newMasterHISD new master HSID
      */
-    public void updatePartitionLeader(int partitionId, long newMasterHISD, boolean isLeaderMigrated) {
+    private void updatePartitionLeader(int partitionId, long newMasterHISD, boolean isLeaderMigrated) {
         PartitionCallback cb = m_callbacks.get(partitionId);
         if (cb != null && cb.m_currentLeader != newMasterHISD) {
             cb.m_previousLeader = cb.m_currentLeader;

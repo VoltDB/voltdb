@@ -38,6 +38,7 @@ import org.voltdb.CommandLog;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltZK;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.exceptions.TransactionRestartException;
@@ -209,15 +210,18 @@ public class MpScheduler extends Scheduler
                 }
             }
         }
-        // Determine if all the partition leaders are on live hosts, that is, all partitions have promoted
-        // their leaders.
-        Set<Integer> partitionLeaderHosts = CoreUtils.getHostIdsFromHSIDs(m_iv2Masters);
-        partitionLeaderHosts.removeAll(((MpInitiatorMailbox)m_mailbox).m_messenger.getLiveHostIds());
-
         // This is a non MPI Promotion (but SPI Promotion) path for repairing outstanding MP Txns
-        MpRepairTask repairTask = new MpRepairTask((InitiatorMailbox)m_mailbox, replicas,
-                partitionLeaderHosts.isEmpty(), repairType);
+        final InitiatorMailbox mailbox = (InitiatorMailbox)m_mailbox;
+        MpRepairTask repairTask = new MpRepairTask(mailbox, replicas, repairType);
         m_pendingTasks.repair(repairTask, replicas, partitionMasters, repairType);
+
+        // At this point, all the repairs are completed. Remove the mp repair blocker if there exists
+        if (mailbox.m_messenger != null) {
+            Set<Integer> liveHostIds = mailbox.m_messenger.getLiveHostIds();
+            if (m_iv2Masters.stream().map(CoreUtils::getHostIdFromHSId).allMatch(liveHostIds::contains)) {
+                VoltZK.removeActionBlocker(mailbox.m_messenger.getZK(), VoltZK.mpRepairInProgress, tmLog);
+            }
+        }
         return new long[0];
     }
 
