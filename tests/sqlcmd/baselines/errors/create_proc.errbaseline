@@ -28,7 +28,7 @@ VOLTDB ERROR: UNEXPECTED FAILURE: java.lang.NoClassDefFoundError: sqlcmdtest/Bre
 	at org.voltdb.iv2.ProcedureTask.processInitiateTask(ProcedureTask.java:#)
 	at org.voltdb.iv2.MpProcedureTask.run(MpProcedureTask.java:#)
 	at org.voltdb.iv2.MpRoSite.run(MpRoSite.java:#)
-	at org.voltcore.utils.CoreUtils$7$1.run(CoreUtils.java:#)
+	at org.voltcore.utils.CoreUtils$5.lambda$newThread$0(CoreUtils.java:#)
 	at java.lang.Thread.run(Thread.java:#)
 Caused by: java.lang.ClassNotFoundException: sqlcmdtest.Breakable0$NestedGetsSabotaged
 	at java.net.URLClassLoader.findClass(URLClassLoader.java:#)
@@ -54,7 +54,7 @@ VOLTDB ERROR: UNEXPECTED FAILURE: java.lang.NoClassDefFoundError: sqlcmdtest/Bre
 	at org.voltdb.iv2.ProcedureTask.processInitiateTask(ProcedureTask.java:#)
 	at org.voltdb.iv2.MpProcedureTask.run(MpProcedureTask.java:#)
 	at org.voltdb.iv2.MpRoSite.run(MpRoSite.java:#)
-	at org.voltcore.utils.CoreUtils$7$1.run(CoreUtils.java:#)
+	at org.voltcore.utils.CoreUtils$5.lambda$newThread$0(CoreUtils.java:#)
 	at java.lang.Thread.run(Thread.java:#)
 Caused by: java.lang.ClassNotFoundException: sqlcmdtest.Breakable0$NestedGetsSabotaged
 	at java.net.URLClassLoader.findClass(URLClassLoader.java:#)
