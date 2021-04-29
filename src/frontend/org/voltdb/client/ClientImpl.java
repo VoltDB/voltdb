@@ -894,6 +894,11 @@ public final class ClientImpl implements Client {
         return m_blockingQueue;
     }
 
+    // Used by system tests
+    public void resetInstanceId() {
+        m_distributer.resetInstanceId();
+    }
+
     // Package access for unit test
     static HostAndPort parseHostAndPort(String server) {
         return HostAndPort.fromString(server.trim()).withDefaultPort(Client.VOLTDB_SERVER_PORT).requireBracketsForIPv6();

@@ -1464,12 +1464,9 @@ class Distributer {
         return m_clusterInstanceId;
     }
 
-    /** TODO
-     * Not exposed to users for the moment.
-    synchronized void resetInstanceId() {
+    public synchronized void resetInstanceId() {
         m_clusterInstanceId = null;
     }
-     */
 
     public String getBuildString() {
         return m_buildString;
