@@ -16,9 +16,9 @@
 #include <cassert>
 #include <boost/assert.hpp>
 
-#include <boost/detail/winapi/get_last_error.hpp>
-#include <boost/detail/winapi/get_current_thread.hpp>
-#include <boost/detail/winapi/get_thread_times.hpp>
+#include <boost/winapi/get_last_error.hpp>
+#include <boost/winapi/get_current_thread.hpp>
+#include <boost/winapi/get_thread_times.hpp>
 
 namespace boost
 {
@@ -29,10 +29,10 @@ namespace chrono
 thread_clock::time_point thread_clock::now( system::error_code & ec )
 {
     //  note that Windows uses 100 nanosecond ticks for FILETIME
-    boost::detail::winapi::FILETIME_ creation, exit, user_time, system_time;
+    boost::winapi::FILETIME_ creation, exit, user_time, system_time;
 
-    if ( boost::detail::winapi::GetThreadTimes(
-            boost::detail::winapi::GetCurrentThread (), &creation, &exit,
+    if ( boost::winapi::GetThreadTimes(
+            boost::winapi::GetCurrentThread (), &creation, &exit,
             &system_time, &user_time ) )
     {
         duration user = duration(
@@ -56,13 +56,13 @@ thread_clock::time_point thread_clock::now( system::error_code & ec )
         {
             boost::throw_exception(
                     system::system_error(
-                            boost::detail::winapi::GetLastError(),
+                            boost::winapi::GetLastError(),
                             ::boost::system::system_category(),
                             "chrono::thread_clock" ));
         }
         else
         {
-            ec.assign( boost::detail::winapi::GetLastError(), ::boost::system::system_category() );
+            ec.assign( boost::winapi::GetLastError(), ::boost::system::system_category() );
             return thread_clock::time_point(duration(0));
         }
     }
@@ -73,10 +73,10 @@ thread_clock::time_point thread_clock::now() BOOST_NOEXCEPT
 {
 
     //  note that Windows uses 100 nanosecond ticks for FILETIME
-    boost::detail::winapi::FILETIME_ creation, exit, user_time, system_time;
+    boost::winapi::FILETIME_ creation, exit, user_time, system_time;
 
-    if ( boost::detail::winapi::GetThreadTimes(
-            boost::detail::winapi::GetCurrentThread (), &creation, &exit,
+    if ( boost::winapi::GetThreadTimes(
+            boost::winapi::GetCurrentThread (), &creation, &exit,
             &system_time, &user_time ) )
     {
         duration user   = duration(

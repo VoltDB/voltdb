@@ -191,7 +191,10 @@ BOOST_HANA_NAMESPACE_BEGIN
     }
 
     template <typename S>
-    struct equal_impl<S, S, when<hana::Struct<S>::value>> {
+    struct equal_impl<S, S, when<
+        hana::Struct<S>::value &&
+        !detail::EqualityComparable<S, S>::value
+    >> {
         template <typename X, typename Y>
         static constexpr auto apply(X const& x, Y const& y) {
             return hana::all_of(hana::accessors<S>(),

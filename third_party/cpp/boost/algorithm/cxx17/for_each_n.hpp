@@ -14,6 +14,8 @@
 
 #include <utility>      // for std::pair
 
+#include <boost/config.hpp>
+
 namespace boost { namespace algorithm {
 
 /// \fn for_each_n(InputIterator first, Size n, Function f);

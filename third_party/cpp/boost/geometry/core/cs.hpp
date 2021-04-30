@@ -4,8 +4,8 @@
 // Copyright (c) 2008-2014 Bruno Lalande, Paris, France.
 // Copyright (c) 2009-2014 Mateusz Loskot, London, UK.
 
-// This file was modified by Oracle on 2014, 2018.
-// Modifications copyright (c) 2014-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2014-2020.
+// Modifications copyright (c) 2014-2020, Oracle and/or its affiliates.
 
 // Contributed and/or modified by Menelaos Karavelas, on behalf of Oracle
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
@@ -20,11 +20,11 @@
 #ifndef BOOST_GEOMETRY_CORE_CS_HPP
 #define BOOST_GEOMETRY_CORE_CS_HPP
 
+
 #include <cstddef>
 
-#include <boost/mpl/assert.hpp>
-
 #include <boost/geometry/core/coordinate_system.hpp>
+#include <boost/geometry/core/static_assert.hpp>
 #include <boost/geometry/core/tags.hpp>
 
 
@@ -58,10 +58,9 @@ namespace core_detail
 template <typename DegreeOrRadian>
 struct define_angular_units
 {
-    BOOST_MPL_ASSERT_MSG
-        ((false),
-         COORDINATE_SYSTEM_UNITS_MUST_BE_DEGREES_OR_RADIANS,
-         (types<DegreeOrRadian>));
+    BOOST_GEOMETRY_STATIC_ASSERT_FALSE(
+        "Coordinate system unit must be degree or radian.",
+        DegreeOrRadian);
 };
 
 template <>
@@ -298,9 +297,9 @@ struct cs_angular_units
 template <typename Units, typename CsTag>
 struct cs_tag_to_coordinate_system
 {
-    BOOST_MPL_ASSERT_MSG((false),
-                         NOT_IMPLEMENTED_FOR_THIS_COORDINATE_SYSTEM,
-                         (types<CsTag>));
+    BOOST_GEOMETRY_STATIC_ASSERT_FALSE(
+        "Not implemented for this coordinate system.",
+        Units, CsTag);
 };
 
 template <typename Units>

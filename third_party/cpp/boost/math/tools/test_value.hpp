@@ -46,7 +46,7 @@ typedef long double largest_float;
 #endif
 
 template <class T, class T2>
-inline T create_test_value(largest_float val, const char*, const boost::mpl::true_&, const T2&)
+inline T create_test_value(largest_float val, const char*, const std::true_type&, const T2&)
 { // Construct from long double or quad parameter val (ignoring string/const char* str).
   // (This is case for MPL parameters = true_ and T2 == false_,
   // and  MPL parameters = true_ and T2 == true_  cpp_bin_float)
@@ -56,7 +56,7 @@ inline T create_test_value(largest_float val, const char*, const boost::mpl::tru
   //
   // Choose this method, even if can be constructed from a string,
   // because it will be faster, and more likely to be the closest representation.
-  // (This is case for MPL parameters = mpl::true_ and T2 == mpl::true_).
+  // (This is case for MPL parameters = true_type and T2 == true_type).
   #ifdef BOOST_MATH_INSTRUMENT_CREATE_TEST_VALUE
   create_type = 1;
   #endif
@@ -64,11 +64,11 @@ inline T create_test_value(largest_float val, const char*, const boost::mpl::tru
 }
 
 template <class T>
-inline T create_test_value(largest_float, const char* str, const boost::mpl::false_&, const boost::mpl::true_&)
+inline T create_test_value(largest_float, const char* str, const std::false_type&, const std::true_type&)
 { // Construct from decimal digit string const char* @c str (ignoring long double parameter).
   // For example, extended precision or other User-Defined types which ARE constructible from a string
   // (but not from double, or long double without loss of precision).
-  // (This is case for MPL parameters = mpl::false_ and T2 == mpl::true_).
+  // (This is case for MPL parameters = false_type and T2 == true_type).
   #ifdef BOOST_MATH_INSTRUMENT_CREATE_TEST_VALUE
   create_type = 2;
   #endif
@@ -76,11 +76,11 @@ inline T create_test_value(largest_float, const char* str, const boost::mpl::fal
 }
 
 template <class T>
-inline T create_test_value(largest_float, const char* str, const boost::mpl::false_&, const boost::mpl::false_&)
+inline T create_test_value(largest_float, const char* str, const std::false_type&, const std::false_type&)
 { // Create test value using from lexical cast of decimal digit string const char* str.
   // For example, extended precision or other User-Defined types which are NOT constructible from a string
   // (NOR constructible from a long double).
-    // (This is case T1 = mpl::false and T2 == mpl::false).
+    // (This is case T1 = false_type and T2 == false_type).
   #ifdef BOOST_MATH_INSTRUMENT_CREATE_TEST_VALUE
   create_type = 3;
   #endif
@@ -107,12 +107,12 @@ inline T create_test_value(largest_float, const char* str, const boost::mpl::fal
 #define BOOST_MATH_TEST_VALUE(T, x) create_test_value<T>(\
   BOOST_MATH_TEST_LARGEST_FLOAT_SUFFIX(x),\
   #x,\
-  boost::mpl::bool_<\
+  std::integral_constant<bool, \
     std::numeric_limits<T>::is_specialized &&\
       (std::numeric_limits<T>::radix == 2)\
         && (std::numeric_limits<T>::digits <= BOOST_MATH_TEST_LARGEST_FLOAT_DIGITS)\
-        && boost::is_convertible<largest_float, T>::value>(),\
-  boost::mpl::bool_<\
-    boost::is_constructible<T, const char*>::value>()\
+        && std::is_convertible<largest_float, T>::value>(),\
+  std::integral_constant<bool, \
+    std::is_constructible<T, const char*>::value>()\
 )
 #endif // TEST_VALUE_HPP

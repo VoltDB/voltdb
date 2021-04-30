@@ -61,7 +61,8 @@ class shm_named_condition_any
    public:
    //!Creates a global condition with a name.
    //!If the condition can't be created throws interprocess_exception
-   shm_named_condition_any(create_only_t create_only, const char *name, const permissions &perm = permissions())
+   template <class CharT>
+   shm_named_condition_any(create_only_t create_only, const CharT *name, const permissions &perm = permissions())
       :  m_shmem  (create_only
                   ,name
                   ,sizeof(internal_condition) +
@@ -78,7 +79,8 @@ class shm_named_condition_any
    //!If the condition is already created, this call is equivalent
    //!shm_named_condition_any(open_only_t, ... )
    //!Does not throw
-   shm_named_condition_any(open_or_create_t open_or_create, const char *name, const permissions &perm = permissions())
+   template <class CharT>
+   shm_named_condition_any(open_or_create_t open_or_create, const CharT *name, const permissions &perm = permissions())
       :  m_shmem  (open_or_create
                   ,name
                   ,sizeof(internal_condition) +
@@ -92,7 +94,8 @@ class shm_named_condition_any
    //!Opens a global condition with a name if that condition is previously
    //!created. If it is not previously created this function throws
    //!interprocess_exception.
-   shm_named_condition_any(open_only_t open_only, const char *name)
+   template <class CharT>
+   shm_named_condition_any(open_only_t open_only, const CharT *name)
       :  m_shmem  (open_only
                   ,name
                   ,read_write
@@ -150,7 +153,8 @@ class shm_named_condition_any
 
    //!Erases a named condition from the system.
    //!Returns false on error. Never throws.
-   static bool remove(const char *name)
+   template <class CharT>
+   static bool remove(const CharT *name)
    {  return shared_memory_object::remove(name); }
 
    #if !defined(BOOST_INTERPROCESS_DOXYGEN_INVOKED)

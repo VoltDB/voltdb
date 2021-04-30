@@ -26,7 +26,6 @@
 #include <boost/range/value_type.hpp>
 
 #include <boost/geometry/algorithms/detail/overlay/overlay_type.hpp>
-#include <boost/geometry/algorithms/detail/ring_identifier.hpp>
 
 
 namespace boost { namespace geometry

@@ -28,16 +28,12 @@ namespace boost
         return boost::make_iterator_range( r );
     }
 
-#ifndef BOOST_NO_FUNCTION_TEMPLATE_ORDERING
-
     template< class Range >
     inline boost::iterator_range< BOOST_DEDUCED_TYPENAME range_iterator<const Range>::type > 
     as_array( const Range& r )
     {
         return boost::make_iterator_range( r );
     }
-    
-#endif
     
 }
 

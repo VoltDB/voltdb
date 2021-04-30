@@ -2,7 +2,7 @@
 // windows/basic_object_handle.hpp
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2019 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2021 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 // Copyright (c) 2011 Boris Schaeling (boris@highscore.de)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
@@ -21,13 +21,13 @@
 #if defined(BOOST_ASIO_HAS_WINDOWS_OBJECT_HANDLE) \
   || defined(GENERATING_DOCUMENTATION)
 
+#include <boost/asio/any_io_executor.hpp>
 #include <boost/asio/async_result.hpp>
 #include <boost/asio/detail/io_object_impl.hpp>
 #include <boost/asio/detail/throw_error.hpp>
 #include <boost/asio/detail/win_object_handle_service.hpp>
 #include <boost/asio/error.hpp>
 #include <boost/asio/execution_context.hpp>
-#include <boost/asio/executor.hpp>
 
 #if defined(BOOST_ASIO_HAS_MOVE)
 # include <utility>
@@ -48,12 +48,20 @@ namespace windows {
  * @e Distinct @e objects: Safe.@n
  * @e Shared @e objects: Unsafe.
  */
-template <typename Executor = executor>
+template <typename Executor = any_io_executor>
 class basic_object_handle
 {
 public:
   /// The type of the executor associated with the object.
   typedef Executor executor_type;
+
+  /// Rebinds the handle type to another executor.
+  template <typename Executor1>
+  struct rebind_executor
+  {
+    /// The handle type when rebound to the specified executor.
+    typedef basic_object_handle<Executor1> other;
+  };
 
   /// The native representation of a handle.
 #if defined(GENERATING_DOCUMENTATION)
@@ -75,7 +83,7 @@ public:
    * object handle.
    */
   explicit basic_object_handle(const executor_type& ex)
-    : impl_(ex)
+    : impl_(0, ex)
   {
   }
 
@@ -89,11 +97,11 @@ public:
    */
   template <typename ExecutionContext>
   explicit basic_object_handle(ExecutionContext& context,
-      typename enable_if<
+      typename constraint<
         is_convertible<ExecutionContext&, execution_context&>::value,
-        basic_object_handle
-      >::type* = 0)
-    : impl_(context)
+        defaulted_constraint
+      >::type = defaulted_constraint())
+    : impl_(0, 0, context)
   {
   }
 
@@ -112,7 +120,7 @@ public:
    */
   basic_object_handle(const executor_type& ex,
       const native_handle_type& native_handle)
-    : impl_(ex)
+    : impl_(0, ex)
   {
     boost::system::error_code ec;
     impl_.get_service().assign(impl_.get_implementation(), native_handle, ec);
@@ -135,10 +143,10 @@ public:
   template <typename ExecutionContext>
   basic_object_handle(ExecutionContext& context,
       const native_handle_type& native_handle,
-      typename enable_if<
+      typename constraint<
         is_convertible<ExecutionContext&, execution_context&>::value
-      >::type* = 0)
-    : impl_(context)
+      >::type = 0)
+    : impl_(0, 0, context)
   {
     boost::system::error_code ec;
     impl_.get_service().assign(impl_.get_implementation(), native_handle, ec);
@@ -363,24 +371,55 @@ public:
    * immediate completion, invocation of the handler will be performed in a
    * manner equivalent to using boost::asio::post().
    */
-  template <typename WaitHandler>
-  BOOST_ASIO_INITFN_RESULT_TYPE(WaitHandler,
+  template <
+      BOOST_ASIO_COMPLETION_TOKEN_FOR(void (boost::system::error_code))
+        WaitHandler BOOST_ASIO_DEFAULT_COMPLETION_TOKEN_TYPE(executor_type)>
+  BOOST_ASIO_INITFN_AUTO_RESULT_TYPE(WaitHandler,
       void (boost::system::error_code))
-  async_wait(BOOST_ASIO_MOVE_ARG(WaitHandler) handler)
+  async_wait(
+      BOOST_ASIO_MOVE_ARG(WaitHandler) handler
+        BOOST_ASIO_DEFAULT_COMPLETION_TOKEN(executor_type))
   {
-    boost::asio::async_completion<WaitHandler,
-      void (boost::system::error_code)> init(handler);
-
-    impl_.get_service().async_wait(impl_.get_implementation(),
-        init.completion_handler, impl_.get_implementation_executor());
-
-    return init.result.get();
+    return async_initiate<WaitHandler, void (boost::system::error_code)>(
+        initiate_async_wait(this), handler);
   }
 
 private:
   // Disallow copying and assignment.
   basic_object_handle(const basic_object_handle&) BOOST_ASIO_DELETED;
   basic_object_handle& operator=(const basic_object_handle&) BOOST_ASIO_DELETED;
+
+  class initiate_async_wait
+  {
+  public:
+    typedef Executor executor_type;
+
+    explicit initiate_async_wait(basic_object_handle* self)
+      : self_(self)
+    {
+    }
+
+    executor_type get_executor() const BOOST_ASIO_NOEXCEPT
+    {
+      return self_->get_executor();
+    }
+
+    template <typename WaitHandler>
+    void operator()(BOOST_ASIO_MOVE_ARG(WaitHandler) handler) const
+    {
+      // If you get an error on the following line it means that your handler
+      // does not meet the documented type requirements for a WaitHandler.
+      BOOST_ASIO_WAIT_HANDLER_CHECK(WaitHandler, handler) type_check;
+
+      detail::non_const_lvalue<WaitHandler> handler2(handler);
+      self_->impl_.get_service().async_wait(
+          self_->impl_.get_implementation(),
+          handler2.value, self_->impl_.get_executor());
+    }
+
+  private:
+    basic_object_handle* self_;
+  };
 
   boost::asio::detail::io_object_impl<
     boost::asio::detail::win_object_handle_service, Executor> impl_;

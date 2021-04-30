@@ -263,7 +263,7 @@ struct voronoi_diagram_traits {
   typedef voronoi_cell<coordinate_type> cell_type;
   typedef voronoi_vertex<coordinate_type> vertex_type;
   typedef voronoi_edge<coordinate_type> edge_type;
-  typedef class {
+  class vertex_equality_predicate_type {
    public:
     enum { ULPS = 128 };
     bool operator()(const vertex_type& v1, const vertex_type& v2) const {
@@ -274,7 +274,7 @@ struct voronoi_diagram_traits {
     }
    private:
     typename detail::ulp_comparison<T> ulp_cmp;
-  } vertex_equality_predicate_type;
+  };
 };
 
 // Voronoi output data structure.

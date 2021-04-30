@@ -4,10 +4,11 @@
 // Copyright (c) 2008-2014 Barend Gehrels, Amsterdam, the Netherlands.
 // Copyright (c) 2009-2014 Mateusz Loskot, London, UK.
 
-// This file was modified by Oracle on 2014.
-// Modifications copyright (c) 2014, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2014-2020.
+// Modifications copyright (c) 2014-2020, Oracle and/or its affiliates.
 
 // Contributed and/or modified by Menelaos Karavelas, on behalf of Oracle
+// Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
 // Parts of Boost.Geometry are redesigned from Geodan's Geographic Library
 // (geolib/GGL), copyright (c) 1995-2010 Geodan, Amsterdam, the Netherlands.
@@ -46,7 +47,7 @@ The point concept is defined as following:
   coordinate system (cartesian, spherical, etc)
 - there must be a specialization of traits::dimension defining its number
   of dimensions (2, 3, ...) (derive it conveniently
-  from boost::mpl::int_&lt;X&gt; for X-D)
+  from std::integral_constant&lt;std::size_t, X&gt; for X-D)
 - there must be a specialization of traits::access, per dimension,
   with two functions:
   - \b get to get a coordinate value

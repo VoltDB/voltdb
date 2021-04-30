@@ -1,5 +1,5 @@
 /* Configure Boost.Outcome with Boost
-(C) 2015-2019 Niall Douglas <http://www.nedproductions.biz/> (24 commits)
+(C) 2015-2021 Niall Douglas <http://www.nedproductions.biz/> (7 commits)
 File Created: August 2015
 
 
@@ -31,7 +31,7 @@ DEALINGS IN THE SOFTWARE.
 #ifndef BOOST_OUTCOME_V2_CONFIG_HPP
 #define BOOST_OUTCOME_V2_CONFIG_HPP
 
-#include "version.hpp"
+#include "detail/version.hpp"
 
 // Pull in detection of __MINGW64_VERSION_MAJOR
 #if defined(__MINGW32__) && !defined(DOXYGEN_IS_IN_THE_HOUSE)
@@ -56,13 +56,16 @@ DEALINGS IN THE SOFTWARE.
 #ifndef BOOST_OUTCOME_SYMBOL_VISIBLE
 #define BOOST_OUTCOME_SYMBOL_VISIBLE BOOST_SYMBOL_VISIBLE
 #endif
+#ifdef __has_cpp_attribute
+#define BOOST_OUTCOME_HAS_CPP_ATTRIBUTE(attr) __has_cpp_attribute(attr)
+#else
+#define BOOST_OUTCOME_HAS_CPP_ATTRIBUTE(attr) (0)
+#endif
 // Weird that Boost.Config doesn't define a BOOST_NO_CXX17_NODISCARD
 #ifndef BOOST_OUTCOME_NODISCARD
-#ifdef __has_cpp_attribute
-#if __has_cpp_attribute(nodiscard)
+#if BOOST_OUTCOME_HAS_CPP_ATTRIBUTE(nodiscard)
 #define BOOST_OUTCOME_NODISCARD [[nodiscard]]
-#endif
-#elif defined(__clang__)
+#elif defined(__clang__)  // deliberately not GCC
 #define BOOST_OUTCOME_NODISCARD __attribute__((warn_unused_result))
 #elif defined(_MSC_VER)
 // _Must_inspect_result_ expands into this
@@ -107,11 +110,15 @@ DEALINGS IN THE SOFTWARE.
 #define BOOST_OUTCOME_TPRED(...) typename = std::enable_if_t<__VA_ARGS__>
 #endif
 #ifndef BOOST_OUTCOME_REQUIRES
-#ifdef __cpp_concepts
-#define BOOST_OUTCOME_REQUIRES(...) requires __VA_ARGS__
+#if defined(__cpp_concepts) && (!defined(_MSC_VER) || _MSC_FULL_VER >= 192400000)  // VS 2019 16.3 is broken here
+#define BOOST_OUTCOME_REQUIRES(...) requires(__VA_ARGS__)
 #else
 #define BOOST_OUTCOME_REQUIRES(...)
 #endif
+#endif
+
+#ifndef BOOST_OUTCOME_ENABLE_LEGACY_SUPPORT_FOR
+#define BOOST_OUTCOME_ENABLE_LEGACY_SUPPORT_FOR 220  // the v2.2 Outcome release
 #endif
 
 namespace boost
@@ -189,6 +196,15 @@ template <class T> struct in_place_type_t
 //! Aliases `std::in_place_type<T>` if on C++ 17 or later, else defined locally.
 template <class T> constexpr in_place_type_t<T> in_place_type{};
 BOOST_OUTCOME_V2_NAMESPACE_END
+#endif
+
+#ifndef BOOST_OUTCOME_TRIVIAL_ABI
+#if defined(STANDARDESE_IS_IN_THE_HOUSE) || __clang_major__ >= 7
+//! Defined to be `[[clang::trivial_abi]]` when on a new enough clang compiler. Usually automatic, can be overriden.
+#define BOOST_OUTCOME_TRIVIAL_ABI [[clang::trivial_abi]]
+#else
+#define BOOST_OUTCOME_TRIVIAL_ABI
+#endif
 #endif
 
 BOOST_OUTCOME_V2_NAMESPACE_BEGIN
@@ -272,6 +288,34 @@ namespace detail
   };
   template <class T, class U> static constexpr bool is_implicitly_constructible = _is_implicitly_constructible<T, U>::value;
 
+  template <class T, class... Args> struct _is_nothrow_constructible
+  {
+    static constexpr bool value = std::is_nothrow_constructible<T, Args...>::value;
+  };
+  template <class T> struct _is_nothrow_constructible<T, void>
+  {
+    static constexpr bool value = false;
+  };
+  template <> struct _is_nothrow_constructible<void, void>
+  {
+    static constexpr bool value = false;
+  };
+  template <class T, class... Args> static constexpr bool is_nothrow_constructible = _is_nothrow_constructible<T, Args...>::value;
+
+  template <class T, class... Args> struct _is_constructible
+  {
+    static constexpr bool value = std::is_constructible<T, Args...>::value;
+  };
+  template <class T> struct _is_constructible<T, void>
+  {
+    static constexpr bool value = false;
+  };
+  template <> struct _is_constructible<void, void>
+  {
+    static constexpr bool value = false;
+  };
+  template <class T, class... Args> static constexpr bool is_constructible = _is_constructible<T, Args...>::value;
+
 #ifndef BOOST_OUTCOME_USE_STD_IS_NOTHROW_SWAPPABLE
 #if defined(_MSC_VER) && _HAS_CXX17
 #define BOOST_OUTCOME_USE_STD_IS_NOTHROW_SWAPPABLE 1  // MSVC always has std::is_nothrow_swappable
@@ -295,18 +339,10 @@ namespace detail
 #if !defined(STANDARDESE_IS_IN_THE_HOUSE) && BOOST_OUTCOME_USE_STD_IS_NOTHROW_SWAPPABLE
   template <class T> using is_nothrow_swappable = std::is_nothrow_swappable<T>;
 #else
-  namespace _is_nothrow_swappable
+  template <class T> struct is_nothrow_swappable
   {
-    using namespace std;
-    template <class T> constexpr inline T &ldeclval();
-    template <class T, class = void> struct is_nothrow_swappable : std::integral_constant<bool, false>
-    {
-    };
-    template <class T> struct is_nothrow_swappable<T, decltype(swap(ldeclval<T>(), ldeclval<T>()))> : std::integral_constant<bool, noexcept(swap(ldeclval<T>(), ldeclval<T>()))>
-    {
-    };
-  }  // namespace _is_nothrow_swappable
-  template <class T> using is_nothrow_swappable = _is_nothrow_swappable::is_nothrow_swappable<T>;
+    static constexpr bool value = std::is_nothrow_move_constructible<T>::value && std::is_nothrow_move_assignable<T>::value;
+  };
 #endif
 }  // namespace detail
 BOOST_OUTCOME_V2_NAMESPACE_END

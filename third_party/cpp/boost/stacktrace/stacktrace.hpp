@@ -1,4 +1,4 @@
-// Copyright Antony Polukhin, 2016-2019.
+// Copyright Antony Polukhin, 2016-2021.
 //
 // Distributed under the Boost Software License, Version 1.0. (See
 // accompanying file LICENSE_1_0.txt or copy at
@@ -13,6 +13,7 @@
 #endif
 
 #include <boost/core/explicit_operator_bool.hpp>
+#include <boost/core/no_exceptions_support.hpp>
 #include <boost/container_hash/hash_fwd.hpp>
 
 #include <iosfwd>
@@ -69,7 +70,7 @@ class basic_stacktrace {
             return;
         }
 
-        try {
+        BOOST_TRY {
             {   // Fast path without additional allocations
                 native_frame_ptr_t buffer[buffer_size];
                 const std::size_t frames_count = boost::stacktrace::detail::this_thread_frames::collect(buffer, buffer_size < max_depth ? buffer_size : max_depth, frames_to_skip + 1);
@@ -95,9 +96,10 @@ class basic_stacktrace {
 
                 buf.resize(buf.size() * 2);
             } while (buf.size() < buf.max_size()); // close to `true`, but suppresses `C4127: conditional expression is constant`.
-        } catch (...) {
+        } BOOST_CATCH (...) {
             // ignore exception
         }
+        BOOST_CATCH_END
     }
     /// @endcond
 

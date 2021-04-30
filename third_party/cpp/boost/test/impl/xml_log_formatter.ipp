@@ -108,7 +108,7 @@ void
 xml_log_formatter::test_unit_skipped( std::ostream& ostr, test_unit const& tu, const_string reason )
 {
     ostr << "<" << tu_type_name( tu )
-         << " name"    << utils::attr_value() << tu.p_name
+         << " name"    << utils::attr_value() << tu.p_name.get()
          << " skipped" << utils::attr_value() << "yes"
          << " reason"  << utils::attr_value() << reason
          << "/>";

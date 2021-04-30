@@ -1,5 +1,5 @@
 /* Proposed SG14 status_code
-(C) 2018-2019 Niall Douglas <http://www.nedproductions.biz/> (5 commits)
+(C) 2018-2021 Niall Douglas <http://www.nedproductions.biz/> (5 commits)
 File Created: Feb 2018
 
 
@@ -60,9 +60,42 @@ namespace detail
   };
   template <class To, class From> struct type_erasure_is_safe
   {
-    static constexpr bool value = traits::is_move_relocating<From>::value  //
+    static constexpr bool value = traits::is_move_bitcopying<From>::value  //
                                   && (sizeof(status_code_sizer<From>) <= sizeof(status_code_sizer<To>));
   };
+  /* We are severely limited by needing to retain C++ 11 compatibility when doing
+  constexpr string parsing. MSVC lets you throw exceptions within a constexpr
+  evaluation context when exceptions are globally disabled, but won't let you
+  divide by zero, even if never evaluated, ever in constexpr. GCC and clang won't
+  let you throw exceptions, ever, if exceptions are globally disabled. So let's
+  use the trick of divide by zero in constexpr on GCC and clang if and only if
+  exceptions are globally disabled.
+  */
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdiv-by-zero"
+#endif
+#if defined(__cpp_exceptions) || (defined(_MSC_VER) && !defined(__clang__))
+#define BOOST_OUTCOME_SYSTEM_ERROR2_FAIL_CONSTEXPR(msg) throw msg
+#else
+#define BOOST_OUTCOME_SYSTEM_ERROR2_FAIL_CONSTEXPR(msg) ((void) msg, 1 / 0)
+#endif
+  constexpr inline unsigned long long parse_hex_byte(char c) { return ('0' <= c && c <= '9') ? (c - '0') : ('a' <= c && c <= 'f') ? (10 + c - 'a') : ('A' <= c && c <= 'F') ? (10 + c - 'A') : BOOST_OUTCOME_SYSTEM_ERROR2_FAIL_CONSTEXPR("Invalid character in UUID"); }
+  constexpr inline unsigned long long parse_uuid2(const char *s)
+  {
+    return ((parse_hex_byte(s[0]) << 0) | (parse_hex_byte(s[1]) << 4) | (parse_hex_byte(s[2]) << 8) | (parse_hex_byte(s[3]) << 12) | (parse_hex_byte(s[4]) << 16) | (parse_hex_byte(s[5]) << 20) | (parse_hex_byte(s[6]) << 24) | (parse_hex_byte(s[7]) << 28) | (parse_hex_byte(s[9]) << 32) | (parse_hex_byte(s[10]) << 36) |
+            (parse_hex_byte(s[11]) << 40) | (parse_hex_byte(s[12]) << 44) | (parse_hex_byte(s[14]) << 48) | (parse_hex_byte(s[15]) << 52) | (parse_hex_byte(s[16]) << 56) | (parse_hex_byte(s[17]) << 60))  //
+           ^                                                                                                                                                                                                //
+           ((parse_hex_byte(s[19]) << 0) | (parse_hex_byte(s[20]) << 4) | (parse_hex_byte(s[21]) << 8) | (parse_hex_byte(s[22]) << 12) | (parse_hex_byte(s[24]) << 16) | (parse_hex_byte(s[25]) << 20) | (parse_hex_byte(s[26]) << 24) | (parse_hex_byte(s[27]) << 28) | (parse_hex_byte(s[28]) << 32) |
+            (parse_hex_byte(s[29]) << 36) | (parse_hex_byte(s[30]) << 40) | (parse_hex_byte(s[31]) << 44) | (parse_hex_byte(s[32]) << 48) | (parse_hex_byte(s[33]) << 52) | (parse_hex_byte(s[34]) << 56) | (parse_hex_byte(s[35]) << 60));
+  }
+  template <size_t N> constexpr inline unsigned long long parse_uuid_from_array(const char (&uuid)[N]) { return (N == 37) ? parse_uuid2(uuid) : ((N == 39) ? parse_uuid2(uuid + 1) : BOOST_OUTCOME_SYSTEM_ERROR2_FAIL_CONSTEXPR("UUID does not have correct length")); }
+  template <size_t N> constexpr inline unsigned long long parse_uuid_from_pointer(const char *uuid) { return (N == 36) ? parse_uuid2(uuid) : ((N == 38) ? parse_uuid2(uuid + 1) : BOOST_OUTCOME_SYSTEM_ERROR2_FAIL_CONSTEXPR("UUID does not have correct length")); }
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
+  static constexpr unsigned long long test_uuid_parse = parse_uuid_from_array("430f1201-94fc-06c7-430f-120194fc06c7");
+  //static constexpr unsigned long long test_uuid_parse2 = parse_uuid_from_array("x30f1201-94fc-06c7-430f-120194fc06c7");
 }  // namespace detail
 
 /*! Abstract base class for a coding domain of a status code.
@@ -116,7 +149,7 @@ public:
     {
       (void) dest;
       (void) src;
-      assert(dest->_thunk == _checking_string_thunk);  // NOLINT
+      assert(dest->_thunk == _checking_string_thunk);                   // NOLINT
       assert(src == nullptr || src->_thunk == _checking_string_thunk);  // NOLINT
       // do nothing
     }
@@ -130,7 +163,10 @@ public:
     //! Handler for when operations occur
     const _thunk_spec _thunk{nullptr};
 
-    constexpr explicit string_ref(_thunk_spec thunk) noexcept : _thunk(thunk) {}
+    constexpr explicit string_ref(_thunk_spec thunk) noexcept
+        : _thunk(thunk)
+    {
+    }
 
   public:
     //! Construct from a C string literal
@@ -140,10 +176,12 @@ public:
 #else
                                                   _thunk_spec thunk = nullptr
 #endif
-                                                  ) noexcept : _begin(str),
-                                                               _end((len == static_cast<size_type>(-1)) ? (str + detail::cstrlen(str)) : (str + len)),  // NOLINT
-                                                               _state{state0, state1, state2},
-                                                               _thunk(thunk)
+                                                  ) noexcept
+        : _begin(str)
+        , _end((len == static_cast<size_type>(-1)) ? (str + detail::cstrlen(str)) : (str + len))
+        ,  // NOLINT
+        _state{state0, state1, state2}
+        , _thunk(thunk)
     {
     }
     //! Copy construct the derived implementation.
@@ -159,7 +197,11 @@ public:
       }
     }
     //! Move construct the derived implementation.
-    string_ref(string_ref &&o) noexcept : _begin(o._begin), _end(o._end), _state{o._state[0], o._state[1], o._state[2]}, _thunk(o._thunk)
+    string_ref(string_ref &&o) noexcept
+        : _begin(o._begin)
+        , _end(o._end)
+        , _state{o._state[0], o._state[1], o._state[2]}
+        , _thunk(o._thunk)
     {
       if(_thunk != nullptr)
       {
@@ -245,10 +287,10 @@ public:
 
     static void _refcounted_string_thunk(string_ref *_dest, const string_ref *_src, _thunk_op op) noexcept
     {
-      auto dest = static_cast<atomic_refcounted_string_ref *>(_dest);  // NOLINT
+      auto dest = static_cast<atomic_refcounted_string_ref *>(_dest);      // NOLINT
       auto src = static_cast<const atomic_refcounted_string_ref *>(_src);  // NOLINT
       (void) src;
-      assert(dest->_thunk == _refcounted_string_thunk);  // NOLINT
+      assert(dest->_thunk == _refcounted_string_thunk);                   // NOLINT
       assert(src == nullptr || src->_thunk == _refcounted_string_thunk);  // NOLINT
       switch(op)
       {
@@ -264,7 +306,7 @@ public:
       }
       case _thunk_op::move:
       {
-        assert(src);  // NOLINT
+        assert(src);                                                  // NOLINT
         auto msrc = const_cast<atomic_refcounted_string_ref *>(src);  // NOLINT
         msrc->_begin = msrc->_end = nullptr;
         msrc->_state[0] = msrc->_state[1] = msrc->_state[2] = nullptr;
@@ -279,7 +321,7 @@ public:
           {
             std::atomic_thread_fence(std::memory_order_acquire);
             free((void *) dest->_begin);  // NOLINT
-            delete dest->_msg();  // NOLINT
+            delete dest->_msg();          // NOLINT
           }
         }
       }
@@ -288,7 +330,8 @@ public:
 
   public:
     //! Construct from a C string literal allocated using `malloc()`.
-    explicit atomic_refcounted_string_ref(const char *str, size_type len = static_cast<size_type>(-1), void *state1 = nullptr, void *state2 = nullptr) noexcept : string_ref(str, len, new(std::nothrow) _allocated_msg, state1, state2, _refcounted_string_thunk)
+    explicit atomic_refcounted_string_ref(const char *str, size_type len = static_cast<size_type>(-1), void *state1 = nullptr, void *state2 = nullptr) noexcept
+        : string_ref(str, len, new(std::nothrow) _allocated_msg, state1, state2, _refcounted_string_thunk)
     {
       if(_msg() == nullptr)
       {
@@ -309,7 +352,26 @@ protected:
 
   Do NOT make up your own value. Do NOT use zero.
   */
-  constexpr explicit status_code_domain(unique_id_type id) noexcept : _id(id) {}
+  constexpr explicit status_code_domain(unique_id_type id) noexcept
+      : _id(id)
+  {
+  }
+  /*! UUID constructor, where input is constexpr parsed into a `unique_id_type`.
+   */
+  template <size_t N>
+  constexpr explicit status_code_domain(const char (&uuid)[N]) noexcept
+      : _id(detail::parse_uuid_from_array<N>(uuid))
+  {
+  }
+  template <size_t N> struct _uuid_size
+  {
+  };
+  //! Alternative UUID constructor
+  template <size_t N>
+  constexpr explicit status_code_domain(const char *uuid, _uuid_size<N> /*unused*/) noexcept
+      : _id(detail::parse_uuid_from_pointer<N>(uuid))
+  {
+  }
   //! No public copying at type erased level
   status_code_domain(const status_code_domain &) = default;
   //! No public moving at type erased level

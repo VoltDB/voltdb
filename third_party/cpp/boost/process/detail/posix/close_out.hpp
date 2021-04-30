@@ -10,8 +10,9 @@
 #ifndef BOOST_PROCESS_DETAIL_POSIX_CLOSE_OUT_HPP
 #define BOOST_PROCESS_DETAIL_POSIX_CLOSE_OUT_HPP
 
-
+#include <boost/process/detail/used_handles.hpp>
 #include <boost/process/detail/posix/handler.hpp>
+#include <array>
 
 namespace boost { namespace process { namespace detail { namespace posix {
 
@@ -20,6 +21,8 @@ struct close_out : handler_base_ext
 {
     template <class Executor>
     inline void on_exec_setup(Executor &e) const;
+
+    std::array<int, 2> get_used_handles() {return {{p1 != -1 ? p1 : p2, p2 != -1 ? p2 : p1}};}
 };
 
 template<>

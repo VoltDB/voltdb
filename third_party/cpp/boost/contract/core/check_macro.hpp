@@ -27,7 +27,7 @@ Macros for implementation checks.
     @code
     void f() {
         ...
-        BOOST_CONTRACT_CHECK(...);
+        BOOST_CONTRACT_CHECK(cond);
         ...
     }
     @endcode
@@ -41,7 +41,7 @@ Macros for implementation checks.
     @param cond Boolean condition to check within implementation code (function
                 body, etc.).
                 (This is not a variadic macro parameter so any comma it might
-                contain must be protected by round parenthesis,
+                contain must be protected by round parenthesis and
                 @c BOOST_CONTRACT_CHECK((cond)) will always work.)
     */
     #define BOOST_CONTRACT_CHECK(cond)
@@ -58,11 +58,11 @@ Macros for implementation checks.
 #ifdef BOOST_CONTRACT_DETAIL_DOXYGEN
     /**
     Preferred way to assert implementation check conditions that are
-    computationally expensive, at least compared to the cost of executing the
-    function body.
+    computationally expensive, at least compared to the computational cost of
+    executing the function body.
 
-    The specified condition will always be compiled and validated
-    syntactically, but it will not be evaluated at run-time unless
+    The specified condition will always be compiled and validated syntactically,
+    but it will not be checked at run-time unless
     @RefMacro{BOOST_CONTRACT_AUDITS} is defined (undefined by default).
     This macro is defined by code equivalent to:
 
@@ -87,7 +87,7 @@ Macros for implementation checks.
     @param cond Boolean condition to check within implementation code (function
                 body, etc.).
                 (This is not a variadic macro parameter so any comma it might
-                contain must be protected by round parenthesis,
+                contain must be protected by round parenthesis and
                 @c BOOST_CONTRACT_CHECK_AUDIT((cond)) will always work.)
     */
     #define BOOST_CONTRACT_CHECK_AUDIT(cond)
@@ -100,11 +100,12 @@ Macros for implementation checks.
 #endif
     
 /**
-Preferred way to assert implementation check conditions that are computationally
-prohibitive, at least compared to the cost of executing the function body.
+Preferred way to document in the code implementation check conditions that are
+computationally prohibitive, at least compared to the computational cost of
+executing the function body.
 
-The specified condition will always be compiled and validated
-syntactically, but it will never be evaluated at run-time.
+The specified condition will always be compiled and validated syntactically, but
+it will never be checked at run-time.
 This macro is defined by code equivalent to:
 
 @code
@@ -123,7 +124,7 @@ defining macros similar to the one above.
 @param cond Boolean condition to check within implementation code (function
             body, etc.).
             (This is not a variadic macro parameter so any comma it might
-            contain must be protected by round parenthesis,
+            contain must be protected by round parenthesis and
             @c BOOST_CONTRACT_CHECK_AXIOM((cond)) will always work.)
 */
 #define BOOST_CONTRACT_CHECK_AXIOM(cond) \

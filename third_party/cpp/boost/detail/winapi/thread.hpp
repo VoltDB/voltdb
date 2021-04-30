@@ -10,6 +10,10 @@
 #ifndef BOOST_DETAIL_WINAPI_THREAD_HPP
 #define BOOST_DETAIL_WINAPI_THREAD_HPP
 
+#include <boost/config/header_deprecated.hpp>
+
+BOOST_HEADER_DEPRECATED("<boost/winapi/thread.hpp>")
+
 #include <boost/winapi/thread.hpp>
 #include <boost/detail/winapi/detail/deprecated_namespace.hpp>
 

@@ -146,7 +146,7 @@ typedef int pid_t;
 
 #  undef hypot // undo the evil #define left by Python.
 
-# elif defined(__BORLANDC__)
+# elif defined(__BORLANDC__) && !defined(__clang__)
 #  undef HAVE_HYPOT
 #  define HAVE_HYPOT 1
 # endif
@@ -227,7 +227,11 @@ typedef int pid_t;
 
 # define PyVarObject_HEAD_INIT(type, size) \
         PyObject_HEAD_INIT(type) size,
+#endif
 
+#if PY_VERSION_HEX < 0x030900A4
+#  define Py_SET_TYPE(obj, type) ((Py_TYPE(obj) = (type)), (void)0)
+#  define Py_SET_SIZE(obj, size) ((Py_SIZE(obj) = (size)), (void)0)
 #endif
 
 

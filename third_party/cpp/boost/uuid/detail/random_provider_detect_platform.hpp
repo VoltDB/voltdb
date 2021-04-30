@@ -3,7 +3,7 @@
 //
 // Distributed under the Boost Software License, Version 1.0.
 // (See accompanying file LICENSE_1_0.txt or copy at
-//   http://www.boost.org/LICENCE_1_0.txt)
+//   https://www.boost.org/LICENSE_1_0.txt)
 //
 // Platform-specific random entropy provider platform detection
 //
@@ -23,6 +23,12 @@
 #if defined(SYS_getrandom)
 #define BOOST_UUID_RANDOM_PROVIDER_HAS_GETRANDOM
 #endif // defined(SYS_getrandom)
+#endif
+
+// On Linux, getentropy is implemented via getrandom. If we know that getrandom is not supported by the kernel, getentropy
+// will certainly not work, even if libc provides a wrapper function for it. There is no reason, ever, to use getentropy on that platform.
+#if !defined(BOOST_UUID_RANDOM_PROVIDER_DISABLE_GETENTROPY) && (defined(__linux__) || defined(__linux) || defined(linux) || defined(__ANDROID__))
+#define BOOST_UUID_RANDOM_PROVIDER_DISABLE_GETENTROPY
 #endif
 
 //
@@ -54,7 +60,7 @@
 # define BOOST_UUID_RANDOM_PROVIDER_GETRANDOM
 # define BOOST_UUID_RANDOM_PROVIDER_NAME getrandom
 
-#elif BOOST_LIB_C_GNU >= BOOST_VERSION_NUMBER(2, 25, 0) && !defined(BOOST_UUID_RANDOM_PROVIDER_FORCE_POSIX)
+#elif BOOST_LIB_C_GNU >= BOOST_VERSION_NUMBER(2, 25, 0) && !defined(BOOST_UUID_RANDOM_PROVIDER_FORCE_POSIX) && !defined(BOOST_UUID_RANDOM_PROVIDER_DISABLE_GETENTROPY)
 # define BOOST_UUID_RANDOM_PROVIDER_GETENTROPY
 # define BOOST_UUID_RANDOM_PROVIDER_NAME getentropy
 

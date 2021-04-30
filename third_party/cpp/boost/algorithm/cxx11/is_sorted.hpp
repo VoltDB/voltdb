@@ -16,6 +16,7 @@
 #include <functional>
 #include <iterator>
 
+#include <boost/config.hpp>
 #include <boost/range/begin.hpp>
 #include <boost/range/end.hpp>
 

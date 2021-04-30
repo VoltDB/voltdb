@@ -10,8 +10,8 @@
     LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 =============================================================================*/
 
-#if !defined(TOKEN_IDS_HPP_414E9A58_F079_4789_8AFF_513815CE475B_INCLUDED)
-#define TOKEN_IDS_HPP_414E9A58_F079_4789_8AFF_513815CE475B_INCLUDED
+#if !defined(BOOST_TOKEN_IDS_HPP_414E9A58_F079_4789_8AFF_513815CE475B_INCLUDED)
+#define BOOST_TOKEN_IDS_HPP_414E9A58_F079_4789_8AFF_513815CE475B_INCLUDED
 
 #include <string>
 
@@ -47,6 +47,7 @@ enum token_category {
     IdentifierTokenType         = 0x08040000,
     ParameterTokenType          = 0x08840000,
     ExtParameterTokenType       = 0x088C0000,
+    OptParameterTokenType       = 0x08940000,
     KeywordTokenType            = 0x10040000,
     OperatorTokenType           = 0x18040000,
     LiteralTokenType            = 0x20040000,
@@ -300,6 +301,19 @@ enum token_id {
     T_THREADLOCAL  = TOKEN_FROM_ID(431, KeywordTokenType),
     T_RAWSTRINGLIT = TOKEN_FROM_ID(432, StringLiteralTokenType),
 
+// C++20 keywords
+    T_CHAR8_T      = TOKEN_FROM_ID(433, KeywordTokenType),
+    T_CONCEPT      = TOKEN_FROM_ID(434, KeywordTokenType),
+    T_CONSTEVAL    = TOKEN_FROM_ID(435, KeywordTokenType),
+    T_CONSTINIT    = TOKEN_FROM_ID(436, KeywordTokenType),
+    T_CO_AWAIT     = TOKEN_FROM_ID(437, KeywordTokenType),
+    T_CO_RETURN    = TOKEN_FROM_ID(438, KeywordTokenType),
+    T_CO_YIELD     = TOKEN_FROM_ID(439, KeywordTokenType),
+    T_REQUIRES     = TOKEN_FROM_ID(440, KeywordTokenType),
+
+// C++20 operators
+    T_SPACESHIP    = TOKEN_FROM_ID(441, OperatorTokenType),
+
     T_LAST_TOKEN_ID,
     T_LAST_TOKEN = ID_FROM_TOKEN(T_LAST_TOKEN_ID & ~PPTokenFlag),
 
@@ -311,7 +325,8 @@ enum token_id {
     T_PLACEHOLDER = TOKEN_FROM_ID(T_LAST_TOKEN+2, WhiteSpaceTokenType),
     T_PLACEMARKER = TOKEN_FROM_ID(T_LAST_TOKEN+3, InternalTokenType),
     T_PARAMETERBASE = TOKEN_FROM_ID(T_LAST_TOKEN+4, ParameterTokenType),
-    T_EXTPARAMETERBASE = TOKEN_FROM_ID(T_LAST_TOKEN+4, ExtParameterTokenType)
+    T_EXTPARAMETERBASE = TOKEN_FROM_ID(T_LAST_TOKEN+4, ExtParameterTokenType),
+    T_OPTPARAMETERBASE = TOKEN_FROM_ID(T_LAST_TOKEN+4, OptParameterTokenType)
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -376,5 +391,5 @@ char const *get_token_value(token_id tokid);
 #include BOOST_ABI_SUFFIX
 #endif
 
-#endif // !defined(TOKEN_IDS_HPP_414E9A58_F079_4789_8AFF_513815CE475B_INCLUDED)
+#endif // !defined(BOOST_TOKEN_IDS_HPP_414E9A58_F079_4789_8AFF_513815CE475B_INCLUDED)
 

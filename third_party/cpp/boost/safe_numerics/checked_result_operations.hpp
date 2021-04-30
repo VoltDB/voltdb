@@ -34,7 +34,7 @@ namespace boost {
 namespace safe_numerics {
 
 template<typename T>
-constexpr void display(const boost::safe_numerics::checked_result<T> & c){
+constexpr inline void display(const boost::safe_numerics::checked_result<T> & c){
     switch(c.m_e){
     case safe_numerics_error::success:
         std::terminate();
@@ -1127,10 +1127,12 @@ inline std::basic_ostream<CharT, Traits> & operator<<(
     std::basic_ostream<CharT, Traits> & os,
     const boost::safe_numerics::checked_result<R> & r
 ){
-    if(!r.exception())
+    bool e = r.exception();
+    os << e;
+    if(!e)
         os << static_cast<R>(r);
     else
-        os << std::error_code(r.m_e).message() << ':' << r.m_msg;
+        os << std::error_code(r.m_e).message() << ':' << static_cast<const char * const>(r);
     return os;
 }
 
@@ -1139,22 +1141,12 @@ inline std::basic_ostream<CharT, Traits> & operator<<(
     std::basic_ostream<CharT, Traits> & os,
     const boost::safe_numerics::checked_result<signed char> & r
 ){
-    if(! r.exception())
+    bool e = r.exception();
+    os << e;
+    if(! e)
         os << static_cast<std::int16_t>(r);
     else
-        os << std::error_code(r.m_e).message() << ':' << r.m_msg;
-    return os;
-}
-
-template<typename CharT, typename Traits>
-inline std::basic_ostream<CharT, Traits> & operator<<(
-    std::basic_ostream<CharT, Traits> & os,
-    const boost::safe_numerics::checked_result<unsigned char> & r
-){
-    if(! r.exception())
-        os << static_cast<std::uint16_t>(r);
-    else
-        os << std::error_code(r.m_e).message() << ':' << r.m_msg;
+        os << std::error_code(r.m_e).message() << ':' << static_cast<const char * const>(r);
     return os;
 }
 
@@ -1163,29 +1155,29 @@ inline std::basic_istream<CharT, Traits> & operator>>(
     std::basic_istream<CharT, Traits> & is,
     boost::safe_numerics::checked_result<R> & r
 ){
-    is >> r.m_r;
+    bool e;
+    is >> e;
+    if(!e)
+        is >> static_cast<R>(r);
+    else
+        is >> std::error_code(r.m_e).message() >> ':' >> static_cast<const char * const>(r);
     return is;
 }
 
-template<typename CharT, typename Traits, typename R>
+template<typename CharT, typename Traits>
 inline std::basic_istream<CharT, Traits> & operator>>(
     std::basic_istream<CharT, Traits> & is, 
     boost::safe_numerics::checked_result<signed char> & r
 ){
-    std::int16_t i;
-    is >> i;
-    r.m_r = i;
-    return is;
-}
-
-template<typename CharT, typename Traits, typename R>
-inline std::basic_istream<CharT, Traits> & operator>>(
-    std::basic_istream<CharT, Traits> & is,
-    boost::safe_numerics::checked_result<unsigned char> & r
-){
-    std::uint16_t i;
-    is >> i;
-    r.m_r = i;
+    bool e;
+    is >> e;
+    if(!e){
+        std::int16_t i;
+        is >> i;
+        r.m_contents.m_r = static_cast<signed char>(i);
+    }
+    else
+        is >> std::error_code(r.m_e).message() >> ':' >> static_cast<const char * const>(r);
     return is;
 }
 

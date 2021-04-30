@@ -1,6 +1,6 @@
 // Boost.Geometry (aka GGL, Generic Geometry Library)
 
-// Copyright (c) 2015-2018, Oracle and/or its affiliates.
+// Copyright (c) 2015-2020, Oracle and/or its affiliates.
 
 // Contributed and/or modified by Vissarion Fysikopoulos, on behalf of Oracle
 // Contributed and/or modified by Menelaos Karavelas, on behalf of Oracle
@@ -13,12 +13,15 @@
 #ifndef BOOST_GEOMETRY_ALGORITHMS_DETAIL_ENVELOPE_RANGE_OF_BOXES_HPP
 #define BOOST_GEOMETRY_ALGORITHMS_DETAIL_ENVELOPE_RANGE_OF_BOXES_HPP
 
-#include <cstddef>
-
 #include <algorithm>
+#include <cstddef>
+#include <type_traits>
 #include <vector>
 
-#include <boost/range.hpp>
+#include <boost/range/begin.hpp>
+#include <boost/range/empty.hpp>
+#include <boost/range/end.hpp>
+#include <boost/range/value_type.hpp>
 
 #include <boost/geometry/algorithms/detail/convert_point_to_point.hpp>
 #include <boost/geometry/algorithms/detail/max_interval_gap.hpp>
@@ -239,7 +242,7 @@ struct envelope_range_of_boxes
                 RangeOfBoxes const
             >::type iterator_type;
 
-        static const bool is_equatorial = ! boost::is_same
+        static const bool is_equatorial = ! std::is_same
                                             <
                                                 typename cs_tag<box_type>::type,
                                                 spherical_polar_tag

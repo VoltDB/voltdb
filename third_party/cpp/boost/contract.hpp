@@ -21,7 +21,7 @@ other library headers and they are automatically included by the
 headers are usually not directly included by programmers).
 
 All files under the <c>boost/contract/detail/</c> directory, names within the
-@c boost::contract::detail namespace, names prefixed with
+@c boost::contract::detail namespace, names prefixed by
 @c boost_contract_detail... and @c BOOST_CONTRACT_DETAIL... (in any namesapce,
 including user's code) are reserved for internal use of this library and should
 never be used directly by programmers.

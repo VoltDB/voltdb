@@ -154,9 +154,8 @@ namespace boost { namespace spirit { namespace qi
             Iterator& it;
             std::size_t state;
 
-        private:
             // silence MSVC warning C4512: assignment operator could not be generated
-            reset_state_on_exit& operator= (reset_state_on_exit const&);
+            BOOST_DELETED_FUNCTION(reset_state_on_exit& operator= (reset_state_on_exit const&))
         };
     }
 
@@ -214,9 +213,8 @@ namespace boost { namespace spirit { namespace qi
         Subject subject;
         State state;
 
-    private:
         // silence MSVC warning C4512: assignment operator could not be generated
-        state_switcher_context& operator= (state_switcher_context const&);
+        BOOST_DELETED_FUNCTION(state_switcher_context& operator= (state_switcher_context const&))
     };
 
     ///////////////////////////////////////////////////////////////////////////

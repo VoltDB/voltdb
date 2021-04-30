@@ -109,6 +109,19 @@ namespace impl
             return this->fit_parameters_;
         }
 
+        // make this accumulator serializeable
+        // TODO: do we need to split to load/save and verify that threshold did not change?
+        template<class Archive>
+        void serialize(Archive & ar, const unsigned int file_version)
+        {
+            ar & sign_;
+            ar & mu_;
+            ar & sigma2_;
+            ar & threshold_;
+            ar & fit_parameters_;
+            ar & is_dirty_;
+        }
+
     private:
         short sign_;                         // for left tail fitting, mirror the extreme values
         mutable float_type mu_;              // mean of samples above threshold

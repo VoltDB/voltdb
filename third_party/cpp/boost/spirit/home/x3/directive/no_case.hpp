@@ -22,7 +22,7 @@ namespace boost { namespace spirit { namespace x3
         static bool const is_pass_through_unary = true;
         static bool const handles_container = Subject::handles_container;
 
-        no_case_directive(Subject const& subject)
+        constexpr no_case_directive(Subject const& subject)
           : base_type(subject) {}
 
         template <typename Iterator, typename Context
@@ -41,14 +41,14 @@ namespace boost { namespace spirit { namespace x3
     struct no_case_gen
     {
         template <typename Subject>
-        no_case_directive<typename extension::as_parser<Subject>::value_type>
+        constexpr no_case_directive<typename extension::as_parser<Subject>::value_type>
         operator[](Subject const& subject) const
         {
             return { as_parser(subject) };
         }
     };
 
-    auto const no_case = no_case_gen{};
+    constexpr auto no_case = no_case_gen{};
 }}}
 
 #endif

@@ -74,7 +74,7 @@
 
     \brief Returns the type of a sequence as a VMD type. Re-entrant version.
 
-    d         = The next available BOOST_PP_WHILE iteration. 
+    d         = The next available BOOST_PP_WHILE iteration. <br/>
     ...       = variadic parameters.
     
     The first variadic parameter is required and is the sequence whose type we are getting.

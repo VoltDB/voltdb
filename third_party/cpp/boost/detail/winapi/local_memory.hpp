@@ -10,6 +10,10 @@
 #ifndef BOOST_DETAIL_WINAPI_LOCAL_MEMORY_HPP
 #define BOOST_DETAIL_WINAPI_LOCAL_MEMORY_HPP
 
+#include <boost/config/header_deprecated.hpp>
+
+BOOST_HEADER_DEPRECATED("<boost/winapi/local_memory.hpp>")
+
 #include <boost/winapi/local_memory.hpp>
 #include <boost/detail/winapi/detail/deprecated_namespace.hpp>
 

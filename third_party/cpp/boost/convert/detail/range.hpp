@@ -1,4 +1,4 @@
-// Copyright (c) 2009-2016 Vladimir Batov.
+// Copyright (c) 2009-2020 Vladimir Batov.
 // Use, modification and distribution are subject to the Boost Software License,
 // Version 1.0. See http://www.boost.org/LICENSE_1_0.txt.
 
@@ -7,7 +7,6 @@
 
 #include <boost/convert/detail/has_member.hpp>
 #include <boost/convert/detail/char.hpp>
-#include <boost/utility/enable_if.hpp>
 #include <boost/range/iterator.hpp>
 
 namespace boost { namespace cnv
@@ -21,7 +20,7 @@ namespace boost { namespace cnv
             BOOST_DECLARE_HAS_MEMBER(has_begin, begin);
             BOOST_DECLARE_HAS_MEMBER(  has_end, end);
 
-            static bool const value = has_begin<T>::value && has_end<T>::value;
+            static bool BOOST_CONSTEXPR_OR_CONST value = has_begin<T>::value && has_end<T>::value;
         };
     }
     template<typename T> struct is_range : detail::is_range<typename boost::remove_const<T>::type, boost::is_class<T>::value> {};
@@ -29,26 +28,26 @@ namespace boost { namespace cnv
     template<typename T, typename enable =void> struct iterator;
 
     template<typename T>
-    struct iterator<T, typename enable_if<is_range<T> >::type>
+    struct iterator<T, typename std::enable_if<is_range<T>::value>::type>
     {
-        typedef typename boost::range_iterator<T>::type             type;
-        typedef typename boost::range_iterator<T const>::type const_type;
-        typedef typename boost::iterator_value<type>::type    value_type;
+        using       type = typename boost::range_iterator<T>::type;
+        using const_type = typename boost::range_iterator<T const>::type;
+        using value_type = typename boost::iterator_value<type>::type;
     };
     template<typename T>
     struct iterator<T*, void>
     {
-        typedef typename boost::remove_const<T>::type value_type;
-        typedef T*                                        type;
-        typedef value_type const*                   const_type;
+        using value_type = typename boost::remove_const<T>::type;
+        using       type = T*;
+        using const_type = value_type const*;
     };
     template<typename T>
     struct range_base
     {
-        typedef typename cnv::iterator<T>::value_type     value_type;
-        typedef typename cnv::iterator<T>::type             iterator;
-        typedef typename cnv::iterator<T>::const_type const_iterator;
-        typedef const_iterator                           sentry_type;
+        using     value_type = typename cnv::iterator<T>::value_type;
+        using       iterator = typename cnv::iterator<T>::type;
+        using const_iterator = typename cnv::iterator<T>::const_type;
+        using    sentry_type = const_iterator;
 
         iterator       begin () { return begin_; }
         const_iterator begin () const { return begin_; }
@@ -64,17 +63,17 @@ namespace boost { namespace cnv
     };
 
     template<typename T>
-    struct range<T, typename enable_if<is_range<T> >::type> : public range_base<T>
+    struct range<T, typename std::enable_if<is_range<T>::value>::type> : public range_base<T>
     {
-        typedef range                                   this_type;
-        typedef range_base<T>                           base_type;
-        typedef typename base_type::iterator             iterator;
-        typedef typename base_type::const_iterator const_iterator;
-        typedef const_iterator                        sentry_type;
+        using      this_type = range;
+        using      base_type = range_base<T>;
+        using       iterator = typename base_type::iterator;
+        using const_iterator = typename base_type::const_iterator;
+        using    sentry_type = const_iterator;
 
         range (T& r) : base_type(r.begin(), r.end()) {}
 
-        iterator       end () { return base_type::end_; }
+        iterator       end ()       { return base_type::end_; }
         const_iterator end () const { return base_type::end_; }
         sentry_type sentry () const { return base_type::end_; }
         std::size_t   size () const { return base_type::end_ - base_type::begin_; }
@@ -82,7 +81,7 @@ namespace boost { namespace cnv
     };
 
     template<typename T>
-    struct range<T*, typename enable_if<cnv::is_char<T> >::type> : public range_base<T*>
+    struct range<T*, typename std::enable_if<cnv::is_char<T>::value>::type> : public range_base<T*>
     {
         using      this_type = range;
         using      base_type = range_base<T*>;

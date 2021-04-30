@@ -17,7 +17,7 @@
 // This is the only way we can avoid
 // warning: non-standard suffix on floating constant [-Wpedantic]
 // when building with -Wall -pedantic.  Neither __extension__
-// nor #pragma dianostic ignored work :(
+// nor #pragma diagnostic ignored work :(
 //
 #pragma GCC system_header
 #endif
@@ -36,7 +36,7 @@ T gamma_imp(T z, const Policy& pol, const lanczos::undefined_lanczos& l);
 // lgamma for small arguments:
 //
 template <class T, class Policy, class Lanczos>
-T lgamma_small_imp(T z, T zm1, T zm2, const mpl::int_<64>&, const Policy& /* l */, const Lanczos&)
+T lgamma_small_imp(T z, T zm1, T zm2, const std::integral_constant<int, 64>&, const Policy& /* l */, const Lanczos&)
 {
    // This version uses rational approximations for small
    // values of z accurate enough for 64-bit mantissas
@@ -118,7 +118,7 @@ T lgamma_small_imp(T z, T zm1, T zm2, const mpl::int_<64>&, const Policy& /* l *
    else
    {
       //
-      // If z is less than 1 use recurrance to shift to
+      // If z is less than 1 use recurrence to shift to
       // z in the interval [1,2]:
       //
       if(z < 1)
@@ -225,7 +225,7 @@ T lgamma_small_imp(T z, T zm1, T zm2, const mpl::int_<64>&, const Policy& /* l *
    return result;
 }
 template <class T, class Policy, class Lanczos>
-T lgamma_small_imp(T z, T zm1, T zm2, const mpl::int_<113>&, const Policy& /* l */, const Lanczos&)
+T lgamma_small_imp(T z, T zm1, T zm2, const std::integral_constant<int, 113>&, const Policy& /* l */, const Lanczos&)
 {
    //
    // This version uses rational approximations for small
@@ -316,7 +316,7 @@ T lgamma_small_imp(T z, T zm1, T zm2, const mpl::int_<113>&, const Policy& /* l 
    else
    {
       //
-      // If z is less than 1 use recurrance to shift to
+      // If z is less than 1 use recurrence to shift to
       // z in the interval [1,2]:
       //
       if(z < 1)
@@ -482,7 +482,7 @@ T lgamma_small_imp(T z, T zm1, T zm2, const mpl::int_<113>&, const Policy& /* l 
    return result;
 }
 template <class T, class Policy, class Lanczos>
-T lgamma_small_imp(T z, T zm1, T zm2, const mpl::int_<0>&, const Policy& pol, const Lanczos&)
+T lgamma_small_imp(T z, T zm1, T zm2, const std::integral_constant<int, 0>&, const Policy& pol, const Lanczos&)
 {
    //
    // No rational approximations are available because either

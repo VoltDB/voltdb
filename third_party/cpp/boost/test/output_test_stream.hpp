@@ -10,5 +10,9 @@
 //!@deprecated Use boost/test/tools/output_test_stream.hpp instead
 // ***************************************************************************
 
+#include <boost/config/header_deprecated.hpp>
+BOOST_HEADER_DEPRECATED( "<boost/test/tools/output_test_stream.hpp>" )
+
+
 // Boost.Test
 #include <boost/test/tools/output_test_stream.hpp>

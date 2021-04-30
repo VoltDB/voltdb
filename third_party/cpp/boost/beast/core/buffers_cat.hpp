@@ -19,7 +19,6 @@ namespace boost {
 namespace beast {
 
 /** A buffer sequence representing a concatenation of buffer sequences.
-
     @see buffers_cat
 */
 template<class... Buffers>
@@ -29,7 +28,6 @@ class buffers_cat_view
 
 public:
     /** The type of buffer returned when dereferencing an iterator.
-
         If every buffer sequence in the view is a <em>MutableBufferSequence</em>,
         then `value_type` will be `net::mutable_buffer`.
         Otherwise, `value_type` will be `net::const_buffer`.
@@ -50,7 +48,6 @@ public:
     buffers_cat_view& operator=(buffers_cat_view const&) = default;
 
     /** Constructor
-
         @param buffers The list of buffer sequences to concatenate.
         Copies of the arguments will be maintained for the lifetime
         of the concatenated sequence; however, the ownership of the
@@ -63,12 +60,12 @@ public:
     const_iterator
     begin() const;
 
-    /// Returns an iterator to one past the last buffer in the sequence 
+    /// Returns an iterator to one past the last buffer in the sequence
     const_iterator
     end() const;
 };
 
-/** Concatenate 2 or more buffer sequences.
+/** Concatenate 1 or more buffer sequences.
 
     This function returns a constant or mutable buffer sequence which,
     when iterated, efficiently concatenates the input buffer sequences.
@@ -76,15 +73,12 @@ public:
     object does not take ownership of the underlying memory. The
     application is still responsible for managing the lifetime of the
     referenced memory.
-
     @param buffers The list of buffer sequences to concatenate.
-
     @return A new buffer sequence that represents the concatenation of
     the input buffer sequences. This buffer sequence will be a
     <em>MutableBufferSequence</em> if each of the passed buffer sequences is
     also a <em>MutableBufferSequence</em>; otherwise the returned buffer
     sequence will be a <em>ConstBufferSequence</em>.
-
     @see buffers_cat_view
 */
 #if BOOST_BEAST_DOXYGEN
@@ -92,15 +86,15 @@ template<class... BufferSequence>
 buffers_cat_view<BufferSequence...>
 buffers_cat(BufferSequence const&... buffers)
 #else
-template<class B1, class B2, class... Bn>
-buffers_cat_view<B1, B2, Bn...>
-buffers_cat(B1 const& b1, B2 const& b2, Bn const&... bn)
+template<class B1, class... Bn>
+buffers_cat_view<B1, Bn...>
+buffers_cat(B1 const& b1, Bn const&... bn)
 #endif
 {
     static_assert(
-        is_const_buffer_sequence<B1, B2, Bn...>::value,
+        is_const_buffer_sequence<B1, Bn...>::value,
         "BufferSequence type requirements not met");
-    return buffers_cat_view<B1, B2, Bn...>{b1, b2, bn...};
+    return buffers_cat_view<B1, Bn...>{b1, bn...};
 }
 
 } // beast

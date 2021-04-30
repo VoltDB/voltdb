@@ -21,7 +21,7 @@ namespace boost { namespace spirit { namespace x3
         typedef unary_parser<Subject, plus<Subject>> base_type;
         static bool const handles_container = true;
 
-        plus(Subject const& subject)
+        constexpr plus(Subject const& subject)
           : base_type(subject) {}
 
         template <typename Iterator, typename Context
@@ -41,7 +41,7 @@ namespace boost { namespace spirit { namespace x3
     };
 
     template <typename Subject>
-    inline plus<typename extension::as_parser<Subject>::value_type>
+    constexpr plus<typename extension::as_parser<Subject>::value_type>
     operator+(Subject const& subject)
     {
         return { as_parser(subject) };

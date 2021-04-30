@@ -29,7 +29,7 @@
 
     \brief inserts an element at the beginning of a tuple. 
 
-    tuple = tuple to insert an element at.
+    tuple = tuple to insert an element at. <br/>
     elem  = element to insert.
 
     If the tuple is an empty tuple the result is a tuple with the single element.

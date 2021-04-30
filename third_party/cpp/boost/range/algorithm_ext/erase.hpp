@@ -52,10 +52,31 @@ inline Container& remove_erase_if( Container& on, Pred pred )
     return on;
 }
 
+template< class Container >
+inline Container& unique_erase( Container& on)
+{
+    BOOST_RANGE_CONCEPT_ASSERT(( ForwardRangeConcept<Container> ));
+    on.erase(
+        std::unique(boost::begin(on), boost::end(on)),
+        boost::end(on));
+    return on;
+}
+
+template< class Container, class Pred >
+inline Container& unique_erase( Container& on, Pred pred )
+{
+    BOOST_RANGE_CONCEPT_ASSERT(( ForwardRangeConcept<Container> ));
+    on.erase(
+        std::unique(boost::begin(on), boost::end(on), pred),
+        boost::end(on));
+    return on;
+}
+
     } // namespace range
     using range::erase;
     using range::remove_erase;
     using range::remove_erase_if;
+    using range::unique_erase;
 } // namespace boost
 
 #endif // include guard

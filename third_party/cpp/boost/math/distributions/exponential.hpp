@@ -260,6 +260,13 @@ inline RealType kurtosis_excess(const exponential_distribution<RealType, Policy>
    return 6;
 }
 
+template <class RealType, class Policy>
+inline RealType entropy(const exponential_distribution<RealType, Policy>& dist)
+{
+   using std::log;
+   return 1 - log(dist.lambda());
+}
+
 } // namespace math
 } // namespace boost
 

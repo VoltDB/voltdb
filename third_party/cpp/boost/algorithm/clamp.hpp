@@ -23,6 +23,7 @@
 #include <iterator>         //  For std::iterator_traits
 #include <cassert>
 
+#include <boost/config.hpp>
 #include <boost/range/begin.hpp>
 #include <boost/range/end.hpp>
 #include <boost/mpl/identity.hpp>      // for identity

@@ -19,7 +19,7 @@
 
 // BSG 2011-02-03
 // We don't include stream.hpp by default. That tries to stream anything not known
-// by default (such as ttmath) and reports errors.
+// by default and reports errors.
 // Users can include stream.hpp themselves (if they want to)
 
 #endif // BOOST_GEOMETRY_IO_WKT_WKT_HPP

@@ -56,9 +56,6 @@ namespace boost { namespace spirit
         explicit basic_istream_iterator(std::basic_istream<Elem, Traits>& x)
           : base_type(x) {}
 
-        basic_istream_iterator(basic_istream_iterator const& x)
-          : base_type(x) {}
-
 #if BOOST_WORKAROUND(__GLIBCPP__, == 20020514)
         basic_istream_iterator(int)   // workaround for a bug in the library
           : base_type() {}            // shipped with gcc 3.1

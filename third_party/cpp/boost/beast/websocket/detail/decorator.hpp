@@ -11,7 +11,6 @@
 #define BOOST_BEAST_WEBSOCKET_DETAIL_DECORATOR_HPP
 
 #include <boost/beast/websocket/rfc6455.hpp>
-#include <boost/beast/core/detail/type_traits.hpp>
 #include <boost/core/exchange.hpp>
 #include <boost/type_traits/make_void.hpp>
 #include <algorithm>
@@ -213,7 +212,7 @@ struct decorator::vtable_impl<F, true>
     void
     move(storage& dst, storage& src) noexcept
     {
-        auto& f = *reinterpret_cast<F*>(&src.buf_);
+        auto& f = *beast::detail::launder_cast<F*>(&src.buf_);
         ::new (&dst.buf_) F(std::move(f));
     }
 
@@ -221,7 +220,7 @@ struct decorator::vtable_impl<F, true>
     void
     destroy(storage& dst) noexcept
     {
-        reinterpret_cast<F*>(&dst.buf_)->~F();
+        beast::detail::launder_cast<F*>(&dst.buf_)->~F();
     }
 
     static
@@ -229,7 +228,7 @@ struct decorator::vtable_impl<F, true>
     invoke_req(storage& dst, request_type& req)
     {
         maybe_invoke<F, request_type>{}(
-            *reinterpret_cast<F*>(&dst.buf_), req);
+            *beast::detail::launder_cast<F*>(&dst.buf_), req);
     }
 
     static
@@ -237,7 +236,7 @@ struct decorator::vtable_impl<F, true>
     invoke_res(storage& dst, response_type& res)
     {
         maybe_invoke<F, response_type>{}(
-            *reinterpret_cast<F*>(&dst.buf_), res);
+            *beast::detail::launder_cast<F*>(&dst.buf_), res);
     }
 
     static

@@ -2,8 +2,8 @@
 
 // Copyright (c) 2007-2012 Barend Gehrels, Amsterdam, the Netherlands.
 
-// This file was modified by Oracle on 2013, 2014, 2015.
-// Modifications copyright (c) 2013-2015 Oracle and/or its affiliates.
+// This file was modified by Oracle on 2013-2020.
+// Modifications copyright (c) 2013-2020 Oracle and/or its affiliates.
 
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
@@ -14,9 +14,7 @@
 #ifndef BOOST_GEOMETRY_ALGORITHMS_DETAIL_RELATE_RELATE_IMPL_HPP
 #define BOOST_GEOMETRY_ALGORITHMS_DETAIL_RELATE_RELATE_IMPL_HPP
 
-#include <boost/mpl/if.hpp>
-#include <boost/mpl/or.hpp>
-#include <boost/type_traits/is_base_of.hpp>
+#include <type_traits>
 
 #include <boost/geometry/algorithms/detail/relate/interface.hpp>
 #include <boost/geometry/algorithms/not_implemented.hpp>
@@ -30,32 +28,36 @@ namespace detail { namespace relate {
 
 struct implemented_tag {};
 
-template <template <typename, typename> class StaticMaskTrait,
-          typename Geometry1,
-          typename Geometry2>
-struct relate_impl
-    : boost::mpl::if_
+template
+<
+    typename Geometry1,
+    typename Geometry2
+>
+struct relate_impl_base
+    : std::conditional_t
         <
-            boost::mpl::or_
+            std::is_base_of
                 <
-                    boost::is_base_of
-                        <
-                            nyi::not_implemented_tag,
-                            StaticMaskTrait<Geometry1, Geometry2>
-                        >,
-                    boost::is_base_of
-                        <
-                            nyi::not_implemented_tag,
-                            dispatch::relate<Geometry1, Geometry2>
-                        >
-                >,
+                    nyi::not_implemented_tag,
+                    dispatch::relate<Geometry1, Geometry2>
+                >::value,
             not_implemented
                 <
                     typename geometry::tag<Geometry1>::type,
                     typename geometry::tag<Geometry2>::type
                 >,
             implemented_tag
-        >::type
+        >
+{};
+
+template
+<
+    typename Geometry1,
+    typename Geometry2,
+    typename StaticMask
+>
+struct relate_impl_dispatch
+    : relate_impl_base<Geometry1, Geometry2>
 {
     template <typename Strategy>
     static inline bool apply(Geometry1 const& g1, Geometry2 const& g2, Strategy const& strategy)
@@ -64,7 +66,7 @@ struct relate_impl
             <
                 Geometry1,
                 Geometry2,
-                typename StaticMaskTrait<Geometry1, Geometry2>::type
+                StaticMask
             >::type handler;
 
         dispatch::relate<Geometry1, Geometry2>::apply(g1, g2, handler, strategy);
@@ -72,6 +74,32 @@ struct relate_impl
         return handler.result();
     }
 };
+
+template <typename Geometry1, typename Geometry2>
+struct relate_impl_dispatch<Geometry1, Geometry2, detail::relate::false_mask>
+    : relate_impl_base<Geometry1, Geometry2>
+{
+    template <typename Strategy>
+    static inline bool apply(Geometry1 const& , Geometry2 const& , Strategy const& )
+    {
+        return false;
+    }
+};
+
+template
+<
+    template <typename, typename> class StaticMaskTrait,
+    typename Geometry1,
+    typename Geometry2
+>
+struct relate_impl
+    : relate_impl_dispatch
+        <
+            Geometry1,
+            Geometry2,
+            typename StaticMaskTrait<Geometry1, Geometry2>::type
+        >
+{};
 
 }} // namespace detail::relate
 #endif // DOXYGEN_NO_DETAIL

@@ -13,6 +13,7 @@
 
 #include <boost/config.hpp>
 #include <boost/lexical_cast.hpp>
+#include <type_traits>
 
 #ifdef BOOST_MSVC
 //
@@ -440,7 +441,7 @@ namespace detail{
 // Version of Digamma accurate to ~100 decimal digits.
 //
 template <class Policy>
-mpfr::mpreal digamma_imp(mpfr::mpreal x, const mpl::int_<0>* , const Policy& pol)
+mpfr::mpreal digamma_imp(mpfr::mpreal x, const std::integral_constant<int, 0>* , const Policy& pol)
 {
    //
    // This handles reflection of negative arguments, and all our
@@ -480,7 +481,7 @@ mpfr::mpreal digamma_imp(mpfr::mpreal x, const mpl::int_<0>* , const Policy& pol
 // starting guess for Halley iteration:
 //
 template <class Policy>
-mpfr::mpreal erf_inv_imp(const mpfr::mpreal& p, const mpfr::mpreal& q, const Policy&, const boost::mpl::int_<64>*)
+mpfr::mpreal erf_inv_imp(const mpfr::mpreal& p, const mpfr::mpreal& q, const Policy&, const std::integral_constant<int, 64>*)
 {
    BOOST_MATH_STD_USING // for ADL of std names.
 

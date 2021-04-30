@@ -87,7 +87,7 @@ gatherv(const communicator& comm, const T* in_values, int in_size,
 {
   if (comm.rank() == root)
     detail::gatherv_impl(comm, in_values, in_size,
-                         out_values, &sizes[0], &displs[0],
+                         out_values, detail::c_data(sizes), detail::c_data(displs),
                          root, is_mpi_datatype<T>());
   else
     detail::gatherv_impl(comm, in_values, in_size, root, is_mpi_datatype<T>());
@@ -99,7 +99,7 @@ gatherv(const communicator& comm, const std::vector<T>& in_values,
         T* out_values, const std::vector<int>& sizes, const std::vector<int>& displs,
         int root)
 {
-  ::boost::mpi::gatherv(comm, &in_values[0], in_values.size(), out_values, sizes, displs, root);
+  ::boost::mpi::gatherv(comm, detail::c_data(in_values), in_values.size(), out_values, sizes, displs, root);
 }
 
 template<typename T>
@@ -113,7 +113,7 @@ template<typename T>
 void gatherv(const communicator& comm, const std::vector<T>& in_values, int root)
 {
   BOOST_ASSERT(comm.rank() != root);
-  detail::gatherv_impl(comm, &in_values[0], in_values.size(), root, is_mpi_datatype<T>());
+  detail::gatherv_impl(comm, detail::c_data(in_values), in_values.size(), root, is_mpi_datatype<T>());
 }
 
 ///////////////////////
@@ -139,7 +139,7 @@ void
 gatherv(const communicator& comm, const std::vector<T>& in_values,
         T* out_values, const std::vector<int>& sizes, int root)
 {
-  ::boost::mpi::gatherv(comm, &in_values[0], in_values.size(), out_values, sizes, root);
+  ::boost::mpi::gatherv(comm, detail::c_data(in_values), in_values.size(), out_values, sizes, root);
 }
 
 } } // end namespace boost::mpi

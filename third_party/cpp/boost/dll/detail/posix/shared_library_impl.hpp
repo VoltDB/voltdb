@@ -1,5 +1,5 @@
 // Copyright 2014 Renato Tegon Forti, Antony Polukhin.
-// Copyright 2015-2019 Antony Polukhin.
+// Copyright 2015-2021 Antony Polukhin.
 //
 // Distributed under the Boost Software License, Version 1.0.
 // (See accompanying file LICENSE_1_0.txt
@@ -69,8 +69,9 @@ public:
         return actual_path;
     }
 
-    void load(boost::dll::fs::path sl, load_mode::type mode, boost::dll::fs::error_code &ec) {
+    void load(boost::dll::fs::path sl, load_mode::type portable_mode, boost::dll::fs::error_code &ec) {
         typedef int native_mode_t;
+        native_mode_t native_mode = static_cast<native_mode_t>(portable_mode);
         unload();
 
         // Do not allow opening NULL paths. User must use program_location() instead
@@ -84,20 +85,20 @@ public:
         }
 
         // Fixing modes
-        if (!(mode & load_mode::rtld_now)) {
-            mode |= load_mode::rtld_lazy;
+        if (!(native_mode & load_mode::rtld_now)) {
+            native_mode |= load_mode::rtld_lazy;
         }
 
-        if (!(mode & load_mode::rtld_global)) {
-            mode |= load_mode::rtld_local;
+        if (!(native_mode & load_mode::rtld_global)) {
+            native_mode |= load_mode::rtld_local;
         }
 
 #if BOOST_OS_LINUX || BOOST_OS_ANDROID
-        if (!sl.has_parent_path() && !(mode & load_mode::search_system_folders)) {
+        if (!sl.has_parent_path() && !(native_mode & load_mode::search_system_folders)) {
             sl = "." / sl;
         }
 #else
-        if (!sl.is_absolute() && !(mode & load_mode::search_system_folders)) {
+        if (!sl.is_absolute() && !(native_mode & load_mode::search_system_folders)) {
             boost::dll::fs::error_code current_path_ec;
             boost::dll::fs::path prog_loc = boost::dll::fs::current_path(current_path_ec);
             if (!current_path_ec) {
@@ -107,14 +108,14 @@ public:
         }
 #endif
 
-        mode &= ~load_mode::search_system_folders;
+        native_mode = static_cast<unsigned>(native_mode) & ~static_cast<unsigned>(load_mode::search_system_folders);
 
         // Trying to open with appended decorations
-        if (!!(mode & load_mode::append_decorations)) {
-            mode &= ~load_mode::append_decorations;
+        if (!!(native_mode & load_mode::append_decorations)) {
+            native_mode = static_cast<unsigned>(native_mode) & ~static_cast<unsigned>(load_mode::append_decorations);
 
             boost::dll::fs::path actual_path = decorate(sl);
-            handle_ = dlopen(actual_path.c_str(), static_cast<native_mode_t>(mode));
+            handle_ = dlopen(actual_path.c_str(), native_mode);
             if (handle_) {
                 boost::dll::detail::reset_dlerror();
                 return;
@@ -131,7 +132,7 @@ public:
         }
 
         // Opening by exactly specified path
-        handle_ = dlopen(sl.c_str(), static_cast<native_mode_t>(mode));
+        handle_ = dlopen(sl.c_str(), native_mode);
         if (handle_) {
             boost::dll::detail::reset_dlerror();
             return;
@@ -153,7 +154,7 @@ public:
             // returned handle is for the main program.
             ec.clear();
             boost::dll::detail::reset_dlerror();
-            handle_ = dlopen(NULL, static_cast<native_mode_t>(mode));
+            handle_ = dlopen(NULL, native_mode);
             if (!handle_) {
                 ec = boost::dll::fs::make_error_code(
                     boost::dll::fs::errc::bad_file_descriptor

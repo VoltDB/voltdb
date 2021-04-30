@@ -33,6 +33,13 @@
 using namespace voltdb;
 using namespace voltdb::topics;
 
+/**
+ * NOTE: Clang++ and G++ starts to conflict on necessity of certain variable capturing,
+ * i.e. between Centos8 and BigSur-11.3.
+ * You'll see #ifdef __clang__ hack for the conflict. If/when in future, the two compilers
+ * of supported platforms converge on the rules, we can take out the hack.
+ */
+
 class TopicTupleStreamTest : public Test {
 public:
     TopicTupleStreamTest() {
@@ -505,7 +512,11 @@ TEST_F(TopicTupleStreamTest, MultiColumnAvroEncoder) {
         // validate entries see AvroEncoderTest for avro format layout
         ASSERT_TRUE(readAndValidateRecord(in, 0, 0,
                 [](SerializeInputBE *in) { return in == nullptr; },
+#ifdef __clang__
+                [this](SerializeInputBE *in) {
+#else
                 [this, valueSchemaId](SerializeInputBE *in) {
+#endif
                         ASSERT_TRUE(in, false);
                         ASSERT_EQ(0, in->readByte(), false);
                         ASSERT_EQ(valueSchemaId, in->readInt(), false);
@@ -520,7 +531,11 @@ TEST_F(TopicTupleStreamTest, MultiColumnAvroEncoder) {
                         return true; }));
         ASSERT_TRUE(readAndValidateRecord(in, timestamp2 - timestamp1, 1,
                 [](SerializeInputBE *in) { return in == nullptr; },
+#ifdef __clang__
+                [this](SerializeInputBE *in) {
+#else
                 [this, valueSchemaId](SerializeInputBE *in) {
+#endif
                         ASSERT_TRUE(in, false);
                         ASSERT_EQ(0, in->readByte(), false);
                         ASSERT_EQ(valueSchemaId, in->readInt(), false);
@@ -568,7 +583,11 @@ TEST_F(TopicTupleStreamTest, MultiColumnAvroEncoder) {
 
         // validate entries see AvroEncoderTest for avro format layout
         ASSERT_TRUE(readAndValidateRecord(in, 0, 0,
+#ifdef __clang__
+                [this](SerializeInputBE *in) {
+#else
                 [this, keySchemaId](SerializeInputBE *in) {
+#endif
                         ASSERT_TRUE(in, false);
                         ASSERT_EQ(0, in->readByte(), false);
                         ASSERT_EQ(keySchemaId, in->readInt(), false);
@@ -576,7 +595,11 @@ TEST_F(TopicTupleStreamTest, MultiColumnAvroEncoder) {
                         ASSERT_EQ(3, readAvroDouble(*in), false);
                         ASSERT_EQ(0, in->remaining(), false);
                         return true; },
+#ifdef __clang__
+                [this](SerializeInputBE *in) {
+#else
                 [this, valueSchemaId](SerializeInputBE *in) {
+#endif
                         ASSERT_TRUE(in, false);
                         ASSERT_EQ(0, in->readByte(), false);
                         ASSERT_EQ(valueSchemaId, in->readInt(), false);
@@ -588,7 +611,11 @@ TEST_F(TopicTupleStreamTest, MultiColumnAvroEncoder) {
                         ASSERT_EQ(0, in->remaining(), false);
                         return true; }));
         ASSERT_TRUE(readAndValidateRecord(in, timestamp2 - timestamp1, 1,
+#ifndef __clang__
                 [this, keySchemaId](SerializeInputBE *in) {
+#else
+                [this](SerializeInputBE *in) {
+#endif
                         ASSERT_TRUE(in, false);
                         ASSERT_EQ(0, in->readByte(), false);
                         ASSERT_EQ(keySchemaId, in->readInt(), false);
@@ -596,7 +623,11 @@ TEST_F(TopicTupleStreamTest, MultiColumnAvroEncoder) {
                         ASSERT_EQ(8, readAvroDouble(*in), false);
                         ASSERT_EQ(0, in->remaining(), false);
                         return true; },
+#ifndef __clang__
                 [this, valueSchemaId](SerializeInputBE *in) {
+#else
+                [this](SerializeInputBE *in) {
+#endif
                         ASSERT_TRUE(in, false);
                         ASSERT_EQ(0, in->readByte(), false);
                         ASSERT_EQ(valueSchemaId, in->readInt(), false);

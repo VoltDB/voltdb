@@ -150,10 +150,10 @@ class BOOST_SYMBOL_VISIBLE illegal_backtracking : public std::exception
 public:
 
     illegal_backtracking() BOOST_NOEXCEPT_OR_NOTHROW {}
-    ~illegal_backtracking() BOOST_NOEXCEPT_OR_NOTHROW {}
+    ~illegal_backtracking() BOOST_NOEXCEPT_OR_NOTHROW BOOST_OVERRIDE {}
 
-    virtual const char*
-    what() const BOOST_NOEXCEPT_OR_NOTHROW
+    const char*
+    what() const BOOST_NOEXCEPT_OR_NOTHROW BOOST_OVERRIDE
     { return "BOOST_SPIRIT_CLASSIC_NS::illegal_backtracking"; }
 };
 
@@ -163,7 +163,7 @@ public:
 // This policy is most effective when used together with the std_deque
 // StoragePolicy.
 // If used with the fixed_size_queue StoragePolicy, it will not detect
-// iterator derefereces that are out of the range of the queue.
+// iterator dereferences that are out of the range of the queue.
 ///////////////////////////////////////////////////////////////////////////////
 class buf_id_check
 {
@@ -1296,5 +1296,3 @@ BOOST_SPIRIT_CLASSIC_NAMESPACE_END
 }} // namespace BOOST_SPIRIT_CLASSIC_NS
 
 #endif // BOOST_SPIRIT_ITERATOR_MULTI_PASS_HPP
-
-

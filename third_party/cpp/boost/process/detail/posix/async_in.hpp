@@ -16,13 +16,16 @@
 #include <boost/process/async_pipe.hpp>
 #include <memory>
 #include <future>
+#include <boost/process/detail/used_handles.hpp>
+#include <array>
 
 namespace boost { namespace process { namespace detail { namespace posix {
 
 
 template<typename Buffer>
 struct async_in_buffer : ::boost::process::detail::posix::handler_base_ext,
-                         ::boost::process::detail::posix::require_io_context
+                         ::boost::process::detail::posix::require_io_context,
+                         ::boost::process::detail::uses_handles
 {
     Buffer & buf;
 
@@ -32,6 +35,7 @@ struct async_in_buffer : ::boost::process::detail::posix::handler_base_ext,
         promise = std::make_shared<std::promise<void>>();
         fut = promise->get_future(); return std::move(*this);
     }
+
 
     std::shared_ptr<boost::process::async_pipe> pipe;
 
@@ -76,8 +80,18 @@ struct async_in_buffer : ::boost::process::detail::posix::handler_base_ext,
     template<typename Executor>
     void on_setup(Executor & exec)
     {
-        pipe = std::make_shared<boost::process::async_pipe>(get_io_context(exec.seq));
+        if (!pipe)
+            pipe = std::make_shared<boost::process::async_pipe>(get_io_context(exec.seq));
     }
+
+    std::array<int, 3> get_used_handles()
+    {
+        if (pipe)
+            return {STDIN_FILENO, pipe->native_source(), pipe->native_sink()};
+        else  //if pipe is not constructed, limit_ds is invoked before -> this also means on_exec_setup gets invoked before.
+            return {STDIN_FILENO, STDIN_FILENO, STDIN_FILENO};
+    }
+
 
     template <typename Executor>
     void on_exec_setup(Executor &exec)

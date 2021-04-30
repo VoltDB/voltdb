@@ -26,7 +26,7 @@
 
 //____________________________________________________________________________//
 
-# if defined(BOOST_NO_STDC_NAMESPACE) && !BOOST_WORKAROUND(__BORLANDC__, <= 0x570)
+# if defined(BOOST_NO_STDC_NAMESPACE) && !BOOST_WORKAROUND(BOOST_BORLANDC, <= 0x570)
 namespace std { using ::toupper; }
 # endif
 

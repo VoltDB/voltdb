@@ -10,11 +10,13 @@
 #ifndef BOOST_BEAST_STRING_PARAM_HPP
 #define BOOST_BEAST_STRING_PARAM_HPP
 
+#if defined(BOOST_BEAST_ALLOW_DEPRECATED) && !defined(BOOST_BEAST_DOXYGEN)
+
+
 #include <boost/beast/core/detail/config.hpp>
 #include <boost/beast/core/string.hpp>
 #include <boost/beast/core/static_string.hpp>
 #include <boost/beast/core/detail/static_ostream.hpp>
-#include <boost/beast/core/detail/type_traits.hpp>
 #include <boost/optional.hpp>
 
 namespace boost {
@@ -126,5 +128,7 @@ public:
 } // boost
 
 #include <boost/beast/core/impl/string_param.hpp>
+
+#endif // defined(BOOST_BEAST_ALLOW_DEPRECATED) && !BOOST_BEAST_DOXYGEN
 
 #endif

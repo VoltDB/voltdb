@@ -1,5 +1,5 @@
 /* Tries to convert an exception ptr into its equivalent error code
-(C) 2017-2019 Niall Douglas <http://www.nedproductions.biz/> (59 commits)
+(C) 2017-2021 Niall Douglas <http://www.nedproductions.biz/> (11 commits)
 File Created: July 2017
 
 
@@ -34,6 +34,7 @@ DEALINGS IN THE SOFTWARE.
 #include "config.hpp"
 
 #include <exception>
+#include <string>
 #include <system_error>
 
 BOOST_OUTCOME_V2_NAMESPACE_BEGIN

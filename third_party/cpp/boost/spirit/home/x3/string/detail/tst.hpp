@@ -10,6 +10,8 @@
 #include <boost/call_traits.hpp>
 #include <boost/assert.hpp>
 
+#include <string>
+
 namespace boost { namespace spirit { namespace x3 { namespace detail
 {
     // This file contains low level TST routines, not for

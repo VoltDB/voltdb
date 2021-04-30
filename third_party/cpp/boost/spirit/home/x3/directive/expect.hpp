@@ -43,7 +43,7 @@ namespace boost { namespace spirit { namespace x3
         typedef unary_parser<Subject, expect_directive<Subject> > base_type;
         static bool const is_pass_through_unary = true;
 
-        expect_directive(Subject const& subject)
+        constexpr expect_directive(Subject const& subject)
           : base_type(subject) {}
 
         template <typename Iterator, typename Context
@@ -66,14 +66,14 @@ namespace boost { namespace spirit { namespace x3
     struct expect_gen
     {
         template <typename Subject>
-        expect_directive<typename extension::as_parser<Subject>::value_type>
+        constexpr expect_directive<typename extension::as_parser<Subject>::value_type>
         operator[](Subject const& subject) const
         {
             return { as_parser(subject) };
         }
     };
 
-    auto const expect = expect_gen{};
+    constexpr auto expect = expect_gen{};
 }}}
 
 namespace boost { namespace spirit { namespace x3 { namespace detail

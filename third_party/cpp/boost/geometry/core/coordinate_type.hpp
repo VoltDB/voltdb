@@ -4,6 +4,10 @@
 // Copyright (c) 2008-2012 Barend Gehrels, Amsterdam, the Netherlands.
 // Copyright (c) 2009-2012 Mateusz Loskot, London, UK.
 
+// This file was modified by Oracle on 2020.
+// Modifications copyright (c) 2020, Oracle and/or its affiliates.
+// Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
+
 // Parts of Boost.Geometry are redesigned from Geodan's Geographic Library
 // (geolib/GGL), copyright (c) 1995-2010 Geodan, Amsterdam, the Netherlands.
 
@@ -15,12 +19,11 @@
 #define BOOST_GEOMETRY_CORE_COORDINATE_TYPE_HPP
 
 
-#include <boost/mpl/assert.hpp>
-
 #include <boost/geometry/core/point_type.hpp>
+#include <boost/geometry/core/static_assert.hpp>
 #include <boost/geometry/core/tag.hpp>
-#include <boost/geometry/util/bare_type.hpp>
 #include <boost/geometry/util/promote_floating_point.hpp>
+#include <boost/geometry/util/type_traits_std.hpp>
 
 
 namespace boost { namespace geometry
@@ -40,10 +43,9 @@ namespace traits
 template <typename Point, typename Enable = void>
 struct coordinate_type
 {
-    BOOST_MPL_ASSERT_MSG
-        (
-            false, NOT_IMPLEMENTED_FOR_THIS_POINT_TYPE, (types<Point>)
-        );
+    BOOST_GEOMETRY_STATIC_ASSERT_FALSE(
+        "Not implemented for this Point type.",
+        Point);
 };
 
 } // namespace traits
@@ -66,7 +68,7 @@ struct coordinate_type<point_tag, Point>
 {
     typedef typename traits::coordinate_type
         <
-            typename geometry::util::bare_type<Point>::type
+            typename util::remove_cptrref<Point>::type
         >::type type;
 };
 
@@ -86,10 +88,10 @@ template <typename Geometry>
 struct coordinate_type
 {
     typedef typename core_dispatch::coordinate_type
-                <
-                    typename tag<Geometry>::type,
-                    typename geometry::util::bare_type<Geometry>::type
-                >::type type;
+        <
+            typename tag<Geometry>::type,
+            typename util::remove_cptrref<Geometry>::type
+        >::type type;
 };
 
 template <typename Geometry>
@@ -101,6 +103,19 @@ struct fp_coordinate_type
         >::type type;
 };
 
+/*!
+\brief assert_coordinate_type_equal, a compile-time check for equality of two coordinate types
+\ingroup utility
+*/
+template <typename Geometry1, typename Geometry2>
+constexpr inline void assert_coordinate_type_equal(Geometry1 const& , Geometry2 const& )
+{
+  static_assert(std::is_same
+      <
+          typename coordinate_type<Geometry1>::type,
+          typename coordinate_type<Geometry2>::type
+      >::value, "Coordinate types in geometries should be the same");
+}
 
 }} // namespace boost::geometry
 

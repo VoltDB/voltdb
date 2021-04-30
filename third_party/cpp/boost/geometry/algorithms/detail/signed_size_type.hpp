@@ -1,6 +1,6 @@
 // Boost.Geometry (aka GGL, Generic Geometry Library)
 
-// Copyright (c) 2014-2015, Oracle and/or its affiliates.
+// Copyright (c) 2014-2020, Oracle and/or its affiliates.
 
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
@@ -13,14 +13,14 @@
 
 
 #include <cstddef>
-#include <boost/type_traits/make_signed.hpp>
+#include <type_traits>
 
 
 namespace boost { namespace geometry
 {
 
 
-typedef boost::make_signed<std::size_t>::type signed_size_type;
+typedef std::make_signed<std::size_t>::type signed_size_type;
 
 
 }} // namespace boost::geometry

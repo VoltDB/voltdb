@@ -31,6 +31,7 @@
 #include <boost/vmd/is_empty.hpp>
 #include <boost/vmd/is_empty_array.hpp>
 #include <boost/vmd/is_empty_list.hpp>
+#include <boost/vmd/is_general_identifier.hpp>
 #include <boost/vmd/is_identifier.hpp>
 #include <boost/vmd/is_list.hpp>
 #include <boost/vmd/is_multi.hpp>

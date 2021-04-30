@@ -52,6 +52,16 @@ class shm_named_semaphore
 
    shm_named_semaphore(open_only_t, const char *name);
 
+   #if defined(BOOST_INTERPROCESS_WCHAR_NAMED_RESOURCES) || defined(BOOST_INTERPROCESS_DOXYGEN_INVOKED)
+
+   shm_named_semaphore(create_only_t, const wchar_t *name, unsigned int initialCount, const permissions &perm = permissions());
+
+   shm_named_semaphore(open_or_create_t, const wchar_t *name, unsigned int initialCount, const permissions &perm = permissions());
+
+   shm_named_semaphore(open_only_t, const wchar_t *name);
+
+   #endif   //defined(BOOST_INTERPROCESS_WCHAR_NAMED_RESOURCES) || defined(BOOST_INTERPROCESS_DOXYGEN_INVOKED)
+
    ~shm_named_semaphore();
 
    void post();
@@ -60,6 +70,12 @@ class shm_named_semaphore
    bool timed_wait(const boost::posix_time::ptime &abs_time);
 
    static bool remove(const char *name);
+
+   #if defined(BOOST_INTERPROCESS_WCHAR_NAMED_RESOURCES) || defined(BOOST_INTERPROCESS_DOXYGEN_INVOKED)
+
+   static bool remove(const wchar_t *name);
+
+   #endif
 
    #if !defined(BOOST_INTERPROCESS_DOXYGEN_INVOKED)
    private:
@@ -114,6 +130,43 @@ inline shm_named_semaphore::shm_named_semaphore
                ,construct_func_t(DoOpen, 0))
 {}
 
+#if defined(BOOST_INTERPROCESS_WCHAR_NAMED_RESOURCES) || defined(BOOST_INTERPROCESS_DOXYGEN_INVOKED)
+
+inline shm_named_semaphore::shm_named_semaphore
+   (create_only_t, const wchar_t *name, unsigned int initialCount, const permissions &perm)
+   :  m_shmem  (create_only
+               ,name
+               ,sizeof(interprocess_semaphore) +
+                  open_create_impl_t::ManagedOpenOrCreateUserOffset
+               ,read_write
+               ,0
+               ,construct_func_t(DoCreate, initialCount)
+               ,perm)
+{}
+
+inline shm_named_semaphore::shm_named_semaphore
+   (open_or_create_t, const wchar_t *name, unsigned int initialCount, const permissions &perm)
+   :  m_shmem  (open_or_create
+               ,name
+               ,sizeof(interprocess_semaphore) +
+                  open_create_impl_t::ManagedOpenOrCreateUserOffset
+               ,read_write
+               ,0
+               ,construct_func_t(DoOpenOrCreate, initialCount)
+               ,perm)
+{}
+
+inline shm_named_semaphore::shm_named_semaphore
+   (open_only_t, const wchar_t *name)
+   :  m_shmem  (open_only
+               ,name
+               ,read_write
+               ,0
+               ,construct_func_t(DoOpen, 0))
+{}
+
+#endif   //defined(BOOST_INTERPROCESS_WCHAR_NAMED_RESOURCES) || defined(BOOST_INTERPROCESS_DOXYGEN_INVOKED)
+
 inline void shm_named_semaphore::post()
 {  semaphore()->post();   }
 
@@ -128,6 +181,13 @@ inline bool shm_named_semaphore::timed_wait(const boost::posix_time::ptime &abs_
 
 inline bool shm_named_semaphore::remove(const char *name)
 {  return shared_memory_object::remove(name); }
+
+#if defined(BOOST_INTERPROCESS_WCHAR_NAMED_RESOURCES) || defined(BOOST_INTERPROCESS_DOXYGEN_INVOKED)
+
+inline bool shm_named_semaphore::remove(const wchar_t *name)
+{  return shared_memory_object::remove(name); }
+
+#endif
 
 }  //namespace ipcdetail {
 }  //namespace interprocess {

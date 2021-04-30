@@ -382,6 +382,15 @@ inline RealType kurtosis(const weibull_distribution<RealType, Policy>& dist)
    return kurtosis_excess(dist) + 3;
 }
 
+template <class RealType, class Policy>
+inline RealType entropy(const weibull_distribution<RealType, Policy>& dist)
+{
+   using std::log;
+   RealType k = dist.shape();
+   RealType lambda = dist.scale();
+   return constants::euler<RealType>()*(1-1/k) + log(lambda/k) + 1;
+}
+
 } // namespace math
 } // namespace boost
 

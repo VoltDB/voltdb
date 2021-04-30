@@ -316,6 +316,14 @@ inline RealType kurtosis_excess(const normal_distribution<RealType, Policy>& /*d
    return 0;
 }
 
+template <class RealType, class Policy>
+inline RealType entropy(const normal_distribution<RealType, Policy> & dist)
+{
+   using std::log;
+   RealType arg = constants::two_pi<RealType>()*constants::e<RealType>()*dist.standard_deviation()*dist.standard_deviation();
+   return log(arg)/2;
+}
+
 } // namespace math
 } // namespace boost
 

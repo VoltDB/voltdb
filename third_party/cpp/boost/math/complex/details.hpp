@@ -56,7 +56,7 @@ inline long double safe_max(long double t)
    // insufficient internal precision:
    return std::sqrt((std::numeric_limits<double>::max)()) / t;
 }
-#if BOOST_WORKAROUND(__BORLANDC__, BOOST_TESTED_AT(0x564))
+#if BOOST_WORKAROUND(BOOST_BORLANDC, BOOST_TESTED_AT(0x564))
 // workaround for type deduction bug:
 inline float safe_max(float t)
 {
@@ -78,7 +78,7 @@ inline long double safe_min(long double t)
    // insufficient internal precision:
    return std::sqrt((std::numeric_limits<double>::min)()) * t;
 }
-#if BOOST_WORKAROUND(__BORLANDC__, BOOST_TESTED_AT(0x564))
+#if BOOST_WORKAROUND(BOOST_BORLANDC, BOOST_TESTED_AT(0x564))
 // type deduction workaround:
 inline double safe_min(double t)
 {

@@ -4,8 +4,8 @@
 // Copyright (c) 2008-2012 Bruno Lalande, Paris, France.
 // Copyright (c) 2009-2012 Mateusz Loskot, London, UK.
 
-// This file was modified by Oracle on 2014.
-// Modifications copyright (c) 2014 Oracle and/or its affiliates.
+// This file was modified by Oracle on 2014-2020.
+// Modifications copyright (c) 2014-2020 Oracle and/or its affiliates.
 
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
@@ -19,14 +19,13 @@
 #ifndef BOOST_GEOMETRY_CORE_CLOSURE_HPP
 #define BOOST_GEOMETRY_CORE_CLOSURE_HPP
 
-#include <boost/mpl/assert.hpp>
-#include <boost/mpl/size_t.hpp>
 #include <boost/range/value_type.hpp>
 
 #include <boost/geometry/core/ring_type.hpp>
+#include <boost/geometry/core/static_assert.hpp>
 #include <boost/geometry/core/tag.hpp>
 #include <boost/geometry/core/tags.hpp>
-#include <boost/geometry/util/bare_type.hpp>
+#include <boost/geometry/util/type_traits_std.hpp>
 
 namespace boost { namespace geometry
 {
@@ -97,10 +96,14 @@ template <closure_selector Closure>
 struct minimum_ring_size {};
 
 template <>
-struct minimum_ring_size<geometry::closed> : boost::mpl::size_t<4> {};
+struct minimum_ring_size<geometry::closed>
+    : std::integral_constant<std::size_t, 4>
+{};
 
 template <>
-struct minimum_ring_size<geometry::open> : boost::mpl::size_t<3> {};
+struct minimum_ring_size<geometry::open>
+    : std::integral_constant<std::size_t, 3>
+{};
 
 
 }} // namespace detail::point_order
@@ -115,11 +118,9 @@ namespace core_dispatch
 template <typename Tag, typename Geometry>
 struct closure
 {
-    BOOST_MPL_ASSERT_MSG
-        (
-            false, NOT_IMPLEMENTED_FOR_THIS_GEOMETRY_TYPE
-            , (types<Geometry>)
-        );
+    BOOST_GEOMETRY_STATIC_ASSERT_FALSE(
+        "Not implemented for this Geometry type.",
+        Geometry);
 };
 
 template <typename Box>
@@ -191,7 +192,7 @@ struct closure
     static const closure_selector value = core_dispatch::closure
         <
             typename tag<Geometry>::type,
-            typename util::bare_type<Geometry>::type
+            typename util::remove_cptrref<Geometry>::type
         >::value;
 };
 

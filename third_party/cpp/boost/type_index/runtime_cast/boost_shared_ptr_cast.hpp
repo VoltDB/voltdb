@@ -15,11 +15,14 @@
 
 #include <boost/type_index/runtime_cast/detail/runtime_cast_impl.hpp>
 #include <boost/type_traits/is_base_and_derived.hpp>
-#include <boost/smart_ptr/shared_ptr.hpp>
 
 #ifdef BOOST_HAS_PRAGMA_ONCE
 # pragma once
 #endif
+
+namespace boost {
+    template<class T> class shared_ptr;
+}
 
 namespace boost { namespace typeindex {
 

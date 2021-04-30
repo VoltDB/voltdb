@@ -1,10 +1,10 @@
-//Copyright (c) 2008-2016 Emil Dotchevski and Reverge Studios, Inc.
+#ifndef BOOST_QVM_OPERATIONS_HPP_INCLUDED
+#define BOOST_QVM_OPERATIONS_HPP_INCLUDED
 
-//Distributed under the Boost Software License, Version 1.0. (See accompanying
-//file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
+/// Copyright (c) 2008-2021 Emil Dotchevski and Reverge Studios, Inc.
 
-#ifndef UUID_0B9D9FB6B95D11DEA8E0305E55D89593
-#define UUID_0B9D9FB6B95D11DEA8E0305E55D89593
+/// Distributed under the Boost Software License, Version 1.0. (See accompanying
+/// file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
 #include <boost/qvm/quat_operations.hpp>
 #include <boost/qvm/vec_operations.hpp>

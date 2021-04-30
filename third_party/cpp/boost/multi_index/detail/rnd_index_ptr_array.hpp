@@ -1,4 +1,4 @@
-/* Copyright 2003-2018 Joaquin M Lopez Munoz.
+/* Copyright 2003-2020 Joaquin M Lopez Munoz.
  * Distributed under the Boost Software License, Version 1.0.
  * (See accompanying file LICENSE_1_0.txt or copy at
  * http://www.boost.org/LICENSE_1_0.txt)
@@ -108,6 +108,14 @@ public:
     std::swap(size_,x.size_);
     std::swap(capacity_,x.capacity_);
     spc.swap(x.spc);
+  }
+
+  template<typename BoolConstant>
+  void swap(random_access_index_ptr_array& x,BoolConstant swap_allocators)
+  {
+    std::swap(size_,x.size_);
+    std::swap(capacity_,x.capacity_);
+    spc.swap(x.spc,swap_allocators);
   }
 
 private:

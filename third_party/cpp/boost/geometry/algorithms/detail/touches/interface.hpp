@@ -5,8 +5,8 @@
 // Copyright (c) 2009-2015 Mateusz Loskot, London, UK.
 // Copyright (c) 2013-2015 Adam Wulkiewicz, Lodz, Poland.
 
-// This file was modified by Oracle on 2013, 2014, 2015, 2017.
-// Modifications copyright (c) 2013-2017, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2013-2021.
+// Modifications copyright (c) 2013-2021, Oracle and/or its affiliates.
 
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
@@ -35,7 +35,8 @@
 #include <boost/geometry/geometries/concepts/check.hpp>
 
 #include <boost/geometry/strategies/default_strategy.hpp>
-#include <boost/geometry/strategies/relate.hpp>
+#include <boost/geometry/strategies/detail.hpp>
+#include <boost/geometry/strategies/relate/services.hpp>
 
 
 namespace boost { namespace geometry
@@ -84,9 +85,14 @@ struct touches<Geometry1, Geometry2, Tag1, Tag2, CastedTag1, CastedTag2, true>
 namespace resolve_strategy
 {
 
+template
+<
+    typename Strategy,
+    bool IsUmbrella = strategies::detail::is_umbrella_strategy<Strategy>::value
+>
 struct touches
 {
-    template <typename Geometry1, typename Geometry2, typename Strategy>
+    template <typename Geometry1, typename Geometry2>
     static inline bool apply(Geometry1 const& geometry1,
                              Geometry2 const& geometry2,
                              Strategy const& strategy)
@@ -96,13 +102,35 @@ struct touches
                 Geometry1, Geometry2
             >::apply(geometry1, geometry2, strategy);
     }
+};
 
+template <typename Strategy>
+struct touches<Strategy, false>
+{
+    template <typename Geometry1, typename Geometry2>
+    static inline bool apply(Geometry1 const& geometry1,
+                             Geometry2 const& geometry2,
+                             Strategy const& strategy)
+    {
+        using strategies::relate::services::strategy_converter;
+
+        return dispatch::touches
+            <
+                Geometry1, Geometry2
+            >::apply(geometry1, geometry2,
+                     strategy_converter<Strategy>::get(strategy));
+    }
+};
+
+template <>
+struct touches<default_strategy, false>
+{
     template <typename Geometry1, typename Geometry2>
     static inline bool apply(Geometry1 const& geometry1,
                              Geometry2 const& geometry2,
                              default_strategy)
     {
-        typedef typename strategy::relate::services::default_strategy
+        typedef typename strategies::relate::services::default_strategy
             <
                 Geometry1,
                 Geometry2
@@ -129,7 +157,10 @@ struct touches
         concepts::check<Geometry1 const>();
         concepts::check<Geometry2 const>();
 
-        return resolve_strategy::touches::apply(geometry1, geometry2, strategy);
+        return resolve_strategy::touches
+                <
+                    Strategy
+                >::apply(geometry1, geometry2, strategy);
     }
 };
 
@@ -261,6 +292,11 @@ struct self_touches<boost::variant<BOOST_VARIANT_ENUM_PARAMS(T)> >
 \qbk{distinguish,one geometry}
 \qbk{[def __one_parameter__]}
 \qbk{[include reference/algorithms/touches.qbk]}
+\qbk{
+[heading Examples]
+[touches_one_geometry]
+[touches_one_geometry_output]
+}
 */
 template <typename Geometry>
 inline bool touches(Geometry const& geometry)
@@ -280,6 +316,11 @@ inline bool touches(Geometry const& geometry)
 
 \qbk{distinguish,two geometries}
 \qbk{[include reference/algorithms/touches.qbk]}
+\qbk{
+[heading Examples]
+[touches_two_geometries]
+[touches_two_geometries_output]
+}
  */
 template <typename Geometry1, typename Geometry2>
 inline bool touches(Geometry1 const& geometry1, Geometry2 const& geometry2)

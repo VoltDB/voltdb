@@ -2,8 +2,8 @@
 
 // Copyright (c) 2008-2015 Barend Gehrels, Amsterdam, the Netherlands.
 
-// This file was modified by Oracle on 2017, 2018.
-// Modifications copyright (c) 2017-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2017, 2018, 2019.
+// Modifications copyright (c) 2017-2019, Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle.
 
 // Use, modification and distribution is subject to the Boost Software License,
@@ -68,31 +68,25 @@ namespace projections
                 detail::apa<T> apa;
             };
 
-            // template class, using CRTP to implement forward/inverse
             template <typename T, typename Parameters>
             struct base_cea_ellipsoid
-                : public base_t_fi<base_cea_ellipsoid<T, Parameters>, T, Parameters>
             {
                 par_cea<T> m_proj_parm;
 
-                inline base_cea_ellipsoid(const Parameters& par)
-                    : base_t_fi<base_cea_ellipsoid<T, Parameters>, T, Parameters>(*this, par)
-                {}
-
                 // FORWARD(e_forward)  spheroid
                 // Project coordinates from geographic (lon, lat) to cartesian (x, y)
-                inline void fwd(T const& lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
+                inline void fwd(Parameters const& par, T const& lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
                 {
-                    xy_x = this->m_par.k0 * lp_lon;
-                    xy_y = .5 * pj_qsfn(sin(lp_lat), this->m_par.e, this->m_par.one_es) / this->m_par.k0;
+                    xy_x = par.k0 * lp_lon;
+                    xy_y = .5 * pj_qsfn(sin(lp_lat), par.e, par.one_es) / par.k0;
                 }
 
                 // INVERSE(e_inverse)  spheroid
                 // Project coordinates from cartesian (x, y) to geographic (lon, lat)
-                inline void inv(T const& xy_x, T const& xy_y, T& lp_lon, T& lp_lat) const
+                inline void inv(Parameters const& par, T const& xy_x, T const& xy_y, T& lp_lon, T& lp_lat) const
                 {
-                    lp_lat = pj_authlat(asin( 2. * xy_y * this->m_par.k0 / this->m_proj_parm.qp), this->m_proj_parm.apa);
-                    lp_lon = xy_x / this->m_par.k0;
+                    lp_lat = pj_authlat(asin( 2. * xy_y * par.k0 / this->m_proj_parm.qp), this->m_proj_parm.apa);
+                    lp_lon = xy_x / par.k0;
                 }
 
                 static inline std::string get_name()
@@ -102,39 +96,33 @@ namespace projections
 
             };
 
-            // template class, using CRTP to implement forward/inverse
             template <typename T, typename Parameters>
             struct base_cea_spheroid
-                : public base_t_fi<base_cea_spheroid<T, Parameters>, T, Parameters>
             {
                 par_cea<T> m_proj_parm;
 
-                inline base_cea_spheroid(const Parameters& par)
-                    : base_t_fi<base_cea_spheroid<T, Parameters>, T, Parameters>(*this, par)
-                {}
-
                 // FORWARD(s_forward)  spheroid
                 // Project coordinates from geographic (lon, lat) to cartesian (x, y)
-                inline void fwd(T const& lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
+                inline void fwd(Parameters const& par, T const& lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
                 {
-                    xy_x = this->m_par.k0 * lp_lon;
-                    xy_y = sin(lp_lat) / this->m_par.k0;
+                    xy_x = par.k0 * lp_lon;
+                    xy_y = sin(lp_lat) / par.k0;
                 }
 
                 // INVERSE(s_inverse)  spheroid
                 // Project coordinates from cartesian (x, y) to geographic (lon, lat)
-                inline void inv(T const& xy_x, T xy_y, T& lp_lon, T& lp_lat) const
+                inline void inv(Parameters const& par, T const& xy_x, T xy_y, T& lp_lon, T& lp_lat) const
                 {
                     static const T half_pi = detail::half_pi<T>();
 
                     T t;
 
-                    if ((t = fabs(xy_y *= this->m_par.k0)) - epsilon <= 1.) {
+                    if ((t = fabs(xy_y *= par.k0)) - epsilon <= 1.) {
                         if (t >= 1.)
                             lp_lat = xy_y < 0. ? -half_pi : half_pi;
                         else
                             lp_lat = asin(xy_y);
-                        lp_lon = xy_x / this->m_par.k0;
+                        lp_lon = xy_x / par.k0;
                     } else
                         BOOST_THROW_EXCEPTION( projection_exception(error_tolerance_condition) );
                 }
@@ -164,7 +152,7 @@ namespace projections
                     par.e = sqrt(par.es);
                     proj_parm.apa = pj_authset<T>(par.es);
 
-                    proj_parm.qp = pj_qsfn(1., par.e, par.one_es);
+                    proj_parm.qp = pj_qsfn(T(1), par.e, par.one_es);
                 }
             }
 
@@ -190,10 +178,9 @@ namespace projections
     struct cea_ellipsoid : public detail::cea::base_cea_ellipsoid<T, Parameters>
     {
         template <typename Params>
-        inline cea_ellipsoid(Params const& params, Parameters const& par)
-            : detail::cea::base_cea_ellipsoid<T, Parameters>(par)
+        inline cea_ellipsoid(Params const& params, Parameters & par)
         {
-            detail::cea::setup_cea(params, this->m_par, this->m_proj_parm);
+            detail::cea::setup_cea(params, par, this->m_proj_parm);
         }
     };
 
@@ -216,10 +203,9 @@ namespace projections
     struct cea_spheroid : public detail::cea::base_cea_spheroid<T, Parameters>
     {
         template <typename Params>
-        inline cea_spheroid(Params const& params, Parameters const& par)
-            : detail::cea::base_cea_spheroid<T, Parameters>(par)
+        inline cea_spheroid(Params const& params, Parameters & par)
         {
-            detail::cea::setup_cea(params, this->m_par, this->m_proj_parm);
+            detail::cea::setup_cea(params, par, this->m_proj_parm);
         }
     };
 
@@ -228,7 +214,7 @@ namespace projections
     {
 
         // Static projection
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_cea, cea_spheroid, cea_ellipsoid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI2(srs::spar::proj_cea, cea_spheroid, cea_ellipsoid)
 
         // Factory entry(s)
         BOOST_GEOMETRY_PROJECTIONS_DETAIL_FACTORY_ENTRY_FI2(cea_entry, cea_spheroid, cea_ellipsoid)

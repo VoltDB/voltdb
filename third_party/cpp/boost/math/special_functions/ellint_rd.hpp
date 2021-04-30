@@ -119,7 +119,7 @@ T ellint_rd_imp(T x, T y, T z, const Policy& pol)
       //
       T pt = (x0 + 3 * y0) / (4 * z * (x0 + y0));
       //
-      // Since we've moved the demoninator from eq.47 inside the expression, we
+      // Since we've moved the denominator from eq.47 inside the expression, we
       // need to also scale "sum" by the same value:
       //
       pt -= sum / (z * (y - z));

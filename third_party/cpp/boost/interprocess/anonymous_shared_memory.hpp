@@ -111,7 +111,7 @@ anonymous_shared_memory(std::size_t size, void *address = 0)
 }
 #else
 {
-   windows_shared_memory anonymous_mapping(create_only, 0, read_write, size);
+   windows_shared_memory anonymous_mapping(create_only, (char*)0, read_write, size);
    return mapped_region(anonymous_mapping, read_write, 0, size, address);
 }
 

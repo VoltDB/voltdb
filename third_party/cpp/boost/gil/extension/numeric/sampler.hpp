@@ -180,7 +180,6 @@ bool sample(bilinear_sampler, SrcView const& src, point<F> const& p, DstP& resul
 	cast_pixel(mp,src_result);
 
 	color_convert(src_result, result);
-
 	return true;
 }
 

@@ -144,9 +144,8 @@ namespace boost { namespace fusion
             : is_same<typename I1::identity, typename I2::identity>
         {};
 
-    private:
         // silence MSVC warning C4512: assignment operator could not be generated
-        boost_tuple_iterator& operator= (boost_tuple_iterator const&);
+        BOOST_DELETED_FUNCTION(boost_tuple_iterator& operator= (boost_tuple_iterator const&))
     };
 
     template <typename Null>

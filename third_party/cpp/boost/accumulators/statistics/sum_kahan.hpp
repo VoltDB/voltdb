@@ -66,6 +66,14 @@ struct sum_kahan_impl
       return this->sum;
     }
 
+    // make this accumulator serializeable
+    template<class Archive>
+    void serialize(Archive & ar, const unsigned int file_version)
+    { 
+        ar & sum;
+        ar & compensation;
+    }
+
 private:
     Sample sum;
     Sample compensation;

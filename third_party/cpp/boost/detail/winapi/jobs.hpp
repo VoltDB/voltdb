@@ -10,6 +10,10 @@
 #ifndef BOOST_DETAIL_WINAPI_JOBS_HPP_
 #define BOOST_DETAIL_WINAPI_JOBS_HPP_
 
+#include <boost/config/header_deprecated.hpp>
+
+BOOST_HEADER_DEPRECATED("<boost/winapi/jobs.hpp>")
+
 #include <boost/winapi/jobs.hpp>
 #include <boost/detail/winapi/detail/deprecated_namespace.hpp>
 

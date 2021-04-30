@@ -2,8 +2,8 @@
 
 // Copyright (c) 2008-2015 Barend Gehrels, Amsterdam, the Netherlands.
 
-// This file was modified by Oracle on 2017, 2018.
-// Modifications copyright (c) 2017-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2017, 2018, 2019.
+// Modifications copyright (c) 2017-2019, Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle.
 
 // Use, modification and distribution is subject to the Boost Software License,
@@ -63,35 +63,29 @@ namespace projections
             template <typename T>
             struct par_omerc
             {
-                T   A, B, E, AB, ArB, BrA, rB, singam, cosgam, sinrot, cosrot;
-                T   v_pole_n, v_pole_s, u_0;
-                int no_rot;
+                T    A, B, E, AB, ArB, BrA, rB, singam, cosgam, sinrot, cosrot;
+                T    v_pole_n, v_pole_s, u_0;
+                bool no_rot;
             };
 
             static const double tolerance = 1.e-7;
             static const double epsilon = 1.e-10;
 
-            // template class, using CRTP to implement forward/inverse
             template <typename T, typename Parameters>
             struct base_omerc_ellipsoid
-                : public base_t_fi<base_omerc_ellipsoid<T, Parameters>, T, Parameters>
             {
                 par_omerc<T> m_proj_parm;
 
-                inline base_omerc_ellipsoid(const Parameters& par)
-                    : base_t_fi<base_omerc_ellipsoid<T, Parameters>, T, Parameters>(*this, par)
-                {}
-
                 // FORWARD(e_forward)  ellipsoid
                 // Project coordinates from geographic (lon, lat) to cartesian (x, y)
-                inline void fwd(T const& lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
+                inline void fwd(Parameters const& par, T const& lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
                 {
                     static const T half_pi = detail::half_pi<T>();
 
                     T  s, t, U, V, W, temp, u, v;
 
                     if (fabs(fabs(lp_lat) - half_pi) > epsilon) {
-                        W = this->m_proj_parm.E / math::pow(pj_tsfn(lp_lat, sin(lp_lat), this->m_par.e), this->m_proj_parm.B);
+                        W = this->m_proj_parm.E / math::pow(pj_tsfn(lp_lat, sin(lp_lat), par.e), this->m_proj_parm.B);
                         temp = 1. / W;
                         s = .5 * (W - temp);
                         t = .5 * (W + temp);
@@ -123,7 +117,7 @@ namespace projections
 
                 // INVERSE(e_inverse)  ellipsoid
                 // Project coordinates from cartesian (x, y) to geographic (lon, lat)
-                inline void inv(T const& xy_x, T const& xy_y, T& lp_lon, T& lp_lat) const
+                inline void inv(Parameters const& par, T const& xy_x, T const& xy_y, T& lp_lon, T& lp_lat) const
                 {
                     static const T half_pi = detail::half_pi<T>();
 
@@ -146,7 +140,7 @@ namespace projections
                         lp_lat = Up < 0. ? -half_pi : half_pi;
                     } else {
                         lp_lat = this->m_proj_parm.E / sqrt((1. + Up) / (1. - Up));
-                        if ((lp_lat = pj_phi2(math::pow(lp_lat, T(1) / this->m_proj_parm.B), this->m_par.e)) == HUGE_VAL) {
+                        if ((lp_lat = pj_phi2(math::pow(lp_lat, T(1) / this->m_proj_parm.B), par.e)) == HUGE_VAL) {
                             BOOST_THROW_EXCEPTION( projection_exception(error_tolerance_condition) );
                         }
                         lp_lon = - this->m_proj_parm.rB * atan2((Sp * this->m_proj_parm.cosgam -
@@ -163,7 +157,7 @@ namespace projections
 
             // Oblique Mercator
             template <typename Params, typename Parameters, typename T>
-            inline void setup_omerc(Params const& params, Parameters& par, par_omerc<T>& proj_parm)
+            inline void setup_omerc(Params const& params, Parameters & par, par_omerc<T>& proj_parm)
             {
                 static const T fourth_pi = detail::fourth_pi<T>();
                 static const T half_pi = detail::half_pi<T>();
@@ -301,10 +295,9 @@ namespace projections
     struct omerc_ellipsoid : public detail::omerc::base_omerc_ellipsoid<T, Parameters>
     {
         template <typename Params>
-        inline omerc_ellipsoid(Params const& params, Parameters const& par)
-            : detail::omerc::base_omerc_ellipsoid<T, Parameters>(par)
+        inline omerc_ellipsoid(Params const& params, Parameters & par)
         {
-            detail::omerc::setup_omerc(params, this->m_par, this->m_proj_parm);
+            detail::omerc::setup_omerc(params, par, this->m_proj_parm);
         }
     };
 
@@ -313,7 +306,7 @@ namespace projections
     {
 
         // Static projection
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_omerc, omerc_ellipsoid, omerc_ellipsoid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI(srs::spar::proj_omerc, omerc_ellipsoid)
 
         // Factory entry(s)
         BOOST_GEOMETRY_PROJECTIONS_DETAIL_FACTORY_ENTRY_FI(omerc_entry, omerc_ellipsoid)

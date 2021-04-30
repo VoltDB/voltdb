@@ -4,6 +4,10 @@
 // Copyright (c) 2008-2012 Bruno Lalande, Paris, France.
 // Copyright (c) 2009-2012 Mateusz Loskot, London, UK.
 
+// This file was modified by Oracle on 2020.
+// Modifications copyright (c) 2020 Oracle and/or its affiliates.
+// Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
+
 // Parts of Boost.Geometry are redesigned from Geodan's Geographic Library
 // (geolib/GGL), copyright (c) 1995-2010 Geodan, Amsterdam, the Netherlands.
 
@@ -19,8 +23,6 @@
 #include <boost/geometry/core/tag.hpp>
 #include <boost/geometry/core/tags.hpp>
 
-#include <boost/geometry/util/add_const_if_c.hpp>
-
 
 namespace boost { namespace geometry
 {
@@ -31,22 +33,20 @@ namespace dispatch
 {
 
 
-template <typename GeometryTag, typename Geometry, typename Range, bool IsConst>
+template <typename GeometryTag, typename Geometry, typename Range>
 struct as_range
 {
-    static inline typename add_const_if_c<IsConst, Range>::type& get(
-            typename add_const_if_c<IsConst, Geometry>::type& input)
+    static inline Range& get(Geometry& input)
     {
         return input;
     }
 };
 
 
-template <typename Geometry, typename Range, bool IsConst>
-struct as_range<polygon_tag, Geometry, Range, IsConst>
+template <typename Geometry, typename Range>
+struct as_range<polygon_tag, Geometry, Range>
 {
-    static inline typename add_const_if_c<IsConst, Range>::type& get(
-            typename add_const_if_c<IsConst, Geometry>::type& input)
+    static inline Range& get(Geometry& input)
     {
         return exterior_ring(input);
     }
@@ -73,8 +73,7 @@ inline Range& as_range(Geometry& input)
         <
             typename tag<Geometry>::type,
             Geometry,
-            Range,
-            false
+            Range
         >::get(input);
 }
 
@@ -91,9 +90,8 @@ inline Range const& as_range(Geometry const& input)
     return dispatch::as_range
         <
             typename tag<Geometry>::type,
-            Geometry,
-            Range,
-            true
+            Geometry const,
+            Range const
         >::get(input);
 }
 

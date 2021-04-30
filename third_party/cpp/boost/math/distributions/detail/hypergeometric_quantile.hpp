@@ -150,7 +150,7 @@ unsigned hypergeometric_quantile_imp(T p, T q, unsigned r, unsigned n, unsigned 
             ++x;
          }
          // By the time we get here, log_pdf may be fairly inaccurate due to
-         // roundoff errors, get a fresh PDF calculation before proceding:
+         // roundoff errors, get a fresh PDF calculation before proceeding:
          diff = hypergeometric_pdf<T>(x, r, n, N, pol);
       }
       while(result < p)
@@ -198,7 +198,7 @@ unsigned hypergeometric_quantile_imp(T p, T q, unsigned r, unsigned n, unsigned 
             --x;
          }
          // By the time we get here, log_pdf may be fairly inaccurate due to
-         // roundoff errors, get a fresh PDF calculation before proceding:
+         // roundoff errors, get a fresh PDF calculation before proceeding:
          diff = hypergeometric_pdf<T>(x, r, n, N, pol);
       }
       while(result + diff / 2 < q)

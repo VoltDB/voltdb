@@ -26,7 +26,7 @@
 
     \brief Tests any two sequences for equality.
 
-    sequence     = First sequence.
+    sequence     = First sequence. <br/>
     ...          = variadic parameters, maximum of 2.
     
     The first variadic parameter is required and is the second sequence to test.
@@ -57,8 +57,8 @@
 
     \brief Tests any two sequences for equality. Re-entrant version.
 
-    d            = The next available BOOST_PP_WHILE iteration. 
-    sequence     = First sequence.
+    d            = The next available BOOST_PP_WHILE iteration. <br/>
+    sequence     = First sequence. <br/>
     ...          = variadic parameters, maximum of 2.
     
     The first variadic parameter is required and is the second sequence to test.

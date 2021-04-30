@@ -2,8 +2,8 @@
 
 // Copyright (c) 2007-2012 Barend Gehrels, Amsterdam, the Netherlands.
 
-// This file was modified by Oracle on 2017, 2018.
-// Modifications copyright (c) 2017-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2017, 2018, 2019.
+// Modifications copyright (c) 2017-2019, Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
 // Use, modification and distribution is subject to the Boost Software License,
@@ -15,7 +15,6 @@
 
 #include <string>
 
-#include <boost/geometry/srs/projections/factory_key.hpp>
 #include <boost/geometry/srs/projections/impl/base_dynamic.hpp>
 
 namespace boost { namespace geometry { namespace projections
@@ -32,7 +31,7 @@ template <typename Params, typename CT, typename Parameters>
 struct factory_entry
 {
     virtual ~factory_entry() {}
-    virtual base_v<CT, Parameters>* create_new(Params const& , Parameters const& ) const = 0;
+    virtual dynamic_wrapper_b<CT, Parameters>* create_new(Params const& , Parameters const& ) const = 0;
 };
 
 // Macros for entries definition
@@ -41,22 +40,22 @@ struct factory_entry
 template <typename Params, typename T, typename Parameters> \
 struct ENTRY : projections::detail::factory_entry<Params, T, Parameters> \
 { \
-    projections::detail::base_v<T, Parameters>* create_new(Params const& params, \
-                                                           Parameters const& parameters) const
+    projections::detail::dynamic_wrapper_b<T, Parameters>* create_new(Params const& params, \
+                                                                      Parameters const& parameters) const
 
 #define BOOST_GEOMETRY_PROJECTIONS_DETAIL_FACTORY_ENTRY_END };
 
 #define BOOST_GEOMETRY_PROJECTIONS_DETAIL_FACTORY_ENTRY_F(ENTRY, PROJ) \
 BOOST_GEOMETRY_PROJECTIONS_DETAIL_FACTORY_ENTRY_BEGIN(ENTRY) \
 { \
-    return new projections::detail::base_v_f<PROJ<T, Parameters>, T, Parameters>(params, parameters); \
+    return new projections::detail::dynamic_wrapper_f<PROJ<T, Parameters>, T, Parameters>(params, parameters); \
 } \
 BOOST_GEOMETRY_PROJECTIONS_DETAIL_FACTORY_ENTRY_END
 
 #define BOOST_GEOMETRY_PROJECTIONS_DETAIL_FACTORY_ENTRY_FI(ENTRY, PROJ) \
 BOOST_GEOMETRY_PROJECTIONS_DETAIL_FACTORY_ENTRY_BEGIN(ENTRY) \
 { \
-    return new projections::detail::base_v_fi<PROJ<T, Parameters>, T, Parameters>(params, parameters); \
+    return new projections::detail::dynamic_wrapper_fi<PROJ<T, Parameters>, T, Parameters>(params, parameters); \
 } \
 BOOST_GEOMETRY_PROJECTIONS_DETAIL_FACTORY_ENTRY_END
 
@@ -64,9 +63,9 @@ BOOST_GEOMETRY_PROJECTIONS_DETAIL_FACTORY_ENTRY_END
 BOOST_GEOMETRY_PROJECTIONS_DETAIL_FACTORY_ENTRY_BEGIN(ENTRY) \
 { \
     if (parameters.es != 0.0) \
-        return new projections::detail::base_v_fi<PROJ_E<T, Parameters>, T, Parameters>(params, parameters); \
+        return new projections::detail::dynamic_wrapper_fi<PROJ_E<T, Parameters>, T, Parameters>(params, parameters); \
     else \
-        return new projections::detail::base_v_fi<PROJ_S<T, Parameters>, T, Parameters>(params, parameters); \
+        return new projections::detail::dynamic_wrapper_fi<PROJ_S<T, Parameters>, T, Parameters>(params, parameters); \
 } \
 BOOST_GEOMETRY_PROJECTIONS_DETAIL_FACTORY_ENTRY_END
 
@@ -76,8 +75,8 @@ template <typename Params, typename T, typename Parameters> \
 inline void FUN_NAME(projections::detail::factory<Params, T, Parameters>& factory)
 
 #define BOOST_GEOMETRY_PROJECTIONS_DETAIL_FACTORY_INIT_ENTRY(PROJ_NAME, ENTRY) \
-    factory.add_to_factory(projections::detail::factory_key(#PROJ_NAME, \
-                                                            srs::dpar::proj_##PROJ_NAME), \
+    factory.add_to_factory(#PROJ_NAME, \
+                           srs::dpar::proj_##PROJ_NAME, \
                            new ENTRY<Params, T, Parameters>);
 
 } // namespace detail

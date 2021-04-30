@@ -7,6 +7,7 @@
 #ifndef BOOST_FIBERS_SPINLOCK_RTM_H
 #define BOOST_FIBERS_SPINLOCK_RTM_H
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cmath>

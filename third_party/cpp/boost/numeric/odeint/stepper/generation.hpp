@@ -29,6 +29,7 @@
 #include <boost/numeric/odeint/stepper/generation/generation_runge_kutta_dopri5.hpp>
 #include <boost/numeric/odeint/stepper/generation/generation_runge_kutta_fehlberg78.hpp>
 
+#include <boost/numeric/odeint/stepper/generation/generation_controlled_adams_bashforth_moulton.hpp>
 
 #include <boost/numeric/odeint/stepper/generation/generation_rosenbrock4.hpp>
 

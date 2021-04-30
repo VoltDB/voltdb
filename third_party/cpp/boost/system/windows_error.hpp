@@ -18,16 +18,6 @@
 #ifdef BOOST_WINDOWS_API
 
 #include <boost/system/error_code.hpp>
-
-//// Neither MinGW or Cygwin versions of winerror.h work if used alone, so on
-//// either of those platforms include the full windows.h
-//
-//#if defined(__MINGW32__) || defined(__CYGWIN__)
-//#include <windows.h>
-//#else
-//#include <winerror.h>
-//#endif
-
 #include <boost/winapi/error_codes.hpp>
 
 namespace boost

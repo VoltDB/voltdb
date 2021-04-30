@@ -114,8 +114,6 @@ protected:
     test_unit( const_string tu_name, const_string tc_file, std::size_t tc_line, test_unit_type t );
     // Master test suite constructor
     explicit                            test_unit( const_string module_name );
-
-private:
 };
 
 // ************************************************************************** //

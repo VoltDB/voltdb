@@ -10,6 +10,10 @@
 #ifndef BOOST_DETAIL_WINAPI_PAGE_PROTECTION_FLAGS_HPP
 #define BOOST_DETAIL_WINAPI_PAGE_PROTECTION_FLAGS_HPP
 
+#include <boost/config/header_deprecated.hpp>
+
+BOOST_HEADER_DEPRECATED("<boost/winapi/page_protection_flags.hpp>")
+
 #include <boost/winapi/page_protection_flags.hpp>
 #include <boost/detail/winapi/detail/deprecated_namespace.hpp>
 

@@ -25,11 +25,8 @@
 #include <boost/beast/core/buffers_suffix.hpp>
 #include <boost/beast/core/flat_static_buffer.hpp>
 #include <boost/beast/core/detail/clamp.hpp>
-#include <boost/beast/core/detail/type_traits.hpp>
-#include <boost/asio/bind_executor.hpp>
 #include <boost/asio/steady_timer.hpp>
 #include <boost/assert.hpp>
-#include <boost/endian/buffers.hpp>
 #include <boost/make_shared.hpp>
 #include <boost/throw_exception.hpp>
 #include <algorithm>
@@ -64,7 +61,7 @@ stream(Args&&... args)
 template<class NextLayer, bool deflateSupported>
 auto
 stream<NextLayer, deflateSupported>::
-get_executor() const noexcept ->
+get_executor() noexcept ->
     executor_type
 {
     return impl_->stream().get_executor();
@@ -140,12 +137,7 @@ read_size_hint(DynamicBuffer& buffer) const
     static_assert(
         net::is_dynamic_buffer<DynamicBuffer>::value,
         "DynamicBuffer type requirements not met");
-    auto const initial_size = (std::min)(
-        +tcp_frame_size,
-        buffer.max_size() - buffer.size());
-    if(initial_size == 0)
-        return 1; // buffer is full
-    return read_size_hint(initial_size);
+    return impl_->read_size_hint_db(buffer);
 }
 
 //------------------------------------------------------------------------------

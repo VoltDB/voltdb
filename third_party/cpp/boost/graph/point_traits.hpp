@@ -9,18 +9,21 @@
 #ifndef BOOST_GRAPH_POINT_TRAITS_HPP
 #define BOOST_GRAPH_POINT_TRAITS_HPP
 
-namespace boost { namespace graph {
-
-template<typename Point>
-struct point_traits
+namespace boost
 {
-  // The type of each component of the point
-  typedef typename Point::component_type component_type;
+namespace graph
+{
 
-  // The number of dimensions in the point
-  static std::size_t dimensions(const Point& point);
-};
+    template < typename Point > struct point_traits
+    {
+        // The type of each component of the point
+        typedef typename Point::component_type component_type;
 
-} } // end namespace boost::graph
+        // The number of dimensions in the point
+        static std::size_t dimensions(const Point& point);
+    };
+
+}
+} // end namespace boost::graph
 
 #endif // BOOST_GRAPH_POINT_TRAITS_HPP

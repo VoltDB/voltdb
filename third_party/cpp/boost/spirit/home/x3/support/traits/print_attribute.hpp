@@ -14,6 +14,9 @@
 #include <boost/fusion/include/for_each.hpp>
 #include <boost/spirit/home/x3/support/traits/attribute_category.hpp>
 #include <boost/spirit/home/x3/support/traits/is_variant.hpp>
+#ifdef BOOST_SPIRIT_X3_UNICODE
+# include <boost/spirit/home/support/char_encoding/unicode.hpp>
+#endif
 
 namespace boost { namespace spirit { namespace x3 { namespace traits
 {
@@ -67,9 +70,8 @@ namespace boost { namespace spirit { namespace x3 { namespace traits
     template <typename Out, typename T, typename Enable = void>
     struct print_attribute_debug
     {
-        // for plain data types
-        template <typename T_>
-        static void call(Out& out, T_ const& val, unused_attribute)
+        // for unused_type
+        static void call(Out& out, unused_type, unused_attribute)
         {
             out << "unused";
         }
@@ -80,6 +82,28 @@ namespace boost { namespace spirit { namespace x3 { namespace traits
         {
             out << val;
         }
+
+#ifdef BOOST_SPIRIT_X3_UNICODE
+        static void call(Out& out, char_encoding::unicode::char_type val, plain_attribute)
+        {
+            if (val >= 0 && val < 127)
+            {
+              if (iscntrl(val))
+                out << "\\" << std::oct << int(val) << std::dec;
+              else if (isprint(val))
+                out << char(val);
+              else
+                out << "\\x" << std::hex << int(val) << std::dec;
+            }
+            else
+              out << "\\x" << std::hex << int(val) << std::dec;
+        }
+
+        static void call(Out& out, char val, plain_attribute tag)
+        {
+            call(out, static_cast<char_encoding::unicode::char_type>(val), tag);
+        }
+#endif
 
         // for fusion data types
         template <typename T_>

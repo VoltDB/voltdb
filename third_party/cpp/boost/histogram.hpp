@@ -9,22 +9,22 @@
 
 /**
   \file boost/histogram.hpp
-  Includes all standard headers of the Boost.histogram library.
+  Includes all standard headers of the Boost.Histogram library.
 
   Extra headers not automatically included are:
-    - boost/histogram/accumulators/ostream.hpp
-    - boost/histogram/axis/ostream.hpp
-    - boost/histogram/ostream.hpp
-    - boost/histogram/serialization.hpp
+    - [boost/histogram/ostream.hpp][1]
+    - [boost/histogram/axis/ostream.hpp][2]
+    - [boost/histogram/accumulators/ostream.hpp][3]
+    - [boost/histogram/serialization.hpp][4]
+
+  [1]: histogram/reference.html#header.boost.histogram.ostream_hpp
+  [2]: histogram/reference.html#header.boost.histogram.axis.ostream_hpp
+  [3]: histogram/reference.html#header.boost.histogram.accumulators.ostream_hpp
+  [4]: histogram/reference.html#header.boost.histogram.serialization_hpp
 */
 
-#include <boost/histogram/accumulators/mean.hpp>
-#include <boost/histogram/accumulators/sum.hpp>
-#include <boost/histogram/accumulators/weighted_mean.hpp>
-#include <boost/histogram/accumulators/weighted_sum.hpp>
-#include <boost/histogram/algorithm/project.hpp>
-#include <boost/histogram/algorithm/reduce.hpp>
-#include <boost/histogram/algorithm/sum.hpp>
+#include <boost/histogram/accumulators.hpp>
+#include <boost/histogram/algorithm.hpp>
 #include <boost/histogram/axis.hpp>
 #include <boost/histogram/histogram.hpp>
 #include <boost/histogram/indexed.hpp>

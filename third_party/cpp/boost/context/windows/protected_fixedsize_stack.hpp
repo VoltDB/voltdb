@@ -16,6 +16,7 @@ extern "C" {
 #include <new>
 
 #include <boost/config.hpp>
+#include <boost/core/ignore_unused.hpp>
 
 #include <boost/context/detail/config.hpp>
 #include <boost/context/stack_context.hpp>
@@ -42,10 +43,7 @@ public:
 
     stack_context allocate() {
         // calculate how many pages are required
-        const std::size_t pages(        
-            static_cast< std::size_t >(
-                std::ceil(
-                    static_cast< float >( size_) / traits_type::page_size() ) ) );
+        const std::size_t pages = (size_ + traits_type::page_size() - 1) / traits_type::page_size()
         // add one page at bottom that will be used as guard-page
         const std::size_t size__ = ( pages + 1) * traits_type::page_size();
 
@@ -53,14 +51,10 @@ public:
         if ( ! vp) throw std::bad_alloc();
 
         DWORD old_options;
-#if defined(BOOST_DISABLE_ASSERTS)
-        ::VirtualProtect(
-            vp, traits_type::page_size(), PAGE_READWRITE | PAGE_GUARD /*PAGE_NOACCESS*/, & old_options);
-#else
         const BOOL result = ::VirtualProtect(
             vp, traits_type::page_size(), PAGE_READWRITE | PAGE_GUARD /*PAGE_NOACCESS*/, & old_options);
+        boost::ignore_unused(result);
         BOOST_ASSERT( FALSE != result);
-#endif
 
         stack_context sctx;
         sctx.size = size__;

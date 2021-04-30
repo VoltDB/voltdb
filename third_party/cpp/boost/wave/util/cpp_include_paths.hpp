@@ -8,8 +8,8 @@
     LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 =============================================================================*/
 
-#if !defined(CPP_INCLUDE_PATHS_HPP_AF620DA4_B3D2_4221_AD91_8A1ABFFB6944_INCLUDED)
-#define CPP_INCLUDE_PATHS_HPP_AF620DA4_B3D2_4221_AD91_8A1ABFFB6944_INCLUDED
+#if !defined(BOOST_CPP_INCLUDE_PATHS_HPP_AF620DA4_B3D2_4221_AD91_8A1ABFFB6944_INCLUDED)
+#define BOOST_CPP_INCLUDE_PATHS_HPP_AF620DA4_B3D2_4221_AD91_8A1ABFFB6944_INCLUDED
 
 #include <string>
 #include <list>
@@ -273,11 +273,11 @@ bool include_paths::add_include_path (
 {
     namespace fs = boost::filesystem;
     if (path_) {
-    fs::path newpath = util::complete_path(create_path(path_), current_dir);
+        fs::path newpath = util::complete_path(create_path(path_), current_dir);
 
         if (!fs::exists(newpath) || !fs::is_directory(newpath)) {
-        // the given path does not form a name of a valid file system directory
-        // item
+            // the given path does not form a name of a valid file system directory
+            // item
             return false;
         }
 
@@ -301,13 +301,13 @@ bool include_paths::find_include_file (std::string &s, std::string &dir,
 
 #if BOOST_WAVE_SUPPORT_INCLUDE_NEXT != 0
     if (0 != current_file) {
-    // re-locate the directory of the current file (#include_next handling)
+        // re-locate the directory of the current file (#include_next handling)
 
-    // #include_next does not distinguish between <file> and "file"
-    // inclusion, nor does it check that the file you specify has the same
-    // name as the current file.  It simply looks for the file named, starting
-    // with the directory in the search path after the one where the current
-    // file was found.
+        // #include_next does not distinguish between <file> and "file"
+        // inclusion, nor does it check that the file you specify has the same
+        // name as the current file.  It simply looks for the file named, starting
+        // with the directory in the search path after the one where the current
+        // file was found.
 
         fs::path file_path (create_path(current_file));
         for (/**/; it != include_paths_end; ++it) {
@@ -352,20 +352,20 @@ include_paths::find_include_file (std::string &s, std::string &dir,
 {
     namespace fs = boost::filesystem;
 
-// if not system include (<...>), then search current directory first
+    // if not system include (<...>), then search current directory first
     if (!is_system) {
-        if (!was_sys_include_path) {  // set_sys_include_delimiter() not called
-        // first have a look at the current directory
-            fs::path currpath (create_path(s));
+        if (!was_sys_include_path) { // set_sys_include_delimiter() not called
+                                     // first have a look at the current directory
+            fs::path currpath(create_path(s));
             if (!currpath.has_root_directory()) {
                 currpath = create_path(current_dir.string());
                 currpath /= create_path(s);
             }
 
             if (fs::exists(currpath) && 0 == current_file) {
-            // if 0 != current_path (#include_next handling) it can't be
-            // the file in the current directory
-                fs::path dirpath (create_path(s));
+                // if 0 != current_path (#include_next handling) it can't be
+                // the file in the current directory
+                fs::path dirpath(create_path(s));
                 if (!dirpath.has_root_directory()) {
                     dirpath = create_path(current_rel_dir.string());
                     dirpath /= create_path(s);
@@ -376,23 +376,23 @@ include_paths::find_include_file (std::string &s, std::string &dir,
                 return true;
             }
 
-        // iterate all user include file directories to find the file
+            // iterate all user include file directories to find the file
             if (find_include_file(s, dir, user_include_paths, current_file))
                 return true;
 
-        // ... fall through
+            // ... fall through
         }
         else {
-        //  if set_sys_include_delimiter() was called, then user include files
-        //  are searched in the user search path only
+            //  if set_sys_include_delimiter() was called, then user include files
+            //  are searched in the user search path only
             return find_include_file(s, dir, user_include_paths, current_file);
         }
 
-    // if nothing found, fall through
-    // ...
+        // if nothing found, fall through
+        // ...
     }
 
-// iterate all system include file directories to find the file
+    // iterate all system include file directories to find the file
     return find_include_file (s, dir, system_include_paths, current_file);
 }
 
@@ -545,4 +545,4 @@ BOOST_CLASS_VERSION(boost::wave::util::include_paths,
 #include BOOST_ABI_SUFFIX
 #endif
 
-#endif // !defined(CPP_INCLUDE_PATHS_HPP_AF620DA4_B3D2_4221_AD91_8A1ABFFB6944_INCLUDED)
+#endif // !defined(BOOST_CPP_INCLUDE_PATHS_HPP_AF620DA4_B3D2_4221_AD91_8A1ABFFB6944_INCLUDED)

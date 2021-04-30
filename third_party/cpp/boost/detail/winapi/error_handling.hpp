@@ -10,6 +10,10 @@
 #ifndef BOOST_DETAIL_WINAPI_ERROR_HANDLING_HPP
 #define BOOST_DETAIL_WINAPI_ERROR_HANDLING_HPP
 
+#include <boost/config/header_deprecated.hpp>
+
+BOOST_HEADER_DEPRECATED("<boost/winapi/error_handling.hpp>")
+
 #include <boost/winapi/error_handling.hpp>
 #include <boost/detail/winapi/detail/deprecated_namespace.hpp>
 

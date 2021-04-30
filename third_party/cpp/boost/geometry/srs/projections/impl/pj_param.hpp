@@ -3,8 +3,8 @@
 
 // Copyright (c) 2008-2012 Barend Gehrels, Amsterdam, the Netherlands.
 
-// This file was modified by Oracle on 2017, 2018.
-// Modifications copyright (c) 2017-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2017-2020.
+// Modifications copyright (c) 2017-2020, Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
 // Use, modification and distribution is subject to the Boost Software License,
@@ -40,8 +40,12 @@
 #define BOOST_GEOMETRY_PROJECTIONS_PJ_PARAM_HPP
 
 
+#include <iterator>
 #include <string>
+#include <type_traits>
 #include <vector>
+
+#include <boost/geometry/core/static_assert.hpp>
 
 #include <boost/geometry/srs/projections/exception.hpp>
 
@@ -50,11 +54,6 @@
 #include <boost/geometry/srs/projections/proj4.hpp>
 #include <boost/geometry/srs/projections/dpar.hpp>
 #include <boost/geometry/srs/projections/spar.hpp>
-
-#include <boost/mpl/assert.hpp>
-#include <boost/type_traits/is_integral.hpp>
-#include <boost/type_traits/is_same.hpp>
-#include <iterator>
 
 
 namespace boost { namespace geometry { namespace projections {
@@ -67,9 +66,12 @@ inline bool pj_param_pred(srs::detail::proj4_parameter const& p, std::string con
     return p.name == name;
 }
 
-template <typename T, typename Id>
-inline bool pj_param_pred(srs::dpar::parameter<T> const& p, Id const& id,
-                          typename boost::disable_if_c<boost::is_convertible<Id, std::string>::value>::type * = 0)
+template
+<
+    typename T, typename Id,
+    std::enable_if_t<! std::is_convertible<Id, std::string>::value, int> = 0
+>
+inline bool pj_param_pred(srs::dpar::parameter<T> const& p, Id const& id)
 {
     return p.is_id_equal(id);
 }
@@ -103,11 +105,11 @@ template
     typename StaticParams,
     typename IsParamPred,
     int I = tuples_find_index_if<StaticParams, typename IsParamPred::pred>::value,
-    int N = boost::tuples::length<StaticParams>::value
+    int N = geometry::tuples::size<StaticParams>::value
 >
 struct pj_param_find_static
 {
-    typedef boost::tuples::element<I, StaticParams> type;
+    typedef geometry::tuples::element<I, StaticParams> type;
     typedef const type* result_type;
     static result_type get(StaticParams const& params)
     {
@@ -131,27 +133,27 @@ inline bool pj_param_exists(Params const& params, Name const& name)
     return pj_param_find(params, name) != params.end();
 }
 
-template <typename Param, BOOST_GEOMETRY_PROJECTIONS_DETAIL_TYPENAME_PX>
-inline bool pj_param_exists(srs::spar::parameters<BOOST_GEOMETRY_PROJECTIONS_DETAIL_PX> const& )
+template <typename Param, typename ...Ps>
+inline bool pj_param_exists(srs::spar::parameters<Ps...> const& )
 {
-    return srs::spar::detail::tuples_is_found
+    return geometry::tuples::is_found
         <
-            typename srs::spar::detail::tuples_find_if
+            typename geometry::tuples::find_if
                 <
-                    srs::spar::parameters<BOOST_GEOMETRY_PROJECTIONS_DETAIL_PX>,
+                    srs::spar::parameters<Ps...>,
                     srs::spar::detail::is_param<Param>::template pred
                 >::type
         >::value;
 }
 
-template <template <typename> class Param, BOOST_GEOMETRY_PROJECTIONS_DETAIL_TYPENAME_PX>
-inline bool pj_param_exists(srs::spar::parameters<BOOST_GEOMETRY_PROJECTIONS_DETAIL_PX> const& )
+template <template <typename> class Param, typename ...Ps>
+inline bool pj_param_exists(srs::spar::parameters<Ps...> const& )
 {
-    return srs::spar::detail::tuples_is_found
+    return geometry::tuples::is_found
         <
-            typename srs::spar::detail::tuples_find_if
+            typename geometry::tuples::find_if
                 <
-                    srs::spar::parameters<BOOST_GEOMETRY_PROJECTIONS_DETAIL_PX>,
+                    srs::spar::parameters<Ps...>,
                     srs::spar::detail::is_param_t<Param>::template pred
                 >::type
         >::value;
@@ -185,11 +187,11 @@ inline void set_value_r(T & val, srs::dpar::parameter<T> const& p)
 template <typename Name>
 inline void check_name(Name const&)
 {
-    static const bool is_ok = boost::is_convertible<Name, std::string>::value
-                           || boost::is_same<Name, srs::dpar::name_i>::value
-                           || boost::is_same<Name, srs::dpar::name_f>::value
-                           || boost::is_same<Name, srs::dpar::name_r>::value;
-    BOOST_MPL_ASSERT_MSG((is_ok), INVALID_ARGUMENT, (Name));
+    static const bool is_ok = std::is_convertible<Name, std::string>::value
+                           || std::is_same<Name, srs::dpar::name_i>::value
+                           || std::is_same<Name, srs::dpar::name_f>::value
+                           || std::is_same<Name, srs::dpar::name_r>::value;
+    BOOST_GEOMETRY_STATIC_ASSERT((is_ok), "Invalid argument.", Name);
 }
 
 
@@ -281,8 +283,8 @@ template
 <
     typename Params,
     template <typename> class IsSamePred,
-    int I = srs::spar::detail::tuples_find_index_if<Params, IsSamePred>::value,
-    int N = boost::tuples::length<Params>::value
+    int I = geometry::tuples::find_index_if<Params, IsSamePred>::value,
+    int N = geometry::tuples::size<Params>::value
 >
 struct _pj_param_x_static
 {
@@ -291,7 +293,7 @@ struct _pj_param_x_static
     static void apply(Params const& params, T & out)
     {
         // TODO: int values could be extracted directly from the type
-        out = boost::tuples::get<I>(params).value;
+        out = geometry::tuples::get<I>(params).value;
     }
 };
 
@@ -309,36 +311,36 @@ struct _pj_param_x_static<Params, IsSamePred, N, N>
     {}
 };
 
-template <template <int> class Param, BOOST_GEOMETRY_PROJECTIONS_DETAIL_TYPENAME_PX>
-inline bool _pj_param_i(srs::spar::parameters<BOOST_GEOMETRY_PROJECTIONS_DETAIL_PX> const& params, int & par)
+template <template <int> class Param, typename ...Ps>
+inline bool _pj_param_i(srs::spar::parameters<Ps...> const& params, int & par)
 {
     typedef _pj_param_x_static
         <
-            srs::spar::parameters<BOOST_GEOMETRY_PROJECTIONS_DETAIL_PX>,
+            srs::spar::parameters<Ps...>,
             srs::spar::detail::is_param_i<Param>::template pred
         > impl;
     impl::apply(params, par);
     return impl::result;
 }
 
-template <template <typename> class Param, BOOST_GEOMETRY_PROJECTIONS_DETAIL_TYPENAME_PX, typename T>
-inline bool _pj_param_f(srs::spar::parameters<BOOST_GEOMETRY_PROJECTIONS_DETAIL_PX> const& params, T & par)
+template <template <typename> class Param, typename ...Ps, typename T>
+inline bool _pj_param_f(srs::spar::parameters<Ps...> const& params, T & par)
 {
     typedef _pj_param_x_static
         <
-            srs::spar::parameters<BOOST_GEOMETRY_PROJECTIONS_DETAIL_PX>,
+            srs::spar::parameters<Ps...>,
             srs::spar::detail::is_param_t<Param>::template pred
         > impl;
     impl::apply(params, par);
     return impl::result;
 }
 
-template <template <typename> class Param, BOOST_GEOMETRY_PROJECTIONS_DETAIL_TYPENAME_PX, typename T>
-inline bool _pj_param_r(srs::spar::parameters<BOOST_GEOMETRY_PROJECTIONS_DETAIL_PX> const& params, T & par)
+template <template <typename> class Param, typename ...Ps, typename T>
+inline bool _pj_param_r(srs::spar::parameters<Ps...> const& params, T & par)
 {
     typedef _pj_param_x_static
         <
-            srs::spar::parameters<BOOST_GEOMETRY_PROJECTIONS_DETAIL_PX>,
+            srs::spar::parameters<Ps...>,
             srs::spar::detail::is_param_t<Param>::template pred
         > impl;
     impl::apply(params, par);
@@ -347,8 +349,8 @@ inline bool _pj_param_r(srs::spar::parameters<BOOST_GEOMETRY_PROJECTIONS_DETAIL_
     return impl::result;
 }
 
-template <typename Param, BOOST_GEOMETRY_PROJECTIONS_DETAIL_TYPENAME_PX>
-inline bool _pj_get_param_b(srs::spar::parameters<BOOST_GEOMETRY_PROJECTIONS_DETAIL_PX> const& params)
+template <typename Param, typename ...Ps>
+inline bool _pj_get_param_b(srs::spar::parameters<Ps...> const& params)
 {
     return pj_param_exists<Param>(params);
 }
@@ -454,15 +456,15 @@ inline bool pj_param_exists(srs::dpar::parameters<T> const& pl,
 {
     return pj_param_exists(pl, n);
 }
-template <typename Param, BOOST_GEOMETRY_PROJECTIONS_DETAIL_TYPENAME_PX, typename Name>
-inline bool pj_param_exists(srs::spar::parameters<BOOST_GEOMETRY_PROJECTIONS_DETAIL_PX> const& pl,
+template <typename Param, typename ...Ps, typename Name>
+inline bool pj_param_exists(srs::spar::parameters<Ps...> const& pl,
                             std::string const& ,
                             Name const& )
 {
     return pj_param_exists<Param>(pl);
 }
-template <template <typename> class Param, BOOST_GEOMETRY_PROJECTIONS_DETAIL_TYPENAME_PX, typename Name>
-inline bool pj_param_exists(srs::spar::parameters<BOOST_GEOMETRY_PROJECTIONS_DETAIL_PX> const& pl,
+template <template <typename> class Param, typename ...Ps, typename Name>
+inline bool pj_param_exists(srs::spar::parameters<Ps...> const& pl,
                             std::string const& ,
                             Name const& )
 {
@@ -483,8 +485,8 @@ inline bool pj_get_param_b(srs::dpar::parameters<T> const& pl,
 {
     return _pj_get_param_b(pl, n);
 }
-template <typename Param, BOOST_GEOMETRY_PROJECTIONS_DETAIL_TYPENAME_PX>
-inline bool pj_get_param_b(srs::spar::parameters<BOOST_GEOMETRY_PROJECTIONS_DETAIL_PX> const& pl,
+template <typename Param, typename ...Ps>
+inline bool pj_get_param_b(srs::spar::parameters<Ps...> const& pl,
                            std::string const& ,
                            srs::dpar::name_be const& )
 {
@@ -509,8 +511,8 @@ inline bool pj_param_i(srs::dpar::parameters<T> const& pl,
 {
     return _pj_param_i(pl, n, par);
 }
-template <template <int> class Param, BOOST_GEOMETRY_PROJECTIONS_DETAIL_TYPENAME_PX>
-inline bool pj_param_i(srs::spar::parameters<BOOST_GEOMETRY_PROJECTIONS_DETAIL_PX> const& pl,
+template <template <int> class Param, typename ...Ps>
+inline bool pj_param_i(srs::spar::parameters<Ps...> const& pl,
                        std::string const& ,
                        srs::dpar::name_i const& ,
                        int & par)
@@ -534,8 +536,8 @@ inline int pj_get_param_i(srs::dpar::parameters<T> const& pl,
 {
     return _pj_get_param_i(pl, n);
 }
-template <template <int> class Param, BOOST_GEOMETRY_PROJECTIONS_DETAIL_TYPENAME_PX>
-inline bool pj_get_param_i(srs::spar::parameters<BOOST_GEOMETRY_PROJECTIONS_DETAIL_PX> const& pl,
+template <template <int> class Param, typename ...Ps>
+inline bool pj_get_param_i(srs::spar::parameters<Ps...> const& pl,
                            std::string const& ,
                            srs::dpar::name_i const& )
 {
@@ -560,8 +562,8 @@ inline bool pj_param_f(srs::dpar::parameters<T> const& pl,
 {
     return _pj_param_f(pl, n, par);
 }
-template <template <typename> class Param, BOOST_GEOMETRY_PROJECTIONS_DETAIL_TYPENAME_PX, typename T>
-inline bool pj_param_f(srs::spar::parameters<BOOST_GEOMETRY_PROJECTIONS_DETAIL_PX> const& pl,
+template <template <typename> class Param, typename ...Ps, typename T>
+inline bool pj_param_f(srs::spar::parameters<Ps...> const& pl,
                        std::string const& ,
                        srs::dpar::name_f const& ,
                        T & par)
@@ -585,8 +587,8 @@ inline T pj_get_param_f(srs::dpar::parameters<T> const& pl,
 {
     return _pj_get_param_f<T>(pl, n);
 }
-template <typename T, template <typename> class Param, BOOST_GEOMETRY_PROJECTIONS_DETAIL_TYPENAME_PX>
-inline T pj_get_param_f(srs::spar::parameters<BOOST_GEOMETRY_PROJECTIONS_DETAIL_PX> const& pl,
+template <typename T, template <typename> class Param, typename ...Ps>
+inline T pj_get_param_f(srs::spar::parameters<Ps...> const& pl,
                         std::string const& ,
                         srs::dpar::name_f const& )
 {
@@ -612,8 +614,8 @@ inline bool pj_param_r(srs::dpar::parameters<T> const& pl,
 {
     return _pj_param_r(pl, n, par);
 }
-template <template <typename> class Param, BOOST_GEOMETRY_PROJECTIONS_DETAIL_TYPENAME_PX, typename T>
-inline bool pj_param_r(srs::spar::parameters<BOOST_GEOMETRY_PROJECTIONS_DETAIL_PX> const& pl,
+template <template <typename> class Param, typename ...Ps, typename T>
+inline bool pj_param_r(srs::spar::parameters<Ps...> const& pl,
                        std::string const& ,
                        srs::dpar::name_r const& ,
                        T & par)
@@ -637,8 +639,8 @@ inline T pj_get_param_r(srs::dpar::parameters<T> const& pl,
 {
     return _pj_get_param_r<T>(pl, n);
 }
-template <typename T, template <typename> class Param, BOOST_GEOMETRY_PROJECTIONS_DETAIL_TYPENAME_PX>
-inline T pj_get_param_r(srs::spar::parameters<BOOST_GEOMETRY_PROJECTIONS_DETAIL_PX> const& pl,
+template <typename T, template <typename> class Param, typename ...Ps>
+inline T pj_get_param_r(srs::spar::parameters<Ps...> const& pl,
                         std::string const& ,
                         srs::dpar::name_r const& )
 {

@@ -28,6 +28,7 @@ inline char method_char(detail::overlay::method_type const& method)
         case method_touch_interior : return 'm';
         case method_collinear : return 'c';
         case method_equal : return 'e';
+        case method_start : return 's';
         case method_error : return '!';
         default : return '?';
     }

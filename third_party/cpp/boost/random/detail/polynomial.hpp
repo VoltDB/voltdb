@@ -304,6 +304,7 @@ public:
         {
             return *this = static_cast<bool>(other);
         }
+	reference(const reference&) = default;
     private:
         digit_t &_value;
         int _idx;

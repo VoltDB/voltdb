@@ -49,7 +49,7 @@
 
     \brief Tests whether a sequence is a VMD type. Re-entrant version.
 
-    d        = The next available BOOST_PP_WHILE iteration. 
+    d        = The next available BOOST_PP_WHILE iteration. <br/>
     sequence = a possible VMD type
     
     returns = 1 if the sequence is a VMD type, 

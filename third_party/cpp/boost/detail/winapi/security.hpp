@@ -10,6 +10,10 @@
 #ifndef BOOST_DETAIL_WINAPI_SECURITY_HPP
 #define BOOST_DETAIL_WINAPI_SECURITY_HPP
 
+#include <boost/config/header_deprecated.hpp>
+
+BOOST_HEADER_DEPRECATED("<boost/winapi/security.hpp>")
+
 #include <boost/winapi/security.hpp>
 #include <boost/detail/winapi/detail/deprecated_namespace.hpp>
 

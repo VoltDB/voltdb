@@ -53,7 +53,7 @@ namespace boost { namespace spirit { namespace iterator_policies
 
         protected:
             unique() {}
-            explicit unique(T x) {}
+            explicit unique(T) {}
 
             void swap(unique&) {}
 
@@ -83,7 +83,7 @@ namespace boost { namespace spirit { namespace iterator_policies
             }
 
             template <typename MultiPass>
-            static bool input_is_valid(MultiPass const& mp, value_type const& t) 
+            static bool input_is_valid(MultiPass const& mp, value_type const&)
             {
                 return mp.shared()->input_is_valid_;
             }

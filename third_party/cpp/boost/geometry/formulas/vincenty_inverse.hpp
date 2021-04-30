@@ -162,8 +162,7 @@ public:
     
         if ( BOOST_GEOMETRY_CONDITION(EnableDistance) )
         {
-            // Oops getting hard here
-            // (again, problem is that ttmath cannot divide by doubles, which is OK)
+            // Some types cannot divide by doubles
             CT const c6 = 6;
             CT const c47 = 47;
             CT const c74 = 74;

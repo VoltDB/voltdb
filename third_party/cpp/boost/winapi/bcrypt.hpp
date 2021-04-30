@@ -19,8 +19,12 @@
 #if BOOST_WINAPI_PARTITION_APP_SYSTEM
 
 #if defined(BOOST_USE_WINDOWS_H)
-
 #include <bcrypt.h>
+#endif
+
+#include <boost/winapi/detail/header.hpp>
+
+#if defined(BOOST_USE_WINDOWS_H)
 
 namespace boost { namespace winapi {
 typedef ::BCRYPT_ALG_HANDLE BCRYPT_ALG_HANDLE_;
@@ -75,6 +79,8 @@ using ::BCryptOpenAlgorithmProvider;
 
 } // winapi
 } // boost
+
+#include <boost/winapi/detail/footer.hpp>
 
 #endif // BOOST_WINAPI_PARTITION_APP_SYSTEM
 

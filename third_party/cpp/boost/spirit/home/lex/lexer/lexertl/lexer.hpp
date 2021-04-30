@@ -188,9 +188,8 @@ namespace boost { namespace spirit { namespace lex { namespace lexertl
             boost::lexer::basic_rules<char_type> const& rules_;
             semantic_actions_type const& actions_;
 
-        private:
             // silence MSVC warning C4512: assignment operator could not be generated
-            iterator_data_type& operator= (iterator_data_type const&);
+            BOOST_DELETED_FUNCTION(iterator_data_type& operator= (iterator_data_type const&))
         };
 
     public:

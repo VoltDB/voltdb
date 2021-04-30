@@ -52,7 +52,7 @@
     The macro checks that the sequence is a pplib list.
     It returns 1 if it is a list, else if returns 0.
     
-    d        = The next available BOOST_PP_WHILE iteration. 
+    d        = The next available BOOST_PP_WHILE iteration. <br/>
     sequence = input as a possible Boost PP list.
     
     returns = 1 if it a list, else returns 0.

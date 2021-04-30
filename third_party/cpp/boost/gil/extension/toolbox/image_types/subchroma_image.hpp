@@ -13,17 +13,11 @@
 #include <boost/gil/image_view.hpp>
 #include <boost/gil/point.hpp>
 #include <boost/gil/virtual_locator.hpp>
-
-#include <boost/mpl/at.hpp>
-#include <boost/mpl/divides.hpp>
-#include <boost/mpl/equal_to.hpp>
-#include <boost/mpl/if.hpp>
-#include <boost/mpl/int.hpp>
-#include <boost/mpl/or.hpp>
-#include <boost/mpl/vector_c.hpp>
+#include <boost/gil/detail/mp11.hpp>
 
 #include <cstddef>
 #include <memory>
+#include <type_traits>
 
 namespace boost { namespace gil {
 
@@ -32,41 +26,36 @@ namespace detail {
 template< int J, int A, int B>
 struct scaling_factors
 {
-    static_assert(mpl::equal_to< mpl::int_< J >, mpl::int_< 4 > >::value, "");
+    static_assert(std::integral_constant<int, J>::value == 4, "");
 
-    static_assert(mpl::or_<mpl::equal_to< mpl::int_<A>, mpl::int_< 4 > >
-                                  , mpl::or_< mpl::equal_to< mpl::int_<A>, mpl::int_< 2 > >
-                                            , mpl::equal_to< mpl::int_<A>, mpl::int_< 1 > >
-                                            >
-                                  >::value, "");
+    static_assert(
+        std::integral_constant<int, A>::value == 4 ||
+        std::integral_constant<int, A>::value == 2 ||
+        std::integral_constant<int, A>::value == 1,
+        "");
 
-    static_assert(mpl::or_< mpl::equal_to< mpl::int_<B>, mpl::int_< 4 > >
-                                  , mpl::or_< mpl::equal_to< mpl::int_<B>, mpl::int_< 2 > >
-                                            , mpl::or_< mpl::equal_to< mpl::int_<B>, mpl::int_< 1 > >
-                                                      , mpl::equal_to< mpl::int_<B>, mpl::int_< 0 > >
-                                                      >
-                                            >
-                                  >::value, "");
+    static_assert(
+        std::integral_constant<int, B>::value == 4 ||
+        std::integral_constant<int, B>::value == 2 ||
+        std::integral_constant<int, B>::value == 1 ||
+        std::integral_constant<int, B>::value == 0,
+        "");
 
     static constexpr int ss_X =
-        mpl::divides
-        <
-            mpl::int_<J>,
-            mpl::int_<A>
-        >::value;
+        std::integral_constant<int, J>::value / std::integral_constant<int, A>::value;
 
     static constexpr int ss_Y =
-        mpl::if_
+        mp11::mp_if_c
         <
-            mpl::equal_to<mpl::int_<B>, mpl::int_<0>>,
-            mpl::int_<2>,
-            typename mpl::if_
+            std::integral_constant<int, B>::value == 0,
+            std::integral_constant<int, 2>,
+            mp11::mp_if_c
             <
-                mpl::equal_to<mpl::int_<A>, mpl::int_<B>>,
-                mpl::int_<1>,
-                mpl::int_<4>
-            >::type
-        >::type::value;
+                std::integral_constant<int, A>::value == std::integral_constant<int, B>::value,
+                std::integral_constant<int, 1>,
+                std::integral_constant<int, 4>
+            >
+        >::value;
 };
 
 } // namespace detail
@@ -111,9 +100,9 @@ struct subchroma_image_deref_fn
     {
         using scaling_factors_t = detail::scaling_factors
             <
-                mpl::at_c<Factors, 0>::type::value,
-                mpl::at_c<Factors, 1>::type::value,
-                mpl::at_c<Factors, 2>::type::value
+                mp11::mp_at_c<Factors, 0>::value,
+                mp11::mp_at_c<Factors, 1>::value,
+                mp11::mp_at_c<Factors, 2>::value
             >;
 
         plane_locator_t y = _y_locator.xy_at( p );
@@ -215,10 +204,12 @@ struct transposed_type< subchroma_image_locator< Locator, Factors > >
 /// \brief A lightweight object that interprets a subchroma image.
 ///
 ////////////////////////////////////////////////////////////////////////////////////////
-template< typename Locator
-        , typename Factors = mpl::vector_c< int, 4, 4, 4 >
-        >
-class subchroma_image_view : public image_view< Locator >
+template
+<
+    typename Locator,
+    typename Factors = mp11::mp_list_c<int, 4, 4, 4>
+>
+class subchroma_image_view : public image_view<Locator>
 {
 public:
 
@@ -339,21 +330,27 @@ struct transposed_type< subchroma_image_view< Locator, Factors > >
 /// A subchroma image holds a bunch of planes which don't need to have the same resolution.
 ///
 ////////////////////////////////////////////////////////////////////////////////////////
-template< typename Pixel
-        , typename Factors   = mpl::vector_c< int, 4, 4, 4 >
-        , typename Allocator = std::allocator< unsigned char >
-        >
-class subchroma_image : public detail::scaling_factors< mpl::at_c< Factors, 0 >::type::value
-                                              , mpl::at_c< Factors, 1 >::type::value
-                                              , mpl::at_c< Factors, 2 >::type::value
-                                              >
+template
+<
+    typename Pixel,
+    typename Factors = mp11::mp_list_c<int, 4, 4, 4>,
+    typename Allocator = std::allocator<unsigned char>
+>
+class subchroma_image : public detail::scaling_factors
+    <
+        mp11::mp_at_c<Factors, 0>::value,
+        mp11::mp_at_c<Factors, 1>::value,
+        mp11::mp_at_c<Factors, 2>::value
+    >
 {
 
 private:
-    using parent_t = detail::scaling_factors< mpl::at_c< Factors, 0 >::type::value
-                                              , mpl::at_c< Factors, 1 >::type::value
-                                              , mpl::at_c< Factors, 2 >::type::value
-                                              >;
+    using parent_t = detail::scaling_factors
+        <
+            mp11::mp_at_c<Factors, 0>::value,
+            mp11::mp_at_c<Factors, 1>::value,
+            mp11::mp_at_c<Factors, 2>::value
+        >;
 
 public:
 
@@ -436,19 +433,20 @@ private:
 
 template < typename Pixel, typename Factors, typename Alloc >
 struct channel_type< subchroma_image< Pixel, Factors, Alloc > >
-    : public channel_type< Pixel > {};
+    : channel_type< Pixel > {};
 
 template < typename Pixel, typename Factors, typename Alloc >
 struct color_space_type< subchroma_image< Pixel, Factors, Alloc > >
-    : public color_space_type< Pixel > {};
+    : color_space_type< Pixel > {};
 
 template < typename Pixel, typename Factors, typename Alloc >
 struct channel_mapping_type<  subchroma_image< Pixel, Factors, Alloc > >
-    : public channel_mapping_type< Pixel > {};
+    : channel_mapping_type< Pixel > {};
 
 template < typename Pixel, typename Factors, typename Alloc >
 struct is_planar< subchroma_image< Pixel, Factors, Alloc > >
-    : public mpl::bool_< false > {};
+    : std::integral_constant<bool, false>
+{};
 
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -514,9 +512,9 @@ typename subchroma_image< Pixel
 {
     using scaling_factors_t = detail::scaling_factors
         <
-            mpl::at_c<Factors, 0>::type::value,
-            mpl::at_c<Factors, 1>::type::value,
-            mpl::at_c<Factors, 2>::type::value
+            mp11::mp_at_c<Factors, 0>::type::value,
+            mp11::mp_at_c<Factors, 1>::type::value,
+            mp11::mp_at_c<Factors, 2>::type::value
         >;
 
     std::size_t y_channel_size = 1;
@@ -527,23 +525,24 @@ typename subchroma_image< Pixel
                                    * u_channel_size;
 
     using plane_view_t = typename subchroma_image<Pixel, Factors>::plane_view_t;
+    using plane_value_t = typename plane_view_t::value_type;
 
     plane_view_t y_plane = interleaved_view( y_width
                                            , y_height
-                                           , (typename plane_view_t::value_type*) y_base // pixels
-                                           , y_width                            // rowsize_in_bytes
+                                           , (plane_value_t*) y_base // pixels
+                                           , y_width                 // rowsize_in_bytes
                                            );
 
     plane_view_t v_plane = interleaved_view( y_width  / scaling_factors_t::ss_X
                                            , y_height / scaling_factors_t::ss_Y
-                                           , (typename plane_view_t::value_type*) v_base // pixels
-                                           , y_width                            // rowsize_in_bytes
+                                           , (plane_value_t*) v_base // pixels
+                                           , y_width                 // rowsize_in_bytes
                                            );
 
     plane_view_t u_plane = interleaved_view( y_width  / scaling_factors_t::ss_X
                                            , y_height / scaling_factors_t::ss_Y
-                                           , (typename plane_view_t::value_type*) u_base // pixels
-                                           , y_width                            // rowsize_in_bytes
+                                           , (plane_value_t*) u_base // pixels
+                                           , y_width                 // rowsize_in_bytes
                                            );
 
     using defer_fn_t = subchroma_image_deref_fn

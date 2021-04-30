@@ -66,11 +66,33 @@ template <typename FPT, typename Lhs, typename Rhs, typename OP>
 inline assertion_result
 compare_fpv( Lhs const& lhs, Rhs const& rhs, OP* cmp_operator)
 {
-    bool result = cmp_operator->eval_direct(lhs, rhs);
+    assertion_result result_direct_compare = cmp_operator->eval_direct(lhs, rhs);
     if(fpctraits<OP>::equality_logical_disjunction) {
-        return result || compare_fpv<FPT>(lhs, rhs, (op::EQ<Lhs, Rhs>*)0);
+        // this look like this can be simplified, but combining result && compare_fpv
+        // looses the message in the return value of compare_fpv
+        if( result_direct_compare ) {
+            result_direct_compare.message() << "operation" << OP::forward() << "on arguments yields 'true'.";
+            return result_direct_compare;
+        }
+        // result || compare_fpv(EQ)
+        assertion_result result_eq = compare_fpv<FPT>(lhs, rhs, (op::EQ<Lhs, Rhs>*)0);
+        result_direct_compare = result_direct_compare || result_eq;
+        if( !result_eq ) {
+            result_direct_compare.message() << "operation" << op::EQ<Lhs, Rhs>::forward() << "on arguments yields 'false': " << result_eq.message() << ".";
+        }
+        return result_direct_compare;
     }
-    return result && compare_fpv<FPT>(lhs, rhs, (op::NE<Lhs, Rhs>*)0);
+    if( !result_direct_compare ) {
+        result_direct_compare.message() << "operation" << OP::forward() << " on arguments yields 'false'.";
+        return result_direct_compare;
+    }
+    // result && compare_fpv(NE)
+    assertion_result result_neq = compare_fpv<FPT>(lhs, rhs, (op::NE<Lhs, Rhs>*)0);
+    result_direct_compare = result_direct_compare && result_neq;
+    if( !result_neq ) {
+        result_direct_compare.message() << "operation" << op::NE<Lhs, Rhs>::forward() << "on arguments yields 'false': " << result_neq.message() << ".";
+    }
+    return result_direct_compare;
 }
 
 //____________________________________________________________________________//
@@ -83,7 +105,7 @@ compare_fpv_near_zero( FPT const& fpv, op::EQ<Lhs,Rhs>* )
 
     assertion_result ar( P( fpv ) );
     if( !ar )
-        ar.message() << "Absolute value exceeds tolerance [|" << fpv << "| > "<< fpc_tolerance<FPT>() << ']';
+        ar.message() << "absolute value exceeds tolerance [|" << fpv << "| > "<< fpc_tolerance<FPT>() << ']';
 
     return ar;
 }
@@ -98,7 +120,7 @@ compare_fpv_near_zero( FPT const& fpv, op::NE<Lhs,Rhs>* )
 
     assertion_result ar( !P( fpv ) );
     if( !ar )
-        ar.message() << "Absolute value is within tolerance [|" << fpv << "| < "<< fpc_tolerance<FPT>() << ']';
+        ar.message() << "absolute value is within tolerance [|" << fpv << "| < "<< fpc_tolerance<FPT>() << ']';
     return ar;
 }
 
@@ -119,7 +141,7 @@ compare_fpv( Lhs const& lhs, Rhs const& rhs, op::EQ<Lhs,Rhs>* )
 
         assertion_result ar( P( lhs, rhs ) );
         if( !ar )
-            ar.message() << "Relative difference exceeds tolerance ["
+            ar.message() << "relative difference exceeds tolerance ["
                          << P.tested_rel_diff() << " > " << P.fraction_tolerance() << ']';
         return ar;
     }
@@ -142,7 +164,7 @@ compare_fpv( Lhs const& lhs, Rhs const& rhs, op::NE<Lhs,Rhs>* )
 
         assertion_result ar( !P( lhs, rhs ) );
         if( !ar )
-            ar.message() << "Relative difference is within tolerance ["
+            ar.message() << "relative difference is within tolerance ["
                          << P.tested_rel_diff() << " < " << fpc_tolerance<FPT>() << ']';
 
         return ar;
@@ -151,7 +173,7 @@ compare_fpv( Lhs const& lhs, Rhs const& rhs, op::NE<Lhs,Rhs>* )
 
 //____________________________________________________________________________//
 
-#define DEFINE_FPV_COMPARISON( oper, name, rev )                        \
+#define DEFINE_FPV_COMPARISON( oper, name, rev, name_inverse )          \
 template<typename Lhs,typename Rhs>                                     \
 struct name<Lhs,Rhs,typename boost::enable_if_c<                        \
     (fpc::tolerance_based<Lhs>::value &&                                \
@@ -164,6 +186,7 @@ struct name<Lhs,Rhs,typename boost::enable_if_c<                        \
 public:                                                                 \
     typedef typename common_type<Lhs,Rhs>::type FPT;                    \
     typedef name<Lhs,Rhs> OP;                                           \
+    typedef name_inverse<Lhs, Rhs> inverse;                             \
                                                                         \
     typedef assertion_result result_type;                               \
                                                                         \
@@ -199,6 +222,8 @@ public:                                                                 \
              << tt_detail::print_helper( rhs );                         \
     }                                                                   \
                                                                         \
+    static char const* forward()                                        \
+    { return " " #oper " "; }                                           \
     static char const* revert()                                         \
     { return " " #rev " "; }                                            \
 };                                                                      \

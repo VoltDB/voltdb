@@ -10,6 +10,13 @@
 #ifndef BOOST_SYSTEM_CYGWIN_ERROR_HPP
 #define BOOST_SYSTEM_CYGWIN_ERROR_HPP
 
+#include <boost/config/pragma_message.hpp>
+
+#if !defined(BOOST_ALLOW_DEPRECATED_HEADERS)
+  BOOST_PRAGMA_MESSAGE("This header is deprecated and is slated for removal."
+  " If you want it retained, please open an issue in github.com/boostorg/system.")
+#endif
+
 //  This header is effectively empty for compiles on operating systems where
 //  it is not applicable.
 

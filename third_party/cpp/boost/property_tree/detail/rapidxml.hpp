@@ -13,7 +13,7 @@
 //! \file rapidxml.hpp This file contains rapidxml parser and DOM implementation
 
 #include <boost/assert.hpp>
-#include <cstdlib>      // For std::size_t
+#include <cstddef>      // For std::size_t
 #include <new>          // For placement new
 
 // On MSVC, disable "conditional expression is constant" warning (level 4). 
@@ -58,7 +58,7 @@ namespace boost { namespace property_tree { namespace detail {namespace rapidxml
 
         //! Gets human readable description of error.
         //! \return Pointer to null terminated description of the error.
-        virtual const char *what() const throw()
+        const char *what() const throw() BOOST_OVERRIDE
         {
             return m_what;
         }
@@ -138,7 +138,7 @@ namespace boost { namespace property_tree { namespace detail {namespace rapidxml
 
     //! Parse flag instructing the parser to not use text of first data node as a value of parent element.
     //! Can be combined with other flags by use of | operator.
-    //! Note that child data nodes of element node take precendence over its value when printing. 
+    //! Note that child data nodes of element node take precedence over its value when printing.
     //! That is, if element has one or more child data nodes <em>and</em> a value, the value will be ignored.
     //! Use rapidxml::parse_no_data_nodes flag to prevent creation of data nodes if you want to manipulate data using values of elements.
     //! <br><br>
@@ -334,7 +334,7 @@ namespace boost { namespace property_tree { namespace detail {namespace rapidxml
     //! you are encouraged to use memory_pool of relevant xml_document to allocate the memory. 
     //! Not only is this faster than allocating them by using <code>new</code> operator, 
     //! but also their lifetime will be tied to the lifetime of document, 
-    //! possibly simplyfing memory management. 
+    //! possibly simplifying memory management.
     //! <br><br>
     //! Call allocate_node() or allocate_attribute() functions to obtain new nodes or attributes from the pool. 
     //! You can also call allocate_string() function to allocate strings.
@@ -391,7 +391,7 @@ namespace boost { namespace property_tree { namespace detail {namespace rapidxml
         }
 
         //! Allocates a new node from the pool, and optionally assigns name and value to it. 
-        //! If the allocation request cannot be accomodated, this function will throw <code>std::bad_alloc</code>.
+        //! If the allocation request cannot be accommodated, this function will throw <code>std::bad_alloc</code>.
         //! If exceptions are disabled by defining RAPIDXML_NO_EXCEPTIONS, this function
         //! will call rapidxml::parse_error_handler() function.
         //! \param type Type of node to create.
@@ -424,7 +424,7 @@ namespace boost { namespace property_tree { namespace detail {namespace rapidxml
         }
 
         //! Allocates a new attribute from the pool, and optionally assigns name and value to it.
-        //! If the allocation request cannot be accomodated, this function will throw <code>std::bad_alloc</code>.
+        //! If the allocation request cannot be accommodated, this function will throw <code>std::bad_alloc</code>.
         //! If exceptions are disabled by defining RAPIDXML_NO_EXCEPTIONS, this function
         //! will call rapidxml::parse_error_handler() function.
         //! \param name Name to assign to the attribute, or 0 to assign no name.
@@ -455,7 +455,7 @@ namespace boost { namespace property_tree { namespace detail {namespace rapidxml
         }
 
         //! Allocates a char array of given size from the pool, and optionally copies a given string to it.
-        //! If the allocation request cannot be accomodated, this function will throw <code>std::bad_alloc</code>.
+        //! If the allocation request cannot be accommodated, this function will throw <code>std::bad_alloc</code>.
         //! If exceptions are disabled by defining RAPIDXML_NO_EXCEPTIONS, this function
         //! will call rapidxml::parse_error_handler() function.
         //! \param source String to initialize the allocated memory with, or 0 to not initialize it.
@@ -694,7 +694,7 @@ namespace boost { namespace property_tree { namespace detail {namespace rapidxml
         //! <br><br>
         //! Note that node does not own its name or value, it only stores a pointer to it. 
         //! It will not delete or otherwise free the pointer on destruction.
-        //! It is reponsibility of the user to properly manage lifetime of the string.
+        //! It is responsibility of the user to properly manage lifetime of the string.
         //! The easiest way to achieve it is to use memory_pool of the document to allocate the string -
         //! on destruction of the document the string will be automatically freed.
         //! <br><br>
@@ -721,7 +721,7 @@ namespace boost { namespace property_tree { namespace detail {namespace rapidxml
         //! <br><br>
         //! Note that node does not own its name or value, it only stores a pointer to it. 
         //! It will not delete or otherwise free the pointer on destruction.
-        //! It is reponsibility of the user to properly manage lifetime of the string.
+        //! It is responsibility of the user to properly manage lifetime of the string.
         //! The easiest way to achieve it is to use memory_pool of the document to allocate the string -
         //! on destruction of the document the string will be automatically freed.
         //! <br><br>
@@ -730,7 +730,7 @@ namespace boost { namespace property_tree { namespace detail {namespace rapidxml
         //! <br><br>
         //! If an element has a child node of type node_data, it will take precedence over element value when printing.
         //! If you want to manipulate data of elements using values, use parser flag rapidxml::parse_no_data_nodes to prevent creation of data nodes by the parser.
-        //! \param val value of node to set. Does not have to be zero terminated.
+        //! \param val Value of node to set. Does not have to be zero terminated.
         //! \param size Size of value, in characters. This does not include zero terminator, if one is present.
         void value(const Ch *val, std::size_t size)
         {
@@ -740,7 +740,7 @@ namespace boost { namespace property_tree { namespace detail {namespace rapidxml
 
         //! Sets value of node to a zero-terminated string.
         //! See also \ref ownership_of_strings and xml_node::value(const Ch *, std::size_t).
-        //! \param val Vame of node to set. Must be zero terminated.
+        //! \param val Name of node to set. Must be zero terminated.
         void value(const Ch *val)
         {
             this->value(val, internal::measure(val));
@@ -1311,7 +1311,7 @@ namespace boost { namespace property_tree { namespace detail {namespace rapidxml
     
         // Note that some of the pointers below have UNDEFINED values if certain other pointers are 0.
         // This is required for maximum performance, as it allows the parser to omit initialization of 
-        // unneded/redundant values.
+        // unneeded/redundant values.
         //
         // The rules are as follows:
         // 1. first_node and first_attribute contain valid pointers, or 0 if node has no children/attributes respectively
@@ -1374,7 +1374,7 @@ namespace boost { namespace property_tree { namespace detail {namespace rapidxml
             parse_bom<Flags>(text);
             
             // Parse children
-            while (1)
+            while (true)
             {
                 // Skip whitespace before node
                 skip<whitespace_pred, Flags>(text);
@@ -1636,7 +1636,7 @@ namespace boost { namespace property_tree { namespace detail {namespace rapidxml
                             {
                                 unsigned long code = 0;
                                 src += 3;   // Skip &#x
-                                while (1)
+                                while (true)
                                 {
                                     unsigned char digit = internal::lookup_tables<0>::lookup_digits[static_cast<unsigned char>(*src)];
                                     if (digit == 0xFF)
@@ -1650,7 +1650,7 @@ namespace boost { namespace property_tree { namespace detail {namespace rapidxml
                             {
                                 unsigned long code = 0;
                                 src += 2;   // Skip &#
-                                while (1)
+                                while (true)
                                 {
                                     unsigned char digit = internal::lookup_tables<0>::lookup_digits[static_cast<unsigned char>(*src)];
                                     if (digit == 0xFF)
@@ -2165,7 +2165,7 @@ namespace boost { namespace property_tree { namespace detail {namespace rapidxml
         void parse_node_contents(Ch *&text, xml_node<Ch> *node)
         {
             // For all children and text
-            while (1)
+            while (true)
             {
                 // Skip whitespace between > and node contents
                 Ch *contents_start = text;      // Store start of node contents before whitespace is skipped
@@ -2395,7 +2395,7 @@ namespace boost { namespace property_tree { namespace detail {namespace rapidxml
              1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1   // F
         };
 
-        // Text (i.e. PCDATA) that does not require processing when ws normalizationis is enabled
+        // Text (i.e. PCDATA) that does not require processing when ws normalizations is enabled
         // (anything but < \0 & space \n \r \t)
         template<int Dummy>
         const unsigned char lookup_tables<Dummy>::lookup_text_pure_with_ws[256] = 

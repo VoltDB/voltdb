@@ -187,8 +187,6 @@ namespace boost {
             return collection_traits<C>::function_type::empty( c );
         }
 
-#ifndef BOOST_NO_FUNCTION_TEMPLATE_ORDERING
-
         //! Free-standing begin() function
         /*!
             Get the begin iterator of the container. Uses collection_traits.
@@ -232,32 +230,6 @@ namespace boost {
         {
             return collection_traits<C>::function_type::end( c );
         }
-
-#else // BOOST_NO_FUNCTION_TEMPLATE_ORDERING
-
-        //! Free-standing begin() function
-        /*!
-            \overload
-        */
-        template< typename C >
-        inline typename collection_traits<C>::result_iterator
-        begin( C& c )
-        {
-            return collection_traits<C>::function_type::begin( c );
-        }
-
-        //! Free-standing end() function
-        /*!
-            \overload
-        */
-        template< typename C >
-        inline typename collection_traits<C>::result_iterator
-        end( C& c )
-        {
-            return collection_traits<C>::function_type::end( c );
-        }
-
-#endif // BOOST_NO_FUNCTION_TEMPLATE_ORDERING
 
     } // namespace algorithm
 } // namespace boost

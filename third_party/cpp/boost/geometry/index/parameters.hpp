@@ -4,6 +4,10 @@
 //
 // Copyright (c) 2011-2017 Adam Wulkiewicz, Lodz, Poland.
 //
+// This file was modified by Oracle on 2019-2020.
+// Modifications copyright (c) 2019-2020 Oracle and/or its affiliates.
+// Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
+//
 // Use, modification and distribution is subject to the Boost Software License,
 // Version 1.0. (See accompanying file LICENSE_1_0.txt or copy at
 // http://www.boost.org/LICENSE_1_0.txt)
@@ -14,7 +18,7 @@
 
 #include <limits>
 
-#include <boost/mpl/assert.hpp>
+#include <boost/geometry/core/static_assert.hpp>
 
 #include <boost/geometry/index/detail/exception.hpp>
 
@@ -79,8 +83,9 @@ template <size_t MaxElements,
           size_t MinElements = detail::default_min_elements_s<MaxElements>::value>
 struct linear
 {
-    BOOST_MPL_ASSERT_MSG((0 < MinElements && 2*MinElements <= MaxElements+1),
-                         INVALID_STATIC_MIN_MAX_PARAMETERS, (linear));
+    BOOST_GEOMETRY_STATIC_ASSERT((0 < MinElements && 2*MinElements <= MaxElements+1),
+        "Invalid MaxElements or MinElements.",
+        std::integer_sequence<size_t, MaxElements, MinElements>);
 
     static const size_t max_elements = MaxElements;
     static const size_t min_elements = MinElements;
@@ -99,8 +104,9 @@ template <size_t MaxElements,
           size_t MinElements = detail::default_min_elements_s<MaxElements>::value>
 struct quadratic
 {
-    BOOST_MPL_ASSERT_MSG((0 < MinElements && 2*MinElements <= MaxElements+1),
-                         INVALID_STATIC_MIN_MAX_PARAMETERS, (quadratic));
+    BOOST_GEOMETRY_STATIC_ASSERT((0 < MinElements && 2*MinElements <= MaxElements+1),
+        "Invalid MaxElements or MinElements.",
+        std::integer_sequence<size_t, MaxElements, MinElements>);
 
     static const size_t max_elements = MaxElements;
     static const size_t min_elements = MinElements;
@@ -129,8 +135,9 @@ template <size_t MaxElements,
           size_t OverlapCostThreshold = 32>
 struct rstar
 {
-    BOOST_MPL_ASSERT_MSG((0 < MinElements && 2*MinElements <= MaxElements+1),
-                         INVALID_STATIC_MIN_MAX_PARAMETERS, (rstar));
+    BOOST_GEOMETRY_STATIC_ASSERT((0 < MinElements && 2*MinElements <= MaxElements+1),
+        "Invalid MaxElements or MinElements.",
+        std::integer_sequence<size_t, MaxElements, MinElements>);
 
     static const size_t max_elements = MaxElements;
     static const size_t min_elements = MinElements;
@@ -252,6 +259,78 @@ private:
     size_t m_reinserted_elements;
     size_t m_overlap_cost_threshold;
 };
+
+
+template <typename Parameters, typename Strategy>
+class parameters
+    : public Parameters
+    , private Strategy
+{
+public:
+    parameters()
+        : Parameters(), Strategy()
+    {}
+
+    parameters(Parameters const& params)
+        : Parameters(params), Strategy()
+    {}
+
+    parameters(Parameters const& params, Strategy const& strategy)
+        : Parameters(params), Strategy(strategy)
+    {}
+
+    Strategy const& strategy() const
+    {
+        return static_cast<Strategy const&>(*this);
+    }
+};
+
+
+namespace detail
+{
+
+template <typename Parameters>
+struct strategy_type
+{
+    typedef default_strategy type;
+    typedef default_strategy result_type;
+};
+
+template <typename Parameters, typename Strategy>
+struct strategy_type< parameters<Parameters, Strategy> >
+{
+    typedef Strategy type;
+    typedef Strategy const& result_type;
+};
+
+
+template <typename Parameters>
+struct get_strategy_impl
+{
+    static inline default_strategy apply(Parameters const&)
+    {
+        return default_strategy();
+    }
+};
+
+template <typename Parameters, typename Strategy>
+struct get_strategy_impl<parameters<Parameters, Strategy> >
+{
+    static inline Strategy const& apply(parameters<Parameters, Strategy> const& parameters)
+    {
+        return parameters.strategy();
+    }
+};
+
+template <typename Parameters>
+inline typename strategy_type<Parameters>::result_type
+    get_strategy(Parameters const& parameters)
+{
+    return get_strategy_impl<Parameters>::apply(parameters);
+}
+
+} // namespace detail
+
 
 }}} // namespace boost::geometry::index
 

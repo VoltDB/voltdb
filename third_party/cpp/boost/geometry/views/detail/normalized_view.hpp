@@ -4,8 +4,9 @@
 // Copyright (c) 2008-2012 Bruno Lalande, Paris, France.
 // Copyright (c) 2009-2012 Mateusz Loskot, London, UK.
 
-// This file was modified by Oracle on 2014.
-// Modifications copyright (c) 2014 Oracle and/or its affiliates.
+// This file was modified by Oracle on 2014-2020.
+// Modifications copyright (c) 2014-2020 Oracle and/or its affiliates.
+// Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
 // Parts of Boost.Geometry are redesigned from Geodan's Geographic Library
 // (geolib/GGL), copyright (c) 1995-2010 Geodan, Amsterdam, the Netherlands.
@@ -14,17 +15,15 @@
 // Version 1.0. (See accompanying file LICENSE_1_0.txt or copy at
 // http://www.boost.org/LICENSE_1_0.txt)
 
-// Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
-
 #ifndef BOOST_GEOMETRY_VIEWS_DETAIL_NORMALIZED_VIEW_HPP
 #define BOOST_GEOMETRY_VIEWS_DETAIL_NORMALIZED_VIEW_HPP
 
+#include <type_traits>
 
 #include <boost/range/begin.hpp>
 #include <boost/range/end.hpp>
 #include <boost/range/iterator.hpp>
-#include <boost/mpl/if.hpp>
-#include <boost/type_traits/is_const.hpp>
+
 #include <boost/geometry/views/detail/range_type.hpp>
 #include <boost/geometry/views/reversible_view.hpp>
 #include <boost/geometry/views/closeable_view.hpp>
@@ -40,19 +39,18 @@ namespace detail {
 template <typename Geometry>
 struct normalized_view
 {
-    static const bool is_const = boost::is_const<Geometry>::value;
+    static const bool is_const = std::is_const<Geometry>::value;
 
     //typedef typename ring_type<Geometry>::type ring_type;
 
     typedef typename detail::range_type<Geometry>::type range_type;
 
-    typedef typename
-        boost::mpl::if_c
-            <
-                is_const,
-                range_type const,
-                range_type
-            >::type range;
+    typedef std::conditional_t
+        <
+            is_const,
+            range_type const,
+            range_type
+        > range;
 
     typedef typename
         reversible_view
@@ -64,13 +62,12 @@ struct normalized_view
                     >::value
             >::type reversible_type;
 
-    typedef typename
-        boost::mpl::if_c
-            <
-                is_const,
-                reversible_type const,
-                reversible_type
-            >::type reversible;
+    typedef std::conditional_t
+        <
+            is_const,
+            reversible_type const,
+            reversible_type
+        > reversible;
 
     typedef typename
         closeable_view
@@ -79,13 +76,12 @@ struct normalized_view
                 geometry::closure<Geometry>::value
             >::type closeable_type;
 
-    typedef typename
-        boost::mpl::if_c
-            <
-                is_const,
-                closeable_type const,
-                closeable_type
-            >::type closeable;
+    typedef std::conditional_t
+        <
+            is_const,
+            closeable_type const,
+            closeable_type
+        > closeable;
     
     explicit inline normalized_view(range & r)
         : m_reversible(r)

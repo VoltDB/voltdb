@@ -1,5 +1,5 @@
 /* Type sugar for success and failure
-(C) 2017-2019 Niall Douglas <http://www.nedproductions.biz/> (59 commits)
+(C) 2017-2021 Niall Douglas <http://www.nedproductions.biz/> (25 commits)
 File Created: July 2017
 
 
@@ -44,6 +44,7 @@ template <class T> struct BOOST_OUTCOME_NODISCARD success_type
 
 private:
   value_type _value;
+  uint16_t _spare_storage{0};
 
 public:
   success_type() = default;
@@ -54,8 +55,9 @@ public:
   ~success_type() = default;
   BOOST_OUTCOME_TEMPLATE(class U)
   BOOST_OUTCOME_TREQUIRES(BOOST_OUTCOME_TPRED(!std::is_same<success_type, std::decay_t<U>>::value))
-  constexpr explicit success_type(U &&v)
+  constexpr explicit success_type(U &&v, uint16_t spare_storage = 0)
       : _value(static_cast<U &&>(v))  // NOLINT
+      , _spare_storage(spare_storage)
   {
   }
 
@@ -63,10 +65,14 @@ public:
   constexpr const value_type &value() const & { return _value; }
   constexpr value_type &&value() && { return static_cast<value_type &&>(_value); }
   constexpr const value_type &&value() const && { return static_cast<value_type &&>(_value); }
+
+  constexpr uint16_t spare_storage() const { return _spare_storage; }
 };
 template <> struct BOOST_OUTCOME_NODISCARD success_type<void>
 {
   using value_type = void;
+
+  constexpr uint16_t spare_storage() const { return 0; }
 };
 /*! Returns type sugar for implicitly constructing a `basic_result<T>` with a successful state,
 default constructing `T` if necessary.
@@ -78,9 +84,9 @@ inline constexpr success_type<void> success() noexcept
 /*! Returns type sugar for implicitly constructing a `basic_result<T>` with a successful state.
 \effects Copies or moves the successful state supplied into the returned type sugar.
 */
-template <class T> inline constexpr success_type<std::decay_t<T>> success(T &&v)
+template <class T> inline constexpr success_type<std::decay_t<T>> success(T &&v, uint16_t spare_storage = 0)
 {
-  return success_type<std::decay_t<T>>{static_cast<T &&>(v)};
+  return success_type<std::decay_t<T>>{static_cast<T &&>(v), spare_storage};
 }
 
 /*! AWAITING HUGO JSON CONVERSION TOOL
@@ -92,9 +98,10 @@ template <class EC, class E = void> struct BOOST_OUTCOME_NODISCARD failure_type
   using exception_type = E;
 
 private:
-  bool _have_error{}, _have_exception{};
   error_type _error;
   exception_type _exception;
+  bool _have_error{false}, _have_exception{false};
+  uint16_t _spare_storage{0};
 
   struct error_init_tag
   {
@@ -111,25 +118,29 @@ public:
   failure_type &operator=(failure_type &&) = default;  // NOLINT
   ~failure_type() = default;
   template <class U, class V>
-  constexpr explicit failure_type(U &&u, V &&v)
-      : _have_error(true)
-      , _have_exception(true)
-      , _error(static_cast<U &&>(u))
+  constexpr explicit failure_type(U &&u, V &&v, uint16_t spare_storage = 0)
+      : _error(static_cast<U &&>(u))
       , _exception(static_cast<V &&>(v))
+      , _have_error(true)
+      , _have_exception(true)
+      , _spare_storage(spare_storage)
   {
   }
   template <class U>
-  constexpr explicit failure_type(in_place_type_t<error_type> /*unused*/, U &&u, error_init_tag /*unused*/ = error_init_tag())
-      : _have_error(true)
-      , _error(static_cast<U &&>(u))
+  constexpr explicit failure_type(in_place_type_t<error_type> /*unused*/, U &&u, uint16_t spare_storage = 0, error_init_tag /*unused*/ = error_init_tag())
+      : _error(static_cast<U &&>(u))
       , _exception()
+      , _have_error(true)
+      , _spare_storage(spare_storage)
   {
   }
   template <class U>
-  constexpr explicit failure_type(in_place_type_t<exception_type> /*unused*/, U &&u, exception_init_tag /*unused*/ = exception_init_tag())
-      : _have_exception(true)
-      , _error()
+  constexpr explicit failure_type(in_place_type_t<exception_type> /*unused*/, U &&u, uint16_t spare_storage = 0,
+                                  exception_init_tag /*unused*/ = exception_init_tag())
+      : _error()
       , _exception(static_cast<U &&>(u))
+      , _have_exception(true)
+      , _spare_storage(spare_storage)
   {
   }
 
@@ -145,6 +156,8 @@ public:
   constexpr const exception_type &exception() const & { return _exception; }
   constexpr exception_type &&exception() && { return static_cast<exception_type &&>(_exception); }
   constexpr const exception_type &&exception() const && { return static_cast<exception_type &&>(_exception); }
+
+  constexpr uint16_t spare_storage() const { return _spare_storage; }
 };
 template <class EC> struct BOOST_OUTCOME_NODISCARD failure_type<EC, void>
 {
@@ -153,6 +166,7 @@ template <class EC> struct BOOST_OUTCOME_NODISCARD failure_type<EC, void>
 
 private:
   error_type _error;
+  uint16_t _spare_storage{0};
 
 public:
   failure_type() = default;
@@ -163,8 +177,9 @@ public:
   ~failure_type() = default;
   BOOST_OUTCOME_TEMPLATE(class U)
   BOOST_OUTCOME_TREQUIRES(BOOST_OUTCOME_TPRED(!std::is_same<failure_type, std::decay_t<U>>::value))
-  constexpr explicit failure_type(U &&u)
+  constexpr explicit failure_type(U &&u, uint16_t spare_storage = 0)
       : _error(static_cast<U &&>(u))  // NOLINT
+      , _spare_storage(spare_storage)
   {
   }
 
@@ -172,6 +187,8 @@ public:
   constexpr const error_type &error() const & { return _error; }
   constexpr error_type &&error() && { return static_cast<error_type &&>(_error); }
   constexpr const error_type &&error() const && { return static_cast<error_type &&>(_error); }
+
+  constexpr uint16_t spare_storage() const { return _spare_storage; }
 };
 template <class E> struct BOOST_OUTCOME_NODISCARD failure_type<void, E>
 {
@@ -180,6 +197,7 @@ template <class E> struct BOOST_OUTCOME_NODISCARD failure_type<void, E>
 
 private:
   exception_type _exception;
+  uint16_t _spare_storage{0};
 
 public:
   failure_type() = default;
@@ -190,8 +208,9 @@ public:
   ~failure_type() = default;
   BOOST_OUTCOME_TEMPLATE(class V)
   BOOST_OUTCOME_TREQUIRES(BOOST_OUTCOME_TPRED(!std::is_same<failure_type, std::decay_t<V>>::value))
-  constexpr explicit failure_type(V &&v)
+  constexpr explicit failure_type(V &&v, uint16_t spare_storage = 0)
       : _exception(static_cast<V &&>(v))  // NOLINT
+      , _spare_storage(spare_storage)
   {
   }
 
@@ -199,20 +218,22 @@ public:
   constexpr const exception_type &exception() const & { return _exception; }
   constexpr exception_type &&exception() && { return static_cast<exception_type &&>(_exception); }
   constexpr const exception_type &&exception() const && { return static_cast<exception_type &&>(_exception); }
+
+  constexpr uint16_t spare_storage() const { return _spare_storage; }
 };
 /*! AWAITING HUGO JSON CONVERSION TOOL
 SIGNATURE NOT RECOGNISED
 */
-template <class EC> inline constexpr failure_type<std::decay_t<EC>> failure(EC &&v)
+template <class EC> inline constexpr failure_type<std::decay_t<EC>> failure(EC &&v, uint16_t spare_storage = 0)
 {
-  return failure_type<std::decay_t<EC>>{static_cast<EC &&>(v)};
+  return failure_type<std::decay_t<EC>>{static_cast<EC &&>(v), spare_storage};
 }
 /*! AWAITING HUGO JSON CONVERSION TOOL
 SIGNATURE NOT RECOGNISED
 */
-template <class EC, class E> inline constexpr failure_type<std::decay_t<EC>, std::decay_t<E>> failure(EC &&v, E &&w)
+template <class EC, class E> inline constexpr failure_type<std::decay_t<EC>, std::decay_t<E>> failure(EC &&v, E &&w, uint16_t spare_storage = 0)
 {
-  return failure_type<std::decay_t<EC>, std::decay_t<E>>{static_cast<EC &&>(v), static_cast<E &&>(w)};
+  return failure_type<std::decay_t<EC>, std::decay_t<E>>{static_cast<EC &&>(v), static_cast<E &&>(w), spare_storage};
 }
 
 namespace detail

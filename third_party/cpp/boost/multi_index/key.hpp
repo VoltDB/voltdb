@@ -1,4 +1,4 @@
-/* Copyright 2003-2018 Joaquin M Lopez Munoz.
+/* Copyright 2003-2019 Joaquin M Lopez Munoz.
  * Distributed under the Boost Software License, Version 1.0.
  * (See accompanying file LICENSE_1_0.txt or copy at
  * http://www.boost.org/LICENSE_1_0.txt)
@@ -24,6 +24,8 @@
 
 #define BOOST_MULTI_INDEX_KEY_SUPPORTED
 
+#include <boost/multi_index/detail/is_function.hpp>
+#include <boost/preprocessor/facilities/empty.hpp>
 #include <type_traits>
 
 namespace boost{
@@ -40,28 +42,33 @@ struct typed_key_impl;
 template<typename Class,typename Type,Type Class::*PtrToMember>
 struct typed_key_impl<
   Type Class::*,PtrToMember,
-  typename std::enable_if<!std::is_function<Type>::value>::type
+  typename std::enable_if<!is_function<Type>::value>::type
 >
 {
   using value_type=Class;
   using type=member<Class,Type,PtrToMember>;
 };
 
-template<
-  typename Class,typename Type,Type (Class::*PtrToMemberFunction)()const
->
-struct typed_key_impl<Type (Class::*)()const,PtrToMemberFunction>
-{
-  using value_type=Class;
-  using type=const_mem_fun<Class,Type,PtrToMemberFunction>;
+#define BOOST_MULTI_INDEX_KEY_TYPED_KEY_IMPL(qualifier,extractor)            \
+template<                                                                    \
+  typename Class,typename Type,Type (Class::*PtrToMemberFunction)()qualifier \
+>                                                                            \
+struct typed_key_impl<Type (Class::*)()qualifier,PtrToMemberFunction>        \
+{                                                                            \
+  using value_type=Class;                                                    \
+  using type=extractor<Class,Type,PtrToMemberFunction>;                      \
 };
 
-template<typename Class,typename Type,Type (Class::*PtrToMemberFunction)()>
-struct typed_key_impl<Type (Class::*)(),PtrToMemberFunction>
-{
-  using value_type=Class;
-  using type=mem_fun<Class,Type,PtrToMemberFunction>;
-};
+BOOST_MULTI_INDEX_KEY_TYPED_KEY_IMPL(                ,mem_fun)
+BOOST_MULTI_INDEX_KEY_TYPED_KEY_IMPL(const           ,const_mem_fun)
+BOOST_MULTI_INDEX_KEY_TYPED_KEY_IMPL(volatile        ,volatile_mem_fun)
+BOOST_MULTI_INDEX_KEY_TYPED_KEY_IMPL(const volatile  ,cv_mem_fun)
+BOOST_MULTI_INDEX_KEY_TYPED_KEY_IMPL(&               ,ref_mem_fun)
+BOOST_MULTI_INDEX_KEY_TYPED_KEY_IMPL(const&          ,cref_mem_fun)
+BOOST_MULTI_INDEX_KEY_TYPED_KEY_IMPL(volatile&       ,vref_mem_fun)
+BOOST_MULTI_INDEX_KEY_TYPED_KEY_IMPL(const volatile& ,cvref_mem_fun)
+
+#undef BOOST_MULTI_INDEX_KEY_TYPED_KEY_IMPL
 
 template<class Value,typename Type,Type (*PtrToFunction)(Value)>
 struct typed_key_impl<Type (*)(Value),PtrToFunction>
@@ -70,11 +77,48 @@ struct typed_key_impl<Type (*)(Value),PtrToFunction>
   using type=global_fun<Value,Type,PtrToFunction>;
 };
 
+template<typename T>
+struct remove_noexcept{using type=T;};
+
+#define BOOST_MULTI_INDEX_KEY_REMOVE_MEMFUN_NOEXCEPT(qualifier) \
+template<typename R,typename C,typename... Args>                \
+struct remove_noexcept<R(C::*)(Args...)qualifier noexcept>      \
+  {using type=R(C::*)(Args...)qualifier;};                      \
+                                                                \
+template<typename R,typename C,typename... Args>                \
+struct remove_noexcept<R(C::*)(Args...,...)qualifier noexcept>  \
+  {using type=R(C::*)(Args...,...)qualifier;};
+
+BOOST_MULTI_INDEX_KEY_REMOVE_MEMFUN_NOEXCEPT(BOOST_PP_EMPTY())
+                                             /* VS warns without dummy arg */
+BOOST_MULTI_INDEX_KEY_REMOVE_MEMFUN_NOEXCEPT(const)
+BOOST_MULTI_INDEX_KEY_REMOVE_MEMFUN_NOEXCEPT(volatile)
+BOOST_MULTI_INDEX_KEY_REMOVE_MEMFUN_NOEXCEPT(const volatile)
+BOOST_MULTI_INDEX_KEY_REMOVE_MEMFUN_NOEXCEPT(&)
+BOOST_MULTI_INDEX_KEY_REMOVE_MEMFUN_NOEXCEPT(const&)
+BOOST_MULTI_INDEX_KEY_REMOVE_MEMFUN_NOEXCEPT(volatile&)
+BOOST_MULTI_INDEX_KEY_REMOVE_MEMFUN_NOEXCEPT(const volatile&)
+BOOST_MULTI_INDEX_KEY_REMOVE_MEMFUN_NOEXCEPT(&&)
+BOOST_MULTI_INDEX_KEY_REMOVE_MEMFUN_NOEXCEPT(const&&)
+BOOST_MULTI_INDEX_KEY_REMOVE_MEMFUN_NOEXCEPT(volatile&&)
+BOOST_MULTI_INDEX_KEY_REMOVE_MEMFUN_NOEXCEPT(const volatile&&)
+
+#undef BOOST_MULTI_INDEX_KEY_REMOVE_MEMFUN_NOEXCEPT
+
+template<typename R,typename... Args>
+struct remove_noexcept<R(*)(Args...)noexcept>{using type=R(*)(Args...);};
+template<typename R,typename... Args>
+struct remove_noexcept<R(*)(Args...,...)noexcept>
+  {using type=R(*)(Args...,...);};
+
+template<typename T>
+using remove_noexcept_t=typename remove_noexcept<T>::type;
+
 template<auto... Keys>
 struct key_impl;
 
 template<auto Key>
-struct key_impl<Key>:typed_key_impl<decltype(Key),Key>{};
+struct key_impl<Key>:typed_key_impl<remove_noexcept_t<decltype(Key)>,Key>{};
 
 template<typename... Ts>
 struct least_generic;

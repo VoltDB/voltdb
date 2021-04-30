@@ -8,9 +8,8 @@
 #ifndef BOOST_GIL_IO_MAKE_WRITER_HPP
 #define BOOST_GIL_IO_MAKE_WRITER_HPP
 
+#include <boost/gil/detail/mp11.hpp>
 #include <boost/gil/io/get_writer.hpp>
-
-#include <boost/mpl/and.hpp>
 
 #include <type_traits>
 
@@ -21,7 +20,7 @@ inline
 auto make_writer(String const& file_name, image_write_info<FormatTag> const& info,
     typename std::enable_if
     <
-        mpl::and_
+        mp11::mp_and
         <
             detail::is_supported_path_spec<String>,
             is_format_tag<FormatTag>
@@ -82,7 +81,7 @@ inline
 auto make_writer(Device& file, image_write_info<FormatTag> const& info,
     typename std::enable_if
     <
-        mpl::and_
+        mp11::mp_and
         <
             typename detail::is_adaptable_output_device<FormatTag, Device>::type,
             is_format_tag<FormatTag>
@@ -101,7 +100,7 @@ inline
 auto make_writer(String const& file_name, FormatTag const&,
     typename std::enable_if
     <
-        mpl::and_
+        mp11::mp_and
         <
             detail::is_supported_path_spec<String>,
             is_format_tag<FormatTag>
@@ -147,7 +146,7 @@ inline
 auto make_writer(Device& file, FormatTag const&,
     typename std::enable_if
     <
-        mpl::and_
+        mp11::mp_and
         <
             typename detail::is_adaptable_output_device<FormatTag, Device>::type,
             is_format_tag<FormatTag>

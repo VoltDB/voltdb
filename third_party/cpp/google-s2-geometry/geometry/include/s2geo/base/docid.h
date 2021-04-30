@@ -104,6 +104,7 @@ class DocId {
   explicit DocId(value_type docid)      { docid_ = docid; }
   value_type docid() const              { return docid_; }   // ONLY use here
   value_type* docidptr()                { return &docid_; }  // ie in this file
+  DocId(DocId const&) = default;
   DocId& operator=(const DocId& x) {
     docid_ = x.docid_;
     return *this;
@@ -211,6 +212,7 @@ class DocId32Bit {
   }
   value_type docid() const              { return docid_; }   // ONLY use here
   value_type* docidptr()                { return &docid_; }  // ie in this file
+  DocId32Bit(DocId32Bit const&) = default;
   DocId32Bit& operator=(const DocId32Bit& x) {
     docid_ = x.docid_;
     return *this;

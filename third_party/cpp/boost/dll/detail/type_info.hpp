@@ -12,13 +12,13 @@
 #include <typeinfo>
 #include <cstring>
 #include <boost/dll/config.hpp>
-#if defined(BOOST_MSVC) || defined(BOOST_MSVC_VER)
+#if defined(_MSC_VER) // MSVC, Clang-cl, and ICC on Windows
 #include <boost/winapi/basic_types.hpp>
 #endif
 
 namespace boost { namespace dll { namespace detail {
 
-#if defined(BOOST_MSVC) || defined(BOOST_MSVC_VER)
+#if defined(_MSC_VER) // MSVC, Clang-cl, and ICC on Windows
 
 #if defined ( _WIN64 )
 

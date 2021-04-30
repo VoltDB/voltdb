@@ -17,6 +17,7 @@
 #include <functional>   // for std::equal_to
 #include <iterator>
 
+#include <boost/config.hpp>
 #include <boost/range/begin.hpp>
 #include <boost/range/end.hpp>
 #include <boost/utility/enable_if.hpp>

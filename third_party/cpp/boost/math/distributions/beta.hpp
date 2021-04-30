@@ -382,6 +382,13 @@ namespace boost
         return result;
       }
       using boost::math::beta;
+
+      // Corner case: check_x ensures x element of [0, 1], but PDF is 0 for x = 0 and x = 1. PDF EQN:
+      // https://wikimedia.org/api/rest_v1/media/math/render/svg/125fdaa41844a8703d1a8610ac00fbf3edacc8e7
+      if(x == 0 || x == 1)
+      {
+        return RealType(0);
+      }
       return ibeta_derivative(a, b, x, Policy());
     } // pdf
 

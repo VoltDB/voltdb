@@ -10,6 +10,10 @@
 #ifndef BOOST_DETAIL_WINAPI_SYNCHRONIZATION_HPP
 #define BOOST_DETAIL_WINAPI_SYNCHRONIZATION_HPP
 
+#include <boost/config/header_deprecated.hpp>
+
+BOOST_HEADER_DEPRECATED("<boost/winapi/synchronization.hpp>")
+
 #include <boost/winapi/synchronization.hpp>
 #include <boost/detail/winapi/detail/deprecated_namespace.hpp>
 

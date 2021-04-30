@@ -18,7 +18,7 @@
 
 # if defined(_WIN32) || defined(__CYGWIN__)
 #   define BOOST_TEST_TIMER_WINDOWS_API
-# elif defined(__MACH__)// && !defined(CLOCK_MONOTONIC)
+# elif defined(__MACH__) && defined(__APPLE__)// && !defined(CLOCK_MONOTONIC)
 #   // we compile for all macs the same, CLOCK_MONOTONIC introduced in 10.12
 #   define BOOST_TEST_TIMER_MACH_API
 # else
@@ -133,6 +133,7 @@ namespace timer {
       return_value.wall = static_cast<nanosecond_type>((clock * timebase.first) / timebase.second);
 #else
       struct timespec end_time;
+      return_value.wall = 0;
       if( ::clock_gettime( CLOCK_MONOTONIC, &end_time ) == 0 )
       {
           return_value.wall = static_cast<nanosecond_type>((end_time.tv_sec - _start_time_wall.tv_sec) * 1E9 + (end_time.tv_nsec - _start_time_wall.tv_nsec));

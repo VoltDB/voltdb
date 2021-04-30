@@ -5,8 +5,8 @@
 // Copyright (c) 2009-2015 Mateusz Loskot, London, UK.
 // Copyright (c) 2014-2015 Samuel Debionne, Grenoble, France.
 
-// This file was modified by Oracle on 2015, 2016, 2017, 2018.
-// Modifications copyright (c) 2015-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2015-2020.
+// Modifications copyright (c) 2015-2020, Oracle and/or its affiliates.
 
 // Contributed and/or modified by Vissarion Fysikopoulos, on behalf of Oracle
 // Contributed and/or modified by Menelaos Karavelas, on behalf of Oracle
@@ -23,10 +23,6 @@
 #include <boost/geometry/algorithms/dispatch/expand.hpp>
 
 #include <boost/geometry/core/tags.hpp>
-
-// For backward compatibility
-#include <boost/geometry/strategies/cartesian/expand_box.hpp>
-#include <boost/geometry/strategies/spherical/expand_box.hpp>
 
 
 namespace boost { namespace geometry
@@ -51,9 +47,11 @@ struct expand
     template <typename Strategy>
     static inline void apply(BoxOut& box_out,
                              BoxIn const& box_in,
-                             Strategy const& )
+                             Strategy const& strategy)
     {
-        Strategy::apply(box_out, box_in);
+        // strategy.expand(box_out, box_in).apply(box_out, box_in);
+        using strategy_t = decltype(strategy.expand(box_out, box_in));
+        strategy_t::apply(box_out, box_in);
     }
 };
 

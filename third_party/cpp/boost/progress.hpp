@@ -20,7 +20,7 @@
 #define BOOST_PROGRESS_HPP
 
 #include <boost/config/header_deprecated.hpp>
-BOOST_HEADER_DEPRECATED( "the facilities in <boost/timer/timer.hpp>" )
+BOOST_HEADER_DEPRECATED( "the facilities in <boost/timer/timer.hpp> or <boost/timer/progress_display.hpp>" )
 
 #include <boost/timer.hpp>
 #include <boost/noncopyable.hpp>

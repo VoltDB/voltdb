@@ -56,125 +56,125 @@ class polymorphic_iarchive_route :
 {
 private:
     // these are used by the serialization library.
-    virtual void load_object(
+    void load_object(
         void *t,
         const basic_iserializer & bis
-    ){
+    ) BOOST_OVERRIDE {
         ArchiveImplementation::load_object(t, bis);
     }
-    virtual const basic_pointer_iserializer * load_pointer(
+    const basic_pointer_iserializer * load_pointer(
         void * & t,
         const basic_pointer_iserializer * bpis_ptr,
         const basic_pointer_iserializer * (*finder)(
             const boost::serialization::extended_type_info & type
         )
-    ){
+    ) BOOST_OVERRIDE {
         return ArchiveImplementation::load_pointer(t, bpis_ptr, finder);
     }
-    virtual void set_library_version(library_version_type archive_library_version){
+    void set_library_version(boost::serialization::library_version_type archive_library_version) BOOST_OVERRIDE {
         ArchiveImplementation::set_library_version(archive_library_version);
     }
-    virtual library_version_type get_library_version() const{
+    boost::serialization::library_version_type get_library_version() const BOOST_OVERRIDE {
         return ArchiveImplementation::get_library_version();
     }
-    virtual unsigned int get_flags() const {
+    unsigned int get_flags() const BOOST_OVERRIDE {
         return ArchiveImplementation::get_flags();
     }
-    virtual void delete_created_pointers(){
+    void delete_created_pointers() BOOST_OVERRIDE {
         ArchiveImplementation::delete_created_pointers();
     }
-    virtual void reset_object_address(
+    void reset_object_address(
         const void * new_address,
         const void * old_address
-    ){
+    ) BOOST_OVERRIDE {
         ArchiveImplementation::reset_object_address(new_address, old_address);
     }
-    virtual void load_binary(void * t, std::size_t size){
+    void load_binary(void * t, std::size_t size) BOOST_OVERRIDE {
         ArchiveImplementation::load_binary(t, size);
     }
     // primitive types the only ones permitted by polymorphic archives
-    virtual void load(bool & t){
+    void load(bool & t) BOOST_OVERRIDE {
         ArchiveImplementation::load(t);
     }
-    virtual void load(char & t){
+    void load(char & t) BOOST_OVERRIDE {
         ArchiveImplementation::load(t);
     }
-    virtual void load(signed char & t){
+    void load(signed char & t) BOOST_OVERRIDE {
         ArchiveImplementation::load(t);
     }
-    virtual void load(unsigned char & t){
+    void load(unsigned char & t) BOOST_OVERRIDE {
         ArchiveImplementation::load(t);
     }
     #ifndef BOOST_NO_CWCHAR
     #ifndef BOOST_NO_INTRINSIC_WCHAR_T
-    virtual void load(wchar_t & t){
+    void load(wchar_t & t) BOOST_OVERRIDE {
         ArchiveImplementation::load(t);
     }
     #endif
     #endif
-    virtual void load(short & t){
+    void load(short & t) BOOST_OVERRIDE {
         ArchiveImplementation::load(t);
     }
-    virtual void load(unsigned short & t){
+    void load(unsigned short & t) BOOST_OVERRIDE {
         ArchiveImplementation::load(t);
     }
-    virtual void load(int & t){
+    void load(int & t) BOOST_OVERRIDE {
         ArchiveImplementation::load(t);
     }
-    virtual void load(unsigned int & t){
+    void load(unsigned int & t) BOOST_OVERRIDE {
         ArchiveImplementation::load(t);
     }
-    virtual void load(long & t){
+    void load(long & t) BOOST_OVERRIDE {
         ArchiveImplementation::load(t);
     }
-    virtual void load(unsigned long & t){
+    void load(unsigned long & t) BOOST_OVERRIDE {
         ArchiveImplementation::load(t);
     }
     #if defined(BOOST_HAS_LONG_LONG)
-    virtual void load(boost::long_long_type & t){
+    void load(boost::long_long_type & t) BOOST_OVERRIDE {
         ArchiveImplementation::load(t);
     }
-    virtual void load(boost::ulong_long_type & t){
+    void load(boost::ulong_long_type & t) BOOST_OVERRIDE {
         ArchiveImplementation::load(t);
     }
     #elif defined(BOOST_HAS_MS_INT64)
-    virtual void load(__int64 & t){
+    void load(__int64 & t) BOOST_OVERRIDE {
         ArchiveImplementation::load(t);
     }
-    virtual void load(unsigned __int64 & t){
+    void load(unsigned __int64 & t) BOOST_OVERRIDE {
         ArchiveImplementation::load(t);
     }
     #endif
-    virtual void load(float & t){
+    void load(float & t) BOOST_OVERRIDE {
         ArchiveImplementation::load(t);
     }
-    virtual void load(double & t){
+    void load(double & t) BOOST_OVERRIDE {
         ArchiveImplementation::load(t);
     }
-    virtual void load(std::string & t){
+    void load(std::string & t) BOOST_OVERRIDE {
         ArchiveImplementation::load(t);
     }
     #ifndef BOOST_NO_STD_WSTRING
-    virtual void load(std::wstring & t){
+    void load(std::wstring & t) BOOST_OVERRIDE {
         ArchiveImplementation::load(t);
     }
     #endif
     // used for xml and other tagged formats default does nothing
-    virtual void load_start(const char * name){
+    void load_start(const char * name) BOOST_OVERRIDE {
         ArchiveImplementation::load_start(name);
     }
-    virtual void load_end(const char * name){
+    void load_end(const char * name) BOOST_OVERRIDE {
         ArchiveImplementation::load_end(name);
     }
-    virtual void register_basic_serializer(const basic_iserializer & bis){
+    void register_basic_serializer(const basic_iserializer & bis) BOOST_OVERRIDE {
         ArchiveImplementation::register_basic_serializer(bis);
     }
-    virtual helper_collection &
-    get_helper_collection(){
+    helper_collection &
+    get_helper_collection() BOOST_OVERRIDE {
         return ArchiveImplementation::get_helper_collection();
     }
 public:
-    // this can't be inheriteded because they appear in mulitple
+    // this can't be inherited because they appear in multiple
     // parents
     typedef mpl::bool_<true> is_loading;
     typedef mpl::bool_<false> is_saving;
@@ -190,7 +190,7 @@ public:
     }
     // register type function
     template<class T>
-    const basic_pointer_iserializer * 
+    const basic_pointer_iserializer *
     register_type(T * t = NULL){
         return ArchiveImplementation::register_type(t);
     }
@@ -202,7 +202,7 @@ public:
     ) :
         ArchiveImplementation(is, flags)
     {}
-    virtual ~polymorphic_iarchive_route(){};
+    ~polymorphic_iarchive_route() BOOST_OVERRIDE {}
 };
 
 } // namespace detail

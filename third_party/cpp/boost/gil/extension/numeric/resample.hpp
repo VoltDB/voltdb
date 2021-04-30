@@ -70,8 +70,8 @@ namespace detail {
 /// \brief resample_pixels when the source is run-time specified
 ///        If invoked on incompatible views, throws std::bad_cast()
 /// \ingroup ImageAlgorithms
-template <typename Sampler, typename Types1, typename V2, typename MapFn>
-void resample_pixels(const any_image_view<Types1>& src, const V2& dst, const MapFn& dst_to_src, Sampler sampler=Sampler())
+template <typename Sampler, typename ...Types1, typename V2, typename MapFn>
+void resample_pixels(const any_image_view<Types1...>& src, const V2& dst, const MapFn& dst_to_src, Sampler sampler=Sampler())
 {
     apply_operation(src, std::bind(
         detail::resample_pixels_fn<Sampler, MapFn>(dst_to_src, sampler),
@@ -82,8 +82,8 @@ void resample_pixels(const any_image_view<Types1>& src, const V2& dst, const Map
 /// \brief resample_pixels when the destination is run-time specified
 ///        If invoked on incompatible views, throws std::bad_cast()
 /// \ingroup ImageAlgorithms
-template <typename Sampler, typename V1, typename Types2, typename MapFn>
-void resample_pixels(const V1& src, const any_image_view<Types2>& dst, const MapFn& dst_to_src, Sampler sampler=Sampler())
+template <typename Sampler, typename V1, typename ...Types2, typename MapFn>
+void resample_pixels(const V1& src, const any_image_view<Types2...>& dst, const MapFn& dst_to_src, Sampler sampler=Sampler())
 {
     using namespace std::placeholders;
     apply_operation(dst, std::bind(
@@ -95,8 +95,8 @@ void resample_pixels(const V1& src, const any_image_view<Types2>& dst, const Map
 /// \brief resample_pixels when both the source and the destination are run-time specified
 ///        If invoked on incompatible views, throws std::bad_cast()
 /// \ingroup ImageAlgorithms
-template <typename Sampler, typename SrcTypes, typename DstTypes, typename MapFn>
-void resample_pixels(const any_image_view<SrcTypes>& src, const any_image_view<DstTypes>& dst, const MapFn& dst_to_src, Sampler sampler=Sampler()) {
+template <typename Sampler, typename ...SrcTypes, typename ...DstTypes, typename MapFn>
+void resample_pixels(const any_image_view<SrcTypes...>& src, const any_image_view<DstTypes...>& dst, const MapFn& dst_to_src, Sampler sampler=Sampler()) {
     apply_operation(src,dst,detail::resample_pixels_fn<Sampler,MapFn>(dst_to_src,sampler));
 }
 

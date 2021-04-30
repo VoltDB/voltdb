@@ -82,7 +82,7 @@ struct treap_tag;
 //! The container supports the following options:
 //! \c base_hook<>/member_hook<>/value_traits<>,
 //! \c constant_time_size<>, \c size_type<>,
-//! \c compare<> and \c priority_compare<>
+//! \c compare<>, \c priority<> and \c priority_of_value<>
 #if defined(BOOST_INTRUSIVE_DOXYGEN_INVOKED)
 template<class T, class ...Options>
 #else

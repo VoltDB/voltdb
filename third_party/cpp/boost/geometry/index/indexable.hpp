@@ -2,6 +2,10 @@
 //
 // Copyright (c) 2011-2019 Adam Wulkiewicz, Lodz, Poland.
 //
+// This file was modified by Oracle on 2020.
+// Modifications copyright (c) 2020 Oracle and/or its affiliates.
+// Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
+//
 // Use, modification and distribution is subject to the Boost Software License,
 // Version 1.0. (See accompanying file LICENSE_1_0.txt or copy at
 // http://www.boost.org/LICENSE_1_0.txt)
@@ -9,42 +13,30 @@
 #ifndef BOOST_GEOMETRY_INDEX_INDEXABLE_HPP
 #define BOOST_GEOMETRY_INDEX_INDEXABLE_HPP
 
-#include <boost/mpl/assert.hpp>
 #include <boost/tuple/tuple.hpp>
-#include <boost/type_traits/is_reference.hpp>
-#include <boost/type_traits/is_same.hpp>
-#include <boost/type_traits/remove_const.hpp>
-#include <boost/type_traits/remove_reference.hpp>
+
+#include <boost/geometry/core/static_assert.hpp>
 
 #include <boost/geometry/index/detail/is_indexable.hpp>
 
-namespace boost { namespace geometry { namespace index { namespace detail {
+#include <boost/geometry/util/type_traits.hpp>
 
-template <typename T>
-struct remove_cr
-    : boost::remove_const
-        <
-            typename boost::remove_reference<T>::type
-        >
-{};
+namespace boost { namespace geometry { namespace index { namespace detail
+{
 
 template <typename From, typename To>
 struct is_referencable
-    : boost::is_same
+    : std::is_same
         <
-            typename remove_cr<From>::type,
-            typename remove_cr<To>::type
+            typename util::remove_cref<From>::type,
+            typename util::remove_cref<To>::type
         >
 {};
 
 template <typename Indexable, typename V>
 inline Indexable const& indexable_prevent_any_type(V const& )
 {
-    BOOST_MPL_ASSERT_MSG(
-        (false),
-        UNEXPECTED_TYPE,
-        (V)
-    );
+    BOOST_GEOMETRY_STATIC_ASSERT_FALSE("Unexpected type.", V);
     return Indexable();
 }
 
@@ -61,11 +53,10 @@ and std::tuple<Indexable, ...>.
 template <typename Value, bool IsIndexable = is_indexable<Value>::value>
 struct indexable
 {
-    BOOST_MPL_ASSERT_MSG(
+    BOOST_GEOMETRY_STATIC_ASSERT(
         (detail::is_indexable<Value>::value),
-        NOT_VALID_INDEXABLE_TYPE,
-        (Value)
-    );
+        "Value has to be an Indexable.",
+        Value);
 
     /*! \brief The type of result returned by function object. */
     typedef Value const& result_type;
@@ -104,11 +95,10 @@ struct indexable<std::pair<Indexable, Second>, false>
 {
     typedef std::pair<Indexable, Second> value_type;
 
-    BOOST_MPL_ASSERT_MSG(
+    BOOST_GEOMETRY_STATIC_ASSERT(
         (detail::is_indexable<Indexable>::value),
-        NOT_VALID_INDEXABLE_TYPE,
-        (Indexable)
-    );
+        "The first type of std::pair has to be an Indexable.",
+        Indexable);
 
     /*! \brief The type of result returned by function object. */
     typedef Indexable const& result_type;
@@ -133,11 +123,10 @@ struct indexable<std::pair<Indexable, Second>, false>
     template <typename I, typename S>
     inline result_type operator()(std::pair<I, S> const& v) const
     {
-        BOOST_MPL_ASSERT_MSG(
+        BOOST_GEOMETRY_STATIC_ASSERT(
             (is_referencable<I, result_type>::value),
-            UNEXPECTED_TYPE,
-            (std::pair<I, S>)
-        );
+            "Unexpected type.",
+            std::pair<I, S>);
         return v.first;
     }
 
@@ -165,11 +154,10 @@ struct indexable_boost_tuple
 {
     typedef Value value_type;
 
-    BOOST_MPL_ASSERT_MSG(
+    BOOST_GEOMETRY_STATIC_ASSERT(
         (detail::is_indexable<Indexable>::value),
-        NOT_VALID_INDEXABLE_TYPE,
-        (Indexable)
-        );
+        "The first type of boost::tuple has to be an Indexable.",
+        Indexable);
 
     /*! \brief The type of result returned by function object. */
     typedef Indexable const& result_type;
@@ -195,11 +183,10 @@ struct indexable_boost_tuple
               typename U5, typename U6, typename U7, typename U8, typename U9>
     inline result_type operator()(boost::tuple<I, U1, U2, U3, U4, U5, U6, U7, U8, U9> const& v) const
     {
-        BOOST_MPL_ASSERT_MSG(
+        BOOST_GEOMETRY_STATIC_ASSERT(
             (is_referencable<I, result_type>::value),
-            UNEXPECTED_TYPE,
-            (boost::tuple<I, U1, U2, U3, U4, U5, U6, U7, U8, U9>)
-        );
+            "Unexpected type.",
+            boost::tuple<I, U1, U2, U3, U4, U5, U6, U7, U8, U9>);
         return boost::get<0>(v);
     }
 
@@ -212,11 +199,10 @@ struct indexable_boost_tuple
     template <typename I, typename T>
     inline result_type operator()(boost::tuples::cons<I, T> const& v) const
     {
-        BOOST_MPL_ASSERT_MSG(
+        BOOST_GEOMETRY_STATIC_ASSERT(
             (is_referencable<I, result_type>::value),
-            UNEXPECTED_TYPE,
-            (boost::tuples::cons<I, T>)
-        );
+            "Unexpected type.",
+            boost::tuples::cons<I, T>);
         return boost::get<0>(v);
     }
 
@@ -284,11 +270,10 @@ struct indexable<std::tuple<Indexable, Args...>, false>
 {
     typedef std::tuple<Indexable, Args...> value_type;
 
-    BOOST_MPL_ASSERT_MSG(
+    BOOST_GEOMETRY_STATIC_ASSERT(
         (detail::is_indexable<Indexable>::value),
-        NOT_VALID_INDEXABLE_TYPE,
-        (Indexable)
-        );
+        "The first type of std::tuple has to be an Indexable.",
+        Indexable);
 
     /*! \brief The type of result returned by function object. */
     typedef Indexable const& result_type;
@@ -313,11 +298,10 @@ struct indexable<std::tuple<Indexable, Args...>, false>
     template <typename I, typename ...A>
     inline result_type operator()(std::tuple<I, A...> const& v) const
     {
-        BOOST_MPL_ASSERT_MSG(
+        BOOST_GEOMETRY_STATIC_ASSERT(
             (is_referencable<I, result_type>::value),
-            UNEXPECTED_TYPE,
-            (std::tuple<I, A...>)
-        );
+            "Unexpected type.",
+            std::tuple<I, A...>);
         return std::get<0>(v);
     }
 

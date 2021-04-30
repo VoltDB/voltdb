@@ -1232,7 +1232,7 @@ namespace boost{ namespace math{
       return boost::math::prime(n, boost::math::policies::policy<>());
    }
 
-   static const unsigned max_prime = 10000;
+   static const unsigned max_prime = 9999;
 
 }} // namespace boost and math
 

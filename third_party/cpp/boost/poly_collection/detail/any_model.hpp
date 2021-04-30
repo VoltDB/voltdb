@@ -1,4 +1,4 @@
-/* Copyright 2016-2018 Joaquin M Lopez Munoz.
+/* Copyright 2016-2020 Joaquin M Lopez Munoz.
  * Distributed under the Boost Software License, Version 1.0.
  * (See accompanying file LICENSE_1_0.txt or copy at
  * http://www.boost.org/LICENSE_1_0.txt)
@@ -183,14 +183,17 @@ private:
      * https://lists.boost.org/boost-users/2017/05/87556.php
      */
 
-    using namespace boost::type_erasure;
-    using ref_type=any<Concept2,T>;
-    using make_ref=any_model_make_reference<_self,ref_type>;
-    using concept_=typename concept_of<value_type>::type;
+    using ref_type=type_erasure::any<Concept2,T>;
+    using make_ref=any_model_make_reference<type_erasure::_self,ref_type>;
+    using concept_=typename type_erasure::concept_of<value_type>::type;
 
-    auto b=make_binding<mpl::map1<mpl::pair<_self,ref_type>>>();
+    auto b=type_erasure::make_binding<
+      mpl::map1<mpl::pair<type_erasure::_self,ref_type>>>();
 
-    return {call(binding<make_ref>{b},make_ref{},x),binding<concept_>{b}};
+    return {
+      type_erasure::call(type_erasure::binding<make_ref>{b},make_ref{},x),
+      type_erasure::binding<concept_>{b}
+    };
   }
 };
 

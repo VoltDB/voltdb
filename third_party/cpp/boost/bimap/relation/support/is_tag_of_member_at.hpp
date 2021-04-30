@@ -27,7 +27,7 @@
 
 /** \struct boost::bimaps::relation::support::is_tag_of_member_at_left
 
-\brief Metafunction to test if a user tag is refering to the left member.
+\brief Metafunction to test if a user tag is referring to the left member.
 
 \code
 
@@ -53,7 +53,7 @@ See also member_with_tag, member_at, is_tag_of_member_at_right.
 
 /** \struct boost::bimaps::relation::support::is_tag_of_member_at_right
 
-\brief Metafunction to test if a user tag is refering to the left member.
+\brief Metafunction to test if a user tag is referring to the left member.
 
 \code
 

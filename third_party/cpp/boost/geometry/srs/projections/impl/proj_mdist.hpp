@@ -54,10 +54,10 @@ namespace detail
     {
         static const int static_size = 20;
 
-        int nb;
         T es;
         T E;
         T b[static_size];
+        int nb;
     };
 
     template <typename T>

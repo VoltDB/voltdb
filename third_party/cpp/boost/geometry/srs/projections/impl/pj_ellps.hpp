@@ -121,7 +121,7 @@ inline std::pair<const pj_ellps_type<T>*, int> pj_get_ellps()
         BOOST_GEOMETRY_PROJECTIONS_DETAIL_PJ_ELLPS_B ("sphere",    6370997.0,   6370997.0,         "Normal Sphere (r=6370997)")
     };
 
-    return std::make_pair(pj_ellps, sizeof(pj_ellps) / sizeof(pj_ellps[0]));
+    return std::make_pair(pj_ellps, (int)(sizeof(pj_ellps) / sizeof(pj_ellps[0])));
 }
 
 } // namespace detail

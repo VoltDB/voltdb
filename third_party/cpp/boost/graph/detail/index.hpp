@@ -16,59 +16,62 @@
 
 namespace boost
 {
-    namespace detail
+namespace detail
+{
+    template < typename Graph > struct vertex_indexer
     {
-        template <typename Graph>
-        struct vertex_indexer
+        typedef vertex_index_t index_type;
+        typedef typename property_map< Graph, vertex_index_t >::type map_type;
+        typedef typename property_map< Graph, vertex_index_t >::const_type
+            const_map_type;
+        typedef typename property_traits< map_type >::value_type value_type;
+        typedef typename graph_traits< Graph >::vertex_descriptor key_type;
+
+        static const_map_type index_map(const Graph& g)
         {
-            typedef vertex_index_t index_type;
-            typedef typename property_map<Graph, vertex_index_t>::type map_type;
-            typedef typename property_map<Graph, vertex_index_t>::const_type const_map_type;
-            typedef typename property_traits<map_type>::value_type value_type;
-            typedef typename graph_traits<Graph>::vertex_descriptor key_type;
+            return get(vertex_index, g);
+        }
 
-            static const_map_type index_map(const Graph& g)
-            { return get(vertex_index, g); }
+        static map_type index_map(Graph& g) { return get(vertex_index, g); }
 
-            static map_type index_map(Graph& g)
-            { return get(vertex_index, g); }
-
-            static value_type index(key_type k, const Graph& g)
-            { return get(vertex_index, g, k); }
-        };
-
-        template <typename Graph>
-        struct edge_indexer
+        static value_type index(key_type k, const Graph& g)
         {
-            typedef edge_index_t index_type;
-            typedef typename property_map<Graph, edge_index_t>::type map_type;
-            typedef typename property_map<Graph, edge_index_t>::const_type const_map_type;
-            typedef typename property_traits<map_type>::value_type value_type;
-            typedef typename graph_traits<Graph>::edge_descriptor key_type;
+            return get(vertex_index, g, k);
+        }
+    };
 
-            static const_map_type index_map(const Graph& g)
-            { return get(edge_index, g); }
+    template < typename Graph > struct edge_indexer
+    {
+        typedef edge_index_t index_type;
+        typedef typename property_map< Graph, edge_index_t >::type map_type;
+        typedef typename property_map< Graph, edge_index_t >::const_type
+            const_map_type;
+        typedef typename property_traits< map_type >::value_type value_type;
+        typedef typename graph_traits< Graph >::edge_descriptor key_type;
 
-            static map_type index_map(Graph& g)
-            { return get(edge_index, g); }
-
-            static value_type index(key_type k, const Graph& g)
-            { return get(edge_index, g, k); }
-        };
-
-        // NOTE: The Graph parameter MUST be a model of VertexIndexGraph or
-        // VertexEdgeGraph - whichever type Key is selecting.
-        template <typename Graph, typename Key>
-        struct choose_indexer
+        static const_map_type index_map(const Graph& g)
         {
-            typedef typename mpl::if_<
-                    is_same<Key, typename graph_traits<Graph>::vertex_descriptor>,
-                    vertex_indexer<Graph>,
-                    edge_indexer<Graph>
-                >::type indexer_type;
-            typedef typename indexer_type::index_type index_type;
-        };
-    }
+            return get(edge_index, g);
+        }
+
+        static map_type index_map(Graph& g) { return get(edge_index, g); }
+
+        static value_type index(key_type k, const Graph& g)
+        {
+            return get(edge_index, g, k);
+        }
+    };
+
+    // NOTE: The Graph parameter MUST be a model of VertexIndexGraph or
+    // VertexEdgeGraph - whichever type Key is selecting.
+    template < typename Graph, typename Key > struct choose_indexer
+    {
+        typedef typename mpl::if_<
+            is_same< Key, typename graph_traits< Graph >::vertex_descriptor >,
+            vertex_indexer< Graph >, edge_indexer< Graph > >::type indexer_type;
+        typedef typename indexer_type::index_type index_type;
+    };
+}
 }
 
 #endif

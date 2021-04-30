@@ -1,6 +1,6 @@
 // Boost.Geometry (aka GGL, Generic Geometry Library)
 
-// Copyright (c) 2014-2017, Oracle and/or its affiliates.
+// Copyright (c) 2014-2020, Oracle and/or its affiliates.
 
 // Contributed and/or modified by Menelaos Karavelas, on behalf of Oracle
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
@@ -14,7 +14,11 @@
 #include <algorithm>
 #include <deque>
 
-#include <boost/range.hpp>
+#include <boost/range/begin.hpp>
+#include <boost/range/empty.hpp>
+#include <boost/range/end.hpp>
+#include <boost/range/size.hpp>
+#include <boost/range/value_type.hpp>
 
 #include <boost/geometry/core/assert.hpp>
 #include <boost/geometry/core/closure.hpp>
@@ -29,7 +33,6 @@
 #include <boost/geometry/policies/robustness/no_rescale_policy.hpp>
 #include <boost/geometry/policies/robustness/segment_ratio.hpp>
 
-#include <boost/geometry/algorithms/equals.hpp>
 #include <boost/geometry/algorithms/intersects.hpp>
 #include <boost/geometry/algorithms/not_implemented.hpp>
 
@@ -37,6 +40,7 @@
 #include <boost/geometry/algorithms/detail/signed_size_type.hpp>
 
 #include <boost/geometry/algorithms/detail/disjoint/linear_linear.hpp>
+#include <boost/geometry/algorithms/detail/equals/point_point.hpp>
 #include <boost/geometry/algorithms/detail/overlay/get_turn_info.hpp>
 #include <boost/geometry/algorithms/detail/overlay/turn_info.hpp>
 #include <boost/geometry/algorithms/detail/overlay/self_turn_points.hpp>
@@ -74,19 +78,25 @@ inline bool check_segment_indices(Turn const& turn,
 }
 
 
-template <typename Geometry, typename Tag = typename tag<Geometry>::type>
+template
+<
+    typename Geometry,
+    typename EqPPStrategy,
+    typename Tag = typename tag<Geometry>::type
+>
 class is_acceptable_turn
     : not_implemented<Geometry>
 {};
 
-template <typename Linestring>
-class is_acceptable_turn<Linestring, linestring_tag>
+template <typename Linestring, typename EqPPStrategy>
+class is_acceptable_turn<Linestring, EqPPStrategy, linestring_tag>
 {
 public:
     is_acceptable_turn(Linestring const& linestring)
         : m_linestring(linestring)
-        , m_is_closed(geometry::equals(range::front(linestring),
-                                       range::back(linestring)))
+        , m_is_closed(geometry::detail::equals::equals_point_point(range::front(linestring),
+                                                                   range::back(linestring),
+                                                                   EqPPStrategy()))
     {}
 
     template <typename Turn>
@@ -104,12 +114,16 @@ private:
     bool const m_is_closed;
 };
 
-template <typename MultiLinestring>
-class is_acceptable_turn<MultiLinestring, multi_linestring_tag>
+template <typename MultiLinestring, typename EqPPStrategy>
+class is_acceptable_turn<MultiLinestring, EqPPStrategy, multi_linestring_tag>
 {
 private:
-    typedef typename boost::range_value<MultiLinestring>::type linestring_type;
-    typedef is_acceptable_turn<linestring_type> base_type;
+    template <typename Point1, typename Point2>
+    static inline bool equals_point_point(Point1 const& point1, Point2 const& point2)
+    {
+        return geometry::detail::equals::equals_point_point(point1, point2,
+                                                            EqPPStrategy());
+    }
 
     template <typename Point, typename Linestring>
     static inline bool is_boundary_point_of(Point const& point,
@@ -117,11 +131,10 @@ private:
     {
         BOOST_GEOMETRY_ASSERT(boost::size(linestring) > 1);
         return
-            ! geometry::equals(range::front(linestring),
-                               range::back(linestring))
+            !equals_point_point(range::front(linestring), range::back(linestring))
             &&
-            (geometry::equals(point, range::front(linestring))
-             || geometry::equals(point, range::back(linestring)));
+            (equals_point_point(point, range::front(linestring))
+             || equals_point_point(point, range::back(linestring)));
     }
 
     template <typename Turn, typename Linestring>
@@ -134,7 +147,7 @@ private:
             &&
             check_segment_indices(turn, boost::size(linestring) - 2)
             &&
-            geometry::equals(range::front(linestring), range::back(linestring))
+            equals_point_point(range::front(linestring), range::back(linestring))
             &&
             turn.operations[0].fraction.is_zero();
             ;
@@ -145,13 +158,13 @@ private:
                                                  Linestring2 const& ls2)
     {
         return
-            geometry::equals(range::front(ls1), range::front(ls2))
+            equals_point_point(range::front(ls1), range::front(ls2))
             ?
-            geometry::equals(range::back(ls1), range::back(ls2))
+            equals_point_point(range::back(ls1), range::back(ls2))
             :
-            (geometry::equals(range::front(ls1), range::back(ls2))
+            (equals_point_point(range::front(ls1), range::back(ls2))
              &&
-             geometry::equals(range::back(ls1), range::front(ls2)))
+                equals_point_point(range::back(ls1), range::front(ls2)))
             ;
     }
 
@@ -163,6 +176,8 @@ public:
     template <typename Turn>
     inline bool apply(Turn const& turn) const
     {
+        typedef typename boost::range_value<MultiLinestring>::type linestring_type;
+        
         linestring_type const& ls1 =
             range::at(m_multilinestring, turn.operations[0].seg_id.multi_index);
 
@@ -195,14 +210,7 @@ inline bool has_self_intersections(Linear const& linear, Strategy const& strateg
     typedef typename point_type<Linear>::type point_type;
 
     // compute self turns
-    typedef detail::overlay::turn_info
-        <
-            point_type,
-            geometry::segment_ratio
-                <
-                    typename geometry::coordinate_type<point_type>::type
-                >
-        > turn_info;
+    typedef detail::overlay::turn_info<point_type> turn_info;
 
     std::deque<turn_info> turns;
 
@@ -211,10 +219,15 @@ inline bool has_self_intersections(Linear const& linear, Strategy const& strateg
             detail::disjoint::assign_disjoint_policy
         > turn_policy;
 
-    is_acceptable_turn<Linear> predicate(linear);
+    typedef is_acceptable_turn
+        <
+            Linear, Strategy
+        > is_acceptable_turn_type;
+
+    is_acceptable_turn_type predicate(linear);
     detail::overlay::predicate_based_interrupt_policy
         <
-            is_acceptable_turn<Linear>
+            is_acceptable_turn_type
         > interrupt_policy(predicate);
 
     // TODO: skip_adjacent should be set to false
@@ -246,11 +259,11 @@ struct is_simple_linestring
             && ! detail::is_valid::has_duplicates
                     <
                         Linestring, closed
-                    >::apply(linestring, policy)
+                    >::apply(linestring, policy, strategy)
             && ! detail::is_valid::has_spikes
                     <
                         Linestring, closed
-                    >::apply(linestring, policy, strategy.get_side_strategy());
+                    >::apply(linestring, policy, strategy);
     }
 };
 

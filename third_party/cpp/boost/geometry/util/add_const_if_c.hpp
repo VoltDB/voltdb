@@ -4,6 +4,10 @@
 // Copyright (c) 2008-2012 Bruno Lalande, Paris, France.
 // Copyright (c) 2009-2012 Mateusz Loskot, London, UK.
 
+// This file was modified by Oracle on 2020.
+// Modifications copyright (c) 2020 Oracle and/or its affiliates.
+// Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
+
 // Parts of Boost.Geometry are redesigned from Geodan's Geographic Library
 // (geolib/GGL), copyright (c) 1995-2010 Geodan, Amsterdam, the Netherlands.
 
@@ -15,42 +19,10 @@
 #define BOOST_GEOMETRY_UTIL_ADD_CONST_IF_C_HPP
 
 
-#include <boost/mpl/if.hpp>
+#include <boost/config/header_deprecated.hpp>
+BOOST_HEADER_DEPRECATED("<boost/geometry/util/type_traits.hpp>")
 
-
-namespace boost { namespace geometry
-{
-
-
-/*!
-    \brief Meta-function to define a const or non const type
-    \ingroup utility
-    \details If the boolean template parameter is true, the type parameter
-        will be defined as const, otherwise it will be defined as it was.
-        This meta-function is used to have one implementation for both
-        const and non const references
-    \note This traits class is completely independant from Boost.Geometry
-        and might be a separate addition to Boost
-    \note Used in a.o. for_each, interior_rings, exterior_ring
-    \par Example
-    \code
-        void foo(typename add_const_if_c<IsConst, Point>::type& point)
-    \endcode
-*/
-template <bool IsConst, typename Type>
-struct add_const_if_c
-{
-    typedef typename boost::mpl::if_c
-        <
-            IsConst,
-            Type const,
-            Type
-        >::type type;
-};
-
-
-
-}} // namespace boost::geometry
+#include <boost/geometry/util/type_traits.hpp>
 
 
 #endif // BOOST_GEOMETRY_UTIL_ADD_CONST_IF_C_HPP

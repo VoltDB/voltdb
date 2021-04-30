@@ -8,8 +8,8 @@
     LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 =============================================================================*/
 
-#if !defined(MACRO_DEFINITION_HPP_D68A639E_2DA5_4E9C_8ACD_CFE6B903831E_INCLUDED)
-#define MACRO_DEFINITION_HPP_D68A639E_2DA5_4E9C_8ACD_CFE6B903831E_INCLUDED
+#if !defined(BOOST_MACRO_DEFINITION_HPP_D68A639E_2DA5_4E9C_8ACD_CFE6B903831E_INCLUDED)
+#define BOOST_MACRO_DEFINITION_HPP_D68A639E_2DA5_4E9C_8ACD_CFE6B903831E_INCLUDED
 
 #include <vector>
 #include <list>
@@ -73,16 +73,17 @@ struct macro_definition {
     // with special parameter tokens to simplify later macro replacement.
     // Additionally mark all occurrences of the macro name itself throughout
     // the macro definition
-    void replace_parameters()
+    template<typename ContextT>
+    void replace_parameters(ContextT const & ctx)
     {
         using namespace boost::wave;
 
         if (!replaced_parameters) {
-        typename definition_container_type::iterator end = macrodefinition.end();
-        typename definition_container_type::iterator it = macrodefinition.begin();
+            typename definition_container_type::iterator end = macrodefinition.end();
+            typename definition_container_type::iterator it = macrodefinition.begin();
 
             for (/**/; it != end; ++it) {
-            token_id id = *it;
+                token_id id = *it;
 
                 if (T_IDENTIFIER == id ||
                     IS_CATEGORY(id, KeywordTokenType) ||
@@ -100,20 +101,31 @@ struct macro_definition {
                             break;
                         }
 #if BOOST_WAVE_SUPPORT_VARIADICS_PLACEMARKERS != 0
-                        else if (T_ELLIPSIS == token_id(*cit) &&
+                        else if (need_variadics(ctx.get_language()) &&
+                            T_ELLIPSIS == token_id(*cit) &&
                             "__VA_ARGS__" == (*it).get_value())
                         {
                         // __VA_ARGS__ requires special handling
                             (*it).set_token_id(token_id(T_EXTPARAMETERBASE+i));
                             break;
                         }
+#if BOOST_WAVE_SUPPORT_VA_OPT != 0
+                        else if (need_va_opt(ctx.get_language()) &&
+                            T_ELLIPSIS == token_id(*cit) &&
+                            "__VA_OPT__" == (*it).get_value())
+                        {
+                        // __VA_OPT__ also requires related special handling
+                            (*it).set_token_id(token_id(T_OPTPARAMETERBASE+i));
+                            break;
+                        }
+#endif
 #endif
                     }
                 }
             }
 
 #if BOOST_WAVE_SUPPORT_VARIADICS_PLACEMARKERS != 0
-        // we need to know, if the last of the formal arguments is an ellipsis
+            // we need to know, if the last of the formal arguments is an ellipsis
             if (macroparameters.size() > 0 &&
                 T_ELLIPSIS == token_id(macroparameters.back()))
             {
@@ -197,4 +209,4 @@ intrusive_ptr_release(macro_definition<TokenT, ContainerT>* p)
 #include BOOST_ABI_SUFFIX
 #endif
 
-#endif // !defined(MACRO_DEFINITION_HPP_D68A639E_2DA5_4E9C_8ACD_CFE6B903831E_INCLUDED)
+#endif // !defined(BOOST_MACRO_DEFINITION_HPP_D68A639E_2DA5_4E9C_8ACD_CFE6B903831E_INCLUDED)

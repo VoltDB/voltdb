@@ -9,7 +9,7 @@
 /////////1/////////2/////////3/////////4/////////5/////////6/////////7/////////8
 // slist.hpp
 
-// (C) Copyright 2002 Robert Ramey - http://www.rrsd.com . 
+// (C) Copyright 2002 Robert Ramey - http://www.rrsd.com .
 // Use, modification and distribution is subject to the Boost Software
 // License, Version 1.0. (See accompanying file LICENSE_1_0.txt or copy at
 // http://www.boost.org/LICENSE_1_0.txt)
@@ -22,16 +22,16 @@
 
 #include <boost/serialization/collections_save_imp.hpp>
 #include <boost/serialization/collections_load_imp.hpp>
-#include <boost/archive/detail/basic_iarchive.hpp>
 #include <boost/serialization/nvp.hpp>
 #include <boost/serialization/collection_size_type.hpp>
 #include <boost/serialization/item_version_type.hpp>
+#include <boost/serialization/library_version_type.hpp>
 #include <boost/serialization/split_free.hpp>
 #include <boost/serialization/detail/stack_constructor.hpp>
 #include <boost/serialization/detail/is_default_constructible.hpp>
 #include <boost/move/utility_core.hpp>
 
-namespace boost { 
+namespace boost {
 namespace serialization {
 
 template<class Archive, class U, class Allocator>
@@ -42,7 +42,7 @@ inline void save(
 ){
     boost::serialization::stl::save_collection<
         Archive,
-        BOOST_STD_EXTENSION_NAMESPACE::slist<U, Allocator> 
+        BOOST_STD_EXTENSION_NAMESPACE::slist<U, Allocator>
     >(ar, t);
 }
 
@@ -88,14 +88,14 @@ inline void load(
     BOOST_STD_EXTENSION_NAMESPACE::slist<U, Allocator> &t,
     const unsigned int file_version
 ){
-    const boost::archive::library_version_type library_version(
+    const boost::serialization::library_version_type library_version(
         ar.get_library_version()
     );
     // retrieve number of elements
     item_version_type item_version(0);
     collection_size_type count;
     ar >> BOOST_SERIALIZATION_NVP(count);
-    if(boost::archive::library_version_type(3) < library_version){
+    if(boost::serialization::library_version_type(3) < library_version){
         ar >> BOOST_SERIALIZATION_NVP(item_version);
     }
     if(detail::is_default_constructible<U>()){

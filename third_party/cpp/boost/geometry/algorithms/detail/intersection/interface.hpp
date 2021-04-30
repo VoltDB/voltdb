@@ -2,9 +2,8 @@
 
 // Copyright (c) 2007-2012 Barend Gehrels, Amsterdam, the Netherlands.
 
-// This file was modified by Oracle on 2014, 2017.
-// Modifications copyright (c) 2014-2017, Oracle and/or its affiliates.
-
+// This file was modified by Oracle on 2014-2020.
+// Modifications copyright (c) 2014-2020, Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
 // Use, modification and distribution is subject to the Boost Software License,
@@ -20,8 +19,11 @@
 #include <boost/variant/variant_fwd.hpp>
 
 #include <boost/geometry/algorithms/detail/overlay/intersection_insert.hpp>
+#include <boost/geometry/algorithms/detail/tupled_output.hpp>
 #include <boost/geometry/policies/robustness/get_rescale_policy.hpp>
 #include <boost/geometry/strategies/default_strategy.hpp>
+#include <boost/geometry/strategies/detail.hpp>
+#include <boost/geometry/strategies/relate/services.hpp>
 #include <boost/geometry/util/range.hpp>
 
 
@@ -50,14 +52,18 @@ struct intersection
             GeometryOut& geometry_out,
             Strategy const& strategy)
     {
-        typedef typename boost::range_value<GeometryOut>::type OneOut;
+        typedef typename geometry::detail::output_geometry_value
+            <
+                GeometryOut
+            >::type SingleOut;
 
         intersection_insert
             <
-                Geometry1, Geometry2, OneOut,
+                Geometry1, Geometry2, SingleOut,
                 overlay_intersection
             >::apply(geometry1, geometry2, robust_policy,
-                     range::back_inserter(geometry_out), strategy);
+                     geometry::detail::output_geometry_back_inserter(geometry_out),
+                     strategy);
 
         return true;
     }
@@ -103,22 +109,35 @@ struct intersection
 
 namespace resolve_strategy {
 
+template
+<
+    typename Strategy,
+    bool IsUmbrella = strategies::detail::is_umbrella_strategy<Strategy>::value
+>
 struct intersection
 {
     template
     <
         typename Geometry1,
         typename Geometry2,
-        typename RobustPolicy,
-        typename GeometryOut,
-        typename Strategy
+        typename GeometryOut
     >
     static inline bool apply(Geometry1 const& geometry1,
                              Geometry2 const& geometry2,
-                             RobustPolicy const& robust_policy,
                              GeometryOut & geometry_out,
                              Strategy const& strategy)
     {
+        typedef typename geometry::rescale_overlay_policy_type
+            <
+                Geometry1,
+                Geometry2,
+                typename Strategy::cs_tag
+            >::type rescale_policy_type;
+        
+        rescale_policy_type robust_policy
+            = geometry::get_rescale_policy<rescale_policy_type>(
+                    geometry1, geometry2, strategy);
+
         return dispatch::intersection
             <
                 Geometry1,
@@ -126,31 +145,54 @@ struct intersection
             >::apply(geometry1, geometry2, robust_policy, geometry_out,
                      strategy);
     }
+};
 
+template <typename Strategy>
+struct intersection<Strategy, false>
+{
     template
     <
         typename Geometry1,
         typename Geometry2,
-        typename RobustPolicy,
         typename GeometryOut
     >
     static inline bool apply(Geometry1 const& geometry1,
                              Geometry2 const& geometry2,
-                             RobustPolicy const& robust_policy,
+                             GeometryOut & geometry_out,
+                             Strategy const& strategy)
+    {
+        using strategies::relate::services::strategy_converter;
+        return intersection
+            <
+                decltype(strategy_converter<Strategy>::get(strategy))
+            >::apply(geometry1, geometry2, geometry_out,
+                     strategy_converter<Strategy>::get(strategy));
+    }
+};
+
+template <>
+struct intersection<default_strategy, false>
+{
+    template
+    <
+        typename Geometry1,
+        typename Geometry2,
+        typename GeometryOut
+    >
+    static inline bool apply(Geometry1 const& geometry1,
+                             Geometry2 const& geometry2,
                              GeometryOut & geometry_out,
                              default_strategy)
     {
-        typedef typename strategy::relate::services::default_strategy
+        typedef typename strategies::relate::services::default_strategy
             <
                 Geometry1, Geometry2
             >::type strategy_type;
-        
-        return dispatch::intersection
+
+        return intersection
             <
-                Geometry1,
-                Geometry2
-            >::apply(geometry1, geometry2, robust_policy, geometry_out,
-                     strategy_type());
+                strategy_type
+            >::apply(geometry1, geometry2, geometry_out, strategy_type());
     }
 };
 
@@ -172,21 +214,10 @@ struct intersection
         concepts::check<Geometry1 const>();
         concepts::check<Geometry2 const>();
         
-        typedef typename geometry::rescale_overlay_policy_type
+        return resolve_strategy::intersection
             <
-                Geometry1,
-                Geometry2
-            >::type rescale_policy_type;
-        
-        rescale_policy_type robust_policy
-            = geometry::get_rescale_policy<rescale_policy_type>(geometry1,
-                                                                geometry2);
-        
-        return resolve_strategy::intersection::apply(geometry1,
-                                                     geometry2,
-                                                     robust_policy,
-                                                     geometry_out,
-                                                     strategy);
+                Strategy
+            >::apply(geometry1, geometry2, geometry_out, strategy);
     }
 };
 

@@ -65,7 +65,7 @@ struct Requires_ : ::boost::ccheck_aux::unaryfunptr_arg_type<Result>
 # define BOOST_CONCEPT_REQUIRES(models, result)                                    \
     typename ::boost::ccheck_aux::unaryfunptr_arg_type<void(*)result>::type
 
-#elif BOOST_WORKAROUND(__BORLANDC__, BOOST_TESTED_AT(0x564))
+#elif BOOST_WORKAROUND(BOOST_BORLANDC, BOOST_TESTED_AT(0x564))
 
 // Same thing as below without the initial typename
 # define BOOST_CONCEPT_REQUIRES(models, result)                                \

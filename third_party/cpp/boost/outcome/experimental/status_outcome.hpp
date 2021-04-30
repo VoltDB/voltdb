@@ -1,5 +1,5 @@
 /* A less simple result type
-(C) 2018-2019 Niall Douglas <http://www.nedproductions.biz/> (59 commits)
+(C) 2018-2021 Niall Douglas <http://www.nedproductions.biz/> (17 commits)
 File Created: Apr 2018
 
 
@@ -58,55 +58,26 @@ BOOST_OUTCOME_SYSTEM_ERROR2_NAMESPACE_END
 
 BOOST_OUTCOME_V2_NAMESPACE_EXPORT_BEGIN
 
-namespace trait
-{
-  namespace detail
-  {
-    // Shortcut this for lower build impact
-    template <class DomainType> struct _is_error_code_available<BOOST_OUTCOME_SYSTEM_ERROR2_NAMESPACE::status_code<DomainType>>
-    {
-      static constexpr bool value = true;
-    };
-    template <class DomainType> struct _is_error_code_available<BOOST_OUTCOME_SYSTEM_ERROR2_NAMESPACE::errored_status_code<DomainType>>
-    {
-      static constexpr bool value = true;
-    };
-  }  // namespace detail
-#if 0
-  template <class DomainType> struct is_error_type<BOOST_OUTCOME_SYSTEM_ERROR2_NAMESPACE::status_code<DomainType>>
-  {
-    static constexpr bool value = true;
-  };
-  template <> struct is_error_type<BOOST_OUTCOME_SYSTEM_ERROR2_NAMESPACE::errc>
-  {
-    static constexpr bool value = true;
-  };
-  template <class DomainType, class Enum> struct is_error_type_enum<BOOST_OUTCOME_SYSTEM_ERROR2_NAMESPACE::status_code<DomainType>, Enum>
-  {
-    static constexpr bool value = boost::system::is_error_condition_enum<Enum>::value;
-  };
-#endif
-}  // namespace trait
-
-
 namespace experimental
 {
   namespace policy
   {
     template <class T, class EC, class E>
-    using default_status_outcome_policy = std::conditional_t<                                                                                                                              //
-    std::is_void<EC>::value && std::is_void<E>::value,                                                                                                                                     //
-    BOOST_OUTCOME_V2_NAMESPACE::policy::terminate,                                                                                                                                               //
-    std::conditional_t<(is_status_code<EC>::value || is_errored_status_code<EC>::value) && (std::is_void<E>::value || BOOST_OUTCOME_V2_NAMESPACE::trait::is_exception_ptr_available<E>::value),  //
-                       status_code_throw<T, EC, E>,                                                                                                                                        //
-                       BOOST_OUTCOME_V2_NAMESPACE::policy::fail_to_compile_observers                                                                                                             //
+    using default_status_outcome_policy = std::conditional_t<  //
+    std::is_void<EC>::value && std::is_void<E>::value,         //
+    BOOST_OUTCOME_V2_NAMESPACE::policy::terminate,                   //
+    std::conditional_t<(is_status_code<EC>::value || is_errored_status_code<EC>::value) &&
+                       (std::is_void<E>::value || BOOST_OUTCOME_V2_NAMESPACE::trait::is_exception_ptr_available<E>::value),  //
+                       status_code_throw<T, EC, E>,                                                                    //
+                       BOOST_OUTCOME_V2_NAMESPACE::policy::fail_to_compile_observers                                         //
                        >>;
   }  // namespace policy
 
-  /*! AWAITING HUGO JSON CONVERSION TOOL 
+  /*! AWAITING HUGO JSON CONVERSION TOOL
 SIGNATURE NOT RECOGNISED
 */
-  template <class R, class S = system_code, class P = std::exception_ptr, class NoValuePolicy = policy::default_status_outcome_policy<R, S, P>>  //
+  template <class R, class S = errored_status_code<erased<typename system_code::value_type>>, class P = std::exception_ptr,
+            class NoValuePolicy = policy::default_status_outcome_policy<R, S, P>>  //
   using status_outcome = basic_outcome<R, S, P, NoValuePolicy>;
 
   namespace policy
@@ -120,7 +91,8 @@ SIGNATURE NOT RECOGNISED
         {
           if(base::_has_exception(static_cast<Impl &&>(self)))
           {
-            BOOST_OUTCOME_V2_NAMESPACE::policy::detail::_rethrow_exception<trait::is_exception_ptr_available<E>::value>(base::_exception<T, status_code<DomainType>, E, status_code_throw>(static_cast<Impl &&>(self)));  // NOLINT
+            BOOST_OUTCOME_V2_NAMESPACE::policy::detail::_rethrow_exception<trait::is_exception_ptr_available<E>::value>(
+            base::_exception<T, status_code<DomainType>, E, status_code_throw>(static_cast<Impl &&>(self)));  // NOLINT
           }
           if(base::_has_error(static_cast<Impl &&>(self)))
           {
@@ -135,7 +107,8 @@ SIGNATURE NOT RECOGNISED
       template <class Impl> static constexpr void wide_error_check(Impl &&self) { _base::narrow_error_check(static_cast<Impl &&>(self)); }
       template <class Impl> static constexpr void wide_exception_check(Impl &&self) { _base::narrow_exception_check(static_cast<Impl &&>(self)); }
     };
-    template <class T, class DomainType, class E> struct status_code_throw<T, errored_status_code<DomainType>, E> : status_code_throw<T, status_code<DomainType>, E>
+    template <class T, class DomainType, class E>
+    struct status_code_throw<T, errored_status_code<DomainType>, E> : status_code_throw<T, status_code<DomainType>, E>
     {
       status_code_throw() = default;
       using status_code_throw<T, status_code<DomainType>, E>::status_code_throw;

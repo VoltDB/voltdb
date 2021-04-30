@@ -1,4 +1,4 @@
-/* Copyright 2016-2017 Joaquin M Lopez Munoz.
+/* Copyright 2016-2019 Joaquin M Lopez Munoz.
  * Distributed under the Boost Software License, Version 1.0.
  * (See accompanying file LICENSE_1_0.txt or copy at
  * http://www.boost.org/LICENSE_1_0.txt)
@@ -13,6 +13,7 @@
 #pragma once
 #endif
 
+#include <boost/detail/workaround.hpp>
 #include <boost/iterator/iterator_facade.hpp>
 #include <type_traits>
 
@@ -72,6 +73,23 @@ public:
   explicit stride_iterator(DerivedValue* x)noexcept:
     p{x},stride_{sizeof(DerivedValue)}{}
 
+#if BOOST_WORKAROUND(BOOST_GCC_VERSION,>=40900)||\
+    BOOST_WORKAROUND(BOOST_CLANG,>=1)&&\
+    (__clang_major__>3 || __clang_major__==3 && __clang_minor__ >= 8)
+/* https://github.com/boostorg/poly_collection/issues/15 */
+  
+#define BOOST_POLY_COLLECTION_NO_SANITIZE
+
+/* UBSan seems not to be supported in some environments */
+#if defined(BOOST_GCC_VERSION)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wattributes"
+#elif defined(BOOST_CLANG)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wattributes"
+#endif
+#endif
+
   template<
     typename DerivedValue,
     typename std::enable_if<
@@ -79,8 +97,21 @@ public:
       (!std::is_const<Value>::value||std::is_const<DerivedValue>::value)
     >::type* =nullptr
   >
+#if defined(BOOST_POLY_COLLECTION_NO_SANITIZE)
+  __attribute__((no_sanitize("undefined")))
+#endif
   explicit operator DerivedValue*()const noexcept
   {return static_cast<DerivedValue*>(p);}
+
+#if defined(BOOST_POLY_COLLECTION_NO_SANITIZE)
+#if defined(BOOST_GCC_VERSION)
+#pragma GCC diagnostic pop
+#elif defined(BOOST_CLANG)
+#pragma clang diagnostic pop
+#endif
+
+#undef BOOST_POLY_COLLECTION_NO_SANITIZE
+#endif
 
   std::size_t stride()const noexcept{return stride_;}
 

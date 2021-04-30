@@ -13,15 +13,21 @@
 #include <boost/process/pipe.hpp>
 #include <boost/process/detail/posix/handler.hpp>
 #include <boost/process/detail/posix/file_descriptor.hpp>
+#include <boost/process/detail/used_handles.hpp>
 #include <cstdio>
 #include <unistd.h>
 
 namespace boost { namespace process { namespace detail { namespace posix {
 
-struct file_in : handler_base_ext
+struct file_in : handler_base_ext, ::boost::process::detail::uses_handles
 {
     file_descriptor file;
     int handle = file.handle();
+
+    std::array<int, 2> get_used_handles()
+    {
+        return {{STDIN_FILENO, handle}};
+    }
 
     template<typename T>
     file_in(T&& t) : file(std::forward<T>(t)) {}

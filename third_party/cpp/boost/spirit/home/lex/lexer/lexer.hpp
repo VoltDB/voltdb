@@ -22,7 +22,9 @@
 #include <boost/noncopyable.hpp>
 #include <boost/fusion/include/vector.hpp>
 #include <boost/mpl/assert.hpp>
-#include <boost/range/iterator_range.hpp>
+#include <boost/proto/extends.hpp>
+#include <boost/proto/traits.hpp>
+#include <boost/range/iterator_range_core.hpp>
 #include <iterator> // for std::iterator_traits
 #include <string>
 
@@ -181,9 +183,8 @@ namespace boost { namespace spirit { namespace lex
 
                 lexer_def_& def;
 
-            private:
                 // silence MSVC warning C4512: assignment operator could not be generated
-                adder& operator= (adder const&);
+                BOOST_DELETED_FUNCTION(adder& operator= (adder const&))
             };
             friend struct adder;
 
@@ -203,9 +204,8 @@ namespace boost { namespace spirit { namespace lex
 
                 lexer_def_& def;
 
-            private:
                 // silence MSVC warning C4512: assignment operator could not be generated
-                pattern_adder& operator= (pattern_adder const&);
+                BOOST_DELETED_FUNCTION(pattern_adder& operator= (pattern_adder const&))
             };
             friend struct pattern_adder;
 
@@ -280,9 +280,8 @@ namespace boost { namespace spirit { namespace lex
             string_type state;
             string_type targetstate;
 
-        private:
             // silence MSVC warning C4512: assignment operator could not be generated
-            lexer_def_& operator= (lexer_def_ const&);
+            BOOST_DELETED_FUNCTION(lexer_def_& operator= (lexer_def_ const&))
         };
 
 #if defined(BOOST_NO_CXX11_RVALUE_REFERENCES)

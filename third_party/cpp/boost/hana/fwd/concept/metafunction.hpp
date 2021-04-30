@@ -90,7 +90,7 @@ BOOST_HANA_NAMESPACE_BEGIN
     //! deep comparison. Hence, we adopt a conservative stance and avoid
     //! providing comparison for `Metafunction`s.
     //!
-    //! [1]: http://en.cppreference.com/w/cpp/concept/FunctionObject
+    //! [1]: http://en.cppreference.com/w/cpp/named_req/FunctionObject
     //! [2]: http://www.boost.org/doc/libs/release/libs/mpl/doc/refmanual/metafunction-class.html
     template <typename F>
     struct Metafunction;

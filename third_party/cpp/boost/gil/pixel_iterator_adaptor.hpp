@@ -80,14 +80,17 @@ struct const_iterator_type<dereference_iterator_adaptor<I,DFn> > {
 };
 
 template <typename I, typename DFn>
-struct iterator_is_mutable<dereference_iterator_adaptor<I,DFn> > : public mpl::bool_<DFn::is_mutable> {};
+struct iterator_is_mutable<dereference_iterator_adaptor<I, DFn>>
+    : std::integral_constant<bool, DFn::is_mutable>
+{};
 
 
 template <typename I, typename DFn>
-struct is_iterator_adaptor<dereference_iterator_adaptor<I,DFn> > : public mpl::true_{};
+struct is_iterator_adaptor<dereference_iterator_adaptor<I, DFn>> : std::true_type {};
 
 template <typename I, typename DFn>
-struct iterator_adaptor_get_base<dereference_iterator_adaptor<I,DFn> > {
+struct iterator_adaptor_get_base<dereference_iterator_adaptor<I, DFn>>
+{
     using type = I;
 };
 
@@ -168,7 +171,7 @@ struct dynamic_x_step_type<dereference_iterator_adaptor<Iterator,DFn> > {
 /// \ingroup PixelIteratorModelDerefPtr
 template <typename Iterator, typename Deref>
 struct iterator_add_deref {
-    GIL_CLASS_REQUIRE(Deref, boost::gil, PixelDereferenceAdaptorConcept)
+    BOOST_GIL_CLASS_REQUIRE(Deref, boost::gil, PixelDereferenceAdaptorConcept)
 
     using type = dereference_iterator_adaptor<Iterator, Deref>;
 
@@ -179,7 +182,7 @@ struct iterator_add_deref {
 /// \brief For dereference iterator adaptors, compose the new function object after the old one
 template <typename Iterator, typename PREV_DEREF, typename Deref>
 struct iterator_add_deref<dereference_iterator_adaptor<Iterator, PREV_DEREF>,Deref> {
-//    GIL_CLASS_REQUIRE(Deref, boost::gil, PixelDereferenceAdaptorConcept)
+//    BOOST_GIL_CLASS_REQUIRE(Deref, boost::gil, PixelDereferenceAdaptorConcept)
 
     using type = dereference_iterator_adaptor<Iterator, deref_compose<Deref,PREV_DEREF>>;
 

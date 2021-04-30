@@ -8,6 +8,7 @@
 #ifndef BOOST_ACCUMULATORS_FRAMEWORK_EXTRACTOR_HPP_EAN_28_10_2005
 #define BOOST_ACCUMULATORS_FRAMEWORK_EXTRACTOR_HPP_EAN_28_10_2005
 
+#include <boost/preprocessor/cat.hpp>
 #include <boost/preprocessor/tuple/rem.hpp>
 #include <boost/preprocessor/array/size.hpp>
 #include <boost/preprocessor/array/data.hpp>
@@ -15,11 +16,17 @@
 #include <boost/preprocessor/seq/to_array.hpp>
 #include <boost/preprocessor/seq/transform.hpp>
 #include <boost/preprocessor/repetition/enum_params.hpp>
+#include <boost/preprocessor/repetition/enum_trailing.hpp>
 #include <boost/preprocessor/repetition/enum_trailing_params.hpp>
 #include <boost/preprocessor/repetition/enum_trailing_binary_params.hpp>
+#include <boost/preprocessor/repetition/repeat.hpp>
+#include <boost/preprocessor/repetition/repeat_from_to.hpp>
 #include <boost/parameter/binding.hpp>
-#include <boost/mpl/apply.hpp>
+#include <boost/mpl/bool.hpp>
+#include <boost/mpl/if.hpp>
 #include <boost/mpl/eval_if.hpp>
+#include <boost/mpl/apply.hpp>
+#include <boost/type_traits/remove_const.hpp>
 #include <boost/type_traits/remove_reference.hpp>
 #include <boost/accumulators/accumulators_fwd.hpp>
 #include <boost/accumulators/framework/parameters/accumulator.hpp>
@@ -33,14 +40,24 @@ namespace detail
     struct accumulator_set_result
     {
         typedef typename as_feature<Feature>::type feature_type;
-        typedef typename mpl::apply<AccumulatorSet, feature_type>::type::result_type type;
+        typedef typename mpl::apply<
+            typename boost::remove_const<
+                typename boost::remove_reference<AccumulatorSet>::type
+            >::type
+          , feature_type
+        >::type::result_type type;
     };
 
     template<typename Args, typename Feature>
     struct argument_pack_result
       : accumulator_set_result<
-            typename remove_reference<
-                typename parameter::binding<Args, tag::accumulator>::type
+            typename boost::remove_reference<
+                typename parameter::binding<
+                    typename boost::remove_const<
+                        typename boost::remove_reference<Args>::type
+                    >::type
+                  , tag::accumulator
+                >::type
             >::type
           , Feature
         >
@@ -147,6 +164,8 @@ struct extractor
       , _
     )
 
+#undef BOOST_ACCUMULATORS_EXTRACTOR_FUN_OP
+
     #ifdef BOOST_ACCUMULATORS_DOXYGEN_INVOKED
     /// \overload
     ///
@@ -155,6 +174,8 @@ struct extractor
     operator ()(AccumulatorSet const &acc, A1 const &a1, A2 const &a2, ...);
     #endif
 };
+
+}} // namespace boost::accumulators
 
 /// INTERNAL ONLY
 ///
@@ -223,7 +244,5 @@ struct extractor
       , BOOST_ACCUMULATORS_DEFINE_EXTRACTOR_FUN                                                     \
       , (3, (Tag, Feature, ParamSeq))                                                               \
     )
-
-}} // namespace boost::accumulators
 
 #endif

@@ -2,8 +2,8 @@
 
 // Copyright (c) 2008-2015 Barend Gehrels, Amsterdam, the Netherlands.
 
-// This file was modified by Oracle on 2017, 2018.
-// Modifications copyright (c) 2017-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2017, 2018, 2019.
+// Modifications copyright (c) 2017-2019, Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle.
 
 // Use, modification and distribution is subject to the Boost Software License,
@@ -163,20 +163,14 @@ namespace projections
                 return(sin(arg_r)*hr);
             }
 
-            // template class, using CRTP to implement forward/inverse
             template <typename T, typename Parameters>
             struct base_etmerc_ellipsoid
-                : public base_t_fi<base_etmerc_ellipsoid<T, Parameters>, T, Parameters>
             {
                 par_etmerc<T> m_proj_parm;
 
-                inline base_etmerc_ellipsoid(const Parameters& par)
-                    : base_t_fi<base_etmerc_ellipsoid<T, Parameters>, T, Parameters>(*this, par)
-                {}
-
                 // FORWARD(e_forward)  ellipsoid
                 // Project coordinates from geographic (lon, lat) to cartesian (x, y)
-                inline void fwd(T const& lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
+                inline void fwd(Parameters const& , T const& lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
                 {
                     T sin_Cn, cos_Cn, cos_Ce, sin_Ce, dCn, dCe;
                     T Cn = lp_lat, Ce = lp_lon;
@@ -205,7 +199,7 @@ namespace projections
 
                 // INVERSE(e_inverse)  ellipsoid
                 // Project coordinates from cartesian (x, y) to geographic (lon, lat)
-                inline void inv(T const& xy_x, T const& xy_y, T& lp_lon, T& lp_lat) const
+                inline void inv(Parameters const& , T const& xy_x, T const& xy_y, T& lp_lon, T& lp_lat) const
                 {
                     T sin_Cn, cos_Cn, cos_Ce, sin_Ce, dCn, dCe;
                     T Cn = xy_y, Ce = xy_x;
@@ -391,10 +385,9 @@ namespace projections
     struct etmerc_ellipsoid : public detail::etmerc::base_etmerc_ellipsoid<T, Parameters>
     {
         template <typename Params>
-        inline etmerc_ellipsoid(Params const& , Parameters const& par)
-            : detail::etmerc::base_etmerc_ellipsoid<T, Parameters>(par)
+        inline etmerc_ellipsoid(Params const& , Parameters & par)
         {
-            detail::etmerc::setup_etmerc(this->m_par, this->m_proj_parm);
+            detail::etmerc::setup_etmerc(par, this->m_proj_parm);
         }
     };
 
@@ -417,10 +410,9 @@ namespace projections
     struct utm_ellipsoid : public detail::etmerc::base_etmerc_ellipsoid<T, Parameters>
     {
         template <typename Params>
-        inline utm_ellipsoid(Params const& params, Parameters const& par)
-            : detail::etmerc::base_etmerc_ellipsoid<T, Parameters>(par)
+        inline utm_ellipsoid(Params const& params, Parameters & par)
         {
-            detail::etmerc::setup_utm(params, this->m_par, this->m_proj_parm);
+            detail::etmerc::setup_utm(params, par, this->m_proj_parm);
         }
     };
 
@@ -429,8 +421,8 @@ namespace projections
     {
 
         // Static projection
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_etmerc, etmerc_ellipsoid, etmerc_ellipsoid)
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_utm, utm_ellipsoid, utm_ellipsoid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI(srs::spar::proj_etmerc, etmerc_ellipsoid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI(srs::spar::proj_utm, utm_ellipsoid)
 
         // Factory entry(s)
         BOOST_GEOMETRY_PROJECTIONS_DETAIL_FACTORY_ENTRY_FI(etmerc_entry, etmerc_ellipsoid)

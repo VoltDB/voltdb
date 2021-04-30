@@ -9,31 +9,29 @@
 
 #include <boost/math/bindings/detail/big_lanczos.hpp>
 
-namespace boost{ namespace math{
+namespace boost {
+namespace math {
 
-namespace lanczos{
+namespace lanczos {
 
 template <class T, class Policy>
 struct lanczos;
 
-template<class Backend, boost::multiprecision::expression_template_option ExpressionTemplates, class Policy>
+template <class Backend, boost::multiprecision::expression_template_option ExpressionTemplates, class Policy>
 struct lanczos<multiprecision::number<Backend, ExpressionTemplates>, Policy>
 {
-   typedef typename boost::math::policies::precision<multiprecision::number<Backend, ExpressionTemplates>, Policy>::type precision_type;
-   typedef typename mpl::if_c<
-      precision_type::value && (precision_type::value <= 73),
-      lanczos13UDT,
-      typename mpl::if_c<
-      precision_type::value&& (precision_type::value <= 122),
-         lanczos22UDT,
-         undefined_lanczos
-      >::type
-   >::type type;
+   using precision_type = typename boost::math::policies::precision<multiprecision::number<Backend, ExpressionTemplates>, Policy>::type;
+   using type = typename std::conditional<
+       precision_type::value && (precision_type::value <= 73),
+       lanczos13UDT,
+       typename std::conditional<
+           precision_type::value && (precision_type::value <= 122),
+           lanczos22UDT,
+           undefined_lanczos>::type>::type;
 };
 
-} // namespace lanczos
+}
 
-}} // namespaces
+}} // namespace boost::math::lanczos
 
 #endif
-

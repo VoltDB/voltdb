@@ -7,6 +7,9 @@
 // Tools for operator on complex as well as scalar types.
 //
 
+#ifndef BOOST_MATH_TOOLS_COMPLEX_HPP
+#define BOOST_MATH_TOOLS_COMPLEX_HPP
+
 #include <boost/type_traits/is_complex.hpp>
 
 namespace boost {
@@ -14,7 +17,7 @@ namespace boost {
       namespace tools {
 
          //
-         // Speicalize this trait for user-defined complex types (ie Boost.Multiprecision):
+         // Specialize this trait for user-defined complex types (ie Boost.Multiprecision):
          //
          template <class T>
          struct is_complex_type : public boost::is_complex<T> {};
@@ -55,3 +58,5 @@ namespace boost {
 
 
 } } }
+
+#endif // BOOST_MATH_TOOLS_COMPLEX_HPP

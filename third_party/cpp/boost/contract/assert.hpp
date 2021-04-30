@@ -29,7 +29,10 @@ Assert contract conditions.
     code that throws @RefClass{boost::contract::assertion_failure} with the
     correct assertion file name (using <c>__FILE__</c>), line number (using
     <c>__LINE__</c>), and asserted condition code so to produce informative
-    error messages.
+    error messages (C++11 <c>__func__</c> is not used here because in most cases
+    it will simply expand to the internal compiler name of the lambda function
+    used to program the contract conditions adding no specificity to the error
+    message).
     
     @RefMacro{BOOST_CONTRACT_ASSERT}, @RefMacro{BOOST_CONTRACT_ASSERT_AUDIT},
     and @RefMacro{BOOST_CONTRACT_ASSERT_AXIOM} are the three assertion levels
@@ -38,11 +41,12 @@ Assert contract conditions.
     @see    @RefSect{tutorial.preconditions, Preconditions},
             @RefSect{tutorial.postconditions, Postconditions},
             @RefSect{tutorial.exception_guarantees, Exceptions Guarantees},
-            @RefSect{tutorial.class_invariants, Class Invariants}
+            @RefSect{tutorial.class_invariants, Class Invariants},
+            @RefSect{extras.no_macros__and_no_variadic_macros_, No Macros}
     
     @param cond Boolean contract condition to check.
                 (This is not a variadic macro parameter so any comma it might
-                contain must be protected by round parenthesis,
+                contain must be protected by round parenthesis and
                 @c BOOST_CONTRACT_ASSERT((cond)) will always work.)
     */
     // This must be an expression (a trivial one so the compiler can optimize it
@@ -64,7 +68,8 @@ Assert contract conditions.
 #ifdef BOOST_CONTRACT_DETAIL_DOXYGEN
     /**
     Preferred way to assert contract conditions that are computationally
-    expensive, at least compared to the cost of executing the function body.
+    expensive, at least compared to the computational cost of executing the
+    function body.
 
     The asserted condition will always be compiled and validated syntactically,
     but it will not be checked at run-time unless
@@ -87,11 +92,12 @@ Assert contract conditions.
     If there is a need, programmers are free to implement their own assertion
     levels defining macros similar to the one above.
     
-    @see @RefSect{extras.assertion_levels, Assertion Levels}
+    @see    @RefSect{extras.assertion_levels, Assertion Levels},
+            @RefSect{extras.no_macros__and_no_variadic_macros_, No Macros}
     
     @param cond Boolean contract condition to check.
                 (This is not a variadic macro parameter so any comma it might
-                contain must be protected by round parenthesis,
+                contain must be protected by round parenthesis and
                 @c BOOST_CONTRACT_ASSERT_AUDIT((cond)) will always work.)
     */
     #define BOOST_CONTRACT_ASSERT_AUDIT(cond)
@@ -104,8 +110,9 @@ Assert contract conditions.
 #endif
 
 /**
-Preferred way to assert contract conditions that are computationally
-prohibitive, at least compared to the cost of executing the function body.
+Preferred way to document in the code contract conditions that are
+computationally prohibitive, at least compared to the computational cost of
+executing the function body.
 
 The asserted condition will always be compiled and validated syntactically, but
 it will never be checked at run-time.
@@ -122,11 +129,12 @@ by this library.
 If there is a need, programmers are free to implement their own assertion levels
 defining macros similar to the one above.
 
-@see @RefSect{extras.assertion_levels, Assertion Levels}
+@see    @RefSect{extras.assertion_levels, Assertion Levels},
+        @RefSect{extras.no_macros__and_no_variadic_macros_, No Macros}
 
 @param cond Boolean contract condition to check.
             (This is not a variadic macro parameter so any comma it might
-            contain must be protected by round parenthesis,
+            contain must be protected by round parenthesis and
             @c BOOST_CONTRACT_ASSERT_AXIOM((cond)) will always work.)
 */
 #define BOOST_CONTRACT_ASSERT_AXIOM(cond) \

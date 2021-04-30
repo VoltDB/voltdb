@@ -1691,8 +1691,8 @@ namespace boost { namespace numeric { namespace ublas {
 #ifdef BOOST_UBLAS_ENABLE_PROXY_SHORTCUTS
 	     using vector_container<self_type>::operator ();
 #endif
-	     typedef typename ALLOC::size_type size_type;
-	     typedef typename ALLOC::difference_type difference_type;
+         typedef typename boost::allocator_size_type<ALLOC>::type size_type;
+         typedef typename boost::allocator_difference_type<ALLOC>::type difference_type;
 	     typedef T value_type;
 	     typedef const T &const_reference;
 	     typedef T &reference;
@@ -1912,8 +1912,8 @@ namespace boost { namespace numeric { namespace ublas {
 #ifdef BOOST_UBLAS_ENABLE_PROXY_SHORTCUTS
 	     using vector_container<self_type>::operator ();
 #endif
-	     typedef typename ALLOC::size_type size_type;
-	     typedef typename ALLOC::difference_type difference_type;
+         typedef typename boost::allocator_size_type<ALLOC>::type size_type;
+         typedef typename boost::allocator_difference_type<ALLOC>::type difference_type;
 	     typedef T value_type;
 	     typedef const T &const_reference;
 	     typedef T &reference;
@@ -2175,8 +2175,8 @@ namespace boost { namespace numeric { namespace ublas {
 #ifdef BOOST_UBLAS_ENABLE_PROXY_SHORTCUTS
 	     using vector_container<self_type>::operator ();
 #endif
-	     typedef typename ALLOC::size_type size_type;
-	     typedef typename ALLOC::difference_type difference_type;
+         typedef typename boost::allocator_size_type<ALLOC>::type size_type;
+         typedef typename boost::allocator_difference_type<ALLOC>::type difference_type;
 	     typedef T value_type;
 	     typedef const T &const_reference;
 	     typedef T &reference;

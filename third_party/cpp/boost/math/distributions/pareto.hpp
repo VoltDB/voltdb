@@ -431,6 +431,15 @@ namespace boost
       return result;
     } // kurtosis_excess
 
+    template <class RealType, class Policy>
+    inline RealType entropy(const pareto_distribution<RealType, Policy>& dist)
+    {
+      using std::log;
+      RealType xm = dist.scale();
+      RealType alpha = dist.shape();
+      return log(xm/alpha) + 1 + 1/alpha;
+    }
+
     } // namespace math
   } // namespace boost
 

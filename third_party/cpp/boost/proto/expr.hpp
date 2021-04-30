@@ -92,7 +92,7 @@ namespace boost { namespace proto
 
         // Work-around for:
         // https://connect.microsoft.com/VisualStudio/feedback/details/765449/codegen-stack-corruption-using-runtime-checks-when-aggregate-initializing-struct
-    #if BOOST_WORKAROUND(BOOST_MSVC, BOOST_TESTED_AT(1700))
+    #if BOOST_WORKAROUND(BOOST_MSVC, < 1800)
         template<typename T, typename Expr, typename C, typename U>
         BOOST_FORCEINLINE
         Expr make_terminal(T &t, Expr *, proto::term<U C::*> *)
@@ -132,9 +132,21 @@ namespace boost { namespace proto
         // actually defined:
         #include <boost/proto/detail/basic_expr.hpp>
 
+        #if defined(__GNUC__) && __GNUC__ >= 9 || defined(__clang__) && __clang_major__ >= 10
+            #pragma GCC diagnostic push
+            // The warning cannot be fixed for aggregates
+            // Sadly, GCC currently emits the warning at the use location:
+            // https://gcc.gnu.org/bugzilla/show_bug.cgi?id=94492
+            #pragma GCC diagnostic ignored "-Wdeprecated-copy"
+        #endif
+
         // This is where the expr specialization are
         // actually defined:
         #include <boost/proto/detail/expr.hpp>
+
+        #if defined(__GNUC__) && __GNUC__ >= 9 || defined(__clang__) && __clang_major__ >= 10
+            #pragma GCC diagnostic pop
+        #endif
     }
 
     /// \brief Lets you inherit the interface of an expression

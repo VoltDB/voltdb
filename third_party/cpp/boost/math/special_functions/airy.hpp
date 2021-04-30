@@ -75,7 +75,7 @@ T airy_bi_imp(T x, const Policy& pol)
    {
       T tg = boost::math::tgamma(constants::twothirds<T>(), pol);
       //T ai = 1 / (pow(T(3), constants::twothirds<T>()) * tg);
-      T bi = 1 / (sqrt(boost::math::cbrt(T(3))) * tg);
+      T bi = 1 / (sqrt(boost::math::cbrt(T(3), pol)) * tg);
       return bi;
    }
    else
@@ -106,7 +106,7 @@ T airy_ai_prime_imp(T x, const Policy& pol)
    else if(fabs(x * x) / 2 < tools::epsilon<T>())
    {
       T tg = boost::math::tgamma(constants::third<T>(), pol);
-      T aip = 1 / (boost::math::cbrt(T(3)) * tg);
+      T aip = 1 / (boost::math::cbrt(T(3), pol) * tg);
       return -aip;
    }
    else
@@ -141,7 +141,7 @@ T airy_bi_prime_imp(T x, const Policy& pol)
    else if(fabs(x * x) / 2 < tools::epsilon<T>())
    {
       T tg = boost::math::tgamma(constants::third<T>(), pol);
-      T bip = sqrt(boost::math::cbrt(T(3))) / tg;
+      T bip = sqrt(boost::math::cbrt(T(3), pol)) / tg;
       return bip;
    }
    else
@@ -175,7 +175,7 @@ T airy_ai_zero_imp(int m, const Policy& pol)
    }
 
    // Set up the initial guess for the upcoming root-finding.
-   const T guess_root = boost::math::detail::airy_zero::airy_ai_zero_detail::initial_guess<T>(m);
+   const T guess_root = boost::math::detail::airy_zero::airy_ai_zero_detail::initial_guess<T>(m, pol);
 
    // Select the maximum allowed iterations based on the number
    // of decimal digits in the numeric type T, being at least 12.
@@ -227,7 +227,7 @@ T airy_bi_zero_imp(int m, const Policy& pol)
         "The requested rank of the zero is %1%, but must be 1 or more !", static_cast<T>(m), pol);
    }
    // Set up the initial guess for the upcoming root-finding.
-   const T guess_root = boost::math::detail::airy_zero::airy_bi_zero_detail::initial_guess<T>(m);
+   const T guess_root = boost::math::detail::airy_zero::airy_bi_zero_detail::initial_guess<T>(m, pol);
 
    // Select the maximum allowed iterations based on the number
    // of decimal digits in the numeric type T, being at least 12.

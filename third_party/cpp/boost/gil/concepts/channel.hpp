@@ -15,13 +15,15 @@
 #include <boost/concept_check.hpp>
 
 #include <utility> // std::swap
+#include <type_traits>
 
 #if defined(BOOST_CLANG)
 #pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunknown-pragmas"
 #pragma clang diagnostic ignored "-Wunused-local-typedefs"
 #endif
 
-#if defined(BOOST_GCC) && (BOOST_GCC >= 40600)
+#if defined(BOOST_GCC) && (BOOST_GCC >= 40900)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-local-typedefs"
 #endif
@@ -65,7 +67,7 @@ auto channel_convert(SrcT const& val)
 ///     static const bool is_mutable;        // use channel_traits<T>::is_mutable to access it
 ///
 ///     static T min_value();                // use channel_traits<T>::min_value to access it
-///     static T max_value();                // use channel_traits<T>::min_value to access it
+///     static T max_value();                // use channel_traits<T>::max_value to access it
 /// };
 /// \endcode
 template <typename T>
@@ -150,7 +152,7 @@ struct ChannelValueConcept
 /// \ingroup ChannelAlgorithm
 template <typename T1, typename T2>  // Models GIL Pixel
 struct channels_are_compatible
-    : is_same
+    : std::is_same
         <
             typename channel_traits<T1>::value_type,
             typename channel_traits<T2>::value_type
@@ -207,7 +209,7 @@ struct ChannelConvertibleConcept
 #pragma clang diagnostic pop
 #endif
 
-#if defined(BOOST_GCC) && (BOOST_GCC >= 40600)
+#if defined(BOOST_GCC) && (BOOST_GCC >= 40900)
 #pragma GCC diagnostic pop
 #endif
 

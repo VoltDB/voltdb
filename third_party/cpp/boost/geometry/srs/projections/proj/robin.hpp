@@ -2,8 +2,8 @@
 
 // Copyright (c) 2008-2015 Barend Gehrels, Amsterdam, the Netherlands.
 
-// This file was modified by Oracle on 2017, 2018.
-// Modifications copyright (c) 2017-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2017, 2018, 2019.
+// Modifications copyright (c) 2017-2019, Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle.
 
 // Use, modification and distribution is subject to the Boost Software License,
@@ -135,15 +135,9 @@ namespace projections
                 return result;
             }
 
-            // template class, using CRTP to implement forward/inverse
             template <typename T, typename Parameters>
             struct base_robin_spheroid
-                : public base_t_fi<base_robin_spheroid<T, Parameters>, T, Parameters>
             {
-                inline base_robin_spheroid(const Parameters& par)
-                    : base_t_fi<base_robin_spheroid<T, Parameters>, T, Parameters>(*this, par)
-                {}
-
                 inline T v(coefs<T> const& c, T const& z) const
                 { return (c.c0 + z * (c.c1 + z * (c.c2 + z * c.c3))); }
                 inline T dv(coefs<T> const& c, T const&  z) const
@@ -151,7 +145,7 @@ namespace projections
 
                 // FORWARD(s_forward)  spheroid
                 // Project coordinates from geographic (lon, lat) to cartesian (x, y)
-                inline void fwd(T const& lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
+                inline void fwd(Parameters const& , T const& lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
                 {
                     int i;
                     T dphi;
@@ -169,7 +163,7 @@ namespace projections
 
                 // INVERSE(s_inverse)  spheroid
                 // Project coordinates from cartesian (x, y) to geographic (lon, lat)
-                inline void inv(T const& xy_x, T const& xy_y, T& lp_lon, T& lp_lat) const
+                inline void inv(Parameters const& , T const& xy_x, T const& xy_y, T& lp_lon, T& lp_lat) const
                 {
                     static const T half_pi = detail::half_pi<T>();
                     const coefs<T> * coefs_x = robin::coefs_x<T>();
@@ -251,10 +245,9 @@ namespace projections
     struct robin_spheroid : public detail::robin::base_robin_spheroid<T, Parameters>
     {
         template <typename Params>
-        inline robin_spheroid(Params const& , Parameters const& par)
-            : detail::robin::base_robin_spheroid<T, Parameters>(par)
+        inline robin_spheroid(Params const& , Parameters & par)
         {
-            detail::robin::setup_robin(this->m_par);
+            detail::robin::setup_robin(par);
         }
     };
 
@@ -263,7 +256,7 @@ namespace projections
     {
 
         // Static projection
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_robin, robin_spheroid, robin_spheroid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI(srs::spar::proj_robin, robin_spheroid)
 
         // Factory entry(s)
         BOOST_GEOMETRY_PROJECTIONS_DETAIL_FACTORY_ENTRY_FI(robin_entry, robin_spheroid)

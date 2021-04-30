@@ -2,8 +2,8 @@
 
 // Copyright (c) 2008-2015 Barend Gehrels, Amsterdam, the Netherlands.
 
-// This file was modified by Oracle on 2017, 2018.
-// Modifications copyright (c) 2017-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2017, 2018, 2019.
+// Modifications copyright (c) 2017-2019, Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle.
 
 // Use, modification and distribution is subject to the Boost Software License,
@@ -61,20 +61,14 @@ namespace projections
                 T m, rmn, q3, n;
             };
 
-            // template class, using CRTP to implement forward/inverse
             template <typename T, typename Parameters>
             struct base_urm5_spheroid
-                : public base_t_f<base_urm5_spheroid<T, Parameters>, T, Parameters>
             {
                 par_urm5<T> m_proj_parm;
 
-                inline base_urm5_spheroid(const Parameters& par)
-                    : base_t_f<base_urm5_spheroid<T, Parameters>, T, Parameters>(*this, par)
-                {}
-
                 // FORWARD(s_forward)  spheroid
                 // Project coordinates from geographic (lon, lat) to cartesian (x, y)
-                inline void fwd(T const& lp_lon, T lp_lat, T& xy_x, T& xy_y) const
+                inline void fwd(Parameters const&, T const& lp_lon, T lp_lat, T& xy_x, T& xy_y) const
                 {
                     T t;
 
@@ -136,10 +130,9 @@ namespace projections
     struct urm5_spheroid : public detail::urm5::base_urm5_spheroid<T, Parameters>
     {
         template <typename Params>
-        inline urm5_spheroid(Params const& params, Parameters const& par)
-            : detail::urm5::base_urm5_spheroid<T, Parameters>(par)
+        inline urm5_spheroid(Params const& params, Parameters & par)
         {
-            detail::urm5::setup_urm5(params, this->m_par, this->m_proj_parm);
+            detail::urm5::setup_urm5(params, par, this->m_proj_parm);
         }
     };
 
@@ -148,7 +141,7 @@ namespace projections
     {
 
         // Static projection
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_urm5, urm5_spheroid, urm5_spheroid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_F(srs::spar::proj_urm5, urm5_spheroid)
 
         // Factory entry(s)
         BOOST_GEOMETRY_PROJECTIONS_DETAIL_FACTORY_ENTRY_F(urm5_entry, urm5_spheroid)

@@ -67,7 +67,7 @@ inline T bessel_j_derivative_small_z_series(T v, T x, const Policy& pol)
 
    bessel_j_derivative_small_z_series_term<T, Policy> s(v, x);
    boost::uintmax_t max_iter = boost::math::policies::get_max_series_iterations<Policy>();
-#if BOOST_WORKAROUND(__BORLANDC__, BOOST_TESTED_AT(0x582))
+#if BOOST_WORKAROUND(BOOST_BORLANDC, BOOST_TESTED_AT(0x582))
    T zero = 0;
    T result = boost::math::tools::sum_series(s, boost::math::policies::get_epsilon<T, Policy>(), max_iter, zero);
 #else
@@ -132,7 +132,7 @@ private:
 // Series form for BesselY' as z -> 0,
 // It's derivative of http://functions.wolfram.com/Bessel-TypeFunctions/BesselY/06/01/04/01/01/0003/
 // This series is only useful when the second term is small compared to the first
-// otherwise we get catestrophic cancellation errors.
+// otherwise we get catastrophic cancellation errors.
 //
 // Approximating tgamma(v) by v^v, and assuming |tgamma(-z)| < eps we end up requiring:
 // eps/2 * v^v(x/2)^-v > (x/2)^v or log(eps/2) > v log((x/2)^2/v)
@@ -181,7 +181,7 @@ inline T bessel_y_derivative_small_z_series(T v, T x, const Policy& pol)
    }
    bessel_y_derivative_small_z_series_term_a<T, Policy> s(v, x);
    boost::uintmax_t max_iter = boost::math::policies::get_max_series_iterations<Policy>();
-#if BOOST_WORKAROUND(__BORLANDC__, BOOST_TESTED_AT(0x582))
+#if BOOST_WORKAROUND(BOOST_BORLANDC, BOOST_TESTED_AT(0x582))
    T zero = 0;
    T result = boost::math::tools::sum_series(s, boost::math::policies::get_epsilon<T, Policy>(), max_iter, zero);
 #else
@@ -193,7 +193,7 @@ inline T bessel_y_derivative_small_z_series(T v, T x, const Policy& pol)
    p = pow(x / 2, v - 1) / 2;
    if (!need_logs)
    {
-      prefix = boost::math::tgamma(-v, pol) * boost::math::cos_pi(v) * p / boost::math::constants::pi<T>();
+      prefix = boost::math::tgamma(-v, pol) * boost::math::cos_pi(v, pol) * p / boost::math::constants::pi<T>();
    }
    else
    {
@@ -203,7 +203,7 @@ inline T bessel_y_derivative_small_z_series(T v, T x, const Policy& pol)
    }
    bessel_y_derivative_small_z_series_term_b<T, Policy> s2(v, x);
    max_iter = boost::math::policies::get_max_series_iterations<Policy>();
-#if BOOST_WORKAROUND(__BORLANDC__, BOOST_TESTED_AT(0x582))
+#if BOOST_WORKAROUND(BOOST_BORLANDC, BOOST_TESTED_AT(0x582))
    T b = boost::math::tools::sum_series(s2, boost::math::policies::get_epsilon<T, Policy>(), max_iter, zero);
 #else
    T b = boost::math::tools::sum_series(s2, boost::math::policies::get_epsilon<T, Policy>(), max_iter);

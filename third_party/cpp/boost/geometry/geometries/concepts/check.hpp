@@ -4,6 +4,10 @@
 // Copyright (c) 2008-2012 Barend Gehrels, Amsterdam, the Netherlands.
 // Copyright (c) 2009-2012 Mateusz Loskot, London, UK.
 
+// This file was modified by Oracle on 2020.
+// Modifications copyright (c) 2020 Oracle and/or its affiliates.
+// Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
+
 // Parts of Boost.Geometry are redesigned from Geodan's Geographic Library
 // (geolib/GGL), copyright (c) 1995-2010 Geodan, Amsterdam, the Netherlands.
 
@@ -16,10 +20,11 @@
 #define BOOST_GEOMETRY_GEOMETRIES_CONCEPTS_CHECK_HPP
 
 
+#include <type_traits>
+
 #include <boost/concept_check.hpp>
 #include <boost/concept/requires.hpp>
 #include <boost/core/ignore_unused.hpp>
-#include <boost/type_traits/is_const.hpp>
 #include <boost/variant/variant_fwd.hpp>
 
 #include <boost/geometry/core/tag.hpp>
@@ -64,7 +69,7 @@ template
 <
     typename Geometry,
     typename GeometryTag = typename geometry::tag<Geometry>::type,
-    bool IsConst = boost::is_const<Geometry>::type::value
+    bool IsConst = std::is_const<Geometry>::type::value
 >
 struct check : not_implemented<GeometryTag>
 {};
@@ -214,6 +219,10 @@ struct checker<boost::variant<BOOST_VARIANT_ENUM_PARAMS(T)> const>
     \ingroup concepts
 */
 template <typename Geometry>
+// workaround for VS2015
+#if !defined(_MSC_VER) || (_MSC_VER >= 1910)
+constexpr
+#endif
 inline void check()
 {
     detail::checker<Geometry> c;
@@ -227,6 +236,10 @@ inline void check()
     \ingroup concepts
 */
 template <typename Geometry1, typename Geometry2>
+// workaround for VS2015
+#if !defined(_MSC_VER) || (_MSC_VER >= 1910)
+constexpr
+#endif
 inline void check_concepts_and_equal_dimensions()
 {
     check<Geometry1>();

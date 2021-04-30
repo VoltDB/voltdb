@@ -41,6 +41,7 @@
 
 #  define BOOST_NO_CXX11_HDR_CODECVT
 #  define BOOST_NO_CXX11_HDR_CONDITION_VARIABLE
+#  define BOOST_NO_CXX11_HDR_EXCEPTION
 #  define BOOST_NO_CXX11_HDR_INITIALIZER_LIST
 #  define BOOST_NO_CXX11_HDR_MUTEX
 #  define BOOST_NO_CXX11_HDR_RANDOM
@@ -91,6 +92,7 @@
 #  define BOOST_NO_CXX17_STD_APPLY
 #  define BOOST_NO_CXX17_HDR_OPTIONAL
 #  define BOOST_NO_CXX17_HDR_STRING_VIEW
+#  define BOOST_NO_CXX17_HDR_VARIANT
 #endif
 #if (_LIBCPP_VERSION > 4000) && (__cplusplus > 201402L) && !defined(_LIBCPP_ENABLE_CXX17_REMOVED_AUTO_PTR)
 #  define BOOST_NO_AUTO_PTR
@@ -102,8 +104,28 @@
 #  define BOOST_NO_CXX98_BINDERS
 #endif
 
-#define BOOST_NO_CXX17_ITERATOR_TRAITS
+#ifdef __has_include
+#if __has_include(<version>)
+
+#if !defined(__cpp_lib_execution) || (__cpp_lib_execution < 201603L)
+#  define BOOST_NO_CXX17_HDR_EXECUTION
+#endif
+#if !defined(__cpp_lib_invoke) || (__cpp_lib_invoke < 201411L)
+#define BOOST_NO_CXX17_STD_INVOKE
+#endif
+
+#else
 #define BOOST_NO_CXX17_STD_INVOKE      // Invoke support is incomplete (no invoke_result)
+#define BOOST_NO_CXX17_HDR_EXECUTION
+#endif
+#else
+#define BOOST_NO_CXX17_STD_INVOKE      // Invoke support is incomplete (no invoke_result)
+#define BOOST_NO_CXX17_HDR_EXECUTION
+#endif
+
+#if _LIBCPP_VERSION < 10000  // What's the correct version check here?
+#define BOOST_NO_CXX17_ITERATOR_TRAITS
+#endif
 
 #if (_LIBCPP_VERSION <= 1101) && !defined(BOOST_NO_CXX11_THREAD_LOCAL)
 // This is a bit of a sledgehammer, because really it's just libc++abi that has no

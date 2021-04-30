@@ -1,5 +1,5 @@
 /* Proposed SG14 status_code
-(C) 2018-2019 Niall Douglas <http://www.nedproductions.biz/> (5 commits)
+(C) 2018-2021 Niall Douglas <http://www.nedproductions.biz/> (5 commits)
 File Created: June 2018
 
 

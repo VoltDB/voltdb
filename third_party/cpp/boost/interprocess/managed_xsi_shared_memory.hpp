@@ -42,12 +42,31 @@ namespace interprocess {
 
 namespace ipcdetail {
 
-template<class AllocationAlgorithm>
+template
+      <
+         class CharType,
+         class AllocationAlgorithm,
+         template<class IndexConfig> class IndexType
+      >
 struct xsishmem_open_or_create
 {
-   typedef  ipcdetail::managed_open_or_create_impl                 //!FileBased, StoreDevice
-      < xsi_shared_memory_file_wrapper, AllocationAlgorithm::Alignment, false, true> type;
+   static const std::size_t segment_manager_alignment = boost::move_detail::alignment_of
+         < segment_manager
+               < CharType
+               , AllocationAlgorithm
+               , IndexType>
+         >::value;
+   static const std::size_t final_segment_manager_alignment
+      = segment_manager_alignment > AllocationAlgorithm::Alignment
+      ? segment_manager_alignment : AllocationAlgorithm::Alignment;
+
+   typedef  ipcdetail::managed_open_or_create_impl
+      < xsi_shared_memory_file_wrapper
+      , final_segment_manager_alignment
+      , false
+      , true> type;
 };
+
 
 }  //namespace ipcdetail {
 
@@ -63,18 +82,21 @@ template
 class basic_managed_xsi_shared_memory
    : public ipcdetail::basic_managed_memory_impl
       <CharType, AllocationAlgorithm, IndexType
-      ,ipcdetail::xsishmem_open_or_create<AllocationAlgorithm>::type::ManagedOpenOrCreateUserOffset>
-   , private ipcdetail::xsishmem_open_or_create<AllocationAlgorithm>::type
+      ,ipcdetail::xsishmem_open_or_create<CharType, AllocationAlgorithm, IndexType>
+         ::type::ManagedOpenOrCreateUserOffset>
+   , private ipcdetail::xsishmem_open_or_create
+      <CharType, AllocationAlgorithm, IndexType>::type
 {
    #if !defined(BOOST_INTERPROCESS_DOXYGEN_INVOKED)
    public:
    typedef xsi_shared_memory_file_wrapper device_type;
 
    public:
-   typedef typename ipcdetail::xsishmem_open_or_create<AllocationAlgorithm>::type base2_t;
+   typedef typename ipcdetail::xsishmem_open_or_create
+      <CharType, AllocationAlgorithm, IndexType>::type base2_t;
    typedef ipcdetail::basic_managed_memory_impl
       <CharType, AllocationAlgorithm, IndexType,
-      base2_t::ManagedOpenOrCreateUserOffset>   base_t;
+      base2_t::ManagedOpenOrCreateUserOffset>          base_t;
 
    typedef ipcdetail::create_open_func<base_t>        create_open_func_t;
 
@@ -100,7 +122,7 @@ class basic_managed_xsi_shared_memory
 
    //!Default constructor. Does nothing.
    //!Useful in combination with move semantics
-   basic_managed_xsi_shared_memory()
+   basic_managed_xsi_shared_memory() BOOST_NOEXCEPT
    {}
 
    //!Creates shared memory and creates and places the segment manager.
@@ -148,7 +170,7 @@ class basic_managed_xsi_shared_memory
 
    //!Moves the ownership of "moved"'s managed memory to *this.
    //!Does not throw
-   basic_managed_xsi_shared_memory(BOOST_RV_REF(basic_managed_xsi_shared_memory) moved)
+   basic_managed_xsi_shared_memory(BOOST_RV_REF(basic_managed_xsi_shared_memory) moved) BOOST_NOEXCEPT
    {
       basic_managed_xsi_shared_memory tmp;
       this->swap(moved);
@@ -157,7 +179,7 @@ class basic_managed_xsi_shared_memory
 
    //!Moves the ownership of "moved"'s managed memory to *this.
    //!Does not throw
-   basic_managed_xsi_shared_memory &operator=(BOOST_RV_REF(basic_managed_xsi_shared_memory) moved)
+   basic_managed_xsi_shared_memory &operator=(BOOST_RV_REF(basic_managed_xsi_shared_memory) moved) BOOST_NOEXCEPT
    {
       basic_managed_xsi_shared_memory tmp(boost::move(moved));
       this->swap(tmp);
@@ -166,7 +188,7 @@ class basic_managed_xsi_shared_memory
 
    //!Swaps the ownership of the managed shared memories managed by *this and other.
    //!Never throws.
-   void swap(basic_managed_xsi_shared_memory &other)
+   void swap(basic_managed_xsi_shared_memory &other) BOOST_NOEXCEPT
    {
       base_t::swap(other);
       base2_t::swap(other);
@@ -178,7 +200,7 @@ class basic_managed_xsi_shared_memory
    static bool remove(int shmid)
    {  return device_type::remove(shmid); }
 
-   int get_shmid() const
+   int get_shmid() const BOOST_NOEXCEPT
    {  return base2_t::get_device().get_shmid(); }
 
    #if !defined(BOOST_INTERPROCESS_DOXYGEN_INVOKED)

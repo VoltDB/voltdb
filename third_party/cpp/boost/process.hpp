@@ -30,6 +30,7 @@
 #include <boost/process/error.hpp>
 #include <boost/process/exe.hpp>
 #include <boost/process/group.hpp>
+#include <boost/process/handles.hpp>
 #include <boost/process/io.hpp>
 #include <boost/process/pipe.hpp>
 #include <boost/process/shell.hpp>

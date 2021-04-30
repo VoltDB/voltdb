@@ -4,6 +4,10 @@
 // Copyright (c) 2008-2012 Bruno Lalande, Paris, France.
 // Copyright (c) 2009-2012 Mateusz Loskot, London, UK.
 
+// This file was modified by Oracle on 2020.
+// Modifications copyright (c) 2020, Oracle and/or its affiliates.
+// Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
+
 // Parts of Boost.Geometry are redesigned from Geodan's Geographic Library
 // (geolib/GGL), copyright (c) 1995-2010 Geodan, Amsterdam, the Netherlands.
 
@@ -16,8 +20,7 @@
 #define BOOST_GEOMETRY_CORE_TOPOLOGICAL_DIMENSION_HPP
 
 
-#include <boost/mpl/int.hpp>
-
+#include <type_traits>
 
 #include <boost/geometry/core/tag.hpp>
 #include <boost/geometry/core/tags.hpp>
@@ -37,42 +40,42 @@ struct top_dim {};
 
 
 template <>
-struct top_dim<point_tag>      : boost::mpl::int_<0> {};
+struct top_dim<point_tag>      : std::integral_constant<int, 0> {};
 
 
 template <>
-struct top_dim<linestring_tag> : boost::mpl::int_<1> {};
+struct top_dim<linestring_tag> : std::integral_constant<int, 1> {};
 
 
 template <>
-struct top_dim<segment_tag>    : boost::mpl::int_<1> {};
+struct top_dim<segment_tag>    : std::integral_constant<int, 1> {};
 
 
 // ring: topological dimension of two, but some people say: 1 !!
 // NOTE: This is not OGC LinearRing!
 template <>
-struct top_dim<ring_tag>       : boost::mpl::int_<2> {};
+struct top_dim<ring_tag>       : std::integral_constant<int, 2> {};
 
 
 // TODO: This is wrong! Boxes may have various topological dimensions
 template <>
-struct top_dim<box_tag>        : boost::mpl::int_<2> {};
+struct top_dim<box_tag>        : std::integral_constant<int, 2> {};
 
 
 template <>
-struct top_dim<polygon_tag>    : boost::mpl::int_<2> {};
+struct top_dim<polygon_tag>    : std::integral_constant<int, 2> {};
 
 
 template <>
-struct top_dim<multi_point_tag> : boost::mpl::int_<0> {};
+struct top_dim<multi_point_tag> : std::integral_constant<int, 0> {};
 
 
 template <>
-struct top_dim<multi_linestring_tag> : boost::mpl::int_<1> {};
+struct top_dim<multi_linestring_tag> : std::integral_constant<int, 1> {};
 
 
 template <>
-struct top_dim<multi_polygon_tag> : boost::mpl::int_<2> {};
+struct top_dim<multi_polygon_tag> : std::integral_constant<int, 2> {};
 
 
 } // namespace core_dispatch

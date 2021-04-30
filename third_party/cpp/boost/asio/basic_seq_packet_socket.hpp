@@ -2,7 +2,7 @@
 // basic_seq_packet_socket.hpp
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2019 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2021 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -31,7 +31,7 @@ namespace asio {
 #define BOOST_ASIO_BASIC_SEQ_PACKET_SOCKET_FWD_DECL
 
 // Forward declaration with defaulted arguments.
-template <typename Protocol, typename Executor = executor>
+template <typename Protocol, typename Executor = any_io_executor>
 class basic_seq_packet_socket;
 
 #endif // !defined(BOOST_ASIO_BASIC_SEQ_PACKET_SOCKET_FWD_DECL)
@@ -44,6 +44,12 @@ class basic_seq_packet_socket;
  * @par Thread Safety
  * @e Distinct @e objects: Safe.@n
  * @e Shared @e objects: Unsafe.
+ *
+ * Synchronous @c send, @c receive, and @c connect operations are thread safe
+ * with respect to each other, if the underlying operating system calls are
+ * also thread safe. This means that it is permitted to perform concurrent
+ * calls to these synchronous operations on a single socket object. Other
+ * synchronous operations, such as @c open or @c close, are not thread safe.
  */
 template <typename Protocol, typename Executor>
 class basic_seq_packet_socket
@@ -101,9 +107,9 @@ public:
    */
   template <typename ExecutionContext>
   explicit basic_seq_packet_socket(ExecutionContext& context,
-      typename enable_if<
+      typename constraint<
         is_convertible<ExecutionContext&, execution_context&>::value
-      >::type* = 0)
+      >::type = 0)
     : basic_socket<Protocol, Executor>(context)
   {
   }
@@ -144,9 +150,10 @@ public:
   template <typename ExecutionContext>
   basic_seq_packet_socket(ExecutionContext& context,
       const protocol_type& protocol,
-      typename enable_if<
-        is_convertible<ExecutionContext&, execution_context&>::value
-      >::type* = 0)
+      typename constraint<
+        is_convertible<ExecutionContext&, execution_context&>::value,
+        defaulted_constraint
+      >::type = defaulted_constraint())
     : basic_socket<Protocol, Executor>(context, protocol)
   {
   }
@@ -191,9 +198,9 @@ public:
   template <typename ExecutionContext>
   basic_seq_packet_socket(ExecutionContext& context,
       const endpoint_type& endpoint,
-      typename enable_if<
+      typename constraint<
         is_convertible<ExecutionContext&, execution_context&>::value
-      >::type* = 0)
+      >::type = 0)
     : basic_socket<Protocol, Executor>(context, endpoint)
   {
   }
@@ -236,9 +243,9 @@ public:
   template <typename ExecutionContext>
   basic_seq_packet_socket(ExecutionContext& context,
       const protocol_type& protocol, const native_handle_type& native_socket,
-      typename enable_if<
+      typename constraint<
         is_convertible<ExecutionContext&, execution_context&>::value
-      >::type* = 0)
+      >::type = 0)
     : basic_socket<Protocol, Executor>(context, protocol, native_socket)
   {
   }
@@ -256,7 +263,7 @@ public:
    * constructed using the @c basic_seq_packet_socket(const executor_type&)
    * constructor.
    */
-  basic_seq_packet_socket(basic_seq_packet_socket&& other)
+  basic_seq_packet_socket(basic_seq_packet_socket&& other) BOOST_ASIO_NOEXCEPT
     : basic_socket<Protocol, Executor>(std::move(other))
   {
   }
@@ -294,10 +301,10 @@ public:
    */
   template <typename Protocol1, typename Executor1>
   basic_seq_packet_socket(basic_seq_packet_socket<Protocol1, Executor1>&& other,
-      typename enable_if<
+      typename constraint<
         is_convertible<Protocol1, Protocol>::value
           && is_convertible<Executor1, Executor>::value
-      >::type* = 0)
+      >::type = 0)
     : basic_socket<Protocol, Executor>(std::move(other))
   {
   }
@@ -316,7 +323,7 @@ public:
    * constructor.
    */
   template <typename Protocol1, typename Executor1>
-  typename enable_if<
+  typename constraint<
     is_convertible<Protocol1, Protocol>::value
       && is_convertible<Executor1, Executor>::value,
     basic_seq_packet_socket&
@@ -429,16 +436,20 @@ public:
    * buffers in one go, and how to use it with arrays, boost::array or
    * std::vector.
    */
-  template <typename ConstBufferSequence, typename WriteHandler>
-  BOOST_ASIO_INITFN_RESULT_TYPE(WriteHandler,
+  template <typename ConstBufferSequence,
+      BOOST_ASIO_COMPLETION_TOKEN_FOR(void (boost::system::error_code,
+        std::size_t)) WriteHandler
+          BOOST_ASIO_DEFAULT_COMPLETION_TOKEN_TYPE(executor_type)>
+  BOOST_ASIO_INITFN_AUTO_RESULT_TYPE(WriteHandler,
       void (boost::system::error_code, std::size_t))
   async_send(const ConstBufferSequence& buffers,
       socket_base::message_flags flags,
-      BOOST_ASIO_MOVE_ARG(WriteHandler) handler)
+      BOOST_ASIO_MOVE_ARG(WriteHandler) handler
+        BOOST_ASIO_DEFAULT_COMPLETION_TOKEN(executor_type))
   {
     return async_initiate<WriteHandler,
       void (boost::system::error_code, std::size_t)>(
-        initiate_async_send(), handler, this, buffers, flags);
+        initiate_async_send(this), handler, buffers, flags);
   }
 
   /// Receive some data on the socket.
@@ -598,16 +609,20 @@ public:
    * multiple buffers in one go, and how to use it with arrays, boost::array or
    * std::vector.
    */
-  template <typename MutableBufferSequence, typename ReadHandler>
-  BOOST_ASIO_INITFN_RESULT_TYPE(ReadHandler,
+  template <typename MutableBufferSequence,
+      BOOST_ASIO_COMPLETION_TOKEN_FOR(void (boost::system::error_code,
+        std::size_t)) ReadHandler
+          BOOST_ASIO_DEFAULT_COMPLETION_TOKEN_TYPE(executor_type)>
+  BOOST_ASIO_INITFN_AUTO_RESULT_TYPE(ReadHandler,
       void (boost::system::error_code, std::size_t))
   async_receive(const MutableBufferSequence& buffers,
       socket_base::message_flags& out_flags,
-      BOOST_ASIO_MOVE_ARG(ReadHandler) handler)
+      BOOST_ASIO_MOVE_ARG(ReadHandler) handler
+        BOOST_ASIO_DEFAULT_COMPLETION_TOKEN(executor_type))
   {
     return async_initiate<ReadHandler,
       void (boost::system::error_code, std::size_t)>(
-        initiate_async_receive_with_flags(), handler, this,
+        initiate_async_receive_with_flags(this), handler,
         buffers, socket_base::message_flags(0), &out_flags);
   }
 
@@ -653,26 +668,48 @@ public:
    * multiple buffers in one go, and how to use it with arrays, boost::array or
    * std::vector.
    */
-  template <typename MutableBufferSequence, typename ReadHandler>
-  BOOST_ASIO_INITFN_RESULT_TYPE(ReadHandler,
+  template <typename MutableBufferSequence,
+      BOOST_ASIO_COMPLETION_TOKEN_FOR(void (boost::system::error_code,
+        std::size_t)) ReadHandler
+          BOOST_ASIO_DEFAULT_COMPLETION_TOKEN_TYPE(executor_type)>
+  BOOST_ASIO_INITFN_AUTO_RESULT_TYPE(ReadHandler,
       void (boost::system::error_code, std::size_t))
   async_receive(const MutableBufferSequence& buffers,
       socket_base::message_flags in_flags,
       socket_base::message_flags& out_flags,
-      BOOST_ASIO_MOVE_ARG(ReadHandler) handler)
+      BOOST_ASIO_MOVE_ARG(ReadHandler) handler
+        BOOST_ASIO_DEFAULT_COMPLETION_TOKEN(executor_type))
   {
     return async_initiate<ReadHandler,
       void (boost::system::error_code, std::size_t)>(
-        initiate_async_receive_with_flags(), handler,
-        this, buffers, in_flags, &out_flags);
+        initiate_async_receive_with_flags(this),
+        handler, buffers, in_flags, &out_flags);
   }
 
 private:
-  struct initiate_async_send
+  // Disallow copying and assignment.
+  basic_seq_packet_socket(const basic_seq_packet_socket&) BOOST_ASIO_DELETED;
+  basic_seq_packet_socket& operator=(
+      const basic_seq_packet_socket&) BOOST_ASIO_DELETED;
+
+  class initiate_async_send
   {
+  public:
+    typedef Executor executor_type;
+
+    explicit initiate_async_send(basic_seq_packet_socket* self)
+      : self_(self)
+    {
+    }
+
+    executor_type get_executor() const BOOST_ASIO_NOEXCEPT
+    {
+      return self_->get_executor();
+    }
+
     template <typename WriteHandler, typename ConstBufferSequence>
     void operator()(BOOST_ASIO_MOVE_ARG(WriteHandler) handler,
-        basic_seq_packet_socket* self, const ConstBufferSequence& buffers,
+        const ConstBufferSequence& buffers,
         socket_base::message_flags flags) const
     {
       // If you get an error on the following line it means that your handler
@@ -680,17 +717,33 @@ private:
       BOOST_ASIO_WRITE_HANDLER_CHECK(WriteHandler, handler) type_check;
 
       detail::non_const_lvalue<WriteHandler> handler2(handler);
-      self->impl_.get_service().async_send(
-          self->impl_.get_implementation(), buffers, flags,
-          handler2.value, self->impl_.get_implementation_executor());
+      self_->impl_.get_service().async_send(
+          self_->impl_.get_implementation(), buffers, flags,
+          handler2.value, self_->impl_.get_executor());
     }
+
+  private:
+    basic_seq_packet_socket* self_;
   };
 
-  struct initiate_async_receive_with_flags
+  class initiate_async_receive_with_flags
   {
+  public:
+    typedef Executor executor_type;
+
+    explicit initiate_async_receive_with_flags(basic_seq_packet_socket* self)
+      : self_(self)
+    {
+    }
+
+    executor_type get_executor() const BOOST_ASIO_NOEXCEPT
+    {
+      return self_->get_executor();
+    }
+
     template <typename ReadHandler, typename MutableBufferSequence>
     void operator()(BOOST_ASIO_MOVE_ARG(ReadHandler) handler,
-        basic_seq_packet_socket* self, const MutableBufferSequence& buffers,
+        const MutableBufferSequence& buffers,
         socket_base::message_flags in_flags,
         socket_base::message_flags* out_flags) const
     {
@@ -699,10 +752,13 @@ private:
       BOOST_ASIO_READ_HANDLER_CHECK(ReadHandler, handler) type_check;
 
       detail::non_const_lvalue<ReadHandler> handler2(handler);
-      self->impl_.get_service().async_receive_with_flags(
-          self->impl_.get_implementation(), buffers, in_flags, *out_flags,
-          handler2.value, self->impl_.get_implementation_executor());
+      self_->impl_.get_service().async_receive_with_flags(
+          self_->impl_.get_implementation(), buffers, in_flags,
+          *out_flags, handler2.value, self_->impl_.get_executor());
     }
+
+  private:
+    basic_seq_packet_socket* self_;
   };
 };
 

@@ -62,6 +62,10 @@ namespace impl
             if (nr_samples < 2) return result_type();
             return nr_samples*(rolling_moment<2>(args) - mean*mean)/(nr_samples-1);
         }
+        
+        // serialization is done by accumulators it depends on
+        template<class Archive>
+        void serialize(Archive & ar, const unsigned int file_version) {}
     };
 
     //! Iterative calculation of the rolling variance.
@@ -137,6 +141,14 @@ namespace impl
             size_t nr_samples = rolling_count(args);
             if (nr_samples < 2) return result_type();
             return numeric::fdiv(sum_of_squares_,(nr_samples-1));
+        }
+        
+        // make this accumulator serializeable
+        template<class Archive>
+        void serialize(Archive & ar, const unsigned int file_version)
+        { 
+            ar & previous_mean_;
+            ar & sum_of_squares_;
         }
 
     private:

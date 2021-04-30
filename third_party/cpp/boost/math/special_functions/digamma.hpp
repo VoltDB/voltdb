@@ -18,7 +18,6 @@
 #include <boost/math/tools/promotion.hpp>
 #include <boost/math/policies/error_handling.hpp>
 #include <boost/math/constants/constants.hpp>
-#include <boost/mpl/comparison.hpp>
 #include <boost/math/tools/big_constant.hpp>
 
 #if defined(__GNUC__) && defined(BOOST_MATH_USE_FLOAT128)
@@ -26,7 +25,7 @@
 // This is the only way we can avoid
 // warning: non-standard suffix on floating constant [-Wpedantic]
 // when building with -Wall -pedantic.  Neither __extension__
-// nor #pragma dianostic ignored work :(
+// nor #pragma diagnostic ignored work :(
 //
 #pragma GCC system_header
 #endif
@@ -38,9 +37,9 @@ namespace detail{
 // Begin by defining the smallest value for which it is safe to
 // use the asymptotic expansion for digamma:
 //
-inline unsigned digamma_large_lim(const mpl::int_<0>*)
+inline unsigned digamma_large_lim(const std::integral_constant<int, 0>*)
 {  return 20;  }
-inline unsigned digamma_large_lim(const mpl::int_<113>*)
+inline unsigned digamma_large_lim(const std::integral_constant<int, 113>*)
 {  return 20;  }
 inline unsigned digamma_large_lim(const void*)
 {  return 10;  }
@@ -55,7 +54,7 @@ inline unsigned digamma_large_lim(const void*)
 // This first one gives 34-digit precision for x >= 20:
 //
 template <class T>
-inline T digamma_imp_large(T x, const mpl::int_<113>*)
+inline T digamma_imp_large(T x, const std::integral_constant<int, 113>*)
 {
    BOOST_MATH_STD_USING // ADL of std functions.
    static const T P[] = {
@@ -88,7 +87,7 @@ inline T digamma_imp_large(T x, const mpl::int_<113>*)
 // 19-digit precision for x >= 10:
 //
 template <class T>
-inline T digamma_imp_large(T x, const mpl::int_<64>*)
+inline T digamma_imp_large(T x, const std::integral_constant<int, 64>*)
 {
    BOOST_MATH_STD_USING // ADL of std functions.
    static const T P[] = {
@@ -115,7 +114,7 @@ inline T digamma_imp_large(T x, const mpl::int_<64>*)
 // 17-digit precision for x >= 10:
 //
 template <class T>
-inline T digamma_imp_large(T x, const mpl::int_<53>*)
+inline T digamma_imp_large(T x, const std::integral_constant<int, 53>*)
 {
    BOOST_MATH_STD_USING // ADL of std functions.
    static const T P[] = {
@@ -139,7 +138,7 @@ inline T digamma_imp_large(T x, const mpl::int_<53>*)
 // 9-digit precision for x >= 10:
 //
 template <class T>
-inline T digamma_imp_large(T x, const mpl::int_<24>*)
+inline T digamma_imp_large(T x, const std::integral_constant<int, 24>*)
 {
    BOOST_MATH_STD_USING // ADL of std functions.
    static const T P[] = {
@@ -178,7 +177,7 @@ public:
 };
 
 template <class T, class Policy>
-inline T digamma_imp_large(T x, const Policy& pol, const mpl::int_<0>*)
+inline T digamma_imp_large(T x, const Policy& pol, const std::integral_constant<int, 0>*)
 {
    BOOST_MATH_STD_USING
    digamma_series_func<T> s(x);
@@ -195,7 +194,7 @@ inline T digamma_imp_large(T x, const Policy& pol, const mpl::int_<0>*)
 // 35-digit precision:
 //
 template <class T>
-T digamma_imp_1_2(T x, const mpl::int_<113>*)
+T digamma_imp_1_2(T x, const std::integral_constant<int, 113>*)
 {
    //
    // Now the approximation, we use the form:
@@ -257,7 +256,7 @@ T digamma_imp_1_2(T x, const mpl::int_<113>*)
 // 19-digit precision:
 //
 template <class T>
-T digamma_imp_1_2(T x, const mpl::int_<64>*)
+T digamma_imp_1_2(T x, const std::integral_constant<int, 64>*)
 {
    //
    // Now the approximation, we use the form:
@@ -307,7 +306,7 @@ T digamma_imp_1_2(T x, const mpl::int_<64>*)
 // 18-digit precision:
 //
 template <class T>
-T digamma_imp_1_2(T x, const mpl::int_<53>*)
+T digamma_imp_1_2(T x, const std::integral_constant<int, 53>*)
 {
    //
    // Now the approximation, we use the form:
@@ -356,7 +355,7 @@ T digamma_imp_1_2(T x, const mpl::int_<53>*)
 // 9-digit precision:
 //
 template <class T>
-inline T digamma_imp_1_2(T x, const mpl::int_<24>*)
+inline T digamma_imp_1_2(T x, const std::integral_constant<int, 24>*)
 {
    //
    // Now the approximation, we use the form:
@@ -447,7 +446,7 @@ T digamma_imp(T x, const Tag* t, const Policy& pol)
          result += 1/x;
       }
       //
-      // If x < 1 use recurrance to shift to > 1:
+      // If x < 1 use recurrence to shift to > 1:
       //
       while(x < 1)
       {
@@ -460,7 +459,7 @@ T digamma_imp(T x, const Tag* t, const Policy& pol)
 }
 
 template <class T, class Policy>
-T digamma_imp(T x, const mpl::int_<0>* t, const Policy& pol)
+T digamma_imp(T x, const std::integral_constant<int, 0>* t, const Policy& pol)
 {
    //
    // This handles reflection of negative arguments, and all our
@@ -562,14 +561,14 @@ struct digamma_initializer
       init()
       {
          typedef typename policies::precision<T, Policy>::type precision_type;
-         do_init(mpl::bool_<precision_type::value && (precision_type::value <= 113)>());
+         do_init(std::integral_constant<bool, precision_type::value && (precision_type::value <= 113)>());
       }
-      void do_init(const mpl::true_&)
+      void do_init(const std::true_type&)
       {
          boost::math::digamma(T(1.5), Policy());
          boost::math::digamma(T(500), Policy());
       }
-      void do_init(const mpl::false_&){}
+      void do_init(const std::false_type&){}
       void force_instantiate()const{}
    };
    static const init initializer;
@@ -591,27 +590,12 @@ inline typename tools::promote_args<T>::type
    typedef typename tools::promote_args<T>::type result_type;
    typedef typename policies::evaluation<result_type, Policy>::type value_type;
    typedef typename policies::precision<T, Policy>::type precision_type;
-   typedef typename mpl::if_<
-      mpl::or_<
-         mpl::less_equal<precision_type, mpl::int_<0> >,
-         mpl::greater<precision_type, mpl::int_<114> >
-      >,
-      mpl::int_<0>,
-      typename mpl::if_<
-         mpl::less<precision_type, mpl::int_<25> >,
-         mpl::int_<24>,
-         typename mpl::if_<
-            mpl::less<precision_type, mpl::int_<54> >,
-            mpl::int_<53>,
-            typename mpl::if_<
-               mpl::less<precision_type, mpl::int_<65> >,
-               mpl::int_<64>,
-               mpl::int_<113>
-            >::type
-         >::type
-      >::type
-   >::type tag_type;
-
+   typedef std::integral_constant<int,
+      (precision_type::value <= 0) || (precision_type::value > 113) ? 0 :
+      precision_type::value <= 24 ? 24 :
+      precision_type::value <= 53 ? 53 :
+      precision_type::value <= 64 ? 64 :
+      precision_type::value <= 113 ? 113 : 0 > tag_type;
    typedef typename policies::normalise<
       Policy,
       policies::promote_float<false>,

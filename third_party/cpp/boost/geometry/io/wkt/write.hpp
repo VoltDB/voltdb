@@ -4,11 +4,13 @@
 // Copyright (c) 2008-2017 Bruno Lalande, Paris, France.
 // Copyright (c) 2009-2017 Mateusz Loskot, London, UK.
 // Copyright (c) 2014-2017 Adam Wulkiewicz, Lodz, Poland.
+// Copyright (c) 2020 Baidyanath Kundu, Haldia, India.
 
-// This file was modified by Oracle on 2015, 2018.
-// Modifications copyright (c) 2015-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2015-2020.
+// Modifications copyright (c) 2015-2020, Oracle and/or its affiliates.
 
 // Contributed and/or modified by Menelaos Karavelas, on behalf of Oracle
+// Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
 // Parts of Boost.Geometry are redesigned from Geodan's Geographic Library
 // (geolib/GGL), copyright (c) 1995-2010 Geodan, Amsterdam, the Netherlands.
@@ -24,8 +26,10 @@
 #include <string>
 
 #include <boost/array.hpp>
-#include <boost/range.hpp>
-
+#include <boost/range/begin.hpp>
+#include <boost/range/end.hpp>
+#include <boost/range/size.hpp>
+#include <boost/range/value_type.hpp>
 #include <boost/variant/apply_visitor.hpp>
 #include <boost/variant/static_visitor.hpp>
 #include <boost/variant/variant_fwd.hpp>
@@ -44,6 +48,13 @@
 #include <boost/geometry/geometries/ring.hpp>
 
 #include <boost/geometry/io/wkt/detail/prefix.hpp>
+
+#include <boost/geometry/strategies/io/cartesian.hpp>
+#include <boost/geometry/strategies/io/geographic.hpp>
+#include <boost/geometry/strategies/io/spherical.hpp>
+
+#include <boost/geometry/util/condition.hpp>
+#include <boost/geometry/util/type_traits.hpp>
 
 
 namespace boost { namespace geometry
@@ -159,7 +170,7 @@ struct wkt_range
         }
 
         // optionally, close range to ring by repeating the first point
-        if (ForceClosurePossible
+        if (BOOST_GEOMETRY_CONDITION(ForceClosurePossible)
             && force_closure
             && boost::size(range) > 1
             && wkt_range::disjoint(*begin, *(end - 1)))
@@ -178,9 +189,9 @@ private:
     static inline bool disjoint(point_type const& p1, point_type const& p2)
     {
         // TODO: pass strategy
-        typedef typename strategy::disjoint::services::default_strategy
+        typedef typename strategies::io::services::default_strategy
             <
-                point_type, point_type
+                point_type
             >::type strategy_type;
 
         return detail::disjoint::disjoint_point_point(p1, p2, strategy_type());
@@ -506,7 +517,7 @@ Small example showing how to use the wkt class
 template <typename Geometry>
 class wkt_manipulator
 {
-    static const bool is_ring = boost::is_same<typename tag<Geometry>::type, ring_tag>::value;
+    static const bool is_ring = util::is_ring<Geometry>::value;
 
 public:
 
@@ -546,6 +557,31 @@ inline wkt_manipulator<Geometry> wkt(Geometry const& geometry)
     concepts::check<Geometry const>();
 
     return wkt_manipulator<Geometry>(geometry);
+}
+
+/*!
+\brief WKT-string formulating function
+\tparam Geometry \tparam_geometry
+\param geometry \param_geometry
+\param significant_digits Specifies the no of significant digits to use in the output wkt
+\ingroup wkt
+\qbk{[include reference/io/to_wkt.qbk]}
+*/
+template <typename Geometry>
+inline std::string to_wkt(Geometry const& geometry)
+{
+    std::stringstream ss;
+    ss << boost::geometry::wkt(geometry);
+    return ss.str();
+}
+
+template <typename Geometry>
+inline std::string to_wkt(Geometry const& geometry, int significant_digits)
+{
+    std::stringstream ss;
+    ss.precision(significant_digits);
+    ss << boost::geometry::wkt(geometry);
+    return ss.str();
 }
 
 #if defined(_MSC_VER)

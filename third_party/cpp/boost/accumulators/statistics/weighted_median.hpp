@@ -106,6 +106,15 @@ namespace impl
             return this->median;
         }
 
+        // make this accumulator serializeable
+        template<class Archive>
+        void serialize(Archive & ar, const unsigned int file_version)
+        { 
+            ar & sum;
+            ar & is_dirty;
+            ar & median;
+        }
+
     private:
         mutable float_type sum;
         mutable bool is_dirty;
@@ -162,6 +171,15 @@ namespace impl
 
             return this->median;
         }
+        
+        // make this accumulator serializeable
+        template<class Archive>
+        void serialize(Archive & ar, const unsigned int file_version)
+        { 
+            ar & is_dirty;
+            ar & median;
+        }
+
     private:
         mutable bool is_dirty;
         mutable float_type median;

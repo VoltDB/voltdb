@@ -231,7 +231,11 @@ BOOST_HANA_NAMESPACE_BEGIN
     };
 #else
     template <typename T, T v>
+#ifdef BOOST_HANA_WORKAROUND_MSVC_EMPTYBASE
+    struct __declspec(empty_bases) integral_constant
+#else
     struct integral_constant
+#endif
         : std::integral_constant<T, v>
         , detail::operators::adl<integral_constant<T, v>>
     {

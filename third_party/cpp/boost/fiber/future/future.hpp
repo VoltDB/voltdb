@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <chrono>
 #include <exception>
+#include <utility>
 
 #include <boost/config.hpp>
 
@@ -30,8 +31,8 @@ struct future_base {
 
     future_base() = default;
 
-    explicit future_base( ptr_type const& p) noexcept :
-        state_{ p } {
+    explicit future_base( ptr_type  p) noexcept :
+        state_{std::move( p )} {
     }
 
     ~future_base() = default;

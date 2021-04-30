@@ -290,6 +290,13 @@ namespace boost { namespace math {
     {
       return kurtosis_excess(dist) + 3;
     } // RealType kurtosis_excess(const logistic_distribution<RealType, Policy>& dist)
+
+    template <class RealType, class Policy>
+    inline RealType entropy(const logistic_distribution<RealType, Policy>& dist)
+    {
+       using std::log;
+       return 2 + log(dist.scale());
+    }
   }}
 
 

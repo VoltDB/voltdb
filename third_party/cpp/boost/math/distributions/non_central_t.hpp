@@ -53,7 +53,7 @@ namespace boost
             if(pois == 0)
                return init_val;
             T xterm, beta;
-            // Recurrance & starting beta terms:
+            // Recurrence & starting beta terms:
             beta = x < y
                ? detail::ibeta_imp(T(k + 1), T(v / 2), x, pol, false, true, &xterm)
                : detail::ibeta_imp(T(v / 2), T(k + 1), y, pol, true, true, &xterm);

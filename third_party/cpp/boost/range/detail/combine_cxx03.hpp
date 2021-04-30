@@ -23,68 +23,20 @@
 #include <boost/preprocessor/arithmetic/dec.hpp>
 #include <boost/preprocessor/arithmetic/div.hpp>
 #include <boost/preprocessor/arithmetic/mul.hpp>
-#include <boost/preprocessor/control.hpp>
+#include <boost/preprocessor/control/if.hpp>
 #include <boost/preprocessor/control/while.hpp>
 #include <boost/preprocessor/facilities/empty.hpp>
 #include <boost/preprocessor/facilities/identity.hpp>
 #include <boost/preprocessor/iteration/local.hpp>
-#include <boost/preprocessor/punctuation/comma.hpp>
-#include <boost/preprocessor/repetition.hpp>
+#include <boost/preprocessor/repetition/enum.hpp>
+#include <boost/preprocessor/repetition/enum_params.hpp>
+#include <boost/preprocessor/repetition/repeat.hpp>
 #include <boost/preprocessor/tuple/elem.hpp>
 #include <boost/range/iterator_range_core.hpp>
 #include <boost/type_traits/remove_reference.hpp>
-#include <boost/mpl/transform.hpp>
-#include <boost/utility/result_of.hpp>
-
-#include <vector>
-#include <list>
 
 namespace boost
 {
-    namespace range_detail
-    {
-
-template<typename F, typename T, int SIZE>
-struct combined_result_impl;
-
-template<typename F, typename T>
-struct combined_result
-    : combined_result_impl<F, T, tuples::length<T>::value>
-{
-};
-
-#define BOOST_RANGE_combined_element(z, n, data) \
-    typename tuples::element<n, T>::type
-
-#define BOOST_RANGE_combined_result(z, n, data) \
-    template<typename F, typename T> \
-    struct combined_result_impl <F,T,n> \
-        : result_of<F(BOOST_PP_ENUM(n, BOOST_RANGE_combined_element, ~))> \
-    { \
-    };
-
-#define BOOST_PP_LOCAL_MACRO(n) BOOST_RANGE_combined_result(~,n,~)
-
-#define BOOST_PP_LOCAL_LIMITS (BOOST_RANGE_MIN_COMBINE_ARGS, \
-                               BOOST_RANGE_MAX_COMBINE_ARGS)
-#include BOOST_PP_LOCAL_ITERATE()
-
-#define BOOST_RANGE_combined_get(z, n, data) get<n>(tuple)
-
-#define BOOST_RANGE_combined_unpack(z, n, data) \
-    template<typename F, typename T> inline \
-    typename combined_result<F,T>::type \
-    unpack_(mpl::int_<n>, F f, const T& tuple) \
-    { \
-        return f(BOOST_PP_ENUM(n, BOOST_RANGE_combined_get, ~)); \
-    }
-
-#define BOOST_PP_LOCAL_MACRO(n) BOOST_RANGE_combined_unpack(~,n,~)
-#define BOOST_PP_LOCAL_LIMITS (BOOST_RANGE_MIN_COMBINE_ARGS, \
-                               BOOST_RANGE_MAX_COMBINE_ARGS)
-#include BOOST_PP_LOCAL_ITERATE()
-
-} // namespace range_detail
 
 namespace range
 {
@@ -114,10 +66,6 @@ namespace range
 
 #endif // include guard
 
-#undef BOOST_RANGE_combined_element
-#undef BOOST_RANGE_combined_result
-#undef BOOST_RANGE_combined_get
-#undef BOOST_RANGE_combined_unpack
 #undef BOOST_RANGE_combined_seq
 #undef BOOST_RANGE_combined_exp_pred
 #undef BOOST_RANGE_combined_exp_op

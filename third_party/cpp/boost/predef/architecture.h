@@ -14,6 +14,7 @@ http://www.boost.org/LICENSE_1_0.txt)
 #include <boost/predef/architecture/arm.h>
 #include <boost/predef/architecture/blackfin.h>
 #include <boost/predef/architecture/convex.h>
+#include <boost/predef/architecture/e2k.h>
 #include <boost/predef/architecture/ia64.h>
 #include <boost/predef/architecture/m68k.h>
 #include <boost/predef/architecture/mips.h>
@@ -21,6 +22,7 @@ http://www.boost.org/LICENSE_1_0.txt)
 #include <boost/predef/architecture/ppc.h>
 #include <boost/predef/architecture/ptx.h>
 #include <boost/predef/architecture/pyramid.h>
+#include <boost/predef/architecture/riscv.h>
 #include <boost/predef/architecture/rs6k.h>
 #include <boost/predef/architecture/sparc.h>
 #include <boost/predef/architecture/superh.h>
@@ -28,6 +30,5 @@ http://www.boost.org/LICENSE_1_0.txt)
 #include <boost/predef/architecture/sys390.h>
 #include <boost/predef/architecture/x86.h>
 #include <boost/predef/architecture/z.h>
-/*#include <boost/predef/architecture/.h>*/
 
 #endif

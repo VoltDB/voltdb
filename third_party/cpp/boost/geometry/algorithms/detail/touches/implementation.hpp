@@ -5,8 +5,8 @@
 // Copyright (c) 2009-2015 Mateusz Loskot, London, UK.
 // Copyright (c) 2013-2015 Adam Wulkiewicz, Lodz, Poland.
 
-// This file was modified by Oracle on 2013, 2014, 2015, 2017.
-// Modifications copyright (c) 2013-2017, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2013-2020.
+// Modifications copyright (c) 2013-2020, Oracle and/or its affiliates.
 
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
@@ -20,6 +20,8 @@
 #ifndef BOOST_GEOMETRY_ALGORITHMS_DETAIL_TOUCHES_IMPLEMENTATION_HPP
 #define BOOST_GEOMETRY_ALGORITHMS_DETAIL_TOUCHES_IMPLEMENTATION_HPP
 
+
+#include <type_traits>
 
 #include <boost/geometry/algorithms/detail/for_each_range.hpp>
 #include <boost/geometry/algorithms/detail/overlay/overlay.hpp>
@@ -101,7 +103,7 @@ struct box_box
     template <typename Box1, typename Box2, typename Strategy>
     static inline bool apply(Box1 const& b1, Box2 const& b2, Strategy const& /*strategy*/)
     {
-        BOOST_STATIC_ASSERT((boost::is_same
+        BOOST_STATIC_ASSERT((std::is_same
                                 <
                                     typename geometry::coordinate_system<Box1>::type,
                                     typename geometry::coordinate_system<Box2>::type
@@ -179,6 +181,7 @@ struct areal_interrupt_policy
                         return true;
                     }
                     break;
+                case overlay::method_start :
                 case overlay::method_none :
                 case overlay::method_disjoint :
                 case overlay::method_error :
@@ -199,78 +202,46 @@ struct areal_interrupt_policy
     }
 };
 
-template<typename Geometry, typename PointInRingStrategy>
-struct check_each_ring_for_within
+template <typename Geometry1, typename Geometry2, typename Strategy>
+inline bool point_on_border_within(Geometry1 const& geometry1,
+                                   Geometry2 const& geometry2,
+                                   Strategy const& strategy)
 {
-    bool has_within;
-    Geometry const& m_geometry;
-    PointInRingStrategy const& m_strategy;
+    typename geometry::point_type<Geometry1>::type pt;
+    return geometry::point_on_border(pt, geometry1)
+        && geometry::within(pt, geometry2, strategy);
+}
 
-    inline check_each_ring_for_within(Geometry const& g, PointInRingStrategy const& strategy)
-        : has_within(false)
-        , m_geometry(g)
-        , m_strategy(strategy)
-    {}
-
-    template <typename Range>
-    inline void apply(Range const& range)
-    {
-        typename geometry::point_type<Range>::type p;
-        geometry::point_on_border(p, range);
-        if ( !has_within && geometry::within(p, m_geometry, m_strategy) )
-        {
-            has_within = true;
-        }
-    }
-};
-
-template <typename FirstGeometry, typename SecondGeometry, typename IntersectionStrategy>
+template <typename FirstGeometry, typename SecondGeometry, typename Strategy>
 inline bool rings_containing(FirstGeometry const& geometry1,
                              SecondGeometry const& geometry2,
-                             IntersectionStrategy const& strategy)
+                             Strategy const& strategy)
 {
-    // NOTE: This strategy could be defined inside IntersectionStrategy
-    typedef typename IntersectionStrategy::template point_in_geometry_strategy
-        <
-            FirstGeometry, SecondGeometry
-        >::type point_in_ring_strategy_type;
-
-    point_in_ring_strategy_type point_in_ring_strategy
-        = strategy.template get_point_in_geometry_strategy<FirstGeometry, SecondGeometry>();
-
-    check_each_ring_for_within
-        <
-            FirstGeometry, point_in_ring_strategy_type
-        > checker(geometry1, point_in_ring_strategy);
-    geometry::detail::for_each_range(geometry2, checker);
-    return checker.has_within;
+    return geometry::detail::any_range_of(geometry2, [&](auto const& range)
+    {
+        return point_on_border_within(range, geometry1, strategy);
+    });
 }
 
 template <typename Geometry1, typename Geometry2>
 struct areal_areal
 {
-    template <typename IntersectionStrategy>
+    template <typename Strategy>
     static inline bool apply(Geometry1 const& geometry1,
                              Geometry2 const& geometry2,
-                             IntersectionStrategy const& strategy)
+                             Strategy const& strategy)
     {
-        typedef detail::no_rescale_policy rescale_policy_type;
         typedef typename geometry::point_type<Geometry1>::type point_type;
-        typedef detail::overlay::turn_info
-            <
-                point_type,
-                typename segment_ratio_type<point_type, rescale_policy_type>::type
-            > turn_info;
+        typedef detail::overlay::turn_info<point_type> turn_info;
 
         std::deque<turn_info> turns;
         detail::touches::areal_interrupt_policy policy;
-        rescale_policy_type robust_policy;
         boost::geometry::get_turns
                 <
                     detail::overlay::do_reverse<geometry::point_order<Geometry1>::value>::value,
                     detail::overlay::do_reverse<geometry::point_order<Geometry2>::value>::value,
                     detail::overlay::assign_null_policy
-                >(geometry1, geometry2, strategy, robust_policy, turns, policy);
+                >(geometry1, geometry2, strategy, detail::no_rescale_policy(), turns, policy);
 
         return policy.result()
             && ! geometry::detail::touches::rings_containing(geometry1, geometry2, strategy)
@@ -298,8 +269,8 @@ namespace dispatch {
 
 // P/P
 
-template <typename Geometry1, typename Geometry2, typename Tag2>
-struct touches<Geometry1, Geometry2, point_tag, Tag2, pointlike_tag, pointlike_tag, false>
+template <typename Geometry1, typename Geometry2>
+struct touches<Geometry1, Geometry2, point_tag, point_tag, pointlike_tag, pointlike_tag, false>
 {
     template <typename Strategy>
     static inline bool apply(Geometry1 const& , Geometry2 const& , Strategy const&)
@@ -308,8 +279,18 @@ struct touches<Geometry1, Geometry2, point_tag, Tag2, pointlike_tag, pointlike_t
     }
 };
 
-template <typename Geometry1, typename Geometry2, typename Tag2>
-struct touches<Geometry1, Geometry2, multi_point_tag, Tag2, pointlike_tag, pointlike_tag, false>
+template <typename Geometry1, typename Geometry2>
+struct touches<Geometry1, Geometry2, point_tag, multi_point_tag, pointlike_tag, pointlike_tag, false>
+{
+    template <typename Strategy>
+    static inline bool apply(Geometry1 const& , Geometry2 const& , Strategy const&)
+    {
+        return false;
+    }
+};
+
+template <typename Geometry1, typename Geometry2>
+struct touches<Geometry1, Geometry2, multi_point_tag, multi_point_tag, pointlike_tag, pointlike_tag, false>
 {
     template <typename Strategy>
     static inline bool apply(Geometry1 const&, Geometry2 const&, Strategy const&)
@@ -318,7 +299,7 @@ struct touches<Geometry1, Geometry2, multi_point_tag, Tag2, pointlike_tag, point
     }
 };
 
-// P/*
+// P/L P/A
 
 template <typename Point, typename Geometry, typename Tag2, typename CastedTag2>
 struct touches<Point, Geometry, point_tag, Tag2, pointlike_tag, CastedTag2, false>
@@ -334,6 +315,8 @@ struct touches<MultiPoint, MultiGeometry, multi_point_tag, Tag2, pointlike_tag, 
             MultiGeometry
         >
 {};
+
+// L/P A/P
 
 template <typename Geometry, typename MultiPoint, typename Tag1, typename CastedTag1>
 struct touches<Geometry, MultiPoint, Tag1, multi_point_tag, CastedTag1, pointlike_tag, false>
@@ -423,32 +406,27 @@ struct self_touches
     {
         concepts::check<Geometry const>();
 
-        typedef typename strategy::relate::services::default_strategy
+        typedef typename strategies::relate::services::default_strategy
             <
                 Geometry, Geometry
             >::type strategy_type;
-        typedef detail::no_rescale_policy rescale_policy_type;
         typedef typename geometry::point_type<Geometry>::type point_type;
-        typedef detail::overlay::turn_info
-            <
-                point_type,
-                typename segment_ratio_type<point_type, rescale_policy_type>::type
-            > turn_info;
+        typedef detail::overlay::turn_info<point_type> turn_info;
 
         typedef detail::overlay::get_turn_info
-        <
-            detail::overlay::assign_null_policy
-        > policy_type;
+            <
+                detail::overlay::assign_null_policy
+            > policy_type;
 
         std::deque<turn_info> turns;
         detail::touches::areal_interrupt_policy policy;
         strategy_type strategy;
-        rescale_policy_type robust_policy;
         // TODO: skip_adjacent should be set to false
         detail::self_get_turn_points::get_turns
-        <
-            false, policy_type
-        >::apply(geometry, strategy, robust_policy, turns, policy, 0, true);
+            <
+                false, policy_type
+            >::apply(geometry, strategy, detail::no_rescale_policy(),
+                     turns, policy, 0, true);
 
         return policy.result();
     }

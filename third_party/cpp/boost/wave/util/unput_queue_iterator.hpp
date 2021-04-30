@@ -9,8 +9,8 @@
     Software License, Version 1.0. (See accompanying file
     LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 =============================================================================*/
-#if !defined(UNPUT_QUEUE_ITERATOR_HPP_76DA23D0_4893_4AD5_ABCC_6CED7CFB89BC_INCLUDED)
-#define UNPUT_QUEUE_ITERATOR_HPP_76DA23D0_4893_4AD5_ABCC_6CED7CFB89BC_INCLUDED
+#if !defined(BOOST_UNPUT_QUEUE_ITERATOR_HPP_76DA23D0_4893_4AD5_ABCC_6CED7CFB89BC_INCLUDED)
+#define BOOST_UNPUT_QUEUE_ITERATOR_HPP_76DA23D0_4893_4AD5_ABCC_6CED7CFB89BC_INCLUDED
 
 #include <list>
 
@@ -88,11 +88,11 @@ public:
     void increment()
     {
         if (!unput_queue.empty()) {
-        // there exist pending tokens in the unput queue
+            // there exist pending tokens in the unput queue
             unput_queue.pop_front();
         }
         else {
-        // the unput_queue is empty, so advance the base iterator
+            // the unput_queue is empty, so advance the base iterator
             ++base_type::base_reference();
         }
     }
@@ -292,4 +292,4 @@ namespace impl {
 #include BOOST_ABI_SUFFIX
 #endif
 
-#endif // !defined(UNPUT_QUEUE_ITERATOR_HPP_76DA23D0_4893_4AD5_ABCC_6CED7CFB89BC_INCLUDED)
+#endif // !defined(BOOST_UNPUT_QUEUE_ITERATOR_HPP_76DA23D0_4893_4AD5_ABCC_6CED7CFB89BC_INCLUDED)

@@ -18,6 +18,7 @@
 #if BOOST_USE_WINAPI_VERSION >= BOOST_WINAPI_VERSION_WIN6
 
 #include <boost/winapi/basic_types.hpp>
+#include <boost/winapi/detail/header.hpp>
 
 #if !defined(BOOST_USE_WINDOWS_H)
 extern "C" {
@@ -33,24 +34,24 @@ typedef boost::winapi::BOOL_
     boost::winapi::PVOID_ Parameter,
     boost::winapi::PVOID_ *Context);
 
-BOOST_SYMBOL_IMPORT boost::winapi::VOID_ BOOST_WINAPI_WINAPI_CC
+BOOST_WINAPI_IMPORT boost::winapi::VOID_ BOOST_WINAPI_WINAPI_CC
 InitOnceInitialize(::_RTL_RUN_ONCE* InitOnce);
 
-BOOST_SYMBOL_IMPORT boost::winapi::BOOL_ BOOST_WINAPI_WINAPI_CC
+BOOST_WINAPI_IMPORT boost::winapi::BOOL_ BOOST_WINAPI_WINAPI_CC
 InitOnceExecuteOnce(
     ::_RTL_RUN_ONCE* InitOnce,
     ::PINIT_ONCE_FN InitFn,
     boost::winapi::PVOID_ Parameter,
     boost::winapi::LPVOID_ *Context);
 
-BOOST_SYMBOL_IMPORT boost::winapi::BOOL_ BOOST_WINAPI_WINAPI_CC
+BOOST_WINAPI_IMPORT boost::winapi::BOOL_ BOOST_WINAPI_WINAPI_CC
 InitOnceBeginInitialize(
     ::_RTL_RUN_ONCE* lpInitOnce,
     boost::winapi::DWORD_ dwFlags,
     boost::winapi::PBOOL_ fPending,
     boost::winapi::LPVOID_ *lpContext);
 
-BOOST_SYMBOL_IMPORT boost::winapi::BOOL_ BOOST_WINAPI_WINAPI_CC
+BOOST_WINAPI_IMPORT boost::winapi::BOOL_ BOOST_WINAPI_WINAPI_CC
 InitOnceComplete(
     ::_RTL_RUN_ONCE* lpInitOnce,
     boost::winapi::DWORD_ dwFlags,
@@ -114,6 +115,8 @@ BOOST_CONSTEXPR_OR_CONST DWORD_ init_once_ctx_reserved_bits = INIT_ONCE_CTX_RESE
 
 }
 }
+
+#include <boost/winapi/detail/footer.hpp>
 
 #endif // BOOST_USE_WINAPI_VERSION >= BOOST_WINAPI_VERSION_WIN6
 

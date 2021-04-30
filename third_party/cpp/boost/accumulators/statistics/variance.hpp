@@ -53,6 +53,10 @@ namespace impl
             result_type tmp = mean(args);
             return accumulators::moment<2>(args) - tmp * tmp;
         }
+        
+        // serialization is done by accumulators it depends on
+        template<class Archive>
+        void serialize(Archive & ar, const unsigned int file_version) {}
     };
 
     //! Iterative calculation of variance.
@@ -111,6 +115,13 @@ namespace impl
         result_type result(dont_care) const
         {
             return this->variance;
+        }
+
+        // make this accumulator serializeable
+        template<class Archive>
+        void serialize(Archive & ar, const unsigned int file_version)
+        { 
+            ar & variance;
         }
 
     private:

@@ -133,11 +133,7 @@ private:
     }
 
     std::priority_queue<size_t,
-#ifdef BOOST_NO_CXX11_ALLOCATOR
-                        std::vector<size_t, typename Alloc::template rebind<size_t>::other >,
-#else
-                        std::vector<size_t, typename std::allocator_traits<Alloc>::template rebind_alloc<size_t> >,
-#endif
+                        std::vector<size_t, typename boost::allocator_rebind<Alloc, size_t>::type>,
                         compare_by_heap_value
                        > unvisited_nodes;
 };

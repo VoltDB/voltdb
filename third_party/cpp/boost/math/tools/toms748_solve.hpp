@@ -503,7 +503,7 @@ std::pair<T, T> bracket_and_solve_root(F f, const T& guess, T factor, bool risin
    BOOST_MATH_STD_USING
    static const char* function = "boost::math::tools::bracket_and_solve_root<%1%>";
    //
-   // Set up inital brackets:
+   // Set up initial brackets:
    //
    T a = guess;
    T b = a;

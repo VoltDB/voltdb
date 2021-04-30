@@ -73,6 +73,36 @@ class named_upgradable_mutex
    //!interprocess_exception.
    named_upgradable_mutex(open_only_t open_only, const char *name);
 
+   #if defined(BOOST_INTERPROCESS_WCHAR_NAMED_RESOURCES) || defined(BOOST_INTERPROCESS_DOXYGEN_INVOKED)
+
+   //!Creates a global upgradable mutex with a name.
+   //!If the upgradable mutex can't be created throws interprocess_exception
+   //! 
+   //!Note: This function is only available on operating systems with
+   //!      native wchar_t APIs (e.g. Windows).
+   named_upgradable_mutex(create_only_t create_only, const wchar_t *name, const permissions &perm = permissions());
+
+   //!Opens or creates a global upgradable mutex with a name.
+   //!If the upgradable mutex is created, this call is equivalent to
+   //!named_upgradable_mutex(create_only_t, ...)
+   //!If the upgradable mutex is already created, this call is equivalent to
+   //!named_upgradable_mutex(open_only_t, ... ).
+   //! 
+   //!Note: This function is only available on operating systems with
+   //!      native wchar_t APIs (e.g. Windows).
+   named_upgradable_mutex(open_or_create_t open_or_create, const wchar_t *name, const permissions &perm = permissions());
+
+   //!Opens a global upgradable mutex with a name if that upgradable mutex
+   //!is previously.
+   //!created. If it is not previously created this function throws
+   //!interprocess_exception.
+   //! 
+   //!Note: This function is only available on operating systems with
+   //!      native wchar_t APIs (e.g. Windows).
+   named_upgradable_mutex(open_only_t open_only, const wchar_t *name);
+
+   #endif //defined(BOOST_INTERPROCESS_WCHAR_NAMED_RESOURCES) || defined(BOOST_INTERPROCESS_DOXYGEN_INVOKED)
+
    //!Destroys *this and indicates that the calling process is finished using
    //!the resource. The destructor function will deallocate
    //!any system resources allocated by the system for use by this process for
@@ -83,25 +113,43 @@ class named_upgradable_mutex
 
    //Exclusive locking
 
+   //!Requires: The calling thread does not own the mutex.
+   //!
    //!Effects: The calling thread tries to obtain exclusive ownership of the mutex,
    //!   and if another thread has exclusive, sharable or upgradable ownership of
    //!   the mutex, it waits until it can obtain the ownership.
    //!Throws: interprocess_exception on error.
+   //!
+   //!Note: A program may deadlock if the thread that has ownership calls 
+   //!   this function. If the implementation can detect the deadlock,
+   //!   an exception could be thrown
    void lock();
 
+   //!Requires: The calling thread does not own the mutex.
+   //!
    //!Effects: The calling thread tries to acquire exclusive ownership of the mutex
    //!   without waiting. If no other thread has exclusive, sharable or upgradable
    //!   ownership of the mutex this succeeds.
    //!Returns: If it can acquire exclusive ownership immediately returns true.
    //!   If it has to wait, returns false.
    //!Throws: interprocess_exception on error.
+   //!
+   //!Note: A program may deadlock if the thread that has ownership calls 
+   //!   this function. If the implementation can detect the deadlock,
+   //!   an exception could be thrown
    bool try_lock();
 
+   //!Requires: The calling thread does not own the mutex.
+   //!
    //!Effects: The calling thread tries to acquire exclusive ownership of the mutex
    //!   waiting if necessary until no other thread has exclusive, sharable or
    //!   upgradable ownership of the mutex or abs_time is reached.
    //!Returns: If acquires exclusive ownership, returns true. Otherwise returns false.
    //!Throws: interprocess_exception on error.
+   //!
+   //!Note: A program may deadlock if the thread that has ownership calls 
+   //!   this function. If the implementation can detect the deadlock,
+   //!   an exception could be thrown
    bool timed_lock(const boost::posix_time::ptime &abs_time);
 
    //!Precondition: The thread must have exclusive ownership of the mutex.
@@ -111,25 +159,43 @@ class named_upgradable_mutex
 
    //Sharable locking
 
+   //!Requires: The calling thread does not own the mutex.
+   //!
    //!Effects: The calling thread tries to obtain sharable ownership of the mutex,
    //!   and if another thread has exclusive ownership of the mutex,
    //!   waits until it can obtain the ownership.
    //!Throws: interprocess_exception on error.
+   //!
+   //!Note: A program may deadlock if the thread that has ownership calls 
+   //!   this function. If the implementation can detect the deadlock,
+   //!   an exception could be thrown
    void lock_sharable();
 
+   //!Requires: The calling thread does not own the mutex.
+   //!
    //!Effects: The calling thread tries to acquire sharable ownership of the mutex
    //!   without waiting. If no other thread has exclusive ownership
    //!   of the mutex this succeeds.
    //!Returns: If it can acquire sharable ownership immediately returns true. If it
    //!   has to wait, returns false.
    //!Throws: interprocess_exception on error.
+   //!
+   //!Note: A program may deadlock if the thread that has ownership calls 
+   //!   this function. If the implementation can detect the deadlock,
+   //!   an exception could be thrown
    bool try_lock_sharable();
 
+   //!Requires: The calling thread does not own the mutex.
+   //!
    //!Effects: The calling thread tries to acquire sharable ownership of the mutex
    //!   waiting if necessary until no other thread has exclusive
    //!   ownership of the mutex or abs_time is reached.
    //!Returns: If acquires sharable ownership, returns true. Otherwise returns false.
    //!Throws: interprocess_exception on error.
+   //!
+   //!Note: A program may deadlock if the thread that has ownership calls 
+   //!   this function. If the implementation can detect the deadlock,
+   //!   an exception could be thrown
    bool timed_lock_sharable(const boost::posix_time::ptime &abs_time);
 
    //!Precondition: The thread must have sharable ownership of the mutex.
@@ -139,25 +205,43 @@ class named_upgradable_mutex
 
    //Upgradable locking
 
+   //!Requires: The calling thread does not own the mutex.
+   //!
    //!Effects: The calling thread tries to obtain upgradable ownership of the mutex,
    //!   and if another thread has exclusive or upgradable ownership of the mutex,
    //!   waits until it can obtain the ownership.
    //!Throws: interprocess_exception on error.
+   //!
+   //!Note: A program may deadlock if the thread that has ownership calls 
+   //!   this function. If the implementation can detect the deadlock,
+   //!   an exception could be thrown
    void lock_upgradable();
 
+   //!Requires: The calling thread does not own the mutex.
+   //!
    //!Effects: The calling thread tries to acquire upgradable ownership of the mutex
    //!   without waiting. If no other thread has exclusive or upgradable ownership
    //!   of the mutex this succeeds.
    //!Returns: If it can acquire upgradable ownership immediately returns true.
    //!   If it has to wait, returns false.
    //!Throws: interprocess_exception on error.
+   //!
+   //!Note: A program may deadlock if the thread that has ownership calls 
+   //!   this function. If the implementation can detect the deadlock,
+   //!   an exception could be thrown
    bool try_lock_upgradable();
 
+   //!Requires: The calling thread does not own the mutex.
+   //!
    //!Effects: The calling thread tries to acquire upgradable ownership of the mutex
    //!   waiting if necessary until no other thread has exclusive or upgradable
    //!   ownership of the mutex or abs_time is reached.
    //!Returns: If acquires upgradable ownership, returns true. Otherwise returns false.
    //!Throws: interprocess_exception on error.
+   //!
+   //!Note: A program may deadlock if the thread that has ownership calls 
+   //!   this function. If the implementation can detect the deadlock,
+   //!   an exception could be thrown
    bool timed_lock_upgradable(const boost::posix_time::ptime &abs_time);
 
    //!Precondition: The thread must have upgradable ownership of the mutex.
@@ -231,6 +315,15 @@ class named_upgradable_mutex
    //!Returns false on error. Never throws.
    static bool remove(const char *name);
 
+   #if defined(BOOST_INTERPROCESS_WCHAR_NAMED_RESOURCES) || defined(BOOST_INTERPROCESS_DOXYGEN_INVOKED)
+   //!Erases a named upgradable mutex from the system.
+   //!Returns false on error. Never throws.
+   //! 
+   //!Note: This function is only available on operating systems with
+   //!      native wchar_t APIs (e.g. Windows).
+   static bool remove(const wchar_t *name);
+   #endif
+
    #if !defined(BOOST_INTERPROCESS_DOXYGEN_INVOKED)
    private:
    friend class ipcdetail::interprocess_tester;
@@ -282,6 +375,43 @@ inline named_upgradable_mutex::named_upgradable_mutex
                ,0
                ,construct_func_t(ipcdetail::DoOpen))
 {}
+
+#if defined(BOOST_INTERPROCESS_WCHAR_NAMED_RESOURCES) || defined(BOOST_INTERPROCESS_DOXYGEN_INVOKED)
+
+inline named_upgradable_mutex::named_upgradable_mutex
+   (create_only_t, const wchar_t *name, const permissions &perm)
+   :  m_shmem  (create_only
+               ,name
+               ,sizeof(interprocess_upgradable_mutex) +
+                  open_create_impl_t::ManagedOpenOrCreateUserOffset
+               ,read_write
+               ,0
+               ,construct_func_t(ipcdetail::DoCreate)
+               ,perm)
+{}
+
+inline named_upgradable_mutex::named_upgradable_mutex
+   (open_or_create_t, const wchar_t *name, const permissions &perm)
+   :  m_shmem  (open_or_create
+               ,name
+               ,sizeof(interprocess_upgradable_mutex) +
+                  open_create_impl_t::ManagedOpenOrCreateUserOffset
+               ,read_write
+               ,0
+               ,construct_func_t(ipcdetail::DoOpenOrCreate)
+               ,perm)
+{}
+
+inline named_upgradable_mutex::named_upgradable_mutex
+   (open_only_t, const wchar_t *name)
+   :  m_shmem  (open_only
+               ,name
+               ,read_write
+               ,0
+               ,construct_func_t(ipcdetail::DoOpen))
+{}
+
+#endif
 
 inline void named_upgradable_mutex::dont_close_on_destruction()
 {  ipcdetail::interprocess_tester::dont_close_on_destruction(m_shmem);  }
@@ -352,6 +482,14 @@ inline bool named_upgradable_mutex::try_unlock_sharable_and_lock_upgradable()
 
 inline bool named_upgradable_mutex::remove(const char *name)
 {  return shared_memory_object::remove(name); }
+
+#if defined(BOOST_INTERPROCESS_WCHAR_NAMED_RESOURCES) || defined(BOOST_INTERPROCESS_DOXYGEN_INVOKED)
+
+inline bool named_upgradable_mutex::remove(const wchar_t *name)
+{  return shared_memory_object::remove(name); }
+
+#endif
+
 
 #endif   //#ifndef BOOST_INTERPROCESS_DOXYGEN_INVOKED
 

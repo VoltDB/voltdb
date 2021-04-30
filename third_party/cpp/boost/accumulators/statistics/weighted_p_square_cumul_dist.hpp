@@ -221,6 +221,19 @@ namespace impl
             return make_iterator_range(this->histogram);
         }
 
+        // make this accumulator serializeable
+        // TODO split to save/load and check on parameters provided in ctor
+        template<class Archive>
+        void serialize(Archive & ar, const unsigned int file_version)
+        {
+            ar & num_cells;
+            ar & heights;
+            ar & actual_positions;
+            ar & desired_positions;
+            ar & histogram;
+            ar & is_dirty; 
+        }
+
     private:
         std::size_t num_cells;            // number of cells b
         array_type  heights;              // q_i

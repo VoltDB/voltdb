@@ -39,11 +39,21 @@ functions (for subcontracting).
 
 Virtual public functions (and therefore also public function overrides)
 declaring contracts using this library must specify an extra function parameter
-at the very end of the parameter list.
+at the very end of their parameter list.
 This parameter must be a pointer to this class and it must have default value
-@c 0 (i.e., @c nullptr).
-(This extra parameter is often named @c v in this documentation, but any name
-can be used.)
+@c 0 or @c nullptr (this extra parameter is often named @c v in this
+documentation, but any name can be used):
+
+@code
+class u {
+public:
+    virtual void f(int x, boost::contract::virtual_* v = 0) { // Declare `v`.
+        ... // Contract declaration (which will use `v`) and function body.
+    }
+
+    ...
+};
+@endcode
 
 In practice this extra parameter does not alter the calling interface of the
 enclosing function declaring the contract because it is always the very last

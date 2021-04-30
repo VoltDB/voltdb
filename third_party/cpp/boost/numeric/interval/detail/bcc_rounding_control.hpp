@@ -11,7 +11,7 @@
 #ifndef BOOST_NUMERIC_INTERVAL_DETAIL_BCC_ROUNDING_CONTROL_HPP
 #define BOOST_NUMERIC_INTERVAL_DETAIL_BCC_ROUNDING_CONTROL_HPP
 
-#ifndef __BORLANDC__
+#if !defined(__BORLANDC__) || defined(__clang__)
 #  error This header is only intended for Borland C++.
 #endif
 

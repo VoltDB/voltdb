@@ -9,16 +9,20 @@
 #if !defined(BOOST_SPIRIT_UTREE_DETAIL2)
 #define BOOST_SPIRIT_UTREE_DETAIL2
 
-#if defined(BOOST_MSVC)
-# pragma warning(push)
-# pragma warning(disable: 4800)
-#endif
-
 #include <boost/type_traits/remove_pointer.hpp>
 #include <boost/type_traits/is_pointer.hpp>
 #include <boost/utility/enable_if.hpp>
 #include <boost/throw_exception.hpp>
 #include <boost/iterator/iterator_traits.hpp>
+#include <cstring> // for std::memcpy
+
+#ifdef _MSC_VER
+# pragma warning(push)
+# pragma warning(disable: 4800) // forcing value to bool 'true' or 'false'
+# if _MSC_VER < 1800
+#  pragma warning(disable: 4702) // unreachable code
+# endif
+#endif
 
 namespace boost { namespace spirit { namespace detail
 {
@@ -1528,11 +1532,11 @@ namespace boost { namespace spirit
         }
 
         template <typename From>
-        To dispatch(From const&, boost::mpl::false_) const
+        BOOST_NORETURN To dispatch(From const&, boost::mpl::false_) const
         {
             // From is NOT convertible to To !!!
             throw std::bad_cast();
-            return To();
+            BOOST_UNREACHABLE_RETURN(To())
         }
 
         template <typename From>
@@ -1554,11 +1558,11 @@ namespace boost { namespace spirit
         typedef T* result_type;
 
         template <typename From>
-        T* operator()(From const&) const
+        BOOST_NORETURN T* operator()(From const&) const
         {
             // From is NOT convertible to T !!!
             throw std::bad_cast();
-            return 0;
+            BOOST_UNREACHABLE_RETURN(NULL)
         }
 
         T* operator()(any_ptr const& p) const
@@ -1628,7 +1632,7 @@ namespace boost { namespace spirit
     }
 }}
 
-#if defined(BOOST_MSVC)
+#ifdef _MSC_VER
 # pragma warning(pop)
 #endif
 #endif

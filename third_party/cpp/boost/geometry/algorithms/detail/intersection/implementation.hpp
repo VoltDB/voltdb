@@ -15,6 +15,7 @@
 #define BOOST_GEOMETRY_ALGORITHMS_DETAIL_INTERSECTION_IMPLEMENTATION_HPP
 
 
+#include <boost/geometry/algorithms/detail/intersection/areal_areal.hpp>
 #include <boost/geometry/algorithms/detail/intersection/box_box.hpp>
 #include <boost/geometry/algorithms/detail/intersection/multi.hpp>
 

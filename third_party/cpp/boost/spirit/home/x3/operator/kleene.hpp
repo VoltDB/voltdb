@@ -21,7 +21,7 @@ namespace boost { namespace spirit { namespace x3
         typedef unary_parser<Subject, kleene<Subject>> base_type;
         static bool const handles_container = true;
 
-        kleene(Subject const& subject)
+        constexpr kleene(Subject const& subject)
           : base_type(subject) {}
 
         template <typename Iterator, typename Context
@@ -37,7 +37,7 @@ namespace boost { namespace spirit { namespace x3
     };
 
     template <typename Subject>
-    inline kleene<typename extension::as_parser<Subject>::value_type>
+    constexpr kleene<typename extension::as_parser<Subject>::value_type>
     operator*(Subject const& subject)
     {
         return { as_parser(subject) };

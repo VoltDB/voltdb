@@ -3,8 +3,8 @@
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
-#if !defined(SPIRIT_KARMA_INDIRECT_ITERATOR_JAN_19_2011_0814PM)
-#define SPIRIT_KARMA_INDIRECT_ITERATOR_JAN_19_2011_0814PM
+#ifndef BOOST_SPIRIT_KARMA_DETAIL_INDIRECT_ITERATOR_HPP
+#define BOOST_SPIRIT_KARMA_DETAIL_INDIRECT_ITERATOR_HPP
 
 #if defined(_MSC_VER)
 #pragma once

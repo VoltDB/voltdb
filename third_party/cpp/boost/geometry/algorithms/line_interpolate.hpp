@@ -1,6 +1,6 @@
 // Boost.Geometry (aka GGL, Generic Geometry Library)
 
-// Copyright (c) 2018, 2019 Oracle and/or its affiliates.
+// Copyright (c) 2018-2020 Oracle and/or its affiliates.
 
 // Contributed and/or modified by Vissarion Fysikopoulos, on behalf of Oracle
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
@@ -13,6 +13,7 @@
 #define BOOST_GEOMETRY_ALGORITHMS_LINE_INTERPOLATE_HPP
 
 #include <iterator>
+#include <type_traits>
 
 #include <boost/range/begin.hpp>
 #include <boost/range/end.hpp>
@@ -21,6 +22,7 @@
 
 #include <boost/geometry/core/cs.hpp>
 #include <boost/geometry/core/closure.hpp>
+#include <boost/geometry/core/static_assert.hpp>
 #include <boost/geometry/core/tags.hpp>
 
 #include <boost/geometry/geometries/concepts/check.hpp>
@@ -119,7 +121,7 @@ struct interpolate_range
                                p,
                                diff_distance);
                 policy.apply(p, pointlike);
-                if (boost::is_same<PointLike, point_t>::value)
+                if (std::is_same<PointLike, point_t>::value)
                 {
                     return;
                 }
@@ -173,11 +175,9 @@ template
 >
 struct line_interpolate
 {
-    BOOST_MPL_ASSERT_MSG
-        (
-            false, NOT_IMPLEMENTED_FOR_THIS_GEOMETRY_TYPE
-            , (types<Geometry>)
-        );
+    BOOST_GEOMETRY_STATIC_ASSERT_FALSE(
+        "Not implemented for this Geometry type.",
+        Geometry, Pointlike);
 };
 
 

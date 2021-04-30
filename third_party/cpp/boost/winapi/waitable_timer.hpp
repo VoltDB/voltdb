@@ -16,6 +16,8 @@
 
 #if BOOST_WINAPI_PARTITION_APP_SYSTEM
 
+#include <boost/winapi/detail/header.hpp>
+
 #if !defined( BOOST_USE_WINDOWS_H )
 extern "C" {
 typedef boost::winapi::VOID_
@@ -25,32 +27,32 @@ typedef boost::winapi::VOID_
     boost::winapi::DWORD_ dwTimerHighValue);
 
 #if !defined( BOOST_NO_ANSI_APIS )
-BOOST_SYMBOL_IMPORT boost::winapi::HANDLE_ BOOST_WINAPI_WINAPI_CC
+BOOST_WINAPI_IMPORT boost::winapi::HANDLE_ BOOST_WINAPI_WINAPI_CC
 CreateWaitableTimerA(
     ::_SECURITY_ATTRIBUTES* lpTimerAttributes,
     boost::winapi::BOOL_ bManualReset,
     boost::winapi::LPCSTR_ lpTimerName);
 
-BOOST_SYMBOL_IMPORT boost::winapi::HANDLE_ BOOST_WINAPI_WINAPI_CC
+BOOST_WINAPI_IMPORT boost::winapi::HANDLE_ BOOST_WINAPI_WINAPI_CC
 OpenWaitableTimerA(
     boost::winapi::DWORD_ dwDesiredAccess,
     boost::winapi::BOOL_ bInheritHandle,
     boost::winapi::LPCSTR_ lpTimerName);
 #endif
 
-BOOST_SYMBOL_IMPORT boost::winapi::HANDLE_ BOOST_WINAPI_WINAPI_CC
+BOOST_WINAPI_IMPORT boost::winapi::HANDLE_ BOOST_WINAPI_WINAPI_CC
 CreateWaitableTimerW(
     ::_SECURITY_ATTRIBUTES* lpTimerAttributes,
     boost::winapi::BOOL_ bManualReset,
     boost::winapi::LPCWSTR_ lpTimerName);
 
-BOOST_SYMBOL_IMPORT boost::winapi::HANDLE_ BOOST_WINAPI_WINAPI_CC
+BOOST_WINAPI_IMPORT boost::winapi::HANDLE_ BOOST_WINAPI_WINAPI_CC
 OpenWaitableTimerW(
     boost::winapi::DWORD_ dwDesiredAccess,
     boost::winapi::BOOL_ bInheritHandle,
     boost::winapi::LPCWSTR_ lpTimerName);
 
-BOOST_SYMBOL_IMPORT boost::winapi::BOOL_ BOOST_WINAPI_WINAPI_CC
+BOOST_WINAPI_IMPORT boost::winapi::BOOL_ BOOST_WINAPI_WINAPI_CC
 SetWaitableTimer(
     boost::winapi::HANDLE_ hTimer,
     const ::_LARGE_INTEGER* lpDueTime,
@@ -59,7 +61,7 @@ SetWaitableTimer(
     boost::winapi::LPVOID_ lpArgToCompletionRoutine,
     boost::winapi::BOOL_ fResume);
 
-BOOST_SYMBOL_IMPORT boost::winapi::BOOL_ BOOST_WINAPI_WINAPI_CC
+BOOST_WINAPI_IMPORT boost::winapi::BOOL_ BOOST_WINAPI_WINAPI_CC
 CancelWaitableTimer(boost::winapi::HANDLE_ hTimer);
 } // extern "C"
 #endif
@@ -140,6 +142,8 @@ BOOST_FORCEINLINE HANDLE_ create_anonymous_waitable_timer(PSECURITY_ATTRIBUTES_ 
 
 }
 }
+
+#include <boost/winapi/detail/footer.hpp>
 
 #endif // BOOST_WINAPI_PARTITION_APP_SYSTEM
 #endif // BOOST_WINAPI_WAITABLE_TIMER_HPP_INCLUDED_

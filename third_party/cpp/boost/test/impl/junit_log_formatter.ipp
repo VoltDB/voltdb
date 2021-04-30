@@ -23,7 +23,6 @@
 #include <boost/test/framework.hpp>
 
 #include <boost/test/tree/visitor.hpp>
-#include <boost/test/tree/test_case_counter.hpp>
 #include <boost/test/tree/traverse.hpp>
 #include <boost/test/results_collector.hpp>
 
@@ -398,7 +397,7 @@ public:
         m_stream << "</testcase>" << std::endl;
     }
 
-    void    visit( test_case const& tc )
+    void    visit( test_case const& tc ) BOOST_OVERRIDE
     {
 
         test_results const& tr = results_collector.results( tc.p_id );
@@ -413,7 +412,7 @@ public:
         }
     }
 
-    bool    test_suite_start( test_suite const& ts )
+    bool    test_suite_start( test_suite const& ts ) BOOST_OVERRIDE
     {
         test_results const& tr = results_collector.results( ts.p_id );
 
@@ -422,7 +421,7 @@ public:
             m_stream << "<testsuite";
 
             // think about: maybe we should add the number of fixtures of a test_suite as
-            // independant tests (field p_fixtures).
+            // independent tests (field p_fixtures).
             // same goes for the timed-execution: we can think of that as a separate test-unit
             // in the suite.
             // see https://llg.cubic.org/docs/junit/ and
@@ -472,7 +471,7 @@ public:
         return true; // indicates that the children should also be parsed
     }
 
-    virtual void    test_suite_finish( test_suite const& ts )
+    void    test_suite_finish( test_suite const& ts ) BOOST_OVERRIDE
     {
         if( m_ts.p_id == ts.p_id ) {
             write_testcase_system_out(runner_log, 0, false);

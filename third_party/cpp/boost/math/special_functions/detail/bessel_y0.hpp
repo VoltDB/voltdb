@@ -24,7 +24,7 @@
 // This is the only way we can avoid
 // warning: non-standard suffix on floating constant [-Wpedantic]
 // when building with -Wall -pedantic.  Neither __extension__
-// nor #pragma dianostic ignored work :(
+// nor #pragma diagnostic ignored work :(
 //
 #pragma GCC system_header
 #endif

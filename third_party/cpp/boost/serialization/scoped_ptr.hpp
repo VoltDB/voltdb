@@ -19,13 +19,13 @@
 #include <boost/serialization/nvp.hpp>
 #include <boost/serialization/split_free.hpp>
 
-namespace boost { 
+namespace boost {
 namespace serialization {
-    
+
     template<class Archive, class T>
     void save(
-        Archive & ar, 
-        const boost::scoped_ptr< T > & t, 
+        Archive & ar,
+        const boost::scoped_ptr< T > & t,
         const unsigned int /* version */
     ){
         T* r = t.get();
@@ -34,19 +34,19 @@ namespace serialization {
 
     template<class Archive, class T>
     void load(
-        Archive & ar, 
-        boost::scoped_ptr< T > & t, 
+        Archive & ar,
+        boost::scoped_ptr< T > & t,
         const unsigned int /* version */
     ){
         T* r;
         ar >> boost::serialization::make_nvp("scoped_ptr", r);
-        t.reset(r); 
+        t.reset(r);
     }
 
     template<class Archive, class T>
     void serialize(
-        Archive& ar, 
-        boost::scoped_ptr< T >& t, 
+        Archive& ar,
+        boost::scoped_ptr< T >& t,
         const unsigned int version
     ){
         boost::serialization::split_free(ar, t, version);

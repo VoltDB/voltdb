@@ -14,14 +14,17 @@
 #include <boost/winapi/handles.hpp>
 #include <boost/winapi/handle_info.hpp>
 #include <boost/process/detail/handler_base.hpp>
+#include <boost/process/detail/used_handles.hpp>
 #include <boost/process/detail/windows/file_descriptor.hpp>
 
 namespace boost { namespace process { namespace detail { namespace windows {
 
 template<int p1, int p2>
-struct null_out : public ::boost::process::detail::handler_base
+struct null_out : public ::boost::process::detail::handler_base, ::boost::process::detail::uses_handles
 {
     file_descriptor sink {"NUL", file_descriptor::write}; //works because it gets destroyed AFTER launch.
+
+    ::boost::winapi::HANDLE_ get_used_handles() const { return sink.handle(); }
 
     template <typename WindowsExecutor>
     void on_setup(WindowsExecutor &e) const;

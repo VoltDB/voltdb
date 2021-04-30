@@ -25,6 +25,8 @@
 #include <boost/accumulators/statistics/count.hpp>
 #include <boost/accumulators/statistics/max.hpp>
 #include <boost/accumulators/statistics/min.hpp>
+#include <boost/serialization/vector.hpp>
+#include <boost/serialization/utility.hpp>
 
 namespace boost { namespace accumulators
 {
@@ -182,6 +184,20 @@ namespace impl
             }
             // returns a range of pairs
             return make_iterator_range(this->histogram);
+        }
+
+        // make this accumulator serializeable
+        // TODO split to save/load and check on parameters provided in ctor
+        template<class Archive>
+        void serialize(Archive & ar, const unsigned int file_version)
+        {
+            ar & cache_size;
+            ar & cache;
+            ar & num_bins;
+            ar & samples_in_bin;
+            ar & bin_positions;
+            ar & histogram;
+            ar & is_dirty; 
         }
 
     private:

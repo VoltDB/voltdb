@@ -102,7 +102,7 @@ namespace boost
                 handle const res = ::boost::winapi::CreateEventExW(
                     0,
                     mutex_name,
-                    type ? create_event_manual_reset : 0 | state ? create_event_initial_set : 0,
+                    (type ? create_event_manual_reset : 0) | (state ? create_event_initial_set : 0),
                     event_all_access);
 #endif
                 return res;

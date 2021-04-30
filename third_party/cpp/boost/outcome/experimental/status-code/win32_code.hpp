@@ -1,5 +1,5 @@
 /* Proposed SG14 status_code
-(C) 2018-2019 Niall Douglas <http://www.nedproductions.biz/> (5 commits)
+(C) 2018-2021 Niall Douglas <http://www.nedproductions.biz/> (5 commits)
 File Created: Feb 2018
 
 
@@ -35,7 +35,7 @@ DEALINGS IN THE SOFTWARE.
 #error This file should only be included on Windows
 #endif
 
-#include "generic_code.hpp"
+#include "quick_status_code_from_enum.hpp"
 
 BOOST_OUTCOME_SYSTEM_ERROR2_NAMESPACE_BEGIN
 
@@ -45,12 +45,27 @@ namespace win32
   // A Win32 DWORD
   using DWORD = unsigned long;
   // Used to retrieve the current Win32 error code
-  extern "C" DWORD __stdcall GetLastError();
+  extern DWORD __stdcall GetLastError();
   // Used to retrieve a locale-specific message string for some error code
-  extern "C" DWORD __stdcall FormatMessageW(DWORD dwFlags, const void *lpSource, DWORD dwMessageId, DWORD dwLanguageId, wchar_t *lpBuffer, DWORD nSize, void /*va_list*/ *Arguments);
+  extern DWORD __stdcall FormatMessageW(DWORD dwFlags, const void *lpSource, DWORD dwMessageId, DWORD dwLanguageId, wchar_t *lpBuffer, DWORD nSize, void /*va_list*/ *Arguments);
   // Converts UTF-16 message string to UTF-8
-  extern "C" int __stdcall WideCharToMultiByte(unsigned int CodePage, DWORD dwFlags, const wchar_t *lpWideCharStr, int cchWideChar, char *lpMultiByteStr, int cbMultiByte, const char *lpDefaultChar, int *lpUsedDefaultChar);
+  extern int __stdcall WideCharToMultiByte(unsigned int CodePage, DWORD dwFlags, const wchar_t *lpWideCharStr, int cchWideChar, char *lpMultiByteStr, int cbMultiByte, const char *lpDefaultChar, int *lpUsedDefaultChar);
 #pragma comment(lib, "kernel32.lib")
+#if(defined(__x86_64__) || defined(_M_X64)) || (defined(__aarch64__) || defined(_M_ARM64))
+#pragma comment(linker, "/alternatename:?GetLastError@win32@system_error2@@YAKXZ=GetLastError")
+#pragma comment(linker, "/alternatename:?FormatMessageW@win32@system_error2@@YAKKPEBXKKPEA_WKPEAX@Z=FormatMessageW")
+#pragma comment(linker, "/alternatename:?WideCharToMultiByte@win32@system_error2@@YAHIKPEB_WHPEADHPEBDPEAH@Z=WideCharToMultiByte")
+#elif defined(__x86__) || defined(_M_IX86) || defined(__i386__)
+#pragma comment(linker, "/alternatename:?GetLastError@win32@system_error2@@YGKXZ=__imp__GetLastError@0")
+#pragma comment(linker, "/alternatename:?FormatMessageW@win32@system_error2@@YGKKPBXKKPA_WKPAX@Z=__imp__FormatMessageW@28")
+#pragma comment(linker, "/alternatename:?WideCharToMultiByte@win32@system_error2@@YGHIKPB_WHPADHPBDPAH@Z=__imp__WideCharToMultiByte@32")
+#elif defined(__arm__) || defined(_M_ARM)
+#pragma comment(linker, "/alternatename:?GetLastError@win32@system_error2@@YAKXZ=GetLastError")
+#pragma comment(linker, "/alternatename:?FormatMessageW@win32@system_error2@@YAKKPBXKKPA_WKPAX@Z=FormatMessageW")
+#pragma comment(linker, "/alternatename:?WideCharToMultiByte@win32@system_error2@@YAHIKPB_WHPADHPBDPAH@Z=WideCharToMultiByte")
+#else
+#error Unknown architecture
+#endif
 }  // namespace win32
 
 class _win32_code_domain;
@@ -60,8 +75,19 @@ using win32_code = status_code<_win32_code_domain>;
 //! (Windows only) A specialisation of `status_error` for the Win32 error code domain.
 using win32_error = status_error<_win32_code_domain>;
 
+namespace mixins
+{
+  template <class Base> struct mixin<Base, _win32_code_domain> : public Base
+  {
+    using Base::Base;
+
+    //! Returns a `win32_code` for the current value of `GetLastError()`.
+    static inline win32_code current() noexcept;
+  };
+}  // namespace mixins
+
 /*! (Windows only) The implementation of the domain for Win32 error codes, those returned by `GetLastError()`.
-*/
+ */
 class _win32_code_domain : public status_code_domain
 {
   template <class DomainType> friend class status_code;
@@ -124,7 +150,10 @@ public:
 
 public:
   //! Default constructor
-  constexpr explicit _win32_code_domain(typename _base::unique_id_type id = 0x8cd18ee72d680f1b) noexcept : _base(id) {}
+  constexpr explicit _win32_code_domain(typename _base::unique_id_type id = 0x8cd18ee72d680f1b) noexcept
+      : _base(id)
+  {
+  }
   _win32_code_domain(const _win32_code_domain &) = default;
   _win32_code_domain(_win32_code_domain &&) = default;
   _win32_code_domain &operator=(const _win32_code_domain &) = default;
@@ -187,6 +216,11 @@ inline constexpr const _win32_code_domain &_win32_code_domain::get()
 {
   return win32_code_domain;
 }
+
+namespace mixins
+{
+  template <class Base> inline win32_code mixin<Base, _win32_code_domain>::current() noexcept { return win32_code(win32::GetLastError()); }
+}  // namespace mixins
 
 BOOST_OUTCOME_SYSTEM_ERROR2_NAMESPACE_END
 

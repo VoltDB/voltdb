@@ -29,7 +29,7 @@
 
     \brief appends an element to the end of a seq. 
 
-    seq = seq to to append an element to.
+    seq = seq to to append an element to. <br/>
     elem  = element to append.
 
     If the seq is an empty seq the result is a seq with the single element.

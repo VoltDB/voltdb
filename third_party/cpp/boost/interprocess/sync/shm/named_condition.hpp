@@ -81,6 +81,36 @@ class shm_named_condition
    //!interprocess_exception.
    shm_named_condition(open_only_t open_only, const char *name);
 
+   #if defined(BOOST_INTERPROCESS_WCHAR_NAMED_RESOURCES) || defined(BOOST_INTERPROCESS_DOXYGEN_INVOKED)
+
+   //!Creates a global condition with a name.
+   //!If the condition can't be created throws interprocess_exception
+   //! 
+   //!Note: This function is only available on operating systems with
+   //!      native wchar_t APIs (e.g. Windows).
+   shm_named_condition(create_only_t create_only, const wchar_t *name, const permissions &perm = permissions());
+
+   //!Opens or creates a global condition with a name.
+   //!If the condition is created, this call is equivalent to
+   //!shm_named_condition(create_only_t, ... )
+   //!If the condition is already created, this call is equivalent
+   //!shm_named_condition(open_only_t, ... )
+   //!Does not throw
+   //! 
+   //!Note: This function is only available on operating systems with
+   //!      native wchar_t APIs (e.g. Windows).
+   shm_named_condition(open_or_create_t open_or_create, const wchar_t *name, const permissions &perm = permissions());
+
+   //!Opens a global condition with a name if that condition is previously
+   //!created. If it is not previously created this function throws
+   //!interprocess_exception.
+   //! 
+   //!Note: This function is only available on operating systems with
+   //!      native wchar_t APIs (e.g. Windows).
+   shm_named_condition(open_only_t open_only, const wchar_t *name);
+
+   #endif //defined(BOOST_INTERPROCESS_WCHAR_NAMED_RESOURCES) || defined(BOOST_INTERPROCESS_DOXYGEN_INVOKED)
+
    //!Destroys *this and indicates that the calling process is finished using
    //!the resource. The destructor function will deallocate
    //!any system resources allocated by the system for use by this process for
@@ -125,6 +155,17 @@ class shm_named_condition
    //!Erases a named condition from the system.
    //!Returns false on error. Never throws.
    static bool remove(const char *name);
+
+   #if defined(BOOST_INTERPROCESS_WCHAR_NAMED_RESOURCES) || defined(BOOST_INTERPROCESS_DOXYGEN_INVOKED)
+
+   //!Erases a named condition from the system.
+   //!Returns false on error. Never throws.
+   //! 
+   //!Note: This function is only available on operating systems with
+   //!      native wchar_t APIs (e.g. Windows).
+   static bool remove(const wchar_t *name);
+
+   #endif //defined(BOOST_INTERPROCESS_WCHAR_NAMED_RESOURCES) || defined(BOOST_INTERPROCESS_DOXYGEN_INVOKED)
 
    #if !defined(BOOST_INTERPROCESS_DOXYGEN_INVOKED)
    private:
@@ -198,6 +239,40 @@ inline shm_named_condition::shm_named_condition(open_only_t, const char *name)
                ,construct_func_t(DoOpen))
 {}
 
+#if defined(BOOST_INTERPROCESS_WCHAR_NAMED_RESOURCES) || defined(BOOST_INTERPROCESS_DOXYGEN_INVOKED)
+
+inline shm_named_condition::shm_named_condition(create_only_t, const wchar_t *name, const permissions &perm)
+   :  m_shmem  (create_only
+               ,name
+               ,sizeof(internal_condition) +
+                  open_create_impl_t::ManagedOpenOrCreateUserOffset
+               ,read_write
+               ,0
+               ,construct_func_t(DoCreate)
+               ,perm)
+{}
+
+inline shm_named_condition::shm_named_condition(open_or_create_t, const wchar_t *name, const permissions &perm)
+   :  m_shmem  (open_or_create
+               ,name
+               ,sizeof(internal_condition) +
+                  open_create_impl_t::ManagedOpenOrCreateUserOffset
+               ,read_write
+               ,0
+               ,construct_func_t(DoOpenOrCreate)
+               ,perm)
+{}
+
+inline shm_named_condition::shm_named_condition(open_only_t, const wchar_t *name)
+   :  m_shmem  (open_only
+               ,name
+               ,read_write
+               ,0
+               ,construct_func_t(DoOpen))
+{}
+
+#endif //defined(BOOST_INTERPROCESS_WCHAR_NAMED_RESOURCES) || defined(BOOST_INTERPROCESS_DOXYGEN_INVOKED)
+
 inline void shm_named_condition::dont_close_on_destruction()
 {  interprocess_tester::dont_close_on_destruction(m_shmem);  }
 
@@ -227,6 +302,14 @@ inline bool shm_named_condition::timed_wait
 
 inline bool shm_named_condition::remove(const char *name)
 {  return shared_memory_object::remove(name); }
+
+#if defined(BOOST_INTERPROCESS_WCHAR_NAMED_RESOURCES) || defined(BOOST_INTERPROCESS_DOXYGEN_INVOKED)
+
+inline bool shm_named_condition::remove(const wchar_t *name)
+{  return shared_memory_object::remove(name); }
+
+#endif
+
 
 #endif   //#ifndef BOOST_INTERPROCESS_DOXYGEN_INVOKED
 

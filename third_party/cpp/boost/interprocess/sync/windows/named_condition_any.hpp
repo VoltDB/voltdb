@@ -33,41 +33,103 @@ namespace boost {
 namespace interprocess {
 namespace ipcdetail {
 
-class windows_named_condition_any
+template<class CharT>
+struct named_cond_callbacks_str;
+
+template<>
+struct named_cond_callbacks_str<char>
+{
+   static const char* ipc_cond()
+   {  return "Global\\bipc.cond.";  }
+
+   static const char* bq()
+   {  return "_bq";  }
+
+   static const char* bl()
+   {  return "_bl";  }
+
+   static const char* ul()
+   {  return "_ul";  }
+};
+
+template<>
+struct named_cond_callbacks_str<wchar_t>
+{
+   static const wchar_t* ipc_cond()
+   {  return L"Global\\bipc.cond.";  }
+
+   static const wchar_t* bq()
+   {  return L"_bq";  }
+
+   static const wchar_t* bl()
+   {  return L"_bl";  }
+
+   static const wchar_t* ul()
+   {  return L"_ul";  }
+};
+
+class winapi_named_condition_any
 {
    #if !defined(BOOST_INTERPROCESS_DOXYGEN_INVOKED)
 
    //Non-copyable
-   windows_named_condition_any();
-   windows_named_condition_any(const windows_named_condition_any &);
-   windows_named_condition_any &operator=(const windows_named_condition_any &);
+   winapi_named_condition_any();
+   winapi_named_condition_any(const winapi_named_condition_any &);
+   winapi_named_condition_any &operator=(const winapi_named_condition_any &);
    #endif   //#ifndef BOOST_INTERPROCESS_DOXYGEN_INVOKED
 
    public:
-   windows_named_condition_any
-      (create_only_t, const char *name, const permissions &perm)
+   winapi_named_condition_any
+      (create_only_t, const char *name, const permissions &perm = permissions())
       : m_condition_data()
    {
       named_cond_callbacks callbacks(m_condition_data.get_members());
       m_named_sync.open_or_create(DoCreate, name, perm, callbacks);
    }
 
-   windows_named_condition_any
-      (open_or_create_t, const char *name, const permissions &perm)
+   winapi_named_condition_any
+      (open_or_create_t, const char *name, const permissions &perm = permissions())
       : m_condition_data()
    {
       named_cond_callbacks callbacks(m_condition_data.get_members());
       m_named_sync.open_or_create(DoOpenOrCreate, name, perm, callbacks);
    }
 
-   windows_named_condition_any(open_only_t, const char *name)
+   winapi_named_condition_any(open_only_t, const char *name)
       : m_condition_data()
    {
       named_cond_callbacks callbacks(m_condition_data.get_members());
       m_named_sync.open_or_create(DoOpen, name, permissions(), callbacks);
    }
 
-   ~windows_named_condition_any()
+   #if defined(BOOST_INTERPROCESS_WCHAR_NAMED_RESOURCES) || defined(BOOST_INTERPROCESS_DOXYGEN_INVOKED)
+
+   winapi_named_condition_any
+      (create_only_t, const wchar_t *name, const permissions &perm = permissions())
+      : m_condition_data()
+   {
+      named_cond_callbacks callbacks(m_condition_data.get_members());
+      m_named_sync.open_or_create(DoCreate, name, perm, callbacks);
+   }
+
+   winapi_named_condition_any
+      (open_or_create_t, const wchar_t *name, const permissions &perm = permissions())
+      : m_condition_data()
+   {
+      named_cond_callbacks callbacks(m_condition_data.get_members());
+      m_named_sync.open_or_create(DoOpenOrCreate, name, perm, callbacks);
+   }
+
+   winapi_named_condition_any(open_only_t, const wchar_t *name)
+      : m_condition_data()
+   {
+      named_cond_callbacks callbacks(m_condition_data.get_members());
+      m_named_sync.open_or_create(DoOpen, name, permissions(), callbacks);
+   }
+
+   #endif   //defined(BOOST_INTERPROCESS_WCHAR_NAMED_RESOURCES) || defined(BOOST_INTERPROCESS_DOXYGEN_INVOKED)
+
+   ~winapi_named_condition_any()
    {
       named_cond_callbacks callbacks(m_condition_data.get_members());
       m_named_sync.close(callbacks);
@@ -96,6 +158,9 @@ class windows_named_condition_any
    {  m_condition_data.wait(lock, pred);   }
 
    static bool remove(const char *name)
+   {  return windows_named_sync::remove(name);  }
+
+   static bool remove(const wchar_t *name)
    {  return windows_named_sync::remove(name);  }
 
    #if !defined(BOOST_INTERPROCESS_DOXYGEN_INVOKED)
@@ -138,6 +203,7 @@ class windows_named_condition_any
       winapi_mutex_wrapper       m_mtx_unblock_lock;
    };
 
+
    class named_cond_callbacks : public windows_named_sync_interface
    {
       typedef __int64 sem_count_t;
@@ -168,50 +234,11 @@ class windows_named_condition_any
       virtual void *buffer_to_store_init_data_from_file()
       {  return &sem_counts; }
 
-      virtual bool open(create_enum_t, const char *id_name)
-      {
-         m_condition_data.m_nwaiters_blocked = 0;
-         m_condition_data.m_nwaiters_gone = 0;
-         m_condition_data.m_nwaiters_to_unblock = 0;
+      virtual bool open(create_enum_t op, const char *id_name)
+      {  return this->open_impl(op, id_name);   }
 
-         //Now open semaphores and mutex.
-         //Use local variables + swap to guarantee consistent
-         //initialization and cleanup in case any opening fails
-         permissions perm;
-         perm.set_unrestricted();
-         std::string aux_str  = "Global\\bipc.cond.";
-         aux_str += id_name;
-         std::size_t pos = aux_str.size();
-
-         //sem_block_queue
-         aux_str += "_bq";
-         winapi_semaphore_wrapper sem_block_queue;
-         bool created;
-         if(!sem_block_queue.open_or_create
-            (aux_str.c_str(), sem_counts[0], winapi_semaphore_wrapper::MaxCount, perm, created))
-            return false;
-         aux_str.erase(pos);
-
-         //sem_block_lock
-         aux_str += "_bl";
-         winapi_semaphore_wrapper sem_block_lock;
-         if(!sem_block_lock.open_or_create
-            (aux_str.c_str(), sem_counts[1], winapi_semaphore_wrapper::MaxCount, perm, created))
-            return false;
-         aux_str.erase(pos);
-
-         //mtx_unblock_lock
-         aux_str += "_ul";
-         winapi_mutex_wrapper mtx_unblock_lock;
-         if(!mtx_unblock_lock.open_or_create(aux_str.c_str(), perm))
-            return false;
-
-         //All ok, commit data
-         m_condition_data.m_sem_block_queue.swap(sem_block_queue);
-         m_condition_data.m_sem_block_lock.swap(sem_block_lock);
-         m_condition_data.m_mtx_unblock_lock.swap(mtx_unblock_lock);
-         return true;
-      }
+      virtual bool open(create_enum_t op, const wchar_t *id_name)
+      {  return this->open_impl(op, id_name);   }
 
       virtual void close()
       {
@@ -227,6 +254,54 @@ class windows_named_condition_any
       {}
 
       private:
+
+      template<class CharT>
+      bool open_impl(create_enum_t, const CharT *id_name)
+      {
+         typedef named_cond_callbacks_str<CharT> str_t;
+         m_condition_data.m_nwaiters_blocked = 0;
+         m_condition_data.m_nwaiters_gone = 0;
+         m_condition_data.m_nwaiters_to_unblock = 0;
+
+         //Now open semaphores and mutex.
+         //Use local variables + swap to guarantee consistent
+         //initialization and cleanup in case any opening fails
+         permissions perm;
+         perm.set_unrestricted();
+         std::basic_string<CharT> aux_str  = str_t::ipc_cond();
+         aux_str += id_name;
+         std::size_t pos = aux_str.size();
+
+         //sem_block_queue
+         aux_str += str_t::bq();
+         winapi_semaphore_wrapper sem_block_queue;
+         bool created;
+         if(!sem_block_queue.open_or_create
+            (aux_str.c_str(), sem_counts[0], winapi_semaphore_wrapper::MaxCount, perm, created))
+            return false;
+         aux_str.erase(pos);
+
+         //sem_block_lock
+         aux_str += str_t::bl();
+         winapi_semaphore_wrapper sem_block_lock;
+         if(!sem_block_lock.open_or_create
+            (aux_str.c_str(), sem_counts[1], winapi_semaphore_wrapper::MaxCount, perm, created))
+            return false;
+         aux_str.erase(pos);
+
+         //mtx_unblock_lock
+         aux_str += str_t::ul();
+         winapi_mutex_wrapper mtx_unblock_lock;
+         if(!mtx_unblock_lock.open_or_create(aux_str.c_str(), perm))
+            return false;
+
+         //All ok, commit data
+         m_condition_data.m_sem_block_queue.swap(sem_block_queue);
+         m_condition_data.m_sem_block_lock.swap(sem_block_lock);
+         m_condition_data.m_mtx_unblock_lock.swap(mtx_unblock_lock);
+         return true;
+      }
+
       condition_data &m_condition_data;
    };
 

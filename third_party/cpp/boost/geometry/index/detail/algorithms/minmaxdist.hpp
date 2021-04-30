@@ -4,6 +4,10 @@
 //
 // Copyright (c) 2011-2014 Adam Wulkiewicz, Lodz, Poland.
 //
+// This file was modified by Oracle on 2020.
+// Modifications copyright (c) 2020 Oracle and/or its affiliates.
+// Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
+//
 // Use, modification and distribution is subject to the Boost Software License,
 // Version 1.0. (See accompanying file LICENSE_1_0.txt or copy at
 // http://www.boost.org/LICENSE_1_0.txt)
@@ -13,6 +17,8 @@
 
 #include <boost/geometry/algorithms/distance.hpp>
 #include <boost/geometry/algorithms/comparable_distance.hpp>
+
+#include <boost/geometry/core/static_assert.hpp>
 
 #include <boost/geometry/index/detail/algorithms/diff_abs.hpp>
 #include <boost/geometry/index/detail/algorithms/sum_for_indexable.hpp>
@@ -64,10 +70,9 @@ struct smallest_for_indexable_dimension<Point, BoxIndexable, box_tag, minmaxdist
 template <typename Point, typename Indexable, typename IndexableTag>
 struct minmaxdist_impl
 {
-    BOOST_MPL_ASSERT_MSG(
-        (false),
-        NOT_IMPLEMENTED_FOR_THIS_INDEXABLE_TAG_TYPE,
-        (minmaxdist_impl));
+    BOOST_GEOMETRY_STATIC_ASSERT_FALSE(
+        "Not implemented for this Indexable type.",
+        Point, Indexable, IndexableTag);
 };
 
 template <typename Point, typename Indexable>

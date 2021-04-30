@@ -1,6 +1,6 @@
 // Boost.Geometry (aka GGL, Generic Geometry Library)
 
-// Copyright (c) 2018-2019 Oracle and/or its affiliates.
+// Copyright (c) 2018-2020 Oracle and/or its affiliates.
 // Contributed and/or modified by Vissarion Fisikopoulos, on behalf of Oracle
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
@@ -16,9 +16,11 @@
 #include <boost/geometry/algorithms/detail/distance/segment_to_box.hpp>
 
 #include <boost/geometry/strategies/distance.hpp>
-#include <boost/geometry/strategies/geographic/parameters.hpp>
 #include <boost/geometry/strategies/geographic/azimuth.hpp>
 #include <boost/geometry/strategies/geographic/distance_cross_track.hpp>
+#include <boost/geometry/strategies/geographic/distance_cross_track_point_box.hpp>
+#include <boost/geometry/strategies/geographic/parameters.hpp>
+#include <boost/geometry/strategies/geographic/side.hpp>
 #include <boost/geometry/strategies/normalize.hpp>
 #include <boost/geometry/strategies/spherical/disjoint_box_box.hpp>
 #include <boost/geometry/strategies/spherical/distance_segment_box.hpp>
@@ -55,6 +57,8 @@ struct geographic_segment_box
           >
     {};
 
+    typedef geographic_tag cs_tag;
+
     // point-point strategy getters
     struct distance_pp_strategy
     {
@@ -81,6 +85,33 @@ struct geographic_segment_box
     {
         typedef typename distance_ps_strategy::type distance_type;
         return distance_type(m_spheroid);
+    }
+
+    struct distance_pb_strategy
+    {
+        typedef geographic_cross_track_point_box
+                <
+                    FormulaPolicy,
+                    Spheroid,
+                    CalculationType
+                > type;
+    };
+
+    inline typename distance_pb_strategy::type get_distance_pb_strategy() const
+    {
+        return typename distance_pb_strategy::type(m_spheroid);
+    }
+
+    typedef side::geographic
+            <
+                FormulaPolicy,
+                Spheroid,
+                CalculationType
+            > side_strategy_type;
+
+    inline side_strategy_type get_side_strategy() const
+    {
+        return side_strategy_type(m_spheroid);
     }
 
     typedef within::spherical_point_point equals_point_point_strategy_type;

@@ -5,8 +5,8 @@
 // Copyright (c) 2009-2015 Mateusz Loskot, London, UK.
 // Copyright (c) 2014-2015 Samuel Debionne, Grenoble, France.
 
-// This file was modified by Oracle on 2015, 2016, 2017, 2018.
-// Modifications copyright (c) 2015-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2015-2020.
+// Modifications copyright (c) 2015-2020, Oracle and/or its affiliates.
 
 // Contributed and/or modified by Vissarion Fysikopoulos, on behalf of Oracle
 // Contributed and/or modified by Menelaos Karavelas, on behalf of Oracle
@@ -25,11 +25,6 @@
 #include <boost/geometry/algorithms/dispatch/expand.hpp>
 
 #include <boost/geometry/core/tags.hpp>
-
-// For backward compatibility
-#include <boost/geometry/strategies/cartesian/expand_segment.hpp>
-#include <boost/geometry/strategies/geographic/expand_segment.hpp>
-#include <boost/geometry/strategies/spherical/expand_segment.hpp>
 
 
 namespace boost { namespace geometry
@@ -54,8 +49,7 @@ struct expand
                              Segment const& segment,
                              Strategy const& strategy)
     {
-        boost::ignore_unused(strategy);
-        strategy.apply(box, segment);
+        strategy.expand(box, segment).apply(box, segment);
     }
 };
 

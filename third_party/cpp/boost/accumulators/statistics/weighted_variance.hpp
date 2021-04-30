@@ -103,6 +103,13 @@ namespace impl
             return this->weighted_variance;
         }
 
+        // make this accumulator serializeable
+        template<class Archive>
+        void serialize(Archive & ar, const unsigned int file_version)
+        {
+            ar & weighted_variance;
+        }
+
     private:
         result_type weighted_variance;
     };

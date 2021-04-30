@@ -4,8 +4,8 @@
 // Copyright (c) 2008-2015 Bruno Lalande, Paris, France.
 // Copyright (c) 2009-2015 Mateusz Loskot, London, UK.
 
-// This file was modified by Oracle on 2015-2018.
-// Modifications copyright (c) 2015-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2015-2020.
+// Modifications copyright (c) 2015-2020, Oracle and/or its affiliates.
 
 // Contributed and/or modified by Vissarion Fysikopoulos, on behalf of Oracle
 // Contributed and/or modified by Menelaos Karavelas, on behalf of Oracle
@@ -21,10 +21,6 @@
 
 #include <boost/geometry/core/tags.hpp>
 
-// For backward compatibility
-#include <boost/geometry/strategies/cartesian/envelope_box.hpp>
-#include <boost/geometry/strategies/spherical/envelope_box.hpp>
-
 
 namespace boost { namespace geometry
 {
@@ -39,9 +35,10 @@ template <typename Box>
 struct envelope<Box, box_tag>
 {
     template<typename BoxIn, typename BoxOut, typename Strategy>
-    static inline void apply(BoxIn const& box_in, BoxOut& mbr, Strategy const& )
+    static inline void apply(BoxIn const& box_in, BoxOut& mbr, Strategy const& strategy)
     {
-        Strategy::apply(box_in, mbr);
+        using strategy_t = decltype(strategy.envelope(box_in, mbr));
+        strategy_t::apply(box_in, mbr);
     }
 };
 

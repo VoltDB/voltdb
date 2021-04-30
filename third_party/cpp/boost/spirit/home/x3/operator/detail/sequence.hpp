@@ -22,16 +22,8 @@
 #include <boost/fusion/include/empty.hpp>
 #include <boost/fusion/include/front.hpp>
 #include <boost/fusion/include/iterator_range.hpp>
-#include <boost/fusion/include/as_deque.hpp>
-#include <boost/fusion/include/mpl.hpp>
 
-#include <boost/mpl/copy_if.hpp>
-#include <boost/mpl/not.hpp>
 #include <boost/mpl/if.hpp>
-#include <boost/mpl/insert_range.hpp>
-#include <boost/mpl/eval_if.hpp>
-#include <boost/mpl/vector.hpp>
-#include <boost/mpl/identity.hpp>
 
 #include <boost/type_traits/add_reference.hpp>
 #include <boost/type_traits/is_same.hpp>
@@ -88,9 +80,9 @@ namespace boost { namespace spirit { namespace x3 { namespace detail
             typename fusion::result_of::begin<Attribute>::type
         >::type type;
 
-        static type call(Attribute& attr)
+        static type call(Attribute& attribute)
         {
-            return fusion::deref(fusion::begin(attr));
+            return fusion::deref(fusion::begin(attribute));
         }
     };
 
@@ -101,9 +93,9 @@ namespace boost { namespace spirit { namespace x3 { namespace detail
 
         template <typename Attribute_>
         static Attribute_&
-        call(Attribute_& attr)
+        call(Attribute_& attribute)
         {
-            return attr;
+            return attribute;
         }
     };
 
@@ -238,65 +230,6 @@ namespace boost { namespace spirit { namespace x3 { namespace detail
         }
     };
 
-    template <typename L, typename R, typename C>
-    struct get_sequence_types
-    {
-        typedef
-            mpl::vector<
-                typename traits::attribute_of<L, C>::type
-              , typename traits::attribute_of<R, C>::type
-            >
-        type;
-    };
-
-    template <typename LL, typename LR, typename R, typename C>
-    struct get_sequence_types<sequence<LL, LR>, R, C>
-        : mpl::push_back< typename get_sequence_types<LL, LR, C>::type
-                        , typename traits::attribute_of<R, C>::type> {};
-
-    template <typename L, typename RL, typename RR, typename C>
-    struct get_sequence_types<L, sequence<RL, RR>, C>
-        : mpl::push_front< typename get_sequence_types<RL, RR, C>::type
-                         , typename traits::attribute_of<L, C>::type> {};
-
-    template <typename LL, typename LR, typename RL, typename RR, typename C>
-    struct get_sequence_types<sequence<LL, LR>, sequence<RL, RR>, C>
-    {
-        typedef typename get_sequence_types<LL, LR, C>::type left;
-        typedef typename get_sequence_types<RL, RR, C>::type right;
-        typedef typename
-            mpl::insert_range<left, typename mpl::end<left>::type, right>::type
-        type;
-    };
-
-    template <typename L, typename R, typename C>
-    struct attribute_of_sequence
-    {
-        // Get all sequence attribute types
-        typedef typename get_sequence_types<L, R, C>::type all_types;
-
-        // Filter all unused_types
-        typedef typename
-            mpl::copy_if<
-                all_types
-              , mpl::not_<is_same<mpl::_1, unused_type>>
-              , mpl::back_inserter<mpl::vector<>>
-            >::type
-        filtered_types;
-
-        // Build a fusion::deque if filtered_types is not empty,
-        // else just return unused_type
-        typedef typename
-            mpl::eval_if<
-                mpl::empty<filtered_types>
-	    , mpl::identity<unused_type>
-	    , mpl::if_<mpl::equal_to<mpl::size<filtered_types>, mpl::int_<1> >,
-	    typename mpl::front<filtered_types>::type
-		      , typename fusion::result_of::as_deque<filtered_types>::type >
-            >::type
-        type;
-    };
-
     template <typename Parser, typename Iterator, typename Context
       , typename RContext, typename Attribute, typename AttributeCategory>
     bool parse_sequence(
@@ -304,11 +237,11 @@ namespace boost { namespace spirit { namespace x3 { namespace detail
       , Context const& context, RContext& rcontext, Attribute& attr
       , AttributeCategory)
     {
-        typedef typename Parser::left_type Left;
-        typedef typename Parser::right_type Right;
-        typedef partition_attribute<Left, Right, Attribute, Context> partition;
-        typedef typename partition::l_pass l_pass;
-        typedef typename partition::r_pass r_pass;
+        using Left = typename Parser::left_type;
+        using Right = typename Parser::right_type;
+        using partition = partition_attribute<Left, Right, Attribute, Context>;
+        using l_pass = typename partition::l_pass;
+        using r_pass = typename partition::r_pass;
 
         typename partition::l_part l_part = partition::left(attr);
         typename partition::r_part r_part = partition::right(attr);
@@ -441,7 +374,7 @@ namespace boost { namespace spirit { namespace x3 { namespace detail
                   "where type of first element is existing key in fusion::map and second element "
                   "is value to be stored under that key");
 
-            Attribute attr_;
+            Attribute attr_{};
             if (!parse_sequence(parser
 			       , first, last, context, rcontext, attr_, traits::container_attribute()))
             {

@@ -24,9 +24,9 @@ namespace boost { namespace spirit { namespace iterator_policies
     {
     public:
         illegal_backtracking() BOOST_NOEXCEPT_OR_NOTHROW {}
-        ~illegal_backtracking() BOOST_NOEXCEPT_OR_NOTHROW {}
+        ~illegal_backtracking() BOOST_NOEXCEPT_OR_NOTHROW BOOST_OVERRIDE {}
 
-        char const* what() const BOOST_NOEXCEPT_OR_NOTHROW
+        char const* what() const BOOST_NOEXCEPT_OR_NOTHROW BOOST_OVERRIDE
         { 
             return "boost::spirit::multi_pass::illegal_backtracking"; 
         }

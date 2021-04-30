@@ -151,7 +151,7 @@ BOOST_HANA_NAMESPACE_BEGIN
     //!
     //! [1]: http://en.wikipedia.org/wiki/Equivalence_relation#Definition
     //! [2]: http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2012/n3351.pdf
-    //! [3]: http://en.cppreference.com/w/cpp/concept/EqualityComparable
+    //! [3]: http://en.cppreference.com/w/cpp/named_req/EqualityComparable
     //! [4]: http://en.wikipedia.org/wiki/Injective_function
     template <typename T>
     struct Comparable;

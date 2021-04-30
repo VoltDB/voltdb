@@ -1,5 +1,5 @@
 // Copyright 2014 Renato Tegon Forti, Antony Polukhin.
-// Copyright 2015-2019 Antony Polukhin.
+// Copyright 2015-2021 Antony Polukhin.
 //
 // Distributed under the Boost Software License, Version 1.0.
 // (See accompanying file LICENSE_1_0.txt
@@ -56,11 +56,12 @@ public:
         return actual_path;
     }
 
-    void load(boost::dll::fs::path sl, load_mode::type mode, boost::dll::fs::error_code &ec) {
+    void load(boost::dll::fs::path sl, load_mode::type portable_mode, boost::dll::fs::error_code &ec) {
         typedef boost::winapi::DWORD_ native_mode_t;
+        native_mode_t native_mode = static_cast<native_mode_t>(portable_mode);
         unload();
 
-        if (!sl.is_absolute() && !(mode & load_mode::search_system_folders)) {
+        if (!sl.is_absolute() && !(native_mode & load_mode::search_system_folders)) {
             boost::dll::fs::error_code current_path_ec;
             boost::dll::fs::path prog_loc = boost::dll::fs::current_path(current_path_ec);
 
@@ -69,13 +70,13 @@ public:
                 sl.swap(prog_loc);
             }
         }
-        mode &= ~load_mode::search_system_folders;
+        native_mode = static_cast<unsigned>(native_mode) & ~static_cast<unsigned>(load_mode::search_system_folders);
 
         // Trying to open with appended decorations
-        if (!!(mode & load_mode::append_decorations)) {
-            mode &= ~load_mode::append_decorations;
+        if (!!(native_mode & load_mode::append_decorations)) {
+            native_mode = static_cast<unsigned>(native_mode) & ~static_cast<unsigned>(load_mode::append_decorations);
 
-            if (load_impl(decorate(sl), static_cast<native_mode_t>(mode), ec)) {
+            if (load_impl(decorate(sl), native_mode, ec)) {
                 return;
             }
 
@@ -85,7 +86,7 @@ public:
                 ? sl.parent_path() / L"lib"
                 : L"lib"
             ).native() + sl.filename().native() + suffix().native();
-            if (load_impl(mingw_load_path, static_cast<native_mode_t>(mode), ec)) {
+            if (load_impl(mingw_load_path, native_mode, ec)) {
                 return;
             }
         }
@@ -98,9 +99,9 @@ public:
         // we have some path. So we do not check for path, only for extension. We can not be sure that
         // such behavior remain across all platforms, so we add L"." by hand.
         if (sl.has_extension()) {
-            handle_ = boost::winapi::LoadLibraryExW(sl.c_str(), 0, static_cast<native_mode_t>(mode));
+            handle_ = boost::winapi::LoadLibraryExW(sl.c_str(), 0, native_mode);
         } else {
-            handle_ = boost::winapi::LoadLibraryExW((sl.native() + L".").c_str(), 0, static_cast<native_mode_t>(mode));
+            handle_ = boost::winapi::LoadLibraryExW((sl.native() + L".").c_str(), 0, native_mode);
         }
 
         // LoadLibraryExW method is capable of self loading from program_location() path. No special actions

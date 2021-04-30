@@ -26,7 +26,7 @@ namespace boost { namespace contract {
 Program contracts for destructors.
 
 This is used to specify postconditions, exception guarantees, old value copies
-at body, and check class invariants for destructors (destructors cannot not have
+at body, and check class invariants for destructors (destructors cannot have
 preconditions, see
 @RefSect{contract_programming_overview.destructor_calls, Destructor Calls}):
 
@@ -83,10 +83,11 @@ postconditions and exception guarantees, within classes that have no invariants.
                 (Usually this template parameter is automatically deduced by C++
                 and it does not need to be explicitly specified by programmers.)
 
-@return The result of this function must be explicitly assigned to a variable of
-        type @RefClass{boost::contract::check} declared locally just before the
-        code of the destructor body (otherwise this library will generate a
-        run-time error, see @RefMacro{BOOST_CONTRACT_ON_MISSING_CHECK_DECL}).
+@return The result of this function must be assigned to a variable of type
+        @RefClass{boost::contract::check} declared explicitly (i.e., without
+        using C++11 @c auto declarations) and locally just before the code of
+        the destructor body (otherwise this library will generate a run-time
+        error, see @RefMacro{BOOST_CONTRACT_ON_MISSING_CHECK_DECL}).
 */
 template<class Class>
 specify_old_postcondition_except<> destructor(Class* obj) {

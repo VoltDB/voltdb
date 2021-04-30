@@ -1,8 +1,9 @@
 // Boost.Geometry (aka GGL, Generic Geometry Library)
 
-// Copyright (c) 2015, Oracle and/or its affiliates.
+// Copyright (c) 2015-2020, Oracle and/or its affiliates.
 
 // Contributed and/or modified by Menelaos Karavelas, on behalf of Oracle
+// Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
 // Licensed under the Boost Software License version 1.0.
 // http://www.boost.org/users/license.html
@@ -11,14 +12,14 @@
 #define BOOST_GEOMETRY_ALGORITHMS_DETAIL_MAX_INTERVAL_GAP_HPP
 
 #include <cstddef>
+#include <functional>
 #include <queue>
 #include <utility>
 #include <vector>
 
-#include <boost/core/ref.hpp>
-#include <boost/range.hpp>
-#include <boost/type_traits/remove_const.hpp>
-#include <boost/type_traits/remove_reference.hpp>
+#include <boost/range/begin.hpp>
+#include <boost/range/end.hpp>
+#include <boost/range/value_type.hpp>
 
 #include <boost/geometry/core/assert.hpp>
 #include <boost/geometry/util/math.hpp>
@@ -49,7 +50,7 @@ public:
     typedef typename Interval::value_type time_type;
 
     sweep_event(Interval const& interval, bool start_event = true)
-        : m_interval(boost::cref(interval))
+        : m_interval(std::cref(interval))
         , m_start_event(start_event)
     {}
 
@@ -81,7 +82,7 @@ public:
     }
 
 private:
-    boost::reference_wrapper<Interval const> m_interval;
+    std::reference_wrapper<Interval const> m_interval;
     bool m_start_event;
 };
 
@@ -118,15 +119,6 @@ class event_visitor
     typedef typename Event::time_type event_time_type;
     typedef typename Event::interval_type::difference_type difference_type;
 
-    typedef typename boost::remove_const
-        <
-            typename boost::remove_reference
-                <
-                    event_time_type
-                >::type
-        >::type bare_time_type;
-
-
 public:
     event_visitor()
         : m_overlap_count(0)
@@ -162,12 +154,12 @@ public:
         }
     }
 
-    bare_time_type const& max_gap_left() const
+    event_time_type const& max_gap_left() const
     {
         return m_max_gap_left;
     }
 
-    bare_time_type const& max_gap_right() const
+    event_time_type const& max_gap_right() const
     {
         return m_max_gap_right;
     }
@@ -179,7 +171,7 @@ public:
 
 private:
     std::size_t m_overlap_count;
-    bare_time_type m_max_gap_left, m_max_gap_right;
+    event_time_type m_max_gap_left, m_max_gap_right;
 };
 
 }} // namespace detail::max_interval_gap
@@ -256,18 +248,9 @@ template <typename RangeOfIntervals>
 inline typename boost::range_value<RangeOfIntervals>::type::difference_type
 maximum_gap(RangeOfIntervals const& range_of_intervals)
 {
-    typedef typename boost::remove_const
-        <
-            typename boost::remove_reference
-                <
-                    typename boost::range_value
-                        <
-                            RangeOfIntervals
-                        >::type::value_type
-                >::type
-        >::type value_type;
+    typedef typename boost::range_value<RangeOfIntervals>::type interval_type;
 
-    value_type left, right;
+    typename interval_type::value_type left, right;
 
     return maximum_gap(range_of_intervals, left, right);
 }

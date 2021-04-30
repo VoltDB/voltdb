@@ -10,6 +10,10 @@
 #ifndef BOOST_DETAIL_WINAPI_WAITABLE_TIMER_HPP
 #define BOOST_DETAIL_WINAPI_WAITABLE_TIMER_HPP
 
+#include <boost/config/header_deprecated.hpp>
+
+BOOST_HEADER_DEPRECATED("<boost/winapi/waitable_timer.hpp>")
+
 #include <boost/winapi/waitable_timer.hpp>
 #include <boost/detail/winapi/detail/deprecated_namespace.hpp>
 

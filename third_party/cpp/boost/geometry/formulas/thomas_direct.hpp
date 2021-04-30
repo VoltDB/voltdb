@@ -1,6 +1,6 @@
 // Boost.Geometry
 
-// Copyright (c) 2016-2018 Oracle and/or its affiliates.
+// Copyright (c) 2016-2020 Oracle and/or its affiliates.
 
 // Contributed and/or modified by Vissarion Fysikopoulos, on behalf of Oracle
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
@@ -15,10 +15,12 @@
 
 #include <boost/math/constants/constants.hpp>
 
+#include <boost/geometry/core/assert.hpp>
 #include <boost/geometry/core/radius.hpp>
 
 #include <boost/geometry/util/condition.hpp>
 #include <boost/geometry/util/math.hpp>
+#include <boost/geometry/util/normalize_spheroidal_coordinates.hpp>
 
 #include <boost/geometry/formulas/differential_quantities.hpp>
 #include <boost/geometry/formulas/flattening.hpp>
@@ -79,6 +81,8 @@ public:
 
         CT const pi = math::pi<CT>();
         CT const pi_half = pi / c2;
+
+        BOOST_GEOMETRY_ASSERT(-pi <= azimuth12 && azimuth12 <= pi);
 
         // keep azimuth small - experiments show low accuracy
         // if the azimuth is closer to (+-)180 deg.
@@ -199,6 +203,15 @@ public:
                               azimuth12, result.reverse_azimuth,
                               b, f,
                               result.reduced_length, result.geodesic_scale);
+        }
+
+        if (BOOST_GEOMETRY_CONDITION(CalcCoordinates))
+        {
+            // For longitudes close to the antimeridian the result can be out
+            // of range. Therefore normalize.
+            // It has to be done at the end because otherwise differential
+            // quantities are calculated incorrectly.
+            math::detail::normalize_angle_cond<radian>(result.lon2);
         }
 
         return result;

@@ -7,6 +7,7 @@
 #ifndef BOOST_FIBERS_SPINLOCK_TTAS_H
 #define BOOST_FIBERS_SPINLOCK_TTAS_H
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cmath>
@@ -64,6 +65,7 @@ public:
                     // -> prevent pipeline stalls
                     cpu_relax();
                 } else if ( BOOST_FIBERS_SPIN_BEFORE_YIELD > retries) {
+                    ++retries;
                     // std::this_thread::sleep_for( 0us) has a fairly long instruction path length,
                     // combined with an expensive ring3 to ring 0 transition costing about 1000 cycles
                     // std::this_thread::sleep_for( 0us) lets give up this_thread the remaining part of its time slice

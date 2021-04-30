@@ -1,4 +1,4 @@
-// Copyright (c) 2009-2016 Vladimir Batov.
+// Copyright (c) 2009-2020 Vladimir Batov.
 // Use, modification and distribution are subject to the Boost Software License,
 // Version 1.0. See http://www.boost.org/LICENSE_1_0.txt.
 
@@ -6,7 +6,6 @@
 #define BOOST_CONVERT_DETAIL_IS_CHAR_HPP
 
 #include <boost/convert/detail/config.hpp>
-#include <type_traits>
 #include <cctype>
 #include <cwctype>
 

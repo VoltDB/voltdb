@@ -35,8 +35,7 @@ namespace boost { namespace spirit { namespace x3
             traits::is_container<Attribute>::value;
 
     public:
-        any_parser()
-          : _content(nullptr) {}
+        any_parser() = default;
 
         template <typename Expr,
             typename Enable = typename enable_if<traits::is_parser<Expr>>::type>

@@ -8,8 +8,8 @@
     http://www.boost.org/LICENSE_1_0.txt)
 =============================================================================*/
 
-#if !defined(PARSE_TREE_UTILS_IPP)
-#define PARSE_TREE_UTILS_IPP
+#ifndef BOOST_SPIRIT_CLASSIC_TREE_IMPL_PARSE_TREE_UTILS_IPP
+#define BOOST_SPIRIT_CLASSIC_TREE_IMPL_PARSE_TREE_UTILS_IPP
 
 ///////////////////////////////////////////////////////////////////////////////
 namespace boost {
@@ -61,7 +61,7 @@ find_node (tree_node<T> const &node, parser_id node_to_search,
 ///////////////////////////////////////////////////////////////////////////////
 //
 //  The functions 'get_node_range' return a pair of iterators pointing at the
-//  range, which containes the elements of a specified node.
+//  range, which contains the elements of a specified node.
 //
 ///////////////////////////////////////////////////////////////////////////////
 namespace impl {
@@ -132,4 +132,4 @@ BOOST_SPIRIT_CLASSIC_NAMESPACE_END
 }   // namespace spirit
 }   // namespace boost
 
-#endif // !defined(PARSE_TREE_UTILS_IPP)
+#endif

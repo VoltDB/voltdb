@@ -10,6 +10,10 @@
 #ifndef BOOST_DETAIL_WINAPI_PIPES_HPP_
 #define BOOST_DETAIL_WINAPI_PIPES_HPP_
 
+#include <boost/config/header_deprecated.hpp>
+
+BOOST_HEADER_DEPRECATED("<boost/winapi/pipes.hpp>")
+
 #include <boost/winapi/pipes.hpp>
 #include <boost/detail/winapi/detail/deprecated_namespace.hpp>
 

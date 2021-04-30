@@ -7,7 +7,7 @@
 *
 * Distributed under the Boost Software License, Version 1.0. (See
 * accompanying file LICENSE_1_0.txt or copy at
-* http://www.boost.org/LICENSE_1_0.txt)
+* https://www.boost.org/LICENSE_1_0.txt)
 *
 * $Id$
 */
@@ -27,9 +27,13 @@
 #   else
 #      define BOOST_LIB_NAME "advapi32"
 #   endif
-#   define BOOST_AUTO_LINK_NOMANGLE
-#   include <boost/config/auto_link.hpp>
-#   undef BOOST_AUTO_LINK_NOMANGLE
+#   if defined(BOOST_AUTO_LINK_NOMANGLE)
+#      include <boost/config/auto_link.hpp>
+#   else
+#      define BOOST_AUTO_LINK_NOMANGLE
+#      include <boost/config/auto_link.hpp>
+#      undef BOOST_AUTO_LINK_NOMANGLE
+#   endif
 #endif
 
 namespace boost {

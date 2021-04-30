@@ -26,8 +26,8 @@
 /** \def BOOST_VMD_ELEM(elem,...)
 
     \brief Accesses an element of a sequence.
-
-    elem      = A sequence element number. From 0 to sequence size - 1.
+  
+    elem      = A sequence element number. From 0 to sequence size - 1. <br/>
     ...       = Variadic parameters.
     
     The first variadic parameter is required and is the sequence to access.
@@ -62,6 +62,8 @@
     parameters do not change what it means that an element is successfully accessed but they
     do change what data is returned by the macro.
              
+  @code
+  
     Splitting: Splitting allows the macro to return the rest of the sequence
              after the element accessed.
     
@@ -132,6 +134,8 @@
              filter or if there are no matching identifiers the BOOST_VMD_RETURN_INDEX is ignored 
              and no index is returned as part of the result.
     
+  @endcode
+  
     returns   = With no optional parameters the element accessed is returned, or emptiness if
                 element is outside the bounds of the sequence. Filters and matching identifiers
                 can change the meaning of whether the element accessed is returned or failure
@@ -159,9 +163,9 @@
 /** \def BOOST_VMD_ELEM_D(d,elem,...)
 
     \brief Accesses an element of a sequence. Re-entrant version.
-
-    d         = The next available BOOST_PP_WHILE iteration. 
-    elem      = A sequence element number. From 0 to sequence size - 1.
+  
+    d         = The next available BOOST_PP_WHILE iteration. <br/>
+    elem      = A sequence element number. From 0 to sequence size - 1. <br/>
     ...       = Variadic parameters.
     
     The first variadic parameter is required and is the sequence to access.
@@ -196,6 +200,8 @@
     parameters do not change what it means that an element is successfully accessed but they
     do change what data is returned by the macro.
              
+  @code
+  
     Splitting: Splitting allows the macro to return the rest of the sequence
              after the element accessed.
     
@@ -264,6 +270,8 @@
              filter or if there are no matching identifiers the BOOST_VMD_RETURN_INDEX is ignored 
              and no index is returned as part of the result.
     
+  @endcode
+  
     returns   = With no optional parameters the element accessed is returned, or emptiness if
                 element is outside the bounds of the sequence. Filters and matching identifiers
                 can change the meaning of whether the element accessed is returned or failure

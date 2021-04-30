@@ -1,4 +1,4 @@
-// Copyright (c) 2009-2016 Vladimir Batov.
+// Copyright (c) 2009-2020 Vladimir Batov.
 // Use, modification and distribution are subject to the Boost Software License,
 // Version 1.0. See http://www.boost.org/LICENSE_1_0.txt.
 
@@ -9,8 +9,8 @@
 
 namespace boost { namespace cnv { namespace detail
 {
-    typedef ::boost::type_traits::yes_type yes_type;
-    typedef ::boost::type_traits:: no_type  no_type;
+    using yes_type = ::boost::type_traits::yes_type;
+    using  no_type = ::boost::type_traits:: no_type;
 
     struct not_found {};
     struct void_return_substitute {};

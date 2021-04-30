@@ -4,6 +4,10 @@
 //
 // Copyright (c) 2011-2015 Adam Wulkiewicz, Lodz, Poland.
 //
+// This file was modified by Oracle on 2019.
+// Modifications copyright (c) 2019 Oracle and/or its affiliates.
+// Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
+//
 // Use, modification and distribution is subject to the Boost Software License,
 // Version 1.0. (See accompanying file LICENSE_1_0.txt or copy at
 // http://www.boost.org/LICENSE_1_0.txt)
@@ -17,17 +21,19 @@ namespace boost { namespace geometry { namespace index {
 
 namespace detail { namespace rtree {
 
-template <typename Value, typename Options, typename Translator, typename Box, typename Allocators>
+template <typename MembersHolder>
 class subtree_destroyer
 {
-    typedef typename rtree::node<Value, typename Options::parameters_type, Box, Allocators, typename Options::node_tag>::type node;
-    typedef typename Allocators::node_pointer pointer;
+    typedef typename MembersHolder::node node;
+
+    typedef typename MembersHolder::allocators_type allocators_type;
+    typedef typename MembersHolder::node_pointer pointer;
 
     subtree_destroyer(subtree_destroyer const&);
     subtree_destroyer & operator=(subtree_destroyer const&);
 
 public:
-    subtree_destroyer(pointer ptr, Allocators & allocators)
+    subtree_destroyer(pointer ptr, allocators_type & allocators)
         : m_ptr(ptr)
         , m_allocators(allocators)
     {}
@@ -41,8 +47,7 @@ public:
     {
         if ( m_ptr && m_ptr != ptr )
         {
-            detail::rtree::visitors::destroy<Value, Options, Translator, Box, Allocators> del_v(m_ptr, m_allocators);
-            detail::rtree::apply_visitor(del_v, *m_ptr);
+            detail::rtree::visitors::destroy<MembersHolder>::apply(m_ptr, m_allocators);
         }
         m_ptr = ptr;
     }
@@ -69,7 +74,7 @@ public:
 
 private:
     pointer m_ptr;
-    Allocators & m_allocators;
+    allocators_type & m_allocators;
 };
 
 }} // namespace detail::rtree

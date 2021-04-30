@@ -11,7 +11,7 @@
 #include <boost/gil/extension/io/tiff/tags.hpp>
 #include <boost/gil/extension/io/tiff/detail/device.hpp>
 
-#include <boost/mpl/contains.hpp>
+#include <boost/gil/detail/mp11.hpp>
 
 namespace boost { namespace gil {
 
@@ -78,10 +78,12 @@ protected:
         tiff_samples_per_pixel::type samples_per_pixel = num_channels< pixel_t >::value;
         this->_io_dev.template set_property<tiff_samples_per_pixel>( samples_per_pixel );
 
-        if (mpl:: contains <color_space_t, alpha_t>:: value) {
+        if /*constexpr*/ (mp11::mp_contains<color_space_t, alpha_t>::value)
+        {
           std:: vector <uint16_t> extra_samples {EXTRASAMPLE_ASSOCALPHA};
           this->_io_dev.template set_property<tiff_extra_samples>( extra_samples );
         }
+
         // write bits per sample
         // @todo: Settings this value usually requires to write for each sample the bit
         // value seperately in case they are different, like rgb556.

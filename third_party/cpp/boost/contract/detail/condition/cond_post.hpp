@@ -17,6 +17,7 @@
     #include <boost/function.hpp>
     #include <boost/type_traits/remove_reference.hpp>
     #include <boost/mpl/if.hpp>
+    #include <boost/preprocessor/facilities/empty.hpp>
 #endif
 
 /* PRIVATE */
@@ -73,7 +74,7 @@ public:
     #ifndef BOOST_CONTRACT_NO_POSTCONDITIONS
         BOOST_CONTRACT_DETAIL_COND_POST_DEF_(
             none,
-            unused,
+            /* r */ BOOST_PP_EMPTY(),
             void (),
             // Won't raise this error if NO_POST (for optimization).
             BOOST_CONTRACT_ERROR_postcondition_result_parameter_not_allowed,

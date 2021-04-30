@@ -9,8 +9,8 @@
     file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 =============================================================================*/
 
-#if !defined(SCANNER_HPP_F4FB01EB_E75C_4537_A146_D34B9895EF37_INCLUDED)
-#define SCANNER_HPP_F4FB01EB_E75C_4537_A146_D34B9895EF37_INCLUDED
+#if !defined(BOOST_SCANNER_HPP_F4FB01EB_E75C_4537_A146_D34B9895EF37_INCLUDED)
+#define BOOST_SCANNER_HPP_F4FB01EB_E75C_4537_A146_D34B9895EF37_INCLUDED
 
 #include <boost/wave/wave_config.hpp>
 #include <boost/wave/cpplexer/re2clex/aq.hpp>
@@ -74,6 +74,7 @@ struct Scanner {
     bool enable_import_keyword;  /* recognize import as a keyword */
     bool single_line_only;       /* don't report missing eol's in C++ comments */
     bool act_in_cpp0x_mode;      /* lexer works in C++11 mode */
+    bool act_in_cpp2a_mode;      /* lexer works in C++20 mode */
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -87,4 +88,4 @@ struct Scanner {
 #include BOOST_ABI_SUFFIX
 #endif
 
-#endif // !defined(SCANNER_HPP_F4FB01EB_E75C_4537_A146_D34B9895EF37_INCLUDED)
+#endif // !defined(BOOST_SCANNER_HPP_F4FB01EB_E75C_4537_A146_D34B9895EF37_INCLUDED)

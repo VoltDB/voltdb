@@ -1,5 +1,5 @@
 /* Policies for result and outcome
-(C) 2018-2019 Niall Douglas <http://www.nedproductions.biz/> (59 commits)
+(C) 2018-2021 Niall Douglas <http://www.nedproductions.biz/> (4 commits)
 File Created: Sep 2018
 
 

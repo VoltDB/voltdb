@@ -3,10 +3,10 @@
 // Copyright (c) 1995, 2007-2015 Barend Gehrels, Amsterdam, the Netherlands.
 // Copyright (c) 1995 Maarten Hilferink, Amsterdam, the Netherlands
 
-// This file was modified by Oracle on 2015.
-// Modifications copyright (c) 2015, Oracle and/or its affiliates.
-
+// This file was modified by Oracle on 2015-2020.
+// Modifications copyright (c) 2015-2020, Oracle and/or its affiliates.
 // Contributed and/or modified by Menelaos Karavelas, on behalf of Oracle
+// Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
 // Parts of Boost.Geometry are redesigned from Geodan's Geographic Library
 // (geolib/GGL), copyright (c) 1995-2010 Geodan, Amsterdam, the Netherlands.
@@ -25,7 +25,8 @@
 #endif
 #include <vector>
 
-#include <boost/range.hpp>
+#include <boost/range/begin.hpp>
+#include <boost/range/end.hpp>
 
 #include <boost/geometry/core/cs.hpp>
 #include <boost/geometry/strategies/distance.hpp>

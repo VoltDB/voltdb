@@ -4,8 +4,8 @@
 // Copyright (c) 2008-2012 Bruno Lalande, Paris, France.
 // Copyright (c) 2009-2012 Mateusz Loskot, London, UK.
 
-// This file was modified by Oracle on 2018.
-// Modifications copyright (c) 2018 Oracle and/or its affiliates.
+// This file was modified by Oracle on 2018-2020.
+// Modifications copyright (c) 2018-2020 Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
 // Parts of Boost.Geometry are redesigned from Geodan's Geographic Library
@@ -19,17 +19,21 @@
 #define BOOST_GEOMETRY_STRATEGIES_CONCEPTS_WITHIN_CONCEPT_HPP
 
 
+#include <type_traits>
 
 #include <boost/concept_check.hpp>
 #include <boost/core/ignore_unused.hpp>
 #include <boost/function_types/result_type.hpp>
 
+#include <boost/geometry/core/static_assert.hpp>
 #include <boost/geometry/core/tag.hpp>
 #include <boost/geometry/core/tag_cast.hpp>
 #include <boost/geometry/core/tags.hpp>
 
 #include <boost/geometry/geometries/concepts/box_concept.hpp>
 #include <boost/geometry/geometries/concepts/point_concept.hpp>
+
+#include <boost/geometry/strategies/detail.hpp>
 
 #include <boost/geometry/util/parameter_type_of.hpp>
 
@@ -38,22 +42,72 @@ namespace boost { namespace geometry { namespace concepts
 {
 
 
+namespace detail
+{
+
+
+template
+<
+    typename Point, typename Geometry, typename Strategy,
+    bool IsUmbrella = strategies::detail::is_umbrella_strategy<Strategy>::value
+>
+struct relate_strategy_dispatch
+{
+    using type = decltype(std::declval<Strategy>().relate(
+                    std::declval<Point>(), std::declval<Geometry>()));
+};
+
+template <typename Point, typename Geometry, typename Strategy>
+struct relate_strategy_dispatch<Point, Geometry, Strategy, false>
+{
+    using type = Strategy;
+};
+
+template
+<
+    typename Point, typename Geometry, typename Strategy,
+    bool IsUmbrella = strategies::detail::is_umbrella_strategy<Strategy>::value
+>
+struct within_strategy_dispatch
+{
+    using type = decltype(std::declval<Strategy>().within(
+                    std::declval<Point>(), std::declval<Geometry>()));
+};
+
+template <typename Point, typename Geometry, typename Strategy>
+struct within_strategy_dispatch<Point, Geometry, Strategy, false>
+{
+    using type = Strategy;
+};
+
+
+} // namespace detail
+
+
 /*!
 \brief Checks strategy for within (point-in-polygon)
 \ingroup within
 */
-template <typename Strategy>
+template <typename Point, typename Polygonal, typename Strategy>
 class WithinStrategyPolygonal
 {
 #ifndef DOXYGEN_NO_CONCEPT_MEMBERS
 
+    typedef typename geometry::point_type<Polygonal>::type point_of_segment;
+
+    // 0)
+    typedef typename concepts::detail::relate_strategy_dispatch
+        <
+            Point, Polygonal, Strategy
+        >::type strategy_type;
+
     // 1) must define state_type
-    typedef typename Strategy::state_type state_type;
+    typedef typename strategy_type::state_type state_type;
 
     struct checker
     {
         template <typename ApplyMethod, typename ResultMethod>
-        static void apply(ApplyMethod const&, ResultMethod const& )
+        static void apply(ApplyMethod, ResultMethod)
         {
             typedef typename parameter_type_of
                 <
@@ -76,28 +130,28 @@ class WithinStrategyPolygonal
                 );
 
             // CHECK: return types (result: int, apply: bool)
-            BOOST_MPL_ASSERT_MSG
+            BOOST_GEOMETRY_STATIC_ASSERT
                 (
-                    (boost::is_same
+                    (std::is_same
                         <
                             bool, typename boost::function_types::result_type<ApplyMethod>::type
-                        >::type::value),
-                    WRONG_RETURN_TYPE_OF_APPLY
-                    , (bool)
+                        >::value),
+                    "Wrong return type of apply().",
+                    bool, ApplyMethod
                 );
-            BOOST_MPL_ASSERT_MSG
+            BOOST_GEOMETRY_STATIC_ASSERT
                 (
-                    (boost::is_same
+                    (std::is_same
                         <
                             int, typename boost::function_types::result_type<ResultMethod>::type
-                        >::type::value),
-                    WRONG_RETURN_TYPE_OF_RESULT
-                    , (int)
+                        >::value),
+                    "Wrong return type of result().",
+                    int, ResultMethod
                 );
 
 
             // CHECK: calling method apply and result
-            Strategy const* str = 0;
+            strategy_type const* str = 0;
             state_type* st = 0;
             point_type const* p = 0;
             segment_point_type const* sp = 0;
@@ -113,7 +167,8 @@ class WithinStrategyPolygonal
 public :
     BOOST_CONCEPT_USAGE(WithinStrategyPolygonal)
     {
-        checker::apply(&Strategy::apply, &Strategy::result);
+        checker::apply(&strategy_type::template apply<Point, point_of_segment>,
+                       &strategy_type::result);
     }
 #endif
 };
@@ -123,10 +178,16 @@ class WithinStrategyPointBox
 {
 #ifndef DOXYGEN_NO_CONCEPT_MEMBERS
 
+    // 0)
+    typedef typename concepts::detail::within_strategy_dispatch
+        <
+            Point, Box, Strategy
+        >::type strategy_type;
+
     struct checker
     {
         template <typename ApplyMethod>
-        static void apply(ApplyMethod const&)
+        static void apply(ApplyMethod)
         {
             typedef typename parameter_type_of
                 <
@@ -149,20 +210,20 @@ class WithinStrategyPointBox
                 );
 
             // CHECK: return types (apply: bool)
-            BOOST_MPL_ASSERT_MSG
+            BOOST_GEOMETRY_STATIC_ASSERT
                 (
-                    (boost::is_same
+                    (std::is_same
                         <
                             bool,
                             typename boost::function_types::result_type<ApplyMethod>::type
-                        >::type::value),
-                    WRONG_RETURN_TYPE
-                    , (bool)
+                        >::value),
+                    "Wrong return type of apply().",
+                    bool, ApplyMethod
                 );
 
 
             // CHECK: calling method apply
-            Strategy const* str = 0;
+            strategy_type const* str = 0;
             point_type const* p = 0;
             box_type const* bx = 0;
 
@@ -176,15 +237,21 @@ class WithinStrategyPointBox
 public :
     BOOST_CONCEPT_USAGE(WithinStrategyPointBox)
     {
-        checker::apply(&Strategy::template apply<Point, Box>);
+        checker::apply(&strategy_type::template apply<Point, Box>);
     }
 #endif
 };
 
-template <typename Strategy>
+template <typename Box1, typename Box2, typename Strategy>
 class WithinStrategyBoxBox
 {
 #ifndef DOXYGEN_NO_CONCEPT_MEMBERS
+
+    // 0)
+    typedef typename concepts::detail::within_strategy_dispatch
+        <
+            Box1, Box2, Strategy
+        >::type strategy_type;
 
     struct checker
     {
@@ -212,20 +279,20 @@ class WithinStrategyBoxBox
                 );
 
             // CHECK: return types (apply: bool)
-            BOOST_MPL_ASSERT_MSG
+            BOOST_GEOMETRY_STATIC_ASSERT
                 (
-                    (boost::is_same
+                    (std::is_same
                         <
                             bool,
                             typename boost::function_types::result_type<ApplyMethod>::type
-                        >::type::value),
-                    WRONG_RETURN_TYPE
-                    , (bool)
+                        >::value),
+                    "Wrong return type of apply().",
+                    bool, ApplyMethod
                 );
 
 
             // CHECK: calling method apply
-            Strategy const* str = 0;
+            strategy_type const* str = 0;
             box_type1 const* b1 = 0;
             box_type2 const* b2 = 0;
 
@@ -239,7 +306,7 @@ class WithinStrategyBoxBox
 public :
     BOOST_CONCEPT_USAGE(WithinStrategyBoxBox)
     {
-        checker::apply(&Strategy::apply);
+        checker::apply(&strategy_type::template apply<Box1, Box2>);
     }
 #endif
 };
@@ -270,7 +337,7 @@ template
 >
 struct check_within<Geometry1, Geometry2, point_tag, AnyTag, areal_tag, Strategy>
 {
-    BOOST_CONCEPT_ASSERT( (WithinStrategyPolygonal<Strategy>) );
+    BOOST_CONCEPT_ASSERT( (WithinStrategyPolygonal<Geometry1, Geometry2, Strategy>) );
 };
 
 
@@ -283,7 +350,7 @@ struct check_within<Geometry1, Geometry2, point_tag, box_tag, areal_tag, Strateg
 template <typename Geometry1, typename Geometry2, typename Strategy>
 struct check_within<Geometry1, Geometry2, box_tag, box_tag, areal_tag, Strategy>
 {
-    BOOST_CONCEPT_ASSERT( (WithinStrategyBoxBox<Strategy>) );
+    BOOST_CONCEPT_ASSERT( (WithinStrategyBoxBox<Geometry1, Geometry2, Strategy>) );
 };
 
 

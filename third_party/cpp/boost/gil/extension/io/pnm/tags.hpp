@@ -12,7 +12,7 @@
 
 #include <boost/gil/io/base.hpp>
 
-#include <boost/mpl/integral_c.hpp>
+#include <type_traits>
 
 namespace boost { namespace gil {
 
@@ -24,13 +24,13 @@ struct pnm_tag : format_tag {};
 /// Defines type for image type property.
 struct pnm_image_type : property_base< uint32_t >
 {
-    using mono_asc_t = boost::mpl::integral_c<type, 1>;
-    using gray_asc_t = boost::mpl::integral_c<type, 2>;
-    using color_asc_t = boost::mpl::integral_c<type, 3>;
+    using mono_asc_t = std::integral_constant<type, 1>;
+    using gray_asc_t = std::integral_constant<type, 2>;
+    using color_asc_t = std::integral_constant<type, 3>;
 
-    using mono_bin_t = boost::mpl::integral_c<type, 4>;
-    using gray_bin_t = boost::mpl::integral_c<type, 5>;
-    using color_bin_t = boost::mpl::integral_c<type, 6>;
+    using mono_bin_t = std::integral_constant<type, 4>;
+    using gray_bin_t = std::integral_constant<type, 5>;
+    using color_bin_t = std::integral_constant<type, 6>;
 };
 
 /// Defines type for image width property.

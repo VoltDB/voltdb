@@ -12,133 +12,238 @@
 
 namespace boost { namespace gil {
 
-// Structures for channel-wise numeric operations
-// Currently defined structures:
-//    channel_plus_t (+), channel_minus_t (-),
-//    channel_multiplies_t (*), channel_divides_t (/),
-//    channel_plus_scalar_t (+s), channel_minus_scalar_t (-s),
-//    channel_multiplies_scalar_t (*s), channel_divides_scalar_t (/s),
-//    channel_halves_t (/=2), channel_zeros_t (=0), channel_assigns_t (=)
+// Function objects and utilities for channel-wise numeric operations.
+//
+// List of currently defined functors:
+//    channel_plus_t (+)
+//    channel_minus_t (-)
+//    channel_multiplies_t (*)
+//    channel_divides_t (/),
+//    channel_plus_scalar_t (+s)
+//    channel_minus_scalar_t (-s),
+//    channel_multiplies_scalar_t (*s)
+//    channel_divides_scalar_t (/s),
+//    channel_halves_t (/=2)
+//    channel_zeros_t (=0)
+//    channel_assigns_t (=)
 
 /// \ingroup ChannelNumericOperations
-/// structure for adding one channel to another
-/// this is a generic implementation; user should specialize it for better performance
-template <typename Channel1,typename Channel2,typename ChannelR>
-struct channel_plus_t {
-    ChannelR operator()(typename channel_traits<Channel1>::const_reference ch1,
-                        typename channel_traits<Channel2>::const_reference ch2) const {
-        return ChannelR(ch1)+ChannelR(ch2);
+/// \brief Arithmetic operation of addition of two channel values.
+/// \note This is a generic implementation; user should specialize it for better performance.
+template <typename Channel1, typename Channel2, typename ChannelResult>
+struct channel_plus_t
+{
+    using ChannelRef1 = typename channel_traits<Channel1>::const_reference;
+    using ChannelRef2 = typename channel_traits<Channel2>::const_reference;
+    static_assert(std::is_convertible<ChannelRef1, ChannelResult>::value,
+        "ChannelRef1 not convertible to ChannelResult");
+    static_assert(std::is_convertible<ChannelRef2, ChannelResult>::value,
+        "ChannelRef2 not convertible to ChannelResult");
+
+    /// \param ch1 - first of the two addends (augend).
+    /// \param ch2 - second of the two addends.
+    auto operator()(ChannelRef1 ch1, ChannelRef2 ch2) const -> ChannelResult
+    {
+        return ChannelResult(ch1) + ChannelResult(ch2);
     }
 };
 
 /// \ingroup ChannelNumericOperations
-/// structure for subtracting one channel from another
-/// this is a generic implementation; user should specialize it for better performance
-template <typename Channel1,typename Channel2,typename ChannelR>
-struct channel_minus_t {
-    ChannelR operator()(typename channel_traits<Channel1>::const_reference ch1,
-                        typename channel_traits<Channel2>::const_reference ch2) const {
-        return ChannelR(ch1)-ChannelR(ch2);
+/// \brief Arithmetic operation of subtraction of two channel values.
+/// \note This is a generic implementation; user should specialize it for better performance.
+template <typename Channel1, typename Channel2, typename ChannelResult>
+struct channel_minus_t
+{
+    using ChannelRef1 = typename channel_traits<Channel1>::const_reference;
+    using ChannelRef2 = typename channel_traits<Channel2>::const_reference;
+    static_assert(std::is_convertible<ChannelRef1, ChannelResult>::value,
+        "ChannelRef1 not convertible to ChannelResult");
+    static_assert(std::is_convertible<ChannelRef2, ChannelResult>::value,
+        "ChannelRef2 not convertible to ChannelResult");
+
+    /// \param ch1 - minuend operand of the subtraction.
+    /// \param ch2 - subtrahend operand of the subtraction.
+    auto operator()(ChannelRef1 ch1, ChannelRef2 ch2) const -> ChannelResult
+    {
+        return ChannelResult(ch1) - ChannelResult(ch2);
     }
 };
 
 /// \ingroup ChannelNumericOperations
-/// structure for multiplying one channel to another
-/// this is a generic implementation; user should specialize it for better performance
-template <typename Channel1,typename Channel2,typename ChannelR>
-struct channel_multiplies_t {
-    ChannelR operator()(typename channel_traits<Channel1>::const_reference ch1,
-                        typename channel_traits<Channel2>::const_reference ch2) const {
-        return ChannelR(ch1)*ChannelR(ch2);
+/// \brief Arithmetic operation of multiplication of two channel values.
+/// \note This is a generic implementation; user should specialize it for better performance.
+template <typename Channel1, typename Channel2, typename ChannelResult>
+struct channel_multiplies_t
+{
+    using ChannelRef1 = typename channel_traits<Channel1>::const_reference;
+    using ChannelRef2 = typename channel_traits<Channel2>::const_reference;
+    static_assert(std::is_convertible<ChannelRef1, ChannelResult>::value,
+        "ChannelRef1 not convertible to ChannelResult");
+    static_assert(std::is_convertible<ChannelRef2, ChannelResult>::value,
+        "ChannelRef2 not convertible to ChannelResult");
+
+    /// \param ch1 - first of the two factors (multiplicand).
+    /// \param ch2 - second of the two factors (multiplier).
+    auto operator()(ChannelRef1 ch1, ChannelRef2 ch2) const -> ChannelResult
+    {
+        return ChannelResult(ch1) * ChannelResult(ch2);
     }
 };
 
 /// \ingroup ChannelNumericOperations
-/// structure for dividing channels
-/// this is a generic implementation; user should specialize it for better performance
-template <typename Channel1,typename Channel2,typename ChannelR>
-struct channel_divides_t {
-    ChannelR operator()(typename channel_traits<Channel1>::const_reference ch1,
-                        typename channel_traits<Channel2>::const_reference ch2) const {
-        return ChannelR(ch1)/ChannelR(ch2);
+/// \brief Arithmetic operation of division of two channel values.
+/// \note This is a generic implementation; user should specialize it for better performance.
+template <typename Channel1, typename Channel2, typename ChannelResult>
+struct channel_divides_t
+{
+    using ChannelRef1 = typename channel_traits<Channel1>::const_reference;
+    using ChannelRef2 = typename channel_traits<Channel2>::const_reference;
+    static_assert(std::is_convertible<ChannelRef1, ChannelResult>::value,
+        "ChannelRef1 not convertible to ChannelResult");
+    static_assert(std::is_convertible<ChannelRef2, ChannelResult>::value,
+        "ChannelRef2 not convertible to ChannelResult");
+
+    /// \param ch1 - dividend operand of the two division operation.
+    /// \param ch2 - divisor operand of the two division operation.
+    auto operator()(ChannelRef1 ch1, ChannelRef2 ch2) const -> ChannelResult
+    {
+        return ChannelResult(ch1) / ChannelResult(ch2);
     }
 };
 
 /// \ingroup ChannelNumericOperations
-/// structure for adding a scalar to a channel
-/// this is a generic implementation; user should specialize it for better performance
-template <typename Channel,typename Scalar,typename ChannelR>
-struct channel_plus_scalar_t {
-    ChannelR operator()(typename channel_traits<Channel>::const_reference ch,
-                        const Scalar& s) const {
-        return ChannelR(ch)+ChannelR(s);
+/// \brief Arithmetic operation of adding scalar to channel value.
+/// \note This is a generic implementation; user should specialize it for better performance.
+template <typename Channel, typename Scalar, typename ChannelResult>
+struct channel_plus_scalar_t
+{
+    using ChannelRef = typename channel_traits<Channel>::const_reference;
+    static_assert(std::is_convertible<ChannelRef, ChannelResult>::value,
+        "ChannelRef not convertible to ChannelResult");
+    static_assert(std::is_scalar<Scalar>::value, "Scalar not a scalar");
+    static_assert(std::is_convertible<Scalar, ChannelResult>::value,
+        "Scalar not convertible to ChannelResult");
+
+    auto operator()(ChannelRef channel, Scalar const& scalar) const -> ChannelResult
+    {
+        return ChannelResult(channel) + ChannelResult(scalar);
     }
 };
 
 /// \ingroup ChannelNumericOperations
-/// structure for subtracting a scalar from a channel
-/// this is a generic implementation; user should specialize it for better performance
-template <typename Channel,typename Scalar,typename ChannelR>
-struct channel_minus_scalar_t {
-    ChannelR operator()(typename channel_traits<Channel>::const_reference ch,
-                        const Scalar& s) const {
-        return ChannelR(ch-s);
+/// \brief Arithmetic operation of subtracting scalar from channel value.
+/// \note This is a generic implementation; user should specialize it for better performance.
+template <typename Channel, typename Scalar, typename ChannelResult>
+struct channel_minus_scalar_t
+{
+    using ChannelRef = typename channel_traits<Channel>::const_reference;
+    static_assert(std::is_convertible<ChannelRef, ChannelResult>::value,
+        "ChannelRef not convertible to ChannelResult");
+    static_assert(std::is_scalar<Scalar>::value, "Scalar not a scalar");
+    static_assert(std::is_convertible<Scalar, ChannelResult>::value,
+        "Scalar not convertible to ChannelResult");
+
+    /// \param channel - minuend operand of the subtraction.
+    /// \param scalar - subtrahend operand of the subtraction.
+    auto operator()(ChannelRef channel, Scalar const& scalar) const -> ChannelResult
+    {
+        // TODO: Convertion after subtraction vs conversion of operands in channel_minus_t?
+        return ChannelResult(channel - scalar);
     }
 };
 
 /// \ingroup ChannelNumericOperations
-/// structure for multiplying a scalar to one channel
-/// this is a generic implementation; user should specialize it for better performance
-template <typename Channel,typename Scalar,typename ChannelR>
-struct channel_multiplies_scalar_t {
-    ChannelR operator()(typename channel_traits<Channel>::const_reference ch,
-                        const Scalar& s) const {
-        return ChannelR(ch)*ChannelR(s);
+/// \brief Arithmetic operation of channel value by a scalar.
+/// \note This is a generic implementation; user should specialize it for better performance.
+template <typename Channel, typename Scalar, typename ChannelResult>
+struct channel_multiplies_scalar_t
+{
+    using ChannelRef = typename channel_traits<Channel>::const_reference;
+    static_assert(std::is_convertible<ChannelRef, ChannelResult>::value,
+        "ChannelRef not convertible to ChannelResult");
+    static_assert(std::is_scalar<Scalar>::value, "Scalar not a scalar");
+    static_assert(std::is_convertible<Scalar, ChannelResult>::value,
+        "Scalar not convertible to ChannelResult");
+
+    /// \param channel - first of the two factors (multiplicand).
+    /// \param scalar - second of the two factors (multiplier).
+    auto operator()(ChannelRef channel, Scalar const& scalar) const -> ChannelResult
+    {
+        return ChannelResult(channel) * ChannelResult(scalar);
     }
 };
 
 /// \ingroup ChannelNumericOperations
-/// structure for dividing a channel by a scalar
-/// this is a generic implementation; user should specialize it for better performance
-template <typename Channel,typename Scalar,typename ChannelR>
-struct channel_divides_scalar_t {
-    ChannelR operator()(typename channel_traits<Channel>::const_reference ch,
-                        const Scalar& s) const {
-        return ChannelR(ch)/ChannelR(s);
+/// \brief Arithmetic operation of dividing channel value by scalar.
+/// \note This is a generic implementation; user should specialize it for better performance.
+template <typename Channel, typename Scalar, typename ChannelResult>
+struct channel_divides_scalar_t
+{
+    using ChannelRef = typename channel_traits<Channel>::const_reference;
+    static_assert(std::is_convertible<ChannelRef, ChannelResult>::value,
+        "ChannelRef not convertible to ChannelResult");
+    static_assert(std::is_scalar<Scalar>::value, "Scalar not a scalar");
+    static_assert(std::is_convertible<Scalar, ChannelResult>::value,
+        "Scalar not convertible to ChannelResult");
+
+    /// \param channel - dividend operand of the two division operation.
+    /// \param scalar - divisor operand of the two division operation.
+    auto operator()(ChannelRef channel, Scalar const& scalar) const -> ChannelResult
+    {
+        return ChannelResult(channel) / ChannelResult(scalar);
     }
 };
 
 /// \ingroup ChannelNumericOperations
-/// structure for halving a channel
-/// this is a generic implementation; user should specialize it for better performance
+/// \brief Arithmetic operation of dividing channel value by 2
+/// \note This is a generic implementation; user should specialize it for better performance.
 template <typename Channel>
-struct channel_halves_t {
-    typename channel_traits<Channel>::reference
-    operator()(typename channel_traits<Channel>::reference ch) const {
-        return ch/=2.0;
+struct channel_halves_t
+{
+    using ChannelRef = typename channel_traits<Channel>::reference;
+
+    auto operator()(ChannelRef channel) const -> ChannelRef
+    {
+        // TODO: Split into steps: extract with explicit conversion to double, divide and assign?
+        //double const v = ch;
+        //ch = static_cast<Channel>(v / 2.0);
+        channel /= 2.0;
+        return channel;
     }
 };
 
 /// \ingroup ChannelNumericOperations
-/// structure for setting a channel to zero
-/// this is a generic implementation; user should specialize it for better performance
+/// \brief Operation of setting channel value to zero
+/// \note This is a generic implementation; user should specialize it for better performance.
 template <typename Channel>
-struct channel_zeros_t {
-    typename channel_traits<Channel>::reference
-    operator()(typename channel_traits<Channel>::reference ch) const {
-        return ch=Channel(0);
+struct channel_zeros_t
+{
+    using ChannelRef = typename channel_traits<Channel>::reference;
+
+    auto operator()(ChannelRef channel) const -> ChannelRef
+    {
+        channel = Channel(0);
+        return channel;
     }
 };
 
 /// \ingroup ChannelNumericOperations
 /// structure for assigning one channel to another
-/// this is a generic implementation; user should specialize it for better performance
-template <typename Channel1,typename Channel2>
-struct channel_assigns_t {
-    typename channel_traits<Channel2>::reference
-    operator()(typename channel_traits<Channel1>::const_reference ch1,
-               typename channel_traits<Channel2>::reference ch2) const {
-        return ch2=Channel2(ch1);
+/// \note This is a generic implementation; user should specialize it for better performance.
+template <typename Channel1, typename Channel2>
+struct channel_assigns_t
+{
+    using ChannelRef1 = typename channel_traits<Channel1>::const_reference;
+    using ChannelRef2 = typename channel_traits<Channel2>::reference;
+    static_assert(std::is_convertible<ChannelRef1, Channel2>::value,
+        "ChannelRef1 not convertible to Channel2");
+
+    /// \param ch1 - assignor side (input) of the assignment operation
+    /// \param ch2 - assignee side (output) of the assignment operation
+    auto operator()(ChannelRef1 ch1, ChannelRef2 ch2) const -> ChannelRef2
+    {
+        ch2 = Channel2(ch1);
+        return ch2;
     }
 };
 

@@ -28,7 +28,6 @@ namespace detail
 /*!
 \brief cast coordinates from a string to a coordinate type
 \detail By default it uses lexical_cast. However, lexical_cast seems not to support
-    ttmath / partial specializations. Therefore this small utility is added.
     See also "define_pi" where the same issue is solved
 */
 template <typename CoordinateType>

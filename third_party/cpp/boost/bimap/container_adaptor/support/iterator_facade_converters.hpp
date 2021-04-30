@@ -28,7 +28,7 @@ namespace support {
 
 /// \brief Converter for Boost.Iterators based iterators.
 /**
-Container adaptor is dessigned to play well with Boost.Iterators. This
+Container adaptor is designed to play well with Boost.Iterators. This
 converter can be used if this library is used to adapt the iterators.
                                                                             **/
 template

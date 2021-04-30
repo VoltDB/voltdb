@@ -124,7 +124,7 @@ template<class Policies, class Sig> const signature_element* get_ret()
     };
 
     return &ret;
-};
+}
 
 #endif
 

@@ -9,7 +9,8 @@
 
 /** @file
 Program contracts for public functions (including subcontracting).
-Overloads handle public functions that are static, virtual void, virtual non-void, overriding void, and overriding non-void.
+The different overloads handle public functions that are static, virtual void,
+virtual non-void, overriding void, and overriding non-void.
 */
 
 #include <boost/contract/core/config.hpp>
@@ -47,6 +48,7 @@ Overloads handle public functions that are static, virtual void, virtual non-voi
 #endif
 #include <boost/preprocessor/control/expr_iif.hpp>
 #include <boost/preprocessor/control/iif.hpp>
+#include <boost/preprocessor/facilities/empty.hpp>
 #include <boost/preprocessor/punctuation/comma_if.hpp>
 
 namespace boost { namespace contract {
@@ -121,11 +123,12 @@ have no static invariants.
                 This template parameter must be explicitly specified for static
                 public functions (because they have no object @c this so there
                 is no function argument from which this type template parameter
-                can be deduced by this library).
+                can be automatically deduced by C++).
 
-@return The result of this function must be explicitly assigned to a variable of
-        type @RefClass{boost::contract::check} declared locally just before the
-        code of the static function body (otherwise this library will generate a
+@return The result of this function must be assigned to a variable of type
+        @RefClass{boost::contract::check} declared explicitly (i.e., without
+        using C++11 @c auto declarations) and locally just before the code of
+        the static public function body (otherwise this library will generate a
         run-time error, see @RefMacro{BOOST_CONTRACT_ON_MISSING_CHECK_DECL}).
 */
 template<class Class>
@@ -204,9 +207,10 @@ no invariants.
                 (Usually this template parameter is automatically deduced by C++
                 and it does not need to be explicitly specified by programmers.)
 
-@return The result of this function must be explicitly assigned to a variable of
-        type @RefClass{boost::contract::check} declared locally just before the
-        code of the public function body (otherwise this library will generate a
+@return The result of this function must be assigned to a variable of type
+        @RefClass{boost::contract::check} declared explicitly (i.e., without
+        using C++11 @c auto declarations) and locally just before the code of
+        the public function body (otherwise this library will generate a
         run-time error, see @RefMacro{BOOST_CONTRACT_ON_MISSING_CHECK_DECL}).
 */
 template<class Class>
@@ -372,10 +376,11 @@ specify_precondition_old_postcondition_except<> public_function(Class* obj) {
                     C++ and it does not need to be explicitly specified by
                     programmers.)
     
-    @return The result of this function must be explicitly assigned to a
-            variable of type @RefClass{boost::contract::check} declared locally
-            just before the code of the public function body (otherwise this
-            library will generate a run-time error, see
+    @return The result of this function must be assigned to a variable of type
+            @RefClass{boost::contract::check} declared explicitly (i.e., without
+            using C++11 @c auto declarations) and locally just before the code
+            of the public function body (otherwise this library will generate a
+            run-time error, see
             @RefMacro{BOOST_CONTRACT_ON_MISSING_CHECK_DECL}).
     */
     template<class Class>
@@ -474,10 +479,11 @@ specify_precondition_old_postcondition_except<> public_function(Class* obj) {
                     C++ and it does not need to be explicitly specified by
                     programmers.)
     
-    @return The result of this function must be explicitly assigned to a
-            variable of type @RefClass{boost::contract::check} declared locally
-            just before the code of the public function body (otherwise this
-            library will generate a run-time error, see
+    @return The result of this function must be assigned to a variable of type
+            @RefClass{boost::contract::check} declared explicitly (i.e., without
+            using C++11 @c auto declarations) and locally just before the code
+            of the public function body (otherwise this library will generate a
+            run-time error, see
             @RefMacro{BOOST_CONTRACT_ON_MISSING_CHECK_DECL}).
     */
     template<typename VirtualResult, class Class>
@@ -498,7 +504,7 @@ specify_precondition_old_postcondition_except<> public_function(Class* obj) {
     BOOST_CONTRACT_DETAIL_DECL_OVERRIDING_PUBLIC_FUNCTION_Z(z, \
         arity, /* is_friend = */ 0, has_virtual_result, \
         Override, VirtualResult, F, Class, Args, \
-        v, r, f, obj, args \
+        v, r, /* f */ BOOST_PP_EMPTY(), obj, args \
     ) { \
         BOOST_PP_IIF(BOOST_CONTRACT_PUBLIC_FUNCTIONS_IMPL_, \
             { /* extra scope paren to expand STATIC_STATIC emu on same line */ \
@@ -646,7 +652,8 @@ specify_precondition_old_postcondition_except<> public_function(Class* obj) {
                 @RefClass{boost::contract::virtual_}<c>*</c> and default value
                 @c 0 from the enclosing public function override.
     @param f    A pointer to the enclosing public function override declaring
-                the contract.
+                the contract (but see @RefSect{advanced.function_overloads,
+                Function Overloads}).
     @param obj  The object @c this from the scope of the enclosing public
                 function override declaring the contract.
                 This object might be mutable, @c const, @c volatile, or
@@ -660,9 +667,9 @@ specify_precondition_old_postcondition_except<> public_function(Class* obj) {
                 appear in the enclosing function declaration), but excluding the
                 trailing argument @c v.
 
-    @tparam Override    The type <c>override_<i>function-name</i></c> declared
-                        using the @RefMacro{BOOST_CONTRACT_OVERRIDE} or related
-                        macros.
+    @tparam Override    The type trait <c>override_<i>function-name</i></c>
+                        declared using the @RefMacro{BOOST_CONTRACT_OVERRIDE} or
+                        related macros.
                         This template parameter must be explicitly specified
                         (because there is no function argument from which it can
                         be automatically deduced by C++).
@@ -670,8 +677,7 @@ specify_precondition_old_postcondition_except<> public_function(Class* obj) {
                 override declaring the contract.
                 (Usually this template parameter is automatically deduced by
                 C++ and it does not need to be explicitly specified by
-                programmers, but see
-                @RefSect{advanced.function_overloads, Function Overloads}.)
+                programmers.)
     @tparam Class   The type of the class containing the virtual public function
                     declaring the contract.
                     (Usually this template parameter is automatically deduced by
@@ -689,10 +695,11 @@ specify_precondition_old_postcondition_except<> public_function(Class* obj) {
                     by C++ and they do not need to be explicitly specified by
                     programmers.)
 
-    @return The result of this function must be explicitly assigned to a
-            variable of type @RefClass{boost::contract::check} declared locally
-            just before the code of the public function body (otherwise this
-            library will generate a run-time error, see
+    @return The result of this function must be assigned to a variable of type
+            @RefClass{boost::contract::check} declared explicitly (i.e., without
+            using C++11 @c auto declarations) and locally just before the code
+            of the public function body (otherwise this library will generate a
+            run-time error, see
             @RefMacro{BOOST_CONTRACT_ON_MISSING_CHECK_DECL}).
     */
     template<class Override, typename F, class Class, typename... Args>
@@ -773,7 +780,8 @@ specify_precondition_old_postcondition_except<> public_function(Class* obj) {
                 programmers must set it to the actual value being returned by
                 the function at each @c return statement.
     @param f    A pointer to the enclosing public function override declaring
-                the contract.
+                the contract (but see @RefSect{advanced.function_overloads,
+                Function Overloads}).
     @param obj  The object @c this from the scope of the enclosing public
                 function override declaring the contract.
                 This object might be mutable, @c const, @c volatile, or
@@ -787,9 +795,9 @@ specify_precondition_old_postcondition_except<> public_function(Class* obj) {
                 appear in the enclosing function declaration), but excluding the
                 trailing argument @c v.
 
-    @tparam Override    The type <c>override_<i>function-name</i></c> declared
-                        using the @RefMacro{BOOST_CONTRACT_OVERRIDE} or related
-                        macros.
+    @tparam Override    The type trait <c>override_<i>function-name</i></c>
+                        declared using the @RefMacro{BOOST_CONTRACT_OVERRIDE} or
+                        related macros.
                         This template parameter must be explicitly specified
                         (because there is no function argument from which it can
                         be automatically deduced by C++).
@@ -811,9 +819,7 @@ specify_precondition_old_postcondition_except<> public_function(Class* obj) {
                 override declaring the contract.
                 (Usually this template parameter is automatically deduced by
                 C++ and it does not need to be explicitly specified by
-                programmers, but see
-                @RefSect{advanced.function_overloads,
-                Function Overloads}.)
+                programmers.)
     @tparam Class   The type of the class containing the virtual public function
                     declaring the contract.
                     (Usually this template parameter is automatically deduced by
@@ -831,10 +837,11 @@ specify_precondition_old_postcondition_except<> public_function(Class* obj) {
                     by C++ and they do not need to be explicitly specified by
                     programmers.)
 
-    @return The result of this function must be explicitly assigned to a
-            variable of type @RefClass{boost::contract::check} declared locally
-            just before the code of the public function body (otherwise this
-            library will generate a run-time error, see
+    @return The result of this function must be assigned to a variable of type
+            @RefClass{boost::contract::check} declared explicitly (i.e., without
+            using C++11 @c auto declarations) and locally just before the code
+            of the public function body (otherwise this library will generate a
+            run-time error, see
             @RefMacro{BOOST_CONTRACT_ON_MISSING_CHECK_DECL}).
     */
     template<class Override, typename VirtualResult, typename F, class Class,

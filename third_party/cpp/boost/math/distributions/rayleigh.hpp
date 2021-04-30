@@ -286,6 +286,13 @@ inline RealType kurtosis_excess(const rayleigh_distribution<RealType, Policy>& /
   //   (four_minus_pi<RealType>() * four_minus_pi<RealType>());
 } // kurtosis
 
+template <class RealType, class Policy>
+inline RealType entropy(const rayleigh_distribution<RealType, Policy>& dist)
+{
+   using std::log;
+   return 1 + log(dist.sigma()*constants::one_div_root_two<RealType>()) + constants::euler<RealType>()/2;
+}
+
 } // namespace math
 } // namespace boost
 

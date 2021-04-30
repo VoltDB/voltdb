@@ -54,12 +54,13 @@ class point_square
     <
         typename Point,
         typename DistanceType,
+        typename MultiplierType,
         typename OutputRange
     >
     inline void add_point(Point const& point,
                 DistanceType const& distance,
-                DistanceType const& x,
-                DistanceType const& y,
+                MultiplierType const& x,
+                MultiplierType const& y,
                 OutputRange& output_range) const
     {
         typename boost::range_value<OutputRange>::type p;

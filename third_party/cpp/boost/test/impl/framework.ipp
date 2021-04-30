@@ -49,7 +49,7 @@
 
 // Boost
 #include <boost/test/utils/timer.hpp>
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 
 // STL
 #include <limits>
@@ -59,9 +59,7 @@
 #include <ctime>
 #include <numeric>
 #include <cmath>
-#ifdef BOOST_NO_CXX98_RANDOM_SHUFFLE
 #include <iterator>
-#endif
 
 #ifdef BOOST_NO_STDC_NAMESPACE
 namespace std { using ::time; using ::srand; }
@@ -276,13 +274,13 @@ private:
     }
 
     // test_tree_visitor interface
-    virtual void    visit( test_case const& tc )
+    void    visit( test_case const& tc ) BOOST_OVERRIDE
     {
         // make sure we only accept test cases if we match last component of the filter
         if( m_depth == m_components.size() && filter_unit( tc ) )
             m_targ_list.push_back( tc.p_id ); // found a test case
     }
-    virtual bool    test_suite_start( test_suite const& ts )
+    bool    test_suite_start( test_suite const& ts ) BOOST_OVERRIDE
     {
         if( !filter_unit( ts ) )
             return false;
@@ -296,7 +294,7 @@ private:
 
         return false;
     }
-    virtual void    test_suite_finish( test_suite const& /*ts*/ )
+    void    test_suite_finish( test_suite const& /*ts*/ ) BOOST_OVERRIDE
     {
         --m_depth;
     }
@@ -322,7 +320,7 @@ public:
 
 private:
     // test_tree_visitor interface
-    virtual bool    visit( test_unit const& tu )
+    bool    visit( test_unit const& tu ) BOOST_OVERRIDE
     {
         if( tu.has_label( m_label ) ) {
             // found a test unit; add it to list of tu to enable with children and stop recursion in case of suites
@@ -350,7 +348,7 @@ public:
     {}
 
     // test_tree_visitor interface
-    virtual bool    visit( test_unit const& tu )
+    bool    visit( test_unit const& tu ) BOOST_OVERRIDE
     {
         const_cast<test_unit&>(tu).p_run_status.value = m_new_status == test_unit::RS_INVALID ? tu.p_default_status : m_new_status;
         if( m_dep_collector ) {
@@ -441,9 +439,7 @@ parse_filters( test_unit_id master_tu_id, test_unit_id_list& tu_to_enable, test_
 
 //____________________________________________________________________________//
 
-#ifdef BOOST_NO_CXX98_RANDOM_SHUFFLE
-
-// a poor man's implementation of random_shuffle
+// a poor man's implementation of random_shuffle, deprecated in C++11
 template< class RandomIt, class RandomFunc >
 void random_shuffle( RandomIt first, RandomIt last, RandomFunc &r )
 {
@@ -458,21 +454,18 @@ void random_shuffle( RandomIt first, RandomIt last, RandomFunc &r )
     }
 }
 
-#endif
-
-
 // A simple handle for registering the global fixtures to the master test suite
 // without deleting an existing static object (the global fixture itself) when the program
 // terminates (shared_ptr).
 class global_fixture_handle : public test_unit_fixture {
 public:
     global_fixture_handle(test_unit_fixture* fixture) : m_global_fixture(fixture) {}
-    ~global_fixture_handle() {}
+    ~global_fixture_handle() BOOST_OVERRIDE {}
 
-    virtual void    setup() {
+    void    setup() BOOST_OVERRIDE {
         m_global_fixture->setup();
     }
-    virtual void    teardown() {
+    void    teardown() BOOST_OVERRIDE {
         m_global_fixture->teardown();
     }
 
@@ -528,7 +521,7 @@ public:
     {
         test_unit& tu = framework::get( tu_id, TUT_ANY );
 
-        // collect all sibling dependancy from tu own list
+        // collect all sibling dependencies from tu own list
         BOOST_TEST_FOREACH( test_unit_id, dep_id, tu.p_dependencies.get() )
             collect_dependant_siblings( tu_id, dep_id, master_tu_id, tuoi );
 
@@ -625,7 +618,7 @@ public:
             while(   parent_id != INV_TEST_UNIT_ID
                   && parent_id != master_tu_id )
             {
-                // we do not use the traverse_test_tree as otherwise it would enable the sibblings and subtree
+                // we do not use the traverse_test_tree as otherwise it would enable the siblings and subtree
                 // of the test case we want to enable (we need to enable the parent suites and their dependencies only)
                 // the parent_id needs to be enabled in order to be properly parsed by finalize_run_status, the visit
                 // does the job
@@ -673,8 +666,11 @@ public:
 
         execution_result result = unit_test_monitor_t::test_ok;
 
-        if( !tu.is_enabled() )
+        if( !tu.is_enabled() ) {
+            BOOST_TEST_FOREACH( test_observer*, to, m_observers )
+                to->test_unit_skipped( tu, "disabled" );
             return result;
+        }
 
         // 10. Check preconditions, including zero time left for execution and
         // successful execution of all dependencies
@@ -778,11 +774,7 @@ public:
                             it++;
                         }
 
-#ifdef BOOST_NO_CXX98_RANDOM_SHUFFLE
                         impl::random_shuffle( children_with_the_same_rank.begin(), children_with_the_same_rank.end(), rand_gen );
-#else
-                        std::random_shuffle( children_with_the_same_rank.begin(), children_with_the_same_rank.end(), rand_gen );
-#endif
 
                         BOOST_TEST_FOREACH( test_unit_id, chld, children_with_the_same_rank ) {
                             unsigned long int chld_timeout = child_timeout(
@@ -999,6 +991,7 @@ setup_loggers()
                                      log_cleaner );
             }
             unit_test_log.set_stream( stream_logger.ref() );
+            unit_test_log.configure();
         }
         else
         {
@@ -1193,7 +1186,6 @@ init( init_unit_test_func init_func, int argc, char* argv[] )
     // 40. Register default test observers
     register_observer( results_collector );
     register_observer( unit_test_log );
-    register_observer( framework_init_observer );
 
     if( runtime_config::get<bool>( runtime_config::btrt_show_progress ) ) {
         progress_monitor.set_stream( std::cout ); // defaults to stdout
@@ -1234,14 +1226,14 @@ finalize_setup_phase( test_unit_id master_tu_id )
     private:
         // test_tree_visitor interface
 
-        virtual bool    test_suite_start( test_suite const& ts)
+        bool    test_suite_start( test_suite const& ts) BOOST_OVERRIDE
         {
             const_cast<test_suite&>(ts).generate();
             const_cast<test_suite&>(ts).check_for_duplicate_test_cases();
             return test_tree_visitor::test_suite_start(ts);
         }
 
-        virtual bool    visit( test_unit const& tu )
+        bool    visit( test_unit const& tu ) BOOST_OVERRIDE
         {
             BOOST_TEST_FOREACH( decorator::base_ptr, d, tu.p_decorators.get() )
                 d->apply( const_cast<test_unit&>(tu) );
@@ -1525,6 +1517,14 @@ master_test_suite()
     return *impl::s_frk_state().m_master_test_suite;
 }
 
+namespace impl {
+
+master_test_suite_name_setter::master_test_suite_name_setter(const_string name) {
+  assign_op( master_test_suite().p_name.value, name.trim( "\"" ), 0 );
+}
+
+}
+
 //____________________________________________________________________________//
 
 // ************************************************************************** //
@@ -1605,6 +1605,33 @@ struct swap_on_delete {
     Cont& m_c2;
 };
 
+struct register_observer_helper {
+  register_observer_helper(test_observer& observer)
+  : m_observer(observer)
+  { 
+    register_obs();
+  }
+
+  ~register_observer_helper() {
+    if(m_registered)
+      deregister_observer( m_observer );
+  }
+
+  void deregister_obs() {
+    m_registered = false;
+    deregister_observer( m_observer );
+  }
+
+  void register_obs() {
+    m_registered = true;
+    register_observer( m_observer );
+  }
+  
+
+  test_observer& m_observer;
+  bool m_registered;
+};
+
 void
 run( test_unit_id id, bool continue_test )
 {
@@ -1626,6 +1653,9 @@ run( test_unit_id id, bool continue_test )
     bool    init_ok             = true;
     const_string setup_error;
 
+    framework_init_observer_t local_init_observer;
+    register_observer_helper init_observer_helper( local_init_observer );
+
     if( call_start_finish ) {
         // indicates the framework that no test is in progress now if observers need to be notified
         impl::s_frk_state().m_test_in_progress = false;
@@ -1633,13 +1663,13 @@ run( test_unit_id id, bool continue_test )
         BOOST_TEST_FOREACH( test_observer*, to, impl::s_frk_state().m_observers ) {
             BOOST_TEST_I_TRY {
                 ut_detail::test_unit_id_restore restore_current_test_unit(impl::s_frk_state().m_curr_test_unit, id);
-                unit_test_monitor_t::error_level result = unit_test_monitor.execute_and_translate( boost::bind( &test_observer::test_start, to, tcc.p_count ) );
+                unit_test_monitor_t::error_level result = unit_test_monitor.execute_and_translate( boost::bind( &test_observer::test_start, to, tcc.p_count, id ) );
                 if( init_ok ) {
                     if( result != unit_test_monitor_t::test_ok ) {
                         init_ok = false;
                     }
                     else {
-                        if( unit_test::framework_init_observer.has_failed() ) {
+                        if( local_init_observer.has_failed() ) {
                             init_ok = false;
                         }
                     }
@@ -1655,6 +1685,9 @@ run( test_unit_id id, bool continue_test )
             }
         }
     }
+
+    // removing this observer as it should not be of any use for the tests
+    init_observer_helper.deregister_obs();
 
     if( init_ok ) {
 
@@ -1694,7 +1727,10 @@ run( test_unit_id id, bool continue_test )
 
     results_reporter::make_report( INV_REPORT_LEVEL, id );
 
-    unit_test::framework_init_observer.clear();
+    // reinstalling this observer
+    init_observer_helper.register_obs();
+
+    local_init_observer.clear();
     if( call_start_finish ) {
         // indicates the framework that no test is in progress anymore if observers need to be notified
         // and this is a teardown, so assertions should not raise any exception otherwise an exception
@@ -1709,7 +1745,7 @@ run( test_unit_id id, bool continue_test )
     impl::s_frk_state().m_test_in_progress = was_in_progress;
 
     // propagates the init/teardown error if any
-    BOOST_TEST_SETUP_ASSERT( init_ok && !unit_test::framework_init_observer.has_failed(), setup_error );
+    BOOST_TEST_SETUP_ASSERT( init_ok && !local_init_observer.has_failed(), setup_error );
 }
 
 //____________________________________________________________________________//

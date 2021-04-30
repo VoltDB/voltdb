@@ -27,8 +27,9 @@
 #include <boost/system/error_code.hpp>
 #include <boost/system/system_error.hpp>
 #include <boost/iterator/iterator_facade.hpp>
+#include <boost/iterator/iterator_categories.hpp>
 #include <boost/core/enable_if.hpp>
-#include <boost/io/detail/quoted_manip.hpp>
+#include <boost/io/quoted.hpp>
 #include <boost/functional/hash_fwd.hpp>
 #include <boost/type_traits/is_integral.hpp>
 #include <string>
@@ -59,6 +60,7 @@ namespace path_detail // intentionally don't use filesystem::detail to not bring
     static BOOST_CONSTEXPR_OR_CONST value_type      dot = Dot;
   };
 
+#if defined(BOOST_NO_CXX17_INLINE_VARIABLES)
   template< typename Char, Char Separator, Char PreferredSeparator, Char Dot >
   BOOST_CONSTEXPR_OR_CONST typename path_constants< Char, Separator, PreferredSeparator, Dot >::value_type
   path_constants< Char, Separator, PreferredSeparator, Dot >::separator;
@@ -68,6 +70,7 @@ namespace path_detail // intentionally don't use filesystem::detail to not bring
   template< typename Char, Char Separator, Char PreferredSeparator, Char Dot >
   BOOST_CONSTEXPR_OR_CONST typename path_constants< Char, Separator, PreferredSeparator, Dot >::value_type
   path_constants< Char, Separator, PreferredSeparator, Dot >::dot;
+#endif
 
 } // namespace path_detail
 
@@ -429,7 +432,7 @@ namespace path_detail // intentionally don't use filesystem::detail to not bring
     String string(const codecvt_type& cvt) const;
 
 #   ifdef BOOST_WINDOWS_API
-    const std::string string() const
+    std::string string() const
     {
       std::string tmp;
       if (!m_pathname.empty())
@@ -437,7 +440,7 @@ namespace path_detail // intentionally don't use filesystem::detail to not bring
         tmp);
       return tmp;
     }
-    const std::string string(const codecvt_type& cvt) const
+    std::string string(const codecvt_type& cvt) const
     {
       std::string tmp;
       if (!m_pathname.empty())
@@ -454,7 +457,7 @@ namespace path_detail // intentionally don't use filesystem::detail to not bring
     const std::string& string() const { return m_pathname; }
     const std::string& string(const codecvt_type&) const { return m_pathname; }
 
-    const std::wstring wstring() const
+    std::wstring wstring() const
     {
       std::wstring tmp;
       if (!m_pathname.empty())
@@ -462,7 +465,7 @@ namespace path_detail // intentionally don't use filesystem::detail to not bring
           tmp);
       return tmp;
     }
-    const std::wstring wstring(const codecvt_type& cvt) const
+    std::wstring wstring(const codecvt_type& cvt) const
     {
       std::wstring tmp;
       if (!m_pathname.empty())
@@ -490,16 +493,16 @@ namespace path_detail // intentionally don't use filesystem::detail to not bring
     String generic_string(const codecvt_type& cvt) const;
 
 #   ifdef BOOST_WINDOWS_API
-    const std::string   generic_string() const { return generic_path().string(); }
-    const std::string   generic_string(const codecvt_type& cvt) const { return generic_path().string(cvt); }
-    const std::wstring  generic_wstring() const { return generic_path().wstring(); }
-    const std::wstring  generic_wstring(const codecvt_type&) const { return generic_wstring(); }
+    std::string   generic_string() const { return generic_path().string(); }
+    std::string   generic_string(const codecvt_type& cvt) const { return generic_path().string(cvt); }
+    std::wstring  generic_wstring() const { return generic_path().wstring(); }
+    std::wstring  generic_wstring(const codecvt_type&) const { return generic_wstring(); }
 #   else // BOOST_POSIX_API
     //  On POSIX-like systems, the generic format is the same as the native format
     const std::string&  generic_string() const  { return m_pathname; }
     const std::string&  generic_string(const codecvt_type&) const  { return m_pathname; }
-    const std::wstring  generic_wstring() const { return this->wstring(); }
-    const std::wstring  generic_wstring(const codecvt_type& cvt) const { return this->wstring(cvt); }
+    std::wstring  generic_wstring() const { return this->wstring(); }
+    std::wstring  generic_wstring(const codecvt_type& cvt) const { return this->wstring(cvt); }
 #   endif
 
     //  -----  compare  -----
@@ -536,7 +539,8 @@ namespace path_detail // intentionally don't use filesystem::detail to not bring
     bool is_relative() const         { return !is_absolute(); }
     bool is_absolute() const
     {
-#     ifdef BOOST_WINDOWS_API
+      // Windows CE has no root name (aka drive letters)
+#     if defined(BOOST_WINDOWS_API) && !defined(UNDER_CE)
       return has_root_name() && has_root_directory();
 #     else
       return has_root_directory();
@@ -595,12 +599,12 @@ namespace path_detail // intentionally don't use filesystem::detail to not bring
 # if defined(BOOST_FILESYSTEM_DEPRECATED)
     //  deprecated functions with enough signature or semantic changes that they are
     //  not supplied by default
-    const std::string file_string() const               { return string(); }
-    const std::string directory_string() const          { return string(); }
-    const std::string native_file_string() const        { return string(); }
-    const std::string native_directory_string() const   { return string(); }
-    const string_type external_file_string() const      { return native(); }
-    const string_type external_directory_string() const { return native(); }
+    std::string file_string() const               { return string(); }
+    std::string directory_string() const          { return string(); }
+    std::string native_file_string() const        { return string(); }
+    std::string native_directory_string() const   { return string(); }
+    string_type external_file_string() const      { return native(); }
+    string_type external_directory_string() const { return native(); }
 
     //  older functions no longer supported
     //typedef bool (*name_check)(const std::string & name);
@@ -783,7 +787,7 @@ namespace path_detail // intentionally don't use filesystem::detail to not bring
   inline bool operator> (const path& lhs, const path& rhs) {return rhs < lhs;}
   inline bool operator>=(const path& lhs, const path& rhs) {return !(lhs < rhs);}
 
-  inline std::size_t hash_value(const path& x)
+  inline std::size_t hash_value(const path& x) BOOST_NOEXCEPT
   {
 # ifdef BOOST_WINDOWS_API
     std::size_t seed = 0;
@@ -797,9 +801,18 @@ namespace path_detail // intentionally don't use filesystem::detail to not bring
 
   inline void swap(path& lhs, path& rhs) BOOST_NOEXCEPT { lhs.swap(rhs); }
 
-  inline path operator/(const path& lhs, const path& rhs) { return path(lhs) /= rhs; }
+  inline path operator/(const path& lhs, const path& rhs)
+  {
+    path p = lhs;
+    p /= rhs;
+    return p;
+  }
 # if !defined(BOOST_NO_CXX11_RVALUE_REFERENCES)
-  inline path&& operator/(path&& lhs, const path& rhs) { lhs /= rhs; return std::move(lhs); }
+  inline path operator/(path&& lhs, const path& rhs)
+  {
+    lhs /= rhs;
+    return std::move(lhs);
+  }
 # endif
 
   //  inserters and extractors
@@ -984,32 +997,28 @@ namespace path_detail // intentionally don't use filesystem::detail to not bring
 namespace path_traits
 {  //  without codecvt
 
-  inline
-    void convert(const char* from,
+  inline void convert(const char* from,
     const char* from_end,    // 0 for null terminated MBCS
     std::wstring & to)
   {
     convert(from, from_end, to, path::codecvt());
   }
 
-  inline
-    void convert(const wchar_t* from,
+  inline void convert(const wchar_t* from,
     const wchar_t* from_end,  // 0 for null terminated MBCS
     std::string & to)
   {
     convert(from, from_end, to, path::codecvt());
   }
 
-  inline
-    void convert(const char* from,
+  inline void convert(const char* from,
     std::wstring & to)
   {
     BOOST_ASSERT(!!from);
     convert(from, 0, to, path::codecvt());
   }
 
-  inline
-    void convert(const wchar_t* from,
+  inline void convert(const wchar_t* from,
     std::string & to)
   {
     BOOST_ASSERT(!!from);

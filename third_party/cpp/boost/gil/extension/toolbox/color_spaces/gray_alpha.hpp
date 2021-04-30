@@ -12,31 +12,30 @@
 #include <boost/gil/gray.hpp>
 #include <boost/gil/typedefs.hpp>
 
-#include <boost/mpl/contains.hpp>
-#include <boost/mpl/vector.hpp>
+#include <boost/gil/detail/mp11.hpp>
 
 namespace boost{ namespace gil {
 
-using gray_alpha_t = mpl::vector2<gray_color_t,alpha_t>;
+using gray_alpha_t = mp11::mp_list<gray_color_t,alpha_t>;
 
 using gray_alpha_layout_t = layout<gray_alpha_t>;
-using alpha_gray_layout_t = layout<gray_alpha_layout_t, mpl::vector2_c<int,1,0>>;
+using alpha_gray_layout_t = layout<gray_alpha_layout_t, mp11::mp_list_c<int,1,0>>;
 
-GIL_DEFINE_BASE_TYPEDEFS(8, uint8_t, alpha_gray)
-GIL_DEFINE_BASE_TYPEDEFS(8s, int8_t, alpha_gray)
-GIL_DEFINE_BASE_TYPEDEFS(16, uint16_t, alpha_gray)
-GIL_DEFINE_BASE_TYPEDEFS(16s, int16_t, alpha_gray)
-GIL_DEFINE_BASE_TYPEDEFS(32, uint32_t, alpha_gray)
-GIL_DEFINE_BASE_TYPEDEFS(32s, int32_t, alpha_gray)
-GIL_DEFINE_BASE_TYPEDEFS(32f, float32_t, alpha_gray)
+BOOST_GIL_DEFINE_BASE_TYPEDEFS(8, uint8_t, alpha_gray)
+BOOST_GIL_DEFINE_BASE_TYPEDEFS(8s, int8_t, alpha_gray)
+BOOST_GIL_DEFINE_BASE_TYPEDEFS(16, uint16_t, alpha_gray)
+BOOST_GIL_DEFINE_BASE_TYPEDEFS(16s, int16_t, alpha_gray)
+BOOST_GIL_DEFINE_BASE_TYPEDEFS(32, uint32_t, alpha_gray)
+BOOST_GIL_DEFINE_BASE_TYPEDEFS(32s, int32_t, alpha_gray)
+BOOST_GIL_DEFINE_BASE_TYPEDEFS(32f, float32_t, alpha_gray)
 
-GIL_DEFINE_ALL_TYPEDEFS(8, uint8_t, gray_alpha)
-GIL_DEFINE_ALL_TYPEDEFS(8s, int8_t, gray_alpha)
-GIL_DEFINE_ALL_TYPEDEFS(16, uint16_t, gray_alpha)
-GIL_DEFINE_ALL_TYPEDEFS(16s, int16_t, gray_alpha)
-GIL_DEFINE_ALL_TYPEDEFS(32, uint32_t, gray_alpha)
-GIL_DEFINE_ALL_TYPEDEFS(32s, int32_t, gray_alpha)
-GIL_DEFINE_ALL_TYPEDEFS(32f, float32_t, gray_alpha)
+BOOST_GIL_DEFINE_ALL_TYPEDEFS(8, uint8_t, gray_alpha)
+BOOST_GIL_DEFINE_ALL_TYPEDEFS(8s, int8_t, gray_alpha)
+BOOST_GIL_DEFINE_ALL_TYPEDEFS(16, uint16_t, gray_alpha)
+BOOST_GIL_DEFINE_ALL_TYPEDEFS(16s, int16_t, gray_alpha)
+BOOST_GIL_DEFINE_ALL_TYPEDEFS(32, uint32_t, gray_alpha)
+BOOST_GIL_DEFINE_ALL_TYPEDEFS(32s, int32_t, gray_alpha)
+BOOST_GIL_DEFINE_ALL_TYPEDEFS(32f, float32_t, gray_alpha)
 
 /// \ingroup ColorConvert
 /// \brief Gray Alpha to RGBA

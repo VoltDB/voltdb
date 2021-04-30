@@ -2,8 +2,8 @@
 
 // Copyright (c) 2008-2015 Barend Gehrels, Amsterdam, the Netherlands.
 
-// This file was modified by Oracle on 2017, 2018.
-// Modifications copyright (c) 2017-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2017, 2018, 2019.
+// Modifications copyright (c) 2017-2019, Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle.
 
 // Use, modification and distribution is subject to the Boost Software License,
@@ -65,20 +65,14 @@ namespace projections
                 T C_x, C_y, A, B, D;
             };
 
-            // template class, using CRTP to implement forward/inverse
             template <typename T, typename Parameters>
             struct base_putp6_spheroid
-                : public base_t_fi<base_putp6_spheroid<T, Parameters>, T, Parameters>
             {
                 par_putp6<T> m_proj_parm;
 
-                inline base_putp6_spheroid(const Parameters& par)
-                    : base_t_fi<base_putp6_spheroid<T, Parameters>, T, Parameters>(*this, par)
-                {}
-
                 // FORWARD(s_forward)  spheroid
                 // Project coordinates from geographic (lon, lat) to cartesian (x, y)
-                inline void fwd(T const& lp_lon, T lp_lat, T& xy_x, T& xy_y) const
+                inline void fwd(Parameters const& , T const& lp_lon, T lp_lat, T& xy_x, T& xy_y) const
                 {
                     T p, r, V;
                     int i;
@@ -100,7 +94,7 @@ namespace projections
 
                 // INVERSE(s_inverse)  spheroid
                 // Project coordinates from cartesian (x, y) to geographic (lon, lat)
-                inline void inv(T const& xy_x, T const& xy_y, T& lp_lon, T& lp_lat) const
+                inline void inv(Parameters const& , T const& xy_x, T const& xy_y, T& lp_lon, T& lp_lat) const
                 {
                     T r;
 
@@ -163,10 +157,9 @@ namespace projections
     struct putp6_spheroid : public detail::putp6::base_putp6_spheroid<T, Parameters>
     {
         template <typename Params>
-        inline putp6_spheroid(Params const& , Parameters const& par)
-            : detail::putp6::base_putp6_spheroid<T, Parameters>(par)
+        inline putp6_spheroid(Params const& , Parameters & par)
         {
-            detail::putp6::setup_putp6(this->m_par, this->m_proj_parm);
+            detail::putp6::setup_putp6(par, this->m_proj_parm);
         }
     };
 
@@ -186,10 +179,9 @@ namespace projections
     struct putp6p_spheroid : public detail::putp6::base_putp6_spheroid<T, Parameters>
     {
         template <typename Params>
-        inline putp6p_spheroid(Params const& , Parameters const& par)
-            : detail::putp6::base_putp6_spheroid<T, Parameters>(par)
+        inline putp6p_spheroid(Params const& , Parameters & par)
         {
-            detail::putp6::setup_putp6p(this->m_par, this->m_proj_parm);
+            detail::putp6::setup_putp6p(par, this->m_proj_parm);
         }
     };
 
@@ -198,8 +190,8 @@ namespace projections
     {
 
         // Static projection
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_putp6, putp6_spheroid, putp6_spheroid)
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_putp6p, putp6p_spheroid, putp6p_spheroid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI(srs::spar::proj_putp6, putp6_spheroid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI(srs::spar::proj_putp6p, putp6p_spheroid)
 
         // Factory entry(s)
         BOOST_GEOMETRY_PROJECTIONS_DETAIL_FACTORY_ENTRY_FI(putp6_entry, putp6_spheroid)

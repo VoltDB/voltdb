@@ -2,8 +2,8 @@
 
 // Copyright (c) 2008-2015 Barend Gehrels, Amsterdam, the Netherlands.
 
-// This file was modified by Oracle on 2017, 2018.
-// Modifications copyright (c) 2017-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2017, 2018, 2019.
+// Modifications copyright (c) 2017-2019, Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle.
 
 // Use, modification and distribution is subject to the Boost Software License,
@@ -60,18 +60,12 @@ namespace projections
     namespace detail { namespace geocent
     {
 
-            // template class, using CRTP to implement forward/inverse
             template <typename T, typename Parameters>
             struct base_geocent_other
-                : public base_t_fi<base_geocent_other<T, Parameters>, T, Parameters>
             {
-                inline base_geocent_other(const Parameters& par)
-                    : base_t_fi<base_geocent_other<T, Parameters>, T, Parameters>(*this, par)
-                {}
-
                 // FORWARD(forward)
                 // Project coordinates from geographic (lon, lat) to cartesian (x, y)
-                inline void fwd(T const& lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
+                inline void fwd(Parameters const& , T const& lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
                 {
                         xy_x = lp_lon;
                         xy_y = lp_lat;
@@ -79,7 +73,7 @@ namespace projections
 
                 // INVERSE(inverse)
                 // Project coordinates from cartesian (x, y) to geographic (lon, lat)
-                inline void inv(T const& xy_x, T const& xy_y, T& lp_lon, T& lp_lat) const
+                inline void inv(Parameters const& , T const& xy_x, T const& xy_y, T& lp_lon, T& lp_lat) const
                 {
                         lp_lat = xy_y;
                         lp_lon = xy_x;
@@ -96,7 +90,7 @@ namespace projections
             template <typename Parameters>
             inline void setup_geocent(Parameters& par)
             {
-                par.is_geocent = 1;
+                par.is_geocent = true;
                 par.x0 = 0.0;
                 par.y0 = 0.0;
             }
@@ -117,10 +111,9 @@ namespace projections
     struct geocent_other : public detail::geocent::base_geocent_other<T, Parameters>
     {
         template <typename Params>
-        inline geocent_other(Params const& , Parameters const& par)
-            : detail::geocent::base_geocent_other<T, Parameters>(par)
+        inline geocent_other(Params const& , Parameters & par)
         {
-            detail::geocent::setup_geocent(this->m_par);
+            detail::geocent::setup_geocent(par);
         }
     };
 
@@ -129,7 +122,7 @@ namespace projections
     {
 
         // Static projection
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_geocent, geocent_other, geocent_other)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI(srs::spar::proj_geocent, geocent_other)
 
         // Factory entry(s)
         BOOST_GEOMETRY_PROJECTIONS_DETAIL_FACTORY_ENTRY_FI(geocent_entry, geocent_other)

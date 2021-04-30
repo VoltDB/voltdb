@@ -34,6 +34,8 @@
 
     sequence = a possible Boost PP tuple.
 
+  @code
+  
     returns  = Normally the macro returns nothing. 
     
                If the sequence is a Boost PP tuple, nothing is 
@@ -48,6 +50,8 @@
                without producing output if the sequence is not a 
                Boost PP tuple.
               
+  @endcode
+  
 */
 
 #if !BOOST_VMD_ASSERT_DATA

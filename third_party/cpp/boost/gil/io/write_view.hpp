@@ -13,9 +13,7 @@
 #include <boost/gil/io/device.hpp>
 #include <boost/gil/io/get_writer.hpp>
 #include <boost/gil/io/path_spec.hpp>
-
-#include <boost/mpl/and.hpp>
-#include <boost/type_traits/is_base_and_derived.hpp>
+#include <boost/gil/detail/mp11.hpp>
 
 #include <type_traits>
 
@@ -27,7 +25,7 @@ inline
 void write_view(Writer& writer, View const& view,
     typename std::enable_if
     <
-        mpl::and_
+        mp11::mp_and
         <
             typename detail::is_writer<Writer>::type,
             typename is_format_tag<typename Writer::format_tag_t>::type,
@@ -48,7 +46,7 @@ inline
 void write_view(Device& device, View const& view, FormatTag const& tag,
     typename std::enable_if
     <
-        mpl::and_
+        mp11::mp_and
         <
             typename detail::is_write_device<FormatTag, Device>::type,
             typename is_format_tag<FormatTag>::type,
@@ -71,7 +69,7 @@ inline
 void write_view(String const& file_name, View const& view, FormatTag const& tag,
     typename std::enable_if
     <
-        mpl::and_
+        mp11::mp_and
         <
             typename detail::is_supported_path_spec<String>::type,
             typename is_format_tag<FormatTag>::type,
@@ -95,7 +93,7 @@ void write_view(
     Device& device, View const& view, image_write_info<FormatTag, Log> const& info,
     typename std::enable_if
     <
-        mpl::and_
+        mp11::mp_and
         <
             typename detail::is_write_device<FormatTag, Device>::type,
             typename is_format_tag<FormatTag>::type,
@@ -119,7 +117,7 @@ void write_view(
     String const& file_name, View const& view, image_write_info<FormatTag, Log> const& info,
     typename std::enable_if
     <
-        mpl::and_
+        mp11::mp_and
         <
             typename detail::is_supported_path_spec<String>::type,
             typename is_format_tag<FormatTag>::type,
@@ -139,12 +137,12 @@ void write_view(
 ////////////////////////////////////// dynamic_image
 
 // without image_write_info
-template <typename Writer, typename Views>
+template <typename Writer, typename ...Views>
 inline
-void write_view(Writer& writer, any_image_view<Views> const& view,
+void write_view(Writer& writer, any_image_view<Views...> const& view,
     typename std::enable_if
     <
-        mpl::and_
+        mp11::mp_and
         <
             typename detail::is_dynamic_image_writer<Writer>::type,
             typename is_format_tag<typename Writer::format_tag_t>::type
@@ -155,13 +153,13 @@ void write_view(Writer& writer, any_image_view<Views> const& view,
 }
 
 // without image_write_info
-template <typename Device, typename Views, typename FormatTag>
+template <typename Device, typename ...Views, typename FormatTag>
 inline
 void write_view(
-    Device& device, any_image_view<Views> const& views, FormatTag const& tag,
+    Device& device, any_image_view<Views...> const& views, FormatTag const& tag,
     typename std::enable_if
     <
-        mpl::and_
+        mp11::mp_and
         <
             typename detail::is_write_device<FormatTag, Device>::type,
             typename is_format_tag<FormatTag>::type
@@ -173,13 +171,13 @@ void write_view(
     write_view(writer, views);
 }
 
-template <typename String, typename Views, typename FormatTag>
+template <typename String, typename ...Views, typename FormatTag>
 inline
 void write_view(
-    String const& file_name, any_image_view<Views> const& views, FormatTag const& tag,
+    String const& file_name, any_image_view<Views...> const& views, FormatTag const& tag,
     typename std::enable_if
     <
-        mpl::and_
+        mp11::mp_and
         <
             typename detail::is_supported_path_spec<String>::type,
             typename is_format_tag<FormatTag>::type
@@ -193,13 +191,13 @@ void write_view(
 
 // with image_write_info
 /// \ingroup IO
-template <typename Device, typename Views, typename FormatTag, typename Log>
+template <typename Device, typename ...Views, typename FormatTag, typename Log>
 inline
 void write_view(
-    Device& device, any_image_view<Views> const& views, image_write_info<FormatTag, Log> const& info,
+    Device& device, any_image_view<Views...> const& views, image_write_info<FormatTag, Log> const& info,
     typename std::enable_if
     <
-        mpl::and_
+        mp11::mp_and
         <
             typename detail::is_write_device<FormatTag, Device>::type,
             typename is_format_tag<FormatTag>::type
@@ -211,13 +209,13 @@ void write_view(
     write_view(writer, views);
 }
 
-template <typename String, typename Views, typename FormatTag, typename Log>
+template <typename String, typename ...Views, typename FormatTag, typename Log>
 inline
 void write_view(
-    String const& file_name, any_image_view<Views> const& views, image_write_info<FormatTag, Log> const& info,
+    String const& file_name, any_image_view<Views...> const& views, image_write_info<FormatTag, Log> const& info,
     typename std::enable_if
     <
-        mpl::and_
+        mp11::mp_and
         <
             typename detail::is_supported_path_spec<String>::type,
             typename is_format_tag<FormatTag>::type

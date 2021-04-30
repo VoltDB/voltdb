@@ -24,6 +24,7 @@
 #include <boost/fiber/exceptions.hpp>
 #include <boost/fiber/mutex.hpp>
 #include <boost/fiber/operations.hpp>
+#include <boost/fiber/waker.hpp>
 
 #ifdef BOOST_HAS_ABI_HEADERS
 #  include BOOST_ABI_PREFIX
@@ -44,10 +45,8 @@ enum class cv_status {
 
 class BOOST_FIBERS_DECL condition_variable_any {
 private:
-    typedef context::wait_queue_t   wait_queue_t;
-
     detail::spinlock    wait_queue_splk_{};
-    wait_queue_t        wait_queue_{};
+    wait_queue          wait_queue_{};
 
 public:
     condition_variable_any() = default;
@@ -69,13 +68,9 @@ public:
         // atomically call lt.unlock() and block on *this
         // store this fiber in waiting-queue
         detail::spinlock_lock lk{ wait_queue_splk_ };
-        BOOST_ASSERT( ! active_ctx->wait_is_linked() );
-        active_ctx->wait_link( wait_queue_);
-        active_ctx->twstatus.store( static_cast< std::intptr_t >( 0), std::memory_order_release);
-        // unlock external lt
         lt.unlock();
-        // suspend this fiber
-        active_ctx->suspend( lk);
+        wait_queue_.suspend_and_wait( lk, active_ctx);
+
         // relock external again before returning
         try {
             lt.lock();
@@ -86,8 +81,6 @@ public:
         } catch (...) {
             std::terminate();
         }
-        // post-conditions
-        BOOST_ASSERT( ! active_ctx->wait_is_linked() );
     }
 
     template< typename LockType, typename Pred >
@@ -105,20 +98,10 @@ public:
         // atomically call lt.unlock() and block on *this
         // store this fiber in waiting-queue
         detail::spinlock_lock lk{ wait_queue_splk_ };
-        BOOST_ASSERT( ! active_ctx->wait_is_linked() );
-        active_ctx->wait_link( wait_queue_);
-        active_ctx->twstatus.store( reinterpret_cast< std::intptr_t >( this), std::memory_order_release);
         // unlock external lt
         lt.unlock();
-        // suspend this fiber
-        if ( ! active_ctx->wait_until( timeout_time, lk) ) {
+        if ( ! wait_queue_.suspend_and_wait_until( lk, active_ctx, timeout_time)) {
             status = cv_status::timeout;
-            // relock local lk
-            lk.lock();
-            // remove from waiting-queue
-            wait_queue_.remove( * active_ctx);
-            // unlock local lk
-            lk.unlock();
         }
         // relock external again before returning
         try {
@@ -130,8 +113,6 @@ public:
         } catch (...) {
             std::terminate();
         }
-        // post-conditions
-        BOOST_ASSERT( ! active_ctx->wait_is_linked() );
         return status;
     }
 

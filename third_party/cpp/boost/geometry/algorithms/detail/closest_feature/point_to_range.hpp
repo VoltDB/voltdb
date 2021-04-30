@@ -1,8 +1,8 @@
 // Boost.Geometry (aka GGL, Generic Geometry Library)
 
-// Copyright (c) 2014, Oracle and/or its affiliates.
-
+// Copyright (c) 2014-2020, Oracle and/or its affiliates.
 // Contributed and/or modified by Menelaos Karavelas, on behalf of Oracle
+// Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
 // Licensed under the Boost Software License version 1.0.
 // http://www.boost.org/users/license.html
@@ -12,7 +12,9 @@
 
 #include <utility>
 
-#include <boost/range.hpp>
+#include <boost/range/begin.hpp>
+#include <boost/range/end.hpp>
+#include <boost/range/size.hpp>
 
 #include <boost/geometry/core/assert.hpp>
 #include <boost/geometry/core/closure.hpp>
@@ -71,8 +73,11 @@ protected:
         // check if other segments are closer
         for (++prev, ++it; it != last; ++prev, ++it)
         {
-            Distance dist = strategy.apply(point, *prev, *it);
-            if (geometry::math::equals(dist, zero))
+            Distance const dist = strategy.apply(point, *prev, *it);
+
+            // Stop only if we find exactly zero distance
+            // otherwise it may stop at some very small value and miss the min
+            if (dist == zero)
             {
                 dist_min = zero;
                 it_min1 = prev;

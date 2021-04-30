@@ -62,7 +62,7 @@ T bessel_yn(int n, T x, const Policy& pol)
     }
     else if(asymptotic_bessel_large_x_limit(n, x))
     {
-       value = factor * asymptotic_bessel_y_large_x_2(static_cast<T>(abs(n)), x);
+       value = factor * asymptotic_bessel_y_large_x_2(static_cast<T>(abs(n)), x, pol);
     }
     else if (n == 0)
     {

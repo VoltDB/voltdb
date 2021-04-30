@@ -2,8 +2,8 @@
 
 // Copyright (c) 2008-2015 Barend Gehrels, Amsterdam, the Netherlands.
 
-// This file was modified by Oracle on 2017, 2018.
-// Modifications copyright (c) 2017-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2017, 2018, 2019.
+// Modifications copyright (c) 2017-2019, Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle.
 
 // Use, modification and distribution is subject to the Boost Software License,
@@ -102,20 +102,14 @@ namespace projections
                 return err;
             }
 
-            // template class, using CRTP to implement forward/inverse
             template <typename T, typename Parameters>
             struct base_sconics_spheroid
-                : public base_t_fi<base_sconics_spheroid<T, Parameters>, T, Parameters>
             {
                 par_sconics<T> m_proj_parm;
 
-                inline base_sconics_spheroid(const Parameters& par)
-                    : base_t_fi<base_sconics_spheroid<T, Parameters>, T, Parameters>(*this, par)
-                {}
-
                 // FORWARD(s_forward)  spheroid
                 // Project coordinates from geographic (lon, lat) to cartesian (x, y)
-                inline void fwd(T lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
+                inline void fwd(Parameters const& , T lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
                 {
                     T rho;
 
@@ -136,7 +130,7 @@ namespace projections
 
                 // INVERSE(s_inverse)  ellipsoid & spheroid
                 // Project coordinates from cartesian (x, y) to geographic (lon, lat)
-                inline void inv(T xy_x, T xy_y, T& lp_lon, T& lp_lat) const
+                inline void inv(Parameters const& , T xy_x, T xy_y, T& lp_lon, T& lp_lat) const
                 {
                     T rho;
 
@@ -300,10 +294,9 @@ namespace projections
     struct tissot_spheroid : public detail::sconics::base_sconics_spheroid<T, Parameters>
     {
         template <typename Params>
-        inline tissot_spheroid(Params const& params, const Parameters& par)
-            : detail::sconics::base_sconics_spheroid<T, Parameters>(par)
+        inline tissot_spheroid(Params const& params, Parameters& par)
         {
-            detail::sconics::setup_tissot(params, this->m_par, this->m_proj_parm);
+            detail::sconics::setup_tissot(params, par, this->m_proj_parm);
         }
     };
 
@@ -326,10 +319,9 @@ namespace projections
     struct murd1_spheroid : public detail::sconics::base_sconics_spheroid<T, Parameters>
     {
         template <typename Params>
-        inline murd1_spheroid(Params const& params, const Parameters& par)
-            : detail::sconics::base_sconics_spheroid<T, Parameters>(par)
+        inline murd1_spheroid(Params const& params, Parameters& par)
         {
-            detail::sconics::setup_murd1(params, this->m_par, this->m_proj_parm);
+            detail::sconics::setup_murd1(params, par, this->m_proj_parm);
         }
     };
 
@@ -352,10 +344,9 @@ namespace projections
     struct murd2_spheroid : public detail::sconics::base_sconics_spheroid<T, Parameters>
     {
         template <typename Params>
-        inline murd2_spheroid(Params const& params, const Parameters& par)
-            : detail::sconics::base_sconics_spheroid<T, Parameters>(par)
+        inline murd2_spheroid(Params const& params, Parameters& par)
         {
-            detail::sconics::setup_murd2(params, this->m_par, this->m_proj_parm);
+            detail::sconics::setup_murd2(params, par, this->m_proj_parm);
         }
     };
 
@@ -378,10 +369,9 @@ namespace projections
     struct murd3_spheroid : public detail::sconics::base_sconics_spheroid<T, Parameters>
     {
         template <typename Params>
-        inline murd3_spheroid(Params const& params, const Parameters& par)
-            : detail::sconics::base_sconics_spheroid<T, Parameters>(par)
+        inline murd3_spheroid(Params const& params, Parameters& par)
         {
-            detail::sconics::setup_murd3(params, this->m_par, this->m_proj_parm);
+            detail::sconics::setup_murd3(params, par, this->m_proj_parm);
         }
     };
 
@@ -404,10 +394,9 @@ namespace projections
     struct euler_spheroid : public detail::sconics::base_sconics_spheroid<T, Parameters>
     {
         template <typename Params>
-        inline euler_spheroid(Params const& params, const Parameters& par)
-            : detail::sconics::base_sconics_spheroid<T, Parameters>(par)
+        inline euler_spheroid(Params const& params, Parameters& par)
         {
-            detail::sconics::setup_euler(params, this->m_par, this->m_proj_parm);
+            detail::sconics::setup_euler(params, par, this->m_proj_parm);
         }
     };
 
@@ -430,10 +419,9 @@ namespace projections
     struct pconic_spheroid : public detail::sconics::base_sconics_spheroid<T, Parameters>
     {
         template <typename Params>
-        inline pconic_spheroid(Params const& params, const Parameters& par)
-            : detail::sconics::base_sconics_spheroid<T, Parameters>(par)
+        inline pconic_spheroid(Params const& params, Parameters& par)
         {
-            detail::sconics::setup_pconic(params, this->m_par, this->m_proj_parm);
+            detail::sconics::setup_pconic(params, par, this->m_proj_parm);
         }
     };
 
@@ -456,10 +444,9 @@ namespace projections
     struct vitk1_spheroid : public detail::sconics::base_sconics_spheroid<T, Parameters>
     {
         template <typename Params>
-        inline vitk1_spheroid(Params const& params, const Parameters& par)
-            : detail::sconics::base_sconics_spheroid<T, Parameters>(par)
+        inline vitk1_spheroid(Params const& params, Parameters& par)
         {
-            detail::sconics::setup_vitk1(params, this->m_par, this->m_proj_parm);
+            detail::sconics::setup_vitk1(params, par, this->m_proj_parm);
         }
     };
 
@@ -468,13 +455,13 @@ namespace projections
     {
 
         // Static projection
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_euler, euler_spheroid, euler_spheroid)
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_murd1, murd1_spheroid, murd1_spheroid)
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_murd2, murd2_spheroid, murd2_spheroid)
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_murd3, murd3_spheroid, murd3_spheroid)
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_pconic, pconic_spheroid, pconic_spheroid)
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_tissot, tissot_spheroid, tissot_spheroid)
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_vitk1, vitk1_spheroid, vitk1_spheroid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI(srs::spar::proj_euler, euler_spheroid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI(srs::spar::proj_murd1, murd1_spheroid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI(srs::spar::proj_murd2, murd2_spheroid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI(srs::spar::proj_murd3, murd3_spheroid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI(srs::spar::proj_pconic, pconic_spheroid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI(srs::spar::proj_tissot, tissot_spheroid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI(srs::spar::proj_vitk1, vitk1_spheroid)
         
         // Factory entry(s)
         BOOST_GEOMETRY_PROJECTIONS_DETAIL_FACTORY_ENTRY_FI(euler_entry, euler_spheroid)

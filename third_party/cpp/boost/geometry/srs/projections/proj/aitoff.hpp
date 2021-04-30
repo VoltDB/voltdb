@@ -2,8 +2,8 @@
 
 // Copyright (c) 2008-2015 Barend Gehrels, Amsterdam, the Netherlands.
 
-// This file was modified by Oracle on 2017, 2018.
-// Modifications copyright (c) 2017-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2017, 2018, 2019.
+// Modifications copyright (c) 2017-2019, Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle.
 
 // Use, modification and distribution is subject to the Boost Software License,
@@ -77,20 +77,14 @@ namespace projections
                 mode_type mode;
             };
 
-            // template class, using CRTP to implement forward/inverse
             template <typename T, typename Parameters>
             struct base_aitoff_spheroid
-                : public base_t_fi<base_aitoff_spheroid<T, Parameters>, T, Parameters>
             {
                 par_aitoff<T> m_proj_parm;
 
-                inline base_aitoff_spheroid(const Parameters& par)
-                    : base_t_fi<base_aitoff_spheroid<T, Parameters>, T, Parameters>(*this, par)
-                {}
-
                 // FORWARD(s_forward)  spheroid
                 // Project coordinates from geographic (lon, lat) to cartesian (x, y)
-                inline void fwd(T const& lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
+                inline void fwd(Parameters const& , T const& lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
                 {
                     T c, d;
 
@@ -127,7 +121,7 @@ namespace projections
 
                 // INVERSE(s_inverse)  sphere
                 // Project coordinates from cartesian (x, y) to geographic (lon, lat)
-                inline void inv(T const& xy_x, T const& xy_y, T& lp_lon, T& lp_lat) const
+                inline void inv(Parameters const& , T const& xy_x, T const& xy_y, T& lp_lon, T& lp_lat) const
                 {
                     static const T pi = detail::pi<T>();
                     static const T two_pi = detail::two_pi<T>();
@@ -253,10 +247,9 @@ namespace projections
     struct aitoff_spheroid : public detail::aitoff::base_aitoff_spheroid<T, Parameters>
     {
         template <typename Params>
-        inline aitoff_spheroid(Params const& , Parameters const& par)
-            : detail::aitoff::base_aitoff_spheroid<T, Parameters>(par)
+        inline aitoff_spheroid(Params const& , Parameters & par)
         {
-            detail::aitoff::setup_aitoff(this->m_par, this->m_proj_parm);
+            detail::aitoff::setup_aitoff(par, this->m_proj_parm);
         }
     };
 
@@ -278,10 +271,9 @@ namespace projections
     struct wintri_spheroid : public detail::aitoff::base_aitoff_spheroid<T, Parameters>
     {
         template <typename Params>
-        inline wintri_spheroid(Params const& params, Parameters const& par)
-            : detail::aitoff::base_aitoff_spheroid<T, Parameters>(par)
+        inline wintri_spheroid(Params const& params, Parameters & par)
         {
-            detail::aitoff::setup_wintri(params, this->m_par, this->m_proj_parm);
+            detail::aitoff::setup_wintri(params, par, this->m_proj_parm);
         }
     };
 
@@ -290,8 +282,8 @@ namespace projections
     {
 
         // Static projection
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_aitoff, aitoff_spheroid, aitoff_spheroid)
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_wintri, wintri_spheroid, wintri_spheroid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI(srs::spar::proj_aitoff, aitoff_spheroid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI(srs::spar::proj_wintri, wintri_spheroid)
 
         // Factory entry(s)
         BOOST_GEOMETRY_PROJECTIONS_DETAIL_FACTORY_ENTRY_FI(aitoff_entry, aitoff_spheroid)

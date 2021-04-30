@@ -26,8 +26,8 @@
     Software License, Version 1.0. (See accompanying file
     LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 =============================================================================*/
-#if !defined(DETECT_INCLUDE_GUARDS_HK060304_INCLUDED)
-#define DETECT_INCLUDE_GUARDS_HK060304_INCLUDED
+#if !defined(BOOST_DETECT_INCLUDE_GUARDS_HK060304_INCLUDED)
+#define BOOST_DETECT_INCLUDE_GUARDS_HK060304_INCLUDED
 
 #include <boost/wave/wave_config.hpp>
 #include <boost/wave/token_ids.hpp>
@@ -260,4 +260,4 @@ include_guards<Token>::state_5(Token& t)
 #include BOOST_ABI_SUFFIX
 #endif
 
-#endif // !DETECT_INCLUDE_GUARDS_HK060304_INCLUDED
+#endif // !BOOST_DETECT_INCLUDE_GUARDS_HK060304_INCLUDED

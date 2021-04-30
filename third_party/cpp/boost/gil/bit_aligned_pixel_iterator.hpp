@@ -15,6 +15,7 @@
 #include <boost/iterator/iterator_facade.hpp>
 
 #include <functional>
+#include <type_traits>
 
 namespace boost { namespace gil {
 
@@ -82,15 +83,21 @@ private:
 };
 
 template <typename NonAlignedPixelReference>
-struct const_iterator_type<bit_aligned_pixel_iterator<NonAlignedPixelReference> > {
-    using type = bit_aligned_pixel_iterator<typename NonAlignedPixelReference::const_reference>;
+struct const_iterator_type<bit_aligned_pixel_iterator<NonAlignedPixelReference>>
+{
+    using type =
+        bit_aligned_pixel_iterator<typename NonAlignedPixelReference::const_reference>;
 };
 
 template <typename NonAlignedPixelReference>
-struct iterator_is_mutable<bit_aligned_pixel_iterator<NonAlignedPixelReference> > : public mpl::bool_<NonAlignedPixelReference::is_mutable> {};
+struct iterator_is_mutable<bit_aligned_pixel_iterator<NonAlignedPixelReference>>
+    : std::integral_constant<bool, NonAlignedPixelReference::is_mutable>
+{};
 
 template <typename NonAlignedPixelReference>
-struct is_iterator_adaptor<bit_aligned_pixel_iterator<NonAlignedPixelReference> > : public mpl::false_ {};
+struct is_iterator_adaptor<bit_aligned_pixel_iterator<NonAlignedPixelReference>>
+    : std::false_type
+{};
 
 /////////////////////////////
 //  PixelBasedConcept
@@ -110,7 +117,9 @@ struct is_planar<bit_aligned_pixel_iterator<NonAlignedPixelReference> > : public
 /////////////////////////////
 
 template <typename NonAlignedPixelReference>
-struct byte_to_memunit<bit_aligned_pixel_iterator<NonAlignedPixelReference> > : public mpl::int_<8> {};
+struct byte_to_memunit<bit_aligned_pixel_iterator<NonAlignedPixelReference>>
+    : std::integral_constant<int, 8>
+{};
 
 template <typename NonAlignedPixelReference>
 inline std::ptrdiff_t memunit_step(const bit_aligned_pixel_iterator<NonAlignedPixelReference>&) {

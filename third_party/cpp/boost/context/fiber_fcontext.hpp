@@ -314,6 +314,8 @@ public:
         return fctx_ < other.fctx_;
     }
 
+    #if !defined(BOOST_EMBTC)
+    
     template< typename charT, class traitsT >
     friend std::basic_ostream< charT, traitsT > &
     operator<<( std::basic_ostream< charT, traitsT > & os, fiber const& other) {
@@ -324,11 +326,33 @@ public:
         }
     }
 
+    #else
+    
+    template< typename charT, class traitsT >
+    friend std::basic_ostream< charT, traitsT > &
+    operator<<( std::basic_ostream< charT, traitsT > & os, fiber const& other);
+
+    #endif
+
     void swap( fiber & other) noexcept {
         std::swap( fctx_, other.fctx_);
     }
 };
 
+#if defined(BOOST_EMBTC)
+
+    template< typename charT, class traitsT >
+    inline std::basic_ostream< charT, traitsT > &
+    operator<<( std::basic_ostream< charT, traitsT > & os, fiber const& other) {
+        if ( nullptr != other.fctx_) {
+            return os << other.fctx_;
+        } else {
+            return os << "{not-a-context}";
+        }
+    }
+
+#endif
+    
 inline
 void swap( fiber & l, fiber & r) noexcept {
     l.swap( r);

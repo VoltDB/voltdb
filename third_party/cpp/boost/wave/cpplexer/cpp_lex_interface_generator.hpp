@@ -53,9 +53,9 @@ template <
 >
 struct BOOST_WAVE_NEW_LEXER_DECL new_lexer_gen
 {
-//  The NewLexer function allows the opaque generation of a new lexer object.
-//  It is coupled to the token type to allow to decouple the lexer/token
-//  configurations at compile time.
+    //  The NewLexer function allows the opaque generation of a new lexer object.
+    //  It is coupled to the token type to allow to decouple the lexer/token
+    //  configurations at compile time.
     static lex_input_interface<TokenT> *
     new_lexer(IteratorT const &first, IteratorT const &last,
         PositionT const &pos, boost::wave::language_support language);
@@ -80,9 +80,9 @@ struct lex_input_interface_generator
     lex_input_interface_generator() {}
     ~lex_input_interface_generator() {}
 
-//  The new_lexer function allows the opaque generation of a new lexer object.
-//  It is coupled to the token type to allow to distinguish different
-//  lexer/token configurations at compile time.
+    //  The new_lexer function allows the opaque generation of a new lexer object.
+    //  It is coupled to the token type to allow to distinguish different
+    //  lexer/token configurations at compile time.
     template <typename IteratorT>
     static lex_input_interface<TokenT> *
     new_lexer(IteratorT const &first, IteratorT const &last,

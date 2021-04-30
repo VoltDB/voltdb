@@ -97,6 +97,13 @@ namespace impl
             return this->cov_;
         }
 
+        // make this accumulator serializeable
+        template<class Archive>
+        void serialize(Archive & ar, const unsigned int file_version)
+        { 
+            ar & cov_;
+        }
+
     private:
         result_type cov_;
     };

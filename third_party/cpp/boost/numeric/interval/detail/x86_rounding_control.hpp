@@ -11,7 +11,7 @@
 #ifndef BOOST_NUMERIC_INTERVAL_DETAIL_X86_ROUNDING_CONTROL_HPP
 #define BOOST_NUMERIC_INTERVAL_DETAIL_X86_ROUNDING_CONTROL_HPP
 
-#ifdef __GNUC__
+#if defined(__GNUC__) || defined(__BORLANDC__) && defined(__clang__)
 #  include <boost/numeric/interval/detail/x86gcc_rounding_control.hpp>
 #elif defined(__BORLANDC__)
 #  include <boost/numeric/interval/detail/bcc_rounding_control.hpp>

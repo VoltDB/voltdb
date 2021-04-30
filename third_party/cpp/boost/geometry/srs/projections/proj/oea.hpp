@@ -2,8 +2,8 @@
 
 // Copyright (c) 2008-2015 Barend Gehrels, Amsterdam, the Netherlands.
 
-// This file was modified by Oracle on 2017, 2018.
-// Modifications copyright (c) 2017-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2017, 2018, 2019.
+// Modifications copyright (c) 2017-2019, Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle.
 
 // Use, modification and distribution is subject to the Boost Software License,
@@ -66,20 +66,14 @@ namespace projections
                 T    cp0, sp0;
             };
 
-            // template class, using CRTP to implement forward/inverse
             template <typename T, typename Parameters>
             struct base_oea_spheroid
-                : public base_t_fi<base_oea_spheroid<T, Parameters>, T, Parameters>
             {
                 par_oea<T> m_proj_parm;
 
-                inline base_oea_spheroid(const Parameters& par)
-                    : base_t_fi<base_oea_spheroid<T, Parameters>, T, Parameters>(*this, par)
-                {}
-
                 // FORWARD(s_forward)  sphere
                 // Project coordinates from geographic (lon, lat) to cartesian (x, y)
-                inline void fwd(T const& lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
+                inline void fwd(Parameters const& , T const& lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
                 {
                     T Az, M, N, cp, sp, cl, shz;
 
@@ -96,7 +90,7 @@ namespace projections
 
                 // INVERSE(s_inverse)  sphere
                 // Project coordinates from cartesian (x, y) to geographic (lon, lat)
-                inline void inv(T const& xy_x, T const& xy_y, T& lp_lon, T& lp_lat) const
+                inline void inv(Parameters const& , T const& xy_x, T const& xy_y, T& lp_lon, T& lp_lat) const
                 {
                     T N, M, xp, yp, z, Az, cz, sz, cAz;
 
@@ -164,10 +158,9 @@ namespace projections
     struct oea_spheroid : public detail::oea::base_oea_spheroid<T, Parameters>
     {
         template <typename Params>
-        inline oea_spheroid(Params const& params, Parameters const& par)
-            : detail::oea::base_oea_spheroid<T, Parameters>(par)
+        inline oea_spheroid(Params const& params, Parameters & par)
         {
-            detail::oea::setup_oea(params, this->m_par, this->m_proj_parm);
+            detail::oea::setup_oea(params, par, this->m_proj_parm);
         }
     };
 
@@ -176,7 +169,7 @@ namespace projections
     {
 
         // Static projection
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_oea, oea_spheroid, oea_spheroid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI(srs::spar::proj_oea, oea_spheroid)
 
         // Factory entry(s)
         BOOST_GEOMETRY_PROJECTIONS_DETAIL_FACTORY_ENTRY_FI(oea_entry, oea_spheroid)

@@ -21,6 +21,7 @@
 //    Nickolay Mladenov, for the implementation of operator+=
 
 //  Revision History
+//  12 Nov 20  Fix operators to work with C++20 rules (Glen Joseph Fernandes)
 //  02 Sep 13  Remove unneeded forward declarations; tweak private helper
 //             function (Daryle Walker)
 //  30 Aug 13  Improve exception safety of "assign"; start modernizing I/O code
@@ -74,7 +75,6 @@
 #include <cstddef>               // for NULL
 #include <stdexcept>             // for std::domain_error
 #include <string>                // for std::string implicit constructor
-#include <boost/operators.hpp>   // for boost::addable etc
 #include <cstdlib>               // for std::abs
 #include <boost/call_traits.hpp> // for boost::call_traits
 #include <boost/detail/workaround.hpp> // for BOOST_WORKAROUND
@@ -87,6 +87,7 @@
 #include <boost/type_traits/is_convertible.hpp>
 #include <boost/type_traits/is_class.hpp>
 #include <boost/type_traits/is_same.hpp>
+#include <boost/type_traits/is_array.hpp>
 
 // Control whether depreciated GCD and LCM functions are included (default: yes)
 #ifndef BOOST_CONTROL_RATIONAL_HAS_GCD
@@ -113,8 +114,11 @@ IntType lcm(IntType n, IntType m)
 
 namespace rational_detail{
 
+   template <class FromInt, class ToInt, typename Enable = void>
+   struct is_compatible_integer;
+
    template <class FromInt, class ToInt>
-   struct is_compatible_integer
+   struct is_compatible_integer<FromInt, ToInt, typename enable_if_c<!is_array<FromInt>::value>::type>
    {
       BOOST_STATIC_CONSTANT(bool, value = ((std::numeric_limits<FromInt>::is_specialized && std::numeric_limits<FromInt>::is_integer
          && (std::numeric_limits<FromInt>::digits <= std::numeric_limits<ToInt>::digits)
@@ -125,6 +129,29 @@ namespace rational_detail{
          || (is_class<ToInt>::value && is_class<FromInt>::value && is_convertible<FromInt, ToInt>::value));
    };
 
+   template <class FromInt, class ToInt>
+   struct is_compatible_integer<FromInt, ToInt, typename enable_if_c<is_array<FromInt>::value>::type>
+   {
+      BOOST_STATIC_CONSTANT(bool, value = false);
+   };
+
+   template <class FromInt, class ToInt, typename Enable = void>
+   struct is_backward_compatible_integer;
+
+   template <class FromInt, class ToInt>
+   struct is_backward_compatible_integer<FromInt, ToInt, typename enable_if_c<!is_array<FromInt>::value>::type>
+   {
+      BOOST_STATIC_CONSTANT(bool, value = (std::numeric_limits<FromInt>::is_specialized && std::numeric_limits<FromInt>::is_integer
+         && !is_compatible_integer<FromInt, ToInt>::value
+         && (std::numeric_limits<FromInt>::radix == std::numeric_limits<ToInt>::radix)
+         && is_convertible<FromInt, ToInt>::value));
+   };
+
+   template <class FromInt, class ToInt>
+   struct is_backward_compatible_integer<FromInt, ToInt, typename enable_if_c<is_array<FromInt>::value>::type>
+   {
+      BOOST_STATIC_CONSTANT(bool, value = false);
+   };
 }
 
 class bad_rational : public std::domain_error
@@ -152,10 +179,12 @@ public:
 
     BOOST_CONSTEXPR
     rational() : num(0), den(1) {}
-    template <class T>
+
+    template <class T>//, typename enable_if_c<!is_array<T>::value>::type>
     BOOST_CONSTEXPR rational(const T& n, typename enable_if_c<
        rational_detail::is_compatible_integer<T, IntType>::value
     >::type const* = 0) : num(n), den(1) {}
+
     template <class T, class U>
     BOOST_CXX14_CONSTEXPR rational(const T& n, const U& d, typename enable_if_c<
        rational_detail::is_compatible_integer<T, IntType>::value && rational_detail::is_compatible_integer<U, IntType>::value
@@ -200,12 +229,9 @@ public:
     // conversion from T to IntType, they will throw a bad_rational
     // if the conversion results in loss of precision or undefined behaviour.
     //
-    template <class T>
+    template <class T>//, typename enable_if_c<!is_array<T>::value>::type>
     BOOST_CXX14_CONSTEXPR rational(const T& n, typename enable_if_c<
-       std::numeric_limits<T>::is_specialized && std::numeric_limits<T>::is_integer
-       && !rational_detail::is_compatible_integer<T, IntType>::value
-       && (std::numeric_limits<T>::radix == std::numeric_limits<IntType>::radix)
-       && is_convertible<T, IntType>::value
+       rational_detail::is_backward_compatible_integer<T, IntType>::value
     >::type const* = 0)
     {
        assign(n, static_cast<T>(1));
@@ -683,7 +709,7 @@ inline typename boost::enable_if_c <
    rational_detail::is_compatible_integer<Arg, IntType>::value || is_same<rational<IntType>, Arg>::value, bool>::type
    operator <= (const rational<IntType>& a, const Arg& b)
 {
-      return !(a > b);
+      return !a.operator>(b);
 }
 template <class Arg, class IntType>
 BOOST_CXX14_CONSTEXPR
@@ -700,7 +726,7 @@ inline typename boost::enable_if_c <
    rational_detail::is_compatible_integer<Arg, IntType>::value || is_same<rational<IntType>, Arg>::value, bool>::type
    operator >= (const rational<IntType>& a, const Arg& b)
 {
-      return !(a < b);
+      return !a.operator<(b);
 }
 template <class Arg, class IntType>
 BOOST_CXX14_CONSTEXPR
@@ -717,7 +743,7 @@ inline typename boost::enable_if_c <
    rational_detail::is_compatible_integer<Arg, IntType>::value || is_same<rational<IntType>, Arg>::value, bool>::type
    operator != (const rational<IntType>& a, const Arg& b)
 {
-      return !(a == b);
+      return !a.operator==(b);
 }
 template <class Arg, class IntType>
 BOOST_CONSTEXPR
@@ -734,7 +760,7 @@ inline typename boost::enable_if_c <
    rational_detail::is_compatible_integer<Arg, IntType>::value, bool>::type
    operator < (const Arg& b, const rational<IntType>& a)
 {
-      return a > b;
+      return a.operator>(b);
 }
 template <class Arg, class IntType>
 BOOST_CXX14_CONSTEXPR
@@ -742,7 +768,7 @@ inline typename boost::enable_if_c <
    rational_detail::is_compatible_integer<Arg, IntType>::value, bool>::type
    operator > (const Arg& b, const rational<IntType>& a)
 {
-      return a < b;
+      return a.operator<(b);
 }
 template <class Arg, class IntType>
 BOOST_CONSTEXPR
@@ -750,7 +776,7 @@ inline typename boost::enable_if_c <
    rational_detail::is_compatible_integer<Arg, IntType>::value, bool>::type
    operator == (const Arg& b, const rational<IntType>& a)
 {
-      return a == b;
+      return a.operator==(b);
 }
 
 // Comparison operators

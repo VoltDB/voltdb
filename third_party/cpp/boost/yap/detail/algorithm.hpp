@@ -226,7 +226,7 @@ namespace boost { namespace yap { namespace detail {
     struct make_operand
     {
         template<typename U>
-        auto operator()(U && u)
+        constexpr auto operator()(U && u)
         {
             return T{static_cast<U &&>(u)};
         }
@@ -235,13 +235,13 @@ namespace boost { namespace yap { namespace detail {
     template<template<expr_kind, class> class ExprTemplate, typename Tuple>
     struct make_operand<ExprTemplate<expr_kind::expr_ref, Tuple>>
     {
-        auto operator()(ExprTemplate<expr_kind::expr_ref, Tuple> expr)
+        constexpr auto operator()(ExprTemplate<expr_kind::expr_ref, Tuple> expr)
         {
             return expr;
         }
 
         template<typename U>
-        auto operator()(U && u)
+        constexpr auto operator()(U && u)
         {
             return ExprTemplate<expr_kind::expr_ref, Tuple>{
                 Tuple{std::addressof(u)}};

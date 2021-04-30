@@ -20,17 +20,18 @@
 
 
 #include <boost/geometry/algorithms/detail/signed_size_type.hpp>
+#include <boost/geometry/algorithms/detail/ring_identifier.hpp>
 
 
 namespace boost { namespace geometry
 {
 
 
-
 // Internal struct to uniquely identify a segment
 // on a linestring,ring
 // or polygon (needs ring_index)
 // or multi-geometry (needs multi_index)
+// It is always used for clockwise indication (even if the original is anticlockwise)
 struct segment_identifier
 {
     inline segment_identifier()
@@ -95,7 +96,18 @@ struct segment_identifier
     signed_size_type piece_index;
 };
 
+#ifndef DOXYGEN_NO_DETAIL
+namespace detail { namespace overlay
+{
 
+// Create a ring identifier from a segment identifier
+inline ring_identifier ring_id_by_seg_id(segment_identifier const& seg_id)
+{
+    return ring_identifier(seg_id.source_index, seg_id.multi_index, seg_id.ring_index);
+}
+
+}} // namespace detail::overlay
+#endif // DOXYGEN_NO_DETAIL
 
 }} // namespace boost::geometry
 

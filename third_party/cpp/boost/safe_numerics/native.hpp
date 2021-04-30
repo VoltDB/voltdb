@@ -1,5 +1,5 @@
-#ifndef BOOST_NUMERIC_NATIVE_HPP
-#define BOOST_NUMERIC_NATIVE_HPP
+#ifndef BOOST_SAFE_NUMERICS_NATIVE_HPP
+#define BOOST_SAFE_NUMERICS_NATIVE_HPP
 
 //  Copyright (c) 2012 Robert Ramey
 //
@@ -107,4 +107,4 @@ public:
 } // safe_numerics
 } // boost
 
-#endif // BOOST_NUMERIC_NATIVE_HPP
+#endif // BOOST_SAFE_NUMERICS_NATIVE_HPP

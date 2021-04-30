@@ -2,8 +2,8 @@
 
 // Copyright (c) 2014-2015 Samuel Debionne, Grenoble, France.
 
-// This file was modified by Oracle on 2015, 2018.
-// Modifications copyright (c) 2015-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2015-2020.
+// Modifications copyright (c) 2015-2020, Oracle and/or its affiliates.
 
 // Contributed and/or modified by Menelaos Karavelas, on behalf of Oracle
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
@@ -17,6 +17,11 @@
 
 #ifndef BOOST_GEOMETRY_UTIL_COMBINE_IF_HPP
 #define BOOST_GEOMETRY_UTIL_COMBINE_IF_HPP
+
+#include <boost/config/pragma_message.hpp>
+#if !defined(BOOST_ALLOW_DEPRECATED_HEADERS)
+BOOST_PRAGMA_MESSAGE("This header is deprecated.")
+#endif
 
 #include <boost/mpl/bind.hpp>
 #include <boost/mpl/fold.hpp>

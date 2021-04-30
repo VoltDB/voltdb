@@ -465,7 +465,7 @@ BOOST_IOSTREAMS_RESTRICT( const T& t, stream_offset off, stream_offset len = -1
                           BOOST_IOSTREAMS_DISABLE_IF_STREAM(T) )
 { return BOOST_IOSTREAMS_RESTRICT(t, off, len, is_std_io<T>()); }
 
-# if !BOOST_WORKAROUND(__BORLANDC__, < 0x600) && \
+# if !BOOST_WORKAROUND(BOOST_BORLANDC, < 0x600) && \
      !defined(__GNUC__) // ---------------------------------------------------//
 
 template<typename T>

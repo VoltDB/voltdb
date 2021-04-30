@@ -1,5 +1,5 @@
 // Copyright 2014 Renato Tegon Forti, Antony Polukhin.
-// Copyright 2015-2019 Antony Polukhin.
+// Copyright 2015-2021 Antony Polukhin.
 //
 // Distributed under the Boost Software License, Version 1.0.
 // (See accompanying file LICENSE_1_0.txt
@@ -40,7 +40,7 @@ namespace boost { namespace dll {
 #define BOOST_DLL_FORCE_NO_WEAK_EXPORTS
 #endif
 
-#if BOOST_COMP_MSVC || ((BOOST_COMP_INTEL || BOOST_COMP_CLANG) && BOOST_OS_WINDOWS)
+#if defined(_MSC_VER) // MSVC, Clang-cl, and ICC on Windows
 
 #define BOOST_DLL_SELECTANY __declspec(selectany)
 

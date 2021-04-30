@@ -1927,11 +1927,15 @@ public:
 
          if ((boost::math::isfinite)(a) && (boost::math::isfinite)(b))
          {
-            if (b <= a)
+            if (a==b)
             {
-               return policies::raise_domain_error(function, "Arguments to integrate are in wrong order; integration over [a,b] must have b > a.", a, Policy());
+               return K(0);
             }
             recursive_info<F> info = { f, tol };
+            if (b < a)
+            {
+               return -recursive_adaptive_integrate(&info, b, a, max_depth, Real(0), error, pL1);
+            }
             return recursive_adaptive_integrate(&info, a, b, max_depth, Real(0), error, pL1);
          }
       }

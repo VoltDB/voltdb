@@ -3,8 +3,8 @@
 // Copyright (c) 2007-2014 Barend Gehrels, Amsterdam, the Netherlands.
 // Copyright (c) 2014 Adam Wulkiewicz, Lodz, Poland.
 
-// This file was modified by Oracle on 2017.
-// Modifications copyright (c) 2017 Oracle and/or its affiliates.
+// This file was modified by Oracle on 2017-2021.
+// Modifications copyright (c) 2017-2021 Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
 // Use, modification and distribution is subject to the Boost Software License,
@@ -17,7 +17,9 @@
 
 #include <map>
 
-#include <boost/range.hpp>
+#include <boost/range/begin.hpp>
+#include <boost/range/end.hpp>
+#include <boost/range/size.hpp>
 
 #include <boost/geometry/core/tags.hpp>
 
@@ -60,18 +62,18 @@ namespace dispatch
     template <typename Box>
     struct select_rings<box_tag, Box>
     {
-        template <typename Geometry, typename RingPropertyMap, typename AreaStrategy>
+        template <typename Geometry, typename RingPropertyMap, typename Strategy>
         static inline void apply(Box const& box, Geometry const& ,
                 ring_identifier const& id, RingPropertyMap& ring_properties,
-                AreaStrategy const& strategy)
+                Strategy const& strategy)
         {
             ring_properties[id] = typename RingPropertyMap::mapped_type(box, strategy);
         }
 
-        template <typename RingPropertyMap, typename AreaStrategy>
+        template <typename RingPropertyMap, typename Strategy>
         static inline void apply(Box const& box,
                 ring_identifier const& id, RingPropertyMap& ring_properties,
-                AreaStrategy const& strategy)
+                Strategy const& strategy)
         {
             ring_properties[id] = typename RingPropertyMap::mapped_type(box, strategy);
         }
@@ -80,10 +82,10 @@ namespace dispatch
     template <typename Ring>
     struct select_rings<ring_tag, Ring>
     {
-        template <typename Geometry, typename RingPropertyMap, typename AreaStrategy>
+        template <typename Geometry, typename RingPropertyMap, typename Strategy>
         static inline void apply(Ring const& ring, Geometry const& ,
                     ring_identifier const& id, RingPropertyMap& ring_properties,
-                    AreaStrategy const& strategy)
+                    Strategy const& strategy)
         {
             if (boost::size(ring) > 0)
             {
@@ -91,10 +93,10 @@ namespace dispatch
             }
         }
 
-        template <typename RingPropertyMap, typename AreaStrategy>
+        template <typename RingPropertyMap, typename Strategy>
         static inline void apply(Ring const& ring,
                     ring_identifier const& id, RingPropertyMap& ring_properties,
-                    AreaStrategy const& strategy)
+                    Strategy const& strategy)
         {
             if (boost::size(ring) > 0)
             {
@@ -107,10 +109,10 @@ namespace dispatch
     template <typename Polygon>
     struct select_rings<polygon_tag, Polygon>
     {
-        template <typename Geometry, typename RingPropertyMap, typename AreaStrategy>
+        template <typename Geometry, typename RingPropertyMap, typename Strategy>
         static inline void apply(Polygon const& polygon, Geometry const& geometry,
                     ring_identifier id, RingPropertyMap& ring_properties,
-                    AreaStrategy const& strategy)
+                    Strategy const& strategy)
         {
             typedef typename geometry::ring_type<Polygon>::type ring_type;
             typedef select_rings<ring_tag, ring_type> per_ring;
@@ -127,10 +129,10 @@ namespace dispatch
             }
         }
 
-        template <typename RingPropertyMap, typename AreaStrategy>
+        template <typename RingPropertyMap, typename Strategy>
         static inline void apply(Polygon const& polygon,
                 ring_identifier id, RingPropertyMap& ring_properties,
-                AreaStrategy const& strategy)
+                Strategy const& strategy)
         {
             typedef typename geometry::ring_type<Polygon>::type ring_type;
             typedef select_rings<ring_tag, ring_type> per_ring;
@@ -151,10 +153,10 @@ namespace dispatch
     template <typename Multi>
     struct select_rings<multi_polygon_tag, Multi>
     {
-        template <typename Geometry, typename RingPropertyMap, typename AreaStrategy>
+        template <typename Geometry, typename RingPropertyMap, typename Strategy>
         static inline void apply(Multi const& multi, Geometry const& geometry,
                     ring_identifier id, RingPropertyMap& ring_properties,
-                    AreaStrategy const& strategy)
+                    Strategy const& strategy)
         {
             typedef typename boost::range_iterator
                 <
@@ -319,16 +321,14 @@ inline void select_rings(Geometry1 const& geometry1, Geometry2 const& geometry2,
 {
     typedef typename geometry::tag<Geometry1>::type tag1;
     typedef typename geometry::tag<Geometry2>::type tag2;
-    typedef typename geometry::point_type<Geometry1>::type point1_type;
-    typedef typename geometry::point_type<Geometry2>::type point2_type;
-
+    
     RingPropertyMap all_ring_properties;
     dispatch::select_rings<tag1, Geometry1>::apply(geometry1, geometry2,
                 ring_identifier(0, -1, -1), all_ring_properties,
-                strategy.template get_area_strategy<point1_type>());
+                strategy);
     dispatch::select_rings<tag2, Geometry2>::apply(geometry2, geometry1,
                 ring_identifier(1, -1, -1), all_ring_properties,
-                strategy.template get_area_strategy<point2_type>());
+                strategy);
 
     update_ring_selection<OverlayType>(geometry1, geometry2, turn_info_per_ring,
                 all_ring_properties, selected_ring_properties,
@@ -349,12 +349,11 @@ inline void select_rings(Geometry const& geometry,
             Strategy const& strategy)
 {
     typedef typename geometry::tag<Geometry>::type tag;
-    typedef typename geometry::point_type<Geometry>::type point_type;
 
     RingPropertyMap all_ring_properties;
     dispatch::select_rings<tag, Geometry>::apply(geometry,
                 ring_identifier(0, -1, -1), all_ring_properties,
-                strategy.template get_area_strategy<point_type>());
+                strategy);
 
     update_ring_selection<OverlayType>(geometry, geometry, turn_info_per_ring,
                 all_ring_properties, selected_ring_properties,

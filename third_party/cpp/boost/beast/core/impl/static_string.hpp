@@ -11,7 +11,6 @@
 #define BOOST_BEAST_IMPL_STATIC_STRING_HPP
 
 #include <boost/beast/core/detail/static_string.hpp>
-#include <boost/beast/core/detail/type_traits.hpp>
 #include <boost/throw_exception.hpp>
 
 namespace boost {
@@ -558,64 +557,6 @@ assign_char(CharT, std::false_type) ->
     BOOST_THROW_EXCEPTION(std::length_error{
         "max_size() == 0"});
 }
-
-namespace detail {
-
-template<class Integer>
-static_string<max_digits(sizeof(Integer))>
-to_static_string(Integer x, std::true_type)
-{
-    if(x == 0)
-        return {'0'};
-    static_string<detail::max_digits(
-        sizeof(Integer))> s;
-    if(x < 0)
-    {
-        x = -x;
-        char buf[max_digits(sizeof(x))];
-        char* p = buf;
-        for(;x > 0; x /= 10)
-            *p++ = "0123456789"[x % 10];
-        s.resize(1 + p - buf);
-        s[0] = '-';
-        auto d = &s[1];
-        while(p > buf)
-            *d++ = *--p;
-    }
-    else
-    {
-        char buf[max_digits(sizeof(x))];
-        char* p = buf;
-        for(;x > 0; x /= 10)
-            *p++ = "0123456789"[x % 10];
-        s.resize(p - buf);
-        auto d = &s[0];
-        while(p > buf)
-            *d++ = *--p;
-    }
-    return s;
-}
-
-template<class Integer>
-static_string<max_digits(sizeof(Integer))>
-to_static_string(Integer x, std::false_type)
-{
-    if(x == 0)
-        return {'0'};
-    char buf[max_digits(sizeof(x))];
-    char* p = buf;
-    for(;x > 0; x /= 10)
-        *p++ = "0123456789"[x % 10];
-    static_string<detail::max_digits(
-        sizeof(Integer))> s;
-    s.resize(p - buf);
-    auto d = &s[0];
-    while(p > buf)
-        *d++ = *--p;
-    return s;
-}
-
-} // detail
 
 template<class Integer, class>
 static_string<detail::max_digits(sizeof(Integer))>

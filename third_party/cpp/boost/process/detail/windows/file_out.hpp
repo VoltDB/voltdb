@@ -14,15 +14,20 @@
 #include <boost/winapi/handles.hpp>
 #include <boost/winapi/handle_info.hpp>
 #include <boost/process/detail/handler_base.hpp>
+#include <boost/process/detail/used_handles.hpp>
 #include <boost/process/detail/windows/file_descriptor.hpp>
 
 namespace boost { namespace process { namespace detail { namespace windows {
 
 template<int p1, int p2>
-struct file_out : public ::boost::process::detail::handler_base
+struct file_out : public ::boost::process::detail::handler_base,
+                         ::boost::process::detail::uses_handles
 {
     file_descriptor file;
     ::boost::winapi::HANDLE_ handle = file.handle();
+
+    ::boost::winapi::HANDLE_ get_used_handles() const { return handle; }
+
 
     template<typename T>
     file_out(T&& t) : file(std::forward<T>(t), file_descriptor::write) {}

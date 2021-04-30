@@ -197,26 +197,26 @@ namespace boost { namespace spirit { namespace x3
         typedef char_encoding::unicode encoding;
         typedef char_encoding::unicode::char_type char_type;
 
-#define BOOST_SPIRIT_X3_BASIC_CLASSIFY(name)                                       \
-        template <typename Char>                                                \
-        static bool                                                             \
-        is(name##_tag, Char ch)                                                 \
-        {                                                                       \
-            return encoding::is ##name                                          \
-                BOOST_PREVENT_MACRO_SUBSTITUTION                                \
-                    (detail::cast_char<char_type>(ch));                         \
-        }                                                                       \
+#define BOOST_SPIRIT_X3_BASIC_CLASSIFY(name)                                     \
+        template <typename Char>                                                 \
+        static bool                                                              \
+        is(name##_tag, Char ch)                                                  \
+        {                                                                        \
+            return encoding::is ##name                                           \
+                BOOST_PREVENT_MACRO_SUBSTITUTION                                 \
+                    (detail::cast_char<char_type>(ch));                          \
+        }                                                                        \
         /***/
 
-#define BOOST_SPIRIT_X3_CLASSIFY(name)                                             \
-        template <typename Char>                                                \
-        static bool                                                             \
-        is(name##_tag, Char ch)                                                 \
-        {                                                                       \
-            return encoding::is_##name                                          \
-                BOOST_PREVENT_MACRO_SUBSTITUTION                                \
-                    (detail::cast_char<char_type>(ch));                         \
-        }                                                                       \
+#define BOOST_SPIRIT_X3_CLASSIFY(name)                                           \
+        template <typename Char>                                                 \
+        static bool                                                              \
+        is(name##_tag, Char ch)                                                  \
+        {                                                                        \
+            return encoding::is_##name                                           \
+                BOOST_PREVENT_MACRO_SUBSTITUTION                                 \
+                    (detail::cast_char<char_type>(ch));                          \
+        }                                                                        \
         /***/
 
 
@@ -414,20 +414,19 @@ namespace boost { namespace spirit { namespace x3
         template <typename Char, typename Context>
         bool test(Char ch, Context const&) const
         {
-            return ((sizeof(Char) <= sizeof(char_type)) || encoding::ischar(ch))
-                && unicode_char_class_base::is(tag(), ch);
+            return encoding::ischar(ch) && unicode_char_class_base::is(tag(), ch);
         }
     };
 
-#define BOOST_SPIRIT_X3_CHAR_CLASS(name)                                           \
-    typedef unicode_char_class<name##_tag> name##_type;                         \
-    name##_type const name = name##_type();                                     \
+#define BOOST_SPIRIT_X3_CHAR_CLASS(name)                                         \
+    typedef unicode_char_class<name##_tag> name##_type;                          \
+    constexpr name##_type name = name##_type();                                  \
     /***/
 
     namespace unicode
     {
         typedef any_char<char_encoding::unicode> char_type;
-        auto const char_ = char_type{};
+        constexpr auto char_ = char_type{};
 
     ///////////////////////////////////////////////////////////////////////////
     //  Unicode Major Categories

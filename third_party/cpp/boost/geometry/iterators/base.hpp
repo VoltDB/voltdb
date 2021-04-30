@@ -4,6 +4,10 @@
 // Copyright (c) 2008-2012 Bruno Lalande, Paris, France.
 // Copyright (c) 2009-2012 Mateusz Loskot, London, UK.
 
+// This file was modified by Oracle on 2020.
+// Modifications copyright (c) 2020 Oracle and/or its affiliates.
+// Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
+
 // Parts of Boost.Geometry are redesigned from Geodan's Geographic Library
 // (geolib/GGL), copyright (c) 1995-2010 Geodan, Amsterdam, the Netherlands.
 
@@ -14,9 +18,10 @@
 #ifndef BOOST_GEOMETRY_ITERATORS_BASE_HPP
 #define BOOST_GEOMETRY_ITERATORS_BASE_HPP
 
+#include <type_traits>
+
 #include <boost/iterator/iterator_adaptor.hpp>
 #include <boost/iterator/iterator_categories.hpp>
-#include <boost/mpl/if.hpp>
 
 #ifndef DOXYGEN_NO_DETAIL
 namespace boost { namespace geometry { namespace detail { namespace iterators
@@ -34,16 +39,16 @@ struct iterator_base
         DerivedClass,
         Iterator,
         boost::use_default,
-        typename boost::mpl::if_
+        std::conditional_t
         <
-            boost::is_convertible
+            std::is_convertible
             <
                 typename boost::iterator_traversal<Iterator>::type,
                 boost::random_access_traversal_tag
-            >,
+            >::value,
             TraversalFlag,
             boost::use_default
-        >::type
+        >
     >
 {
     // Define operator cast to Iterator to be able to write things like Iterator it = myit++

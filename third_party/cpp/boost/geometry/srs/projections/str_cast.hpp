@@ -1,6 +1,6 @@
 // Boost.Geometry
 
-// Copyright (c) 2018, Oracle and/or its affiliates.
+// Copyright (c) 2018-2020, Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
 // Use, modification and distribution is subject to the Boost Software License,
@@ -10,14 +10,13 @@
 #ifndef BOOST_GEOMETRY_SRS_PROJECTIONS_STR_CAST_HPP
 #define BOOST_GEOMETRY_SRS_PROJECTIONS_STR_CAST_HPP
 
+#include <cstdlib>
+#include <string>
+#include <type_traits>
+
 #include <boost/config.hpp>
 #include <boost/geometry/core/exception.hpp>
 #include <boost/throw_exception.hpp>
-#include <boost/type_traits/is_integral.hpp>
-#include <boost/type_traits/is_signed.hpp>
-
-#include <cstdlib>
-#include <string>
 
 namespace boost { namespace geometry
 {
@@ -37,8 +36,8 @@ namespace detail
 template
 <
     typename T,
-    bool IsIntegral = boost::is_integral<T>::value,
-    bool IsSigned = boost::is_signed<T>::value
+    bool IsIntegral = std::is_integral<T>::value,
+    bool IsSigned = std::is_signed<T>::value
 >
 struct str_cast_traits_strtox
 {

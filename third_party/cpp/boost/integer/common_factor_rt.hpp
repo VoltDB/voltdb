@@ -2,7 +2,7 @@
 
 //  Use, modification and distribution are subject to the
 //  Boost Software License, Version 1.0. (See accompanying file
-//  LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
+//  LICENSE_1_0.txt or copy at https://www.boost.org/LICENSE_1_0.txt)
 
 #ifndef BOOST_INTEGER_COMMON_FACTOR_RT_HPP
 #define BOOST_INTEGER_COMMON_FACTOR_RT_HPP
@@ -129,7 +129,7 @@ namespace boost {
          BOOST_FORCEINLINE static BOOST_CXX14_CONSTEXPR unsigned make_odd(T& val) BOOST_GCD_NOEXCEPT(T)
          {
             unsigned r = 0;
-            while(0 == (val & 1u))
+            while (T(0) == (val & 1u))
             {
 #ifdef _MSC_VER  // VC++ can't handle operator >>= in constexpr code for some reason
                val = val >> 1;

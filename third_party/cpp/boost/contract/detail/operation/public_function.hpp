@@ -10,9 +10,10 @@
 #include <boost/contract/core/virtual.hpp>
 #include <boost/contract/core/exception.hpp>
 #include <boost/contract/core/config.hpp>
+#include <boost/contract/core/virtual.hpp>
 #include <boost/contract/detail/condition/cond_subcontracting.hpp>
 #include <boost/contract/detail/tvariadic.hpp>
-#include <boost/contract/core/virtual.hpp>
+#include <boost/contract/detail/exception.hpp>
 #if     !defined(BOOST_CONTRACT_ALL_DISABLE_NO_ASSERTION) && ( \
         !defined(BOOST_CONTRACT_NO_INVARIANTS) || \
         !defined(BOOST_CONTRACT_NO_PRECONDITIONS) || \
@@ -113,7 +114,7 @@ private:
                 #ifndef BOOST_CONTRACT_NO_EXIT_INVARIANTS
                     this->check_subcontracted_exit_inv();
                 #endif
-                if(std::uncaught_exception()) {
+                if(uncaught_exception()) {
                     #ifndef BOOST_CONTRACT_NO_EXCEPTS
                         this->check_subcontracted_except();
                     #endif
@@ -141,7 +142,7 @@ public:
                 #ifndef BOOST_CONTRACT_NO_EXIT_INVARIANTS
                     this->check_subcontracted_exit_inv();
                 #endif
-                if(std::uncaught_exception()) {
+                if(uncaught_exception()) {
                     #ifndef BOOST_CONTRACT_NO_EXCEPTS
                         this->check_subcontracted_except();
                     #endif

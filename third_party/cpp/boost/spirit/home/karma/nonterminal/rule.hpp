@@ -15,8 +15,6 @@
 #include <boost/config.hpp>
 #include <boost/function.hpp>
 #include <boost/mpl/vector.hpp>
-#include <boost/type_traits/add_const.hpp>
-#include <boost/type_traits/add_reference.hpp>
 #include <boost/type_traits/is_same.hpp>
 
 #include <boost/fusion/include/vector.hpp>
@@ -39,6 +37,12 @@
 #include <boost/spirit/home/karma/nonterminal/nonterminal_fwd.hpp>
 #include <boost/spirit/home/karma/nonterminal/detail/generator_binder.hpp>
 #include <boost/spirit/home/karma/nonterminal/detail/parameterized.hpp>
+
+#include <boost/static_assert.hpp>
+#include <boost/proto/extends.hpp>
+#include <boost/proto/traits.hpp>
+#include <boost/type_traits/is_const.hpp>
+#include <boost/type_traits/is_reference.hpp>
 
 #if defined(BOOST_MSVC)
 # pragma warning(push)
@@ -133,9 +137,10 @@ namespace boost { namespace spirit { namespace karma
         typedef typename
             spirit::detail::attr_from_sig<sig_type>::type
         attr_type;
-        typedef typename add_reference<
-            typename add_const<attr_type>::type>::type
-        attr_reference_type;
+        BOOST_STATIC_ASSERT_MSG(
+            !is_reference<attr_type>::value && !is_const<attr_type>::value,
+            "Const/reference qualifiers on Karma rule attribute are meaningless");
+        typedef attr_type const& attr_reference_type;
 
         // parameter_types is a sequence of types passed as parameters to the rule
         typedef typename

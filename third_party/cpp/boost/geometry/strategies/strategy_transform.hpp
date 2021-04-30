@@ -191,7 +191,7 @@ namespace detail
 
         // Phi = first, theta is second, r is third, see documentation on cs::spherical
 
-        // (calculations are splitted to implement ttmath)
+        // (calculations are splitted to implement user defined types)
 
         T r_sin_theta = r;
         T r_cos_theta = r;

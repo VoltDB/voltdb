@@ -360,7 +360,7 @@ namespace tools
 {
 
 template <>
-inline concepts::std_real_concept make_big_value<concepts::std_real_concept>(boost::math::tools::largest_float val, const char*, mpl::false_ const&, mpl::false_ const&)
+inline concepts::std_real_concept make_big_value<concepts::std_real_concept>(boost::math::tools::largest_float val, const char*, std::false_type const&, std::false_type const&)
 {
    return val;  // Can't use lexical_cast here, sometimes it fails....
 }

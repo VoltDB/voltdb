@@ -70,12 +70,12 @@ private:
 #endif
       return m_weights[n];
    }
-   void init(const mpl::int_<0>&);
-   void init(const mpl::int_<1>&);
-   void init(const mpl::int_<2>&);
-   void init(const mpl::int_<3>&);
+   void init(const std::integral_constant<int, 0>&);
+   void init(const std::integral_constant<int, 1>&);
+   void init(const std::integral_constant<int, 2>&);
+   void init(const std::integral_constant<int, 3>&);
 #ifdef BOOST_HAS_FLOAT128
-   void init(const mpl::int_<4>&);
+   void init(const std::integral_constant<int, 4>&);
 #endif
 
    void extend_refinements()const
@@ -139,7 +139,7 @@ exp_sinh_detail<Real, Policy>::exp_sinh_detail(size_t max_refinements)
    : m_abscissas(max_refinements), m_weights(max_refinements),
    m_max_refinements(max_refinements)
 {
-   init(mpl::int_<initializer_selector>());
+   init(std::integral_constant<int, initializer_selector>());
 }
 template<class Real, class Policy>
 template<class F>
@@ -260,7 +260,7 @@ auto exp_sinh_detail<Real, Policy>::integrate(const F& f, Real* error, Real* L1,
 
 
 template<class Real, class Policy>
-void exp_sinh_detail<Real, Policy>::init(const mpl::int_<0>&)
+void exp_sinh_detail<Real, Policy>::init(const std::integral_constant<int, 0>&)
 {
    using std::exp;
    using std::log;
@@ -338,7 +338,7 @@ void exp_sinh_detail<Real, Policy>::init(const mpl::int_<0>&)
 }
 
 template<class Real, class Policy>
-void exp_sinh_detail<Real, Policy>::init(const mpl::int_<1>&)
+void exp_sinh_detail<Real, Policy>::init(const std::integral_constant<int, 1>&)
 {
    m_abscissas = {
       { 3.47876573e-23f, 5.62503650e-09f, 9.95706124e-04f, 9.67438487e-02f, 7.43599217e-01f, 4.14293205e+00f, 1.08086768e+02f, 4.56291316e+05f, 2.70123007e+15f, },
@@ -378,7 +378,7 @@ void exp_sinh_detail<Real, Policy>::init(const mpl::int_<1>&)
 }
 
 template<class Real, class Policy>
-void exp_sinh_detail<Real, Policy>::init(const mpl::int_<2>&)
+void exp_sinh_detail<Real, Policy>::init(const std::integral_constant<int, 2>&)
 {
    m_abscissas = {
       { 7.241670621354483269e-163, 2.257639733856759198e-60, 1.153241619257215165e-22, 8.747691973876861825e-09, 1.173446923800022477e-03, 1.032756936219208144e-01, 7.719261204224504866e-01, 4.355544675823585545e+00, 1.215101039066652656e+02, 6.228845436711506169e+05, 6.278613977336989392e+15, 9.127414935180233465e+42, 6.091127771174027909e+116, },
@@ -418,7 +418,7 @@ void exp_sinh_detail<Real, Policy>::init(const mpl::int_<2>&)
 }
 #if LDBL_MAX_EXP == 16384
 template<class Real, class Policy>
-void exp_sinh_detail<Real, Policy>::init(const mpl::int_<3>&)
+void exp_sinh_detail<Real, Policy>::init(const std::integral_constant<int, 3>&)
 {
    m_abscissas = {
       { 1.02756529896290544244959196973059583e-2497L, 2.56737528671961581475200468317128232e-919L, 1.17417808941462434184174780056564573e-338L, 4.82182886130634548471358754377036370e-125L, 1.85613301660646818149136526457281019e-46L, 1.52174118093087534300657777272732001e-17L, 6.75122240537294392532710530940672267e-07L, 5.94481311616464419075825632567494453e-03L, 2.00100938779037997581424620542543429e-01L, 1.17328605653712546899681147538372171e+00L, 8.18356490677287285512063117929807241e+00L, 5.59865842621965368881982340891928481e+02L, 3.69902944883650290371636082450503730e+07L, 4.05747121124517088709477132072461878e+20L, 1.07723884748977308147226626407207905e+56L, 2.07250561337258237728923403163755392e+152L, 1.09889904624000153879292638133263171e+414L, 3.02463014753652876878705286965250144e+1125L, },
@@ -459,7 +459,7 @@ void exp_sinh_detail<Real, Policy>::init(const mpl::int_<3>&)
 #endif
 #ifdef BOOST_HAS_FLOAT128
 template<class Real, class Policy>
-void exp_sinh_detail<Real, Policy>::init(const mpl::int_<4>&)
+void exp_sinh_detail<Real, Policy>::init(const std::integral_constant<int, 4>&)
 {
    m_abscissas = {
       { 2.239451308457907276646263599248028318747e-2543Q, 4.087883914826209167187520163938786544603e-936Q, 7.764136408896555253208502557716060646316e-345Q, 2.569416154701911093162209102345213640613e-127Q, 2.705458070464053854934121429341356913371e-47Q, 7.491188348021113917760090371440516887521e-18Q, 5.198294603582515693057809058359470253018e-07Q, 0.005389922804577577496651910020276229582764Q, 0.1920600417448513371971708155403009636026Q, 1.140219687292143805081229623729334820659Q, 7.806184141505854070922571674663437423603Q, 497.9910059199034049204308876883447088185Q, 27016042.73379639480428530637021605662451Q, 172966369043668599418.5877957471751383371Q, 1.061675373362961296862509492541522509127e+55Q, 3.811736521949348274993846910907815663725e+149Q, 4.031589783270233530756613072386084762687e+406Q, 1.857591496578858801010210685679553673527e+1105Q, },

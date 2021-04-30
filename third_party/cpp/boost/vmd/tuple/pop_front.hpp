@@ -51,7 +51,7 @@
 
     \brief pops an element from the front of a tuple. It reenters BOOST_PP_REPEAT with maximum efficiency.
 
-    z     = the next available BOOST_PP_REPEAT dimension.
+    z     = the next available BOOST_PP_REPEAT dimension. <br/>
     tuple = tuple to pop an element from.
 
     If the tuple is an empty tuple the result is undefined.

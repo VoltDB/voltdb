@@ -1,4 +1,5 @@
 // Copyright 2015-2018 Klemens D. Morgenstern
+// Copyright 2019-2021 Antony Polukhin
 //
 // Distributed under the Boost Software License, Version 1.0.
 // (See accompanying file LICENSE_1_0.txt
@@ -8,7 +9,15 @@
 #ifndef BOOST_DLL_IMPORT_MANGLED_HPP_
 #define BOOST_DLL_IMPORT_MANGLED_HPP_
 
+/// \file boost/dll/import_mangled.hpp
+/// \warning Extremely experimental! Requires C++11! Will change in next version of Boost! boost/dll/import_mangled.hpp is not included in boost/dll.hpp
+/// \brief Contains the boost::dll::experimental::import_mangled function for importing mangled symbols.
+
 #include <boost/dll/config.hpp>
+#if (__cplusplus < 201103L) && (!defined(_MSVC_LANG) || _MSVC_LANG < 201103L)
+#  error This file requires C++11 at least!
+#endif
+
 #include <boost/make_shared.hpp>
 #include <boost/move/move.hpp>
 #include <boost/dll/smart_library.hpp>
@@ -19,7 +28,6 @@
 #include <boost/type_traits/is_object.hpp>
 
 
-
 #ifdef BOOST_HAS_PRAGMA_ONCE
 # pragma once
 #endif
@@ -28,8 +36,6 @@ namespace boost { namespace dll { namespace experimental {
 
 namespace detail
 {
-
-
 
 template <class ... Ts>
 class mangled_library_function {

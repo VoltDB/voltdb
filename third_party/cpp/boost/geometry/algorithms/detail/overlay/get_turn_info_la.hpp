@@ -3,8 +3,8 @@
 // Copyright (c) 2007-2012 Barend Gehrels, Amsterdam, the Netherlands.
 // Copyright (c) 2017 Adam Wulkiewicz, Lodz, Poland.
 
-// This file was modified by Oracle on 2013, 2014, 2015, 2017, 2018.
-// Modifications copyright (c) 2013-2018 Oracle and/or its affiliates.
+// This file was modified by Oracle on 2013-2020.
+// Modifications copyright (c) 2013-2020 Oracle and/or its affiliates.
 
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
@@ -44,7 +44,7 @@ struct get_turn_info_linear_areal
         typename UniqueSubRange1,
         typename UniqueSubRange2,
         typename TurnInfo,
-        typename IntersectionStrategy,
+        typename UmbrellaStrategy,
         typename RobustPolicy,
         typename OutputIterator
     >
@@ -52,7 +52,7 @@ struct get_turn_info_linear_areal
                 UniqueSubRange1 const& range_p,
                 UniqueSubRange2 const& range_q,
                 TurnInfo const& tp_model,
-                IntersectionStrategy const& strategy,
+                UmbrellaStrategy const& umbrella_strategy,
                 RobustPolicy const& robust_policy,
                 OutputIterator out)
     {
@@ -60,11 +60,11 @@ struct get_turn_info_linear_areal
             <
                 UniqueSubRange1, UniqueSubRange2,
                 typename TurnInfo::point_type,
-                IntersectionStrategy,
+                UmbrellaStrategy,
                 RobustPolicy
             > inters_info;
 
-        inters_info inters(range_p, range_q, strategy, robust_policy);
+        inters_info inters(range_p, range_q, umbrella_strategy, robust_policy);
 
         char const method = inters.d_info().how;
 
@@ -79,7 +79,7 @@ struct get_turn_info_linear_areal
             case 's' : // starts from the middle
                 get_turn_info_for_endpoint<true, true>(range_p, range_q,
                     tp_model, inters, method_none, out,
-                    strategy.get_point_in_point_strategy());
+                    umbrella_strategy);
                 break;
 
             case 'd' : // disjoint: never do anything
@@ -89,30 +89,27 @@ struct get_turn_info_linear_areal
             {
                 if ( get_turn_info_for_endpoint<false, true>(range_p, range_q,
                         tp_model, inters, method_touch_interior, out,
-                        strategy.get_point_in_point_strategy()) )
+                        umbrella_strategy) )
                 {
                     // do nothing
                 }
                 else
                 {
-                    typedef touch_interior
-                        <
-                            TurnInfo
-                        > policy;
+                    typedef touch_interior<TurnInfo> handler;
 
                     // If Q (1) arrives (1)
                     if ( inters.d_info().arrival[1] == 1 )
                     {
-                        policy::template apply<0>(range_p, range_q, tp,
+                        handler::template apply<0>(range_p, range_q, tp,
                                     inters.i_info(), inters.d_info(),
-                                    inters.sides());
+                                    inters.sides(), umbrella_strategy);
                     }
                     else
                     {
                         // Swap p/q
-                        policy::template apply<1>(range_q, range_p,
+                        handler::template apply<1>(range_q, range_p,
                                     tp, inters.i_info(), inters.d_info(),
-                                    inters.get_swapped_sides());
+                                    inters.swapped_sides(), umbrella_strategy);
                     }
 
                     if ( tp.operations[1].operation == operation_blocked )
@@ -127,7 +124,7 @@ struct get_turn_info_linear_areal
                     // this function assumes that 'u' must be set for a spike
                     calculate_spike_operation(tp.operations[0].operation,
                                               inters,
-                                              strategy.get_point_in_point_strategy());
+                                              umbrella_strategy);
                     
                     *out++ = tp;
                 }
@@ -147,14 +144,15 @@ struct get_turn_info_linear_areal
                 // Both touch (both arrive there)
                 if ( get_turn_info_for_endpoint<false, true>(range_p, range_q,
                         tp_model, inters, method_touch, out,
-                        strategy.get_point_in_point_strategy()) )
+                        umbrella_strategy) )
                 {
                     // do nothing
                 }
                 else 
                 {
                     touch<TurnInfo>::apply(range_p, range_q, tp,
-                        inters.i_info(), inters.d_info(), inters.sides());
+                        inters.i_info(), inters.d_info(), inters.sides(),
+                        umbrella_strategy);
 
                     if ( tp.operations[1].operation == operation_blocked )
                     {
@@ -220,7 +218,7 @@ struct get_turn_info_linear_areal
                     bool ignore_spike
                         = calculate_spike_operation(tp.operations[0].operation,
                                                     inters,
-                                                    strategy.get_point_in_point_strategy());
+                                                    umbrella_strategy);
 
                     if ( ! BOOST_GEOMETRY_CONDITION(handle_spikes)
                       || ignore_spike
@@ -236,7 +234,7 @@ struct get_turn_info_linear_areal
             {
                 if ( get_turn_info_for_endpoint<true, true>(range_p, range_q,
                         tp_model, inters, method_equal, out,
-                        strategy.get_point_in_point_strategy()) )
+                        umbrella_strategy) )
                 {
                     // do nothing
                 }
@@ -249,7 +247,8 @@ struct get_turn_info_linear_areal
                         // Both equal
                         // or collinear-and-ending at intersection point
                         equal<TurnInfo>::apply(range_p, range_q, tp,
-                            inters.i_info(), inters.d_info(), inters.sides());
+                            inters.i_info(), inters.d_info(), inters.sides(),
+                            umbrella_strategy);
 
                         turn_transformer_ec<false> transformer(method_touch);
                         transformer(tp);
@@ -280,7 +279,7 @@ struct get_turn_info_linear_areal
                 if ( get_turn_info_for_endpoint<true, true>(
                         range_p, range_q,
                         tp_model, inters, method_collinear, out,
-                        strategy.get_point_in_point_strategy()) )
+                        umbrella_strategy) )
                 {
                     // do nothing
                 }
@@ -297,7 +296,8 @@ struct get_turn_info_linear_areal
                         {
                             // Collinear, but similar thus handled as equal
                             equal<TurnInfo>::apply(range_p, range_q, tp,
-                                inters.i_info(), inters.d_info(), inters.sides());
+                                inters.i_info(), inters.d_info(), inters.sides(),
+                                umbrella_strategy);
 
                             method_replace = method_touch;
                             version = append_equal;
@@ -359,13 +359,13 @@ struct get_turn_info_linear_areal
 
                     if ( range_p.is_first_segment()
                       && equals::equals_point_point(range_p.at(0), tp.point,
-                                                    strategy.get_point_in_point_strategy()) )
+                                                    umbrella_strategy) )
                     {
                         tp.operations[0].position = position_front;
                     }
                     else if ( range_p.is_last_segment()
                            && equals::equals_point_point(range_p.at(1), tp.point,
-                                                         strategy.get_point_in_point_strategy()) )
+                                                         umbrella_strategy) )
                     {
                         tp.operations[0].position = position_back;
                     }
@@ -392,10 +392,10 @@ struct get_turn_info_linear_areal
 
     template <typename Operation,
               typename IntersectionInfo,
-              typename EqPPStrategy>
+              typename Strategy>
     static inline bool calculate_spike_operation(Operation & op,
                                                  IntersectionInfo const& inters,
-                                                 EqPPStrategy const& strategy)
+                                                 Strategy const& strategy)
     {
         bool is_p_spike = ( op == operation_union || op == operation_intersection )
                        && inters.is_spike_p();
@@ -415,7 +415,7 @@ struct get_turn_info_linear_areal
                 // spike on the edge point
                 // if it's already known that the spike is going out this musn't be checked
                 if ( ! going_out
-                  && detail::equals::equals_point_point(inters.rpj(), inters.rqj(), strategy) )
+                  && equals::equals_point_point(inters.rpj(), inters.rqj(), strategy) )
                 {
                     int const pk_q2 = inters.sides().pk_wrt_q2();
                     going_in = pk_q1 < 0 && pk_q2 < 0; // Pk on the right of both
@@ -427,7 +427,7 @@ struct get_turn_info_linear_areal
                 // spike on the edge point
                 // if it's already known that the spike is going in this musn't be checked
                 if ( ! going_in
-                  && detail::equals::equals_point_point(inters.rpj(), inters.rqj(), strategy) )
+                  && equals::equals_point_point(inters.rpj(), inters.rqj(), strategy) )
                 {
                     int const pk_q2 = inters.sides().pk_wrt_q2();
                     going_in = pk_q1 < 0 || pk_q2 < 0; // Pk on the right of one of them
@@ -679,7 +679,7 @@ struct get_turn_info_linear_areal
               typename TurnInfo,
               typename IntersectionInfo,
               typename OutputIterator,
-              typename EqPPStrategy>
+              typename Strategy>
     static inline bool get_turn_info_for_endpoint(
                             UniqueSubRange1 const& range_p,
                             UniqueSubRange2 const& range_q,
@@ -687,7 +687,7 @@ struct get_turn_info_linear_areal
                             IntersectionInfo const& inters,
                             method_type /*method*/,
                             OutputIterator out,
-                            EqPPStrategy const& strategy)
+                            Strategy const& strategy)
     {
         namespace ov = overlay;
         typedef ov::get_turn_info_for_endpoint<EnableFirst, EnableLast> get_info_e;
@@ -704,9 +704,6 @@ struct get_turn_info_linear_areal
             // P sub-range has no end-points
             return false;
         }
-
-        typename IntersectionInfo::side_strategy_type const& sides
-                = inters.get_side_strategy();
 
         linear_intersections intersections(range_p.at(0),
                                            range_q.at(0),
@@ -738,6 +735,8 @@ struct get_turn_info_linear_areal
             }
             else
             {
+                auto const sides = strategy.side();
+
                 // pi is the intersection point at qj or in the middle of q1
                 // so consider segments
                 // 1. pi at qj: qi-qj-pj and qi-qj-qk
@@ -807,6 +806,8 @@ struct get_turn_info_linear_areal
             }
             else //if ( result.template get<0>().count == 1 )
             {
+                auto const sides = strategy.side();
+
                 // pj is the intersection point at qj or in the middle of q1
                 // so consider segments
                 // 1. pj at qj: qi-qj-pi and qi-qj-qk
@@ -862,14 +863,6 @@ struct get_turn_info_linear_areal
 
         // don't ignore anything for now
         return false;
-    }
-
-    template <typename Point1, typename Point2, typename IntersectionStrategy>
-    static inline bool equals_point_point(Point1 const& point1, Point2 const& point2,
-                                          IntersectionStrategy const& strategy)
-    {
-        return detail::equals::equals_point_point(point1, point2,
-                                                  strategy.get_point_in_point_strategy());
     }
 };
 

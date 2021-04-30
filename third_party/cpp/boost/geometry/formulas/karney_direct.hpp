@@ -5,8 +5,8 @@
 // Contributed and/or modified by Adeel Ahmad,
 //   as part of Google Summer of Code 2018 program.
 
-// This file was modified by Oracle on 2018.
-// Modifications copyright (c) 2018 Oracle and/or its affiliates.
+// This file was modified by Oracle on 2018-2020.
+// Modifications copyright (c) 2018-2020 Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
 // Use, modification and distribution is subject to the Boost Software License,
@@ -102,11 +102,11 @@ public:
         CT const ep2 = e2 / math::sqr(one_minus_f);
 
         CT sin_alpha1, cos_alpha1;
-        math::sin_cos_degrees<CT>(math::round_angle<CT>(azi12), sin_alpha1, cos_alpha1);
+        math::sin_cos_degrees<CT>(azi12, sin_alpha1, cos_alpha1);
 
         // Find the reduced latitude.
         CT sin_beta1, cos_beta1;
-        math::sin_cos_degrees<CT>(math::round_angle<CT>(lat1), sin_beta1, cos_beta1);
+        math::sin_cos_degrees<CT>(lat1, sin_beta1, cos_beta1);
         sin_beta1 *= one_minus_f;
 
         math::normalize_unit_vector<CT>(sin_beta1, cos_beta1);
@@ -217,6 +217,13 @@ public:
             math::normalize_longitude<degree, CT>(lon12);
 
             result.lon2 = lon1 + lon12;
+
+            // For longitudes close to the antimeridian the result can be out
+            // of range. Therefore normalize.
+            // In other formulas this has to be done at the end because
+            // otherwise differential quantities are calculated incorrectly.
+            // But here it's ok since result.lon2 is not used after this point.
+            math::normalize_longitude<degree, CT>(result.lon2);
         }
 
         if (BOOST_GEOMETRY_CONDITION(CalcQuantities))

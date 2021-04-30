@@ -73,7 +73,7 @@ namespace boost { namespace yap { namespace detail {
     {
         using tuple_t = hana::tuple<rvalue_ref_to_value_t<PlaceholderArgs>...>;
 
-        placeholder_transform_t(PlaceholderArgs &&... args) :
+        constexpr placeholder_transform_t(PlaceholderArgs &&... args) :
             placeholder_args_(static_cast<PlaceholderArgs &&>(args)...)
         {}
 
@@ -86,7 +86,7 @@ namespace boost { namespace yap { namespace detail {
                 "Out of range placeholder index,");
             using nth_type = nth_element<I - 1, PlaceholderArgs...>;
             return as_expr<minimal_expr>(
-                rvalue_mover<!std::is_lvalue_reference<nth_type>::value>::value(
+                rvalue_mover<!std::is_lvalue_reference<nth_type>::value>{}(
                     placeholder_args_[hana::llong<I - 1>{}]));
         }
 
@@ -98,7 +98,7 @@ namespace boost { namespace yap { namespace detail {
     {
         using tuple_t = hana::tuple<rvalue_ref_to_value_t<PlaceholderArgs>...>;
 
-        evaluation_transform_t(PlaceholderArgs &&... args) :
+        constexpr evaluation_transform_t(PlaceholderArgs &&... args) :
             placeholder_args_(static_cast<PlaceholderArgs &&>(args)...)
         {}
 
@@ -331,7 +331,8 @@ namespace boost { namespace yap { namespace detail {
     struct default_transform<false, false, false>
     {
         template<typename Expr, typename TransformTuple>
-        decltype(auto) operator()(Expr && expr, TransformTuple transforms) const
+        constexpr decltype(auto)
+        operator()(Expr && expr, TransformTuple transforms) const
         {
             return transform_nonterminal(
                 expr, std::move(expr.elements), transforms);
@@ -433,7 +434,7 @@ namespace boost { namespace yap { namespace detail {
     };
 
     template<typename T>
-    decltype(auto) terminal_value(T && x)
+    constexpr decltype(auto) terminal_value(T && x)
     {
         return value_impl<true>(static_cast<T &&>(x));
     }

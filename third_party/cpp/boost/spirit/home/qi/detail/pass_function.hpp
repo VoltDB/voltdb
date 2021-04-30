@@ -4,8 +4,8 @@
     Distributed under the Boost Software License, Version 1.0. (See accompanying
     file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 =============================================================================*/
-#if !defined(SPIRIT_PASS_FUNCTION_FEBRUARY_05_2007_1138AM)
-#define SPIRIT_PASS_FUNCTION_FEBRUARY_05_2007_1138AM
+#ifndef BOOST_SPIRIT_QI_DETAIL_PASS_FUNCTION_HPP
+#define BOOST_SPIRIT_QI_DETAIL_PASS_FUNCTION_HPP
 
 #if defined(_MSC_VER)
 #pragma once
@@ -61,9 +61,8 @@ namespace boost { namespace spirit { namespace qi { namespace detail
         Context& context;
         Skipper const& skipper;
 
-    private:
         // silence MSVC warning C4512: assignment operator could not be generated
-        pass_function& operator= (pass_function const&);
+        BOOST_DELETED_FUNCTION(pass_function& operator= (pass_function const&))
     };
 }}}}
 

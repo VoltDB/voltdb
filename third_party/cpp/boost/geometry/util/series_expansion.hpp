@@ -4,6 +4,11 @@
 
 // Contributed and/or modified by Adeel Ahmad, as part of Google Summer of Code 2018 program.
 
+// This file was modified by Oracle on 2019.
+// Modifications copyright (c) 2019 Oracle and/or its affiliates.
+
+// Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
+
 // Use, modification and distribution is subject to the Boost Software License,
 // Version 1.0. (See accompanying file LICENSE_1_0.txt or copy at
 // http://www.boost.org/LICENSE_1_0.txt)
@@ -633,16 +638,16 @@ namespace boost { namespace geometry { namespace series_expansion {
     inline void evaluate_coeffs_C3(Coeffs1 &coeffs1, Coeffs2 &coeffs2, CT const& eps)
     {
         CT mult = 1;
-        int offset = 0;
+        size_t offset = 0;
 
-        // l is the index of C3[l].
-        for (size_t l = 1; l < Coeffs1::static_size; ++l)
+        // i is the index of C3[i].
+        for (size_t i = 1; i < Coeffs1::static_size; ++i)
         {
             // Order of polynomial in eps.
-            int m = Coeffs1::static_size - l;
+            size_t m = Coeffs1::static_size - i;
             mult *= eps;
 
-            coeffs1[l] = mult * math::horner_evaluate(eps, coeffs2.begin() + offset,
+            coeffs1[i] = mult * math::horner_evaluate(eps, coeffs2.begin() + offset,
                                                            coeffs2.begin() + offset + m);
 
             offset += m;

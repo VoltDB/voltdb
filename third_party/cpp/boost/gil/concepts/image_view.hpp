@@ -20,13 +20,15 @@
 
 #include <cstddef>
 #include <iterator>
+#include <type_traits>
 
 #if defined(BOOST_CLANG)
 #pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunknown-pragmas"
 #pragma clang diagnostic ignored "-Wunused-local-typedefs"
 #endif
 
-#if defined(BOOST_GCC) && (BOOST_GCC >= 40600)
+#if defined(BOOST_GCC) && (BOOST_GCC >= 40900)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-local-typedefs"
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
@@ -38,7 +40,7 @@ namespace boost { namespace gil {
 /// \ingroup ImageViewConcept
 /// \brief N-dimensional range
 
-/// \defgroup ImageView2DConcept ImageView2DConcept
+/// \defgroup ImageView2DConcept ImageView2DLocatorConcept
 /// \ingroup ImageViewConcept
 /// \brief 2-dimensional range
 
@@ -132,12 +134,12 @@ struct RandomAccessNDImageViewConcept
         // point_t must be an N-dimensional point, each dimension of which must have the same type as difference_type of the corresponding iterator
         gil_function_requires<PointNDConcept<point_t>>();
         static_assert(point_t::num_dimensions == N, "");
-        static_assert(is_same
+        static_assert(std::is_same
             <
                 typename std::iterator_traits<first_it_type>::difference_type,
                 typename point_t::template axis<0>::coord_t
             >::value, "");
-        static_assert(is_same
+        static_assert(std::is_same
             <
                 typename std::iterator_traits<last_it_type>::difference_type,
                 typename point_t::template axis<N-1>::coord_t
@@ -379,7 +381,7 @@ struct ImageViewConcept
         // TODO: This executes the requirements for RandomAccess2DLocatorConcept again. Fix it to improve compile time
         gil_function_requires<PixelLocatorConcept<typename View::xy_locator>>();
 
-        static_assert(is_same<typename View::x_coord_t, typename View::y_coord_t>::value, "");
+        static_assert(std::is_same<typename View::x_coord_t, typename View::y_coord_t>::value, "");
 
         using coord_t = typename View::coord_t; // 1D difference type (same for all dimensions)
         std::size_t num_chan = view.num_channels(); ignore_unused_variable_warning(num_chan);
@@ -548,7 +550,7 @@ struct ViewsCompatibleConcept
 #pragma clang diagnostic pop
 #endif
 
-#if defined(BOOST_GCC) && (BOOST_GCC >= 40600)
+#if defined(BOOST_GCC) && (BOOST_GCC >= 40900)
 #pragma GCC diagnostic pop
 #endif
 

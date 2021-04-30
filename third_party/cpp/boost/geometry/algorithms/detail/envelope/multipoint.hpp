@@ -1,6 +1,6 @@
 // Boost.Geometry (aka GGL, Generic Geometry Library)
 
-// Copyright (c) 2015-2018, Oracle and/or its affiliates.
+// Copyright (c) 2015-2020, Oracle and/or its affiliates.
 
 // Contributed and/or modified by Vissarion Fysikopoulos, on behalf of Oracle
 // Contributed and/or modified by Menelaos Karavelas, on behalf of Oracle
@@ -17,10 +17,6 @@
 
 #include <boost/geometry/algorithms/dispatch/envelope.hpp>
 
-// For backward compatibility
-#include <boost/geometry/strategies/cartesian/envelope_multipoint.hpp>
-#include <boost/geometry/strategies/spherical/envelope_multipoint.hpp>
-
 namespace boost { namespace geometry
 {
 
@@ -34,9 +30,11 @@ template <typename MultiPoint>
 struct envelope<MultiPoint, multi_point_tag>
 {
     template <typename Box, typename Strategy>
-    static inline void apply(MultiPoint const& multipoint, Box& mbr, Strategy const& )
+    static inline void apply(MultiPoint const& multipoint, Box& mbr, Strategy const& strategy)
     {
-        Strategy::apply(multipoint, mbr);
+        // strategy.envelope(multipoint, mbr).apply(multipoint, mbr);
+        using strategy_t = decltype(strategy.envelope(multipoint, mbr));
+        strategy_t::apply(multipoint, mbr);
     }
 };
 

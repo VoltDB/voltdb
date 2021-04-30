@@ -2,8 +2,8 @@
 
 // Copyright (c) 2008-2015 Barend Gehrels, Amsterdam, the Netherlands.
 
-// This file was modified by Oracle on 2017, 2018.
-// Modifications copyright (c) 2017-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2017, 2018, 2019.
+// Modifications copyright (c) 2017-2019, Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle.
 
 // Use, modification and distribution is subject to the Boost Software License,
@@ -61,18 +61,12 @@ namespace projections
             //static const double C13 = 0.33333333333333333333;
             static const double one_plus_eps = 1.0000001;
 
-            // template class, using CRTP to implement forward/inverse
             template <typename T, typename Parameters>
             struct base_eck2_spheroid
-                : public base_t_fi<base_eck2_spheroid<T, Parameters>, T, Parameters>
             {
-                inline base_eck2_spheroid(const Parameters& par)
-                    : base_t_fi<base_eck2_spheroid<T, Parameters>, T, Parameters>(*this, par)
-                {}
-
                 // FORWARD(s_forward)  spheroid
                 // Project coordinates from geographic (lon, lat) to cartesian (x, y)
-                inline void fwd(T const& lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
+                inline void fwd(Parameters const& , T const& lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
                 {
                     xy_x = FXC * lp_lon * (xy_y = sqrt(4. - 3. * sin(fabs(lp_lat))));
                     xy_y = FYC * (2. - xy_y);
@@ -81,7 +75,7 @@ namespace projections
 
                 // INVERSE(s_inverse)  spheroid
                 // Project coordinates from cartesian (x, y) to geographic (lon, lat)
-                inline void inv(T const& xy_x, T const& xy_y, T& lp_lon, T& lp_lat) const
+                inline void inv(Parameters const& , T const& xy_x, T const& xy_y, T& lp_lon, T& lp_lat) const
                 {
                     static const T half_pi = detail::half_pi<T>();
                     static const T C13 = detail::third<T>();
@@ -132,10 +126,9 @@ namespace projections
     struct eck2_spheroid : public detail::eck2::base_eck2_spheroid<T, Parameters>
     {
         template <typename Params>
-        inline eck2_spheroid(Params const& , Parameters const& par)
-            : detail::eck2::base_eck2_spheroid<T, Parameters>(par)
+        inline eck2_spheroid(Params const& , Parameters & par)
         {
-            detail::eck2::setup_eck2(this->m_par);
+            detail::eck2::setup_eck2(par);
         }
     };
 
@@ -144,7 +137,7 @@ namespace projections
     {
 
         // Static projection
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_eck2, eck2_spheroid, eck2_spheroid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI(srs::spar::proj_eck2, eck2_spheroid)
 
         // Factory entry(s)
         BOOST_GEOMETRY_PROJECTIONS_DETAIL_FACTORY_ENTRY_FI(eck2_entry, eck2_spheroid)

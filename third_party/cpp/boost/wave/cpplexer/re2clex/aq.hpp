@@ -9,8 +9,8 @@
     file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 =============================================================================*/
 
-#if !defined(AQ_HPP_A21D9145_B643_44C0_81E7_DB346DD67EE1_INCLUDED)
-#define AQ_HPP_A21D9145_B643_44C0_81E7_DB346DD67EE1_INCLUDED
+#if !defined(BOOST_AQ_HPP_A21D9145_B643_44C0_81E7_DB346DD67EE1_INCLUDED)
+#define BOOST_AQ_HPP_A21D9145_B643_44C0_81E7_DB346DD67EE1_INCLUDED
 
 #include <boost/wave/wave_config.hpp>
 #include <cstdlib>
@@ -61,4 +61,4 @@ BOOST_WAVE_DECL void aq_terminate(aq_queue q);
 #include BOOST_ABI_SUFFIX
 #endif
 
-#endif // !defined(AQ_HPP_A21D9145_B643_44C0_81E7_DB346DD67EE1_INCLUDED)
+#endif // !defined(BOOST_AQ_HPP_A21D9145_B643_44C0_81E7_DB346DD67EE1_INCLUDED)

@@ -4,8 +4,8 @@
 // Copyright (c) 2008-2012 Bruno Lalande, Paris, France.
 // Copyright (c) 2009-2012 Mateusz Loskot, London, UK.
 
-// This file was modified by Oracle on 2018.
-// Modifications copyright (c) 2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2018, 2019.
+// Modifications copyright (c) 2018, 2019, Oracle and/or its affiliates.
 
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
@@ -47,18 +47,21 @@ namespace strategy { namespace within
 
 template
 <
-    typename Point,
-    typename PointOfSegment = Point,
+    typename Point_,                   // for backward compatibility
+    typename PointOfSegment_ = Point_, // for backward compatibility
     typename CalculationType = void
 >
 class crossings_multiply
 {
-    typedef typename select_calculation_type
-        <
-            Point,
-            PointOfSegment,
-            CalculationType
-        >::type calculation_type;
+    template <typename Point, typename PointOfSegment>
+    struct calculation_type
+        : select_calculation_type
+            <
+                Point,
+                PointOfSegment,
+                CalculationType
+            >
+    {};
 
     class flags
     {
@@ -79,20 +82,21 @@ class crossings_multiply
 
 public :
 
-    typedef Point point_type;
-    typedef PointOfSegment segment_point_type;
     typedef flags state_type;
 
+    template <typename Point, typename PointOfSegment>
     static inline bool apply(Point const& point,
             PointOfSegment const& seg1, PointOfSegment const& seg2,
             flags& state)
     {
-        calculation_type const tx = get<0>(point);
-        calculation_type const ty = get<1>(point);
-        calculation_type const x0 = get<0>(seg1);
-        calculation_type const y0 = get<1>(seg1);
-        calculation_type const x1 = get<0>(seg2);
-        calculation_type const y1 = get<1>(seg2);
+        typedef typename calculation_type<Point, PointOfSegment>::type calc_t;
+
+        calc_t const tx = get<0>(point);
+        calc_t const ty = get<1>(point);
+        calc_t const x0 = get<0>(seg1);
+        calc_t const y0 = get<1>(seg1);
+        calc_t const x1 = get<0>(seg2);
+        calc_t const y1 = get<1>(seg2);
 
         if (state.first)
         {

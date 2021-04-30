@@ -68,13 +68,13 @@ namespace bimaps {
 namespace support {
 
 // Since it is very error-prone to directly write the hole bunch
-// of relation accesor. They are buil from litle macro blocks that
+// of relation accesor. They are built from little macro blocks that
 // are both more readable, leading to self docummenting code and a
-// lot more easier to understand and mantain.
+// lot more easier to understand and maintain.
 // It is very important to note that the three building blocks have
 // to laid in the same namespace in order to work. There is also
 // important to keep them in order.
-// The forward declaration are not necesary but they help a lot to
+// The forward declaration are not necessary but they help a lot to
 // the reader, as they undercover what is the signature of the
 // result code.
 // In the end, it is not quicker to do it in this way because you

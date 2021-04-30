@@ -20,6 +20,7 @@
 #include <boost/gil/io/typedefs.hpp>
 
 #include <csetjmp>
+#include <type_traits>
 #include <vector>
 
 namespace boost { namespace gil {
@@ -99,7 +100,7 @@ public:
 
         this->get()->dct_method = this->_settings._dct_method;
 
-        using is_read_and_convert_t = typename is_same
+        using is_read_and_convert_t = typename std::is_same
             <
                 ConversionPolicy,
                 detail::read_and_no_convert
@@ -275,8 +276,8 @@ public:
               )
     {}
 
-    template< typename Images >
-    void apply( any_image< Images >& images )
+    template< typename ...Images >
+    void apply( any_image< Images... >& images )
     {
         detail::jpeg_type_format_checker format_checker( this->_info._color_space != JCS_YCbCr
                                                        ? this->_info._color_space

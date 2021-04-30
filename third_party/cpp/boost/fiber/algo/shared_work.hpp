@@ -59,18 +59,18 @@ public:
 	shared_work & operator=( shared_work const&) = delete;
 	shared_work & operator=( shared_work &&) = delete;
 
-    void awakened( context * ctx) noexcept;
+    void awakened( context * ctx) noexcept override;
 
-    context * pick_next() noexcept;
+    context * pick_next() noexcept override;
 
-    bool has_ready_fibers() const noexcept {
+    bool has_ready_fibers() const noexcept override {
         std::unique_lock< std::mutex > lock{ rqueue_mtx_ };
         return ! rqueue_.empty() || ! lqueue_.empty();
     }
 
-	void suspend_until( std::chrono::steady_clock::time_point const& time_point) noexcept;
+	void suspend_until( std::chrono::steady_clock::time_point const& time_point) noexcept override;
 
-	void notify() noexcept;
+	void notify() noexcept override;
 };
 
 }}}

@@ -5,8 +5,8 @@
 // Copyright (c) 2009-2015 Mateusz Loskot, London, UK.
 // Copyright (c) 2013-2015 Adam Wulkiewicz, Lodz, Poland
 
-// This file was modified by Oracle on 2013-2018.
-// Modifications copyright (c) 2013-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2013-2020.
+// Modifications copyright (c) 2013-2020, Oracle and/or its affiliates.
 
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 // Contributed and/or modified by Menelaos Karavelas, on behalf of Oracle
@@ -41,8 +41,26 @@ namespace detail { namespace disjoint
 /*!
     \brief Internal utility function to detect if point/box are disjoint
  */
-template <typename Point, typename Box, typename Strategy>
-inline bool disjoint_point_box(Point const& point, Box const& box, Strategy const& )
+template
+<
+    typename Point, typename Box, typename Strategy,
+    std::enable_if_t<strategies::detail::is_umbrella_strategy<Strategy>::value, int> = 0
+>
+inline bool disjoint_point_box(Point const& point, Box const& box,
+                               Strategy const& strategy)
+{
+    typedef decltype(strategy.covered_by(point, box)) strategy_type;
+    // ! covered_by(point, box)
+    return ! strategy_type::apply(point, box);
+}
+
+template
+<
+    typename Point, typename Box, typename Strategy,
+    std::enable_if_t<! strategies::detail::is_umbrella_strategy<Strategy>::value, int> = 0
+>
+inline bool disjoint_point_box(Point const& point, Box const& box,
+                               Strategy const& )
 {
     // ! covered_by(point, box)
     return ! Strategy::apply(point, box);
@@ -62,10 +80,12 @@ template <typename Point, typename Box, std::size_t DimensionCount>
 struct disjoint<Point, Box, DimensionCount, point_tag, box_tag, false>
 {
     template <typename Strategy>
-    static inline bool apply(Point const& point, Box const& box, Strategy const& )
+    static inline bool apply(Point const& point, Box const& box,
+                             Strategy const& strategy)
     {
+        typedef decltype(strategy.covered_by(point, box)) strategy_type;
         // ! covered_by(point, box)
-        return ! Strategy::apply(point, box);
+        return ! strategy_type::apply(point, box);
     }
 };
 

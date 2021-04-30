@@ -10,6 +10,10 @@
 #ifndef BOOST_DETAIL_WINAPI_CONDITION_VARIABLE_HPP
 #define BOOST_DETAIL_WINAPI_CONDITION_VARIABLE_HPP
 
+#include <boost/config/header_deprecated.hpp>
+
+BOOST_HEADER_DEPRECATED("<boost/winapi/condition_variable.hpp>")
+
 #include <boost/winapi/condition_variable.hpp>
 #include <boost/detail/winapi/detail/deprecated_namespace.hpp>
 

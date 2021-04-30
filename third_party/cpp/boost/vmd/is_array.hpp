@@ -52,7 +52,7 @@
     The macro checks that the sequence is a Boost PP array.
     It returns 1 if it is an array, else if returns 0.
 
-    d        = The next available BOOST_PP_WHILE iteration. 
+    d        = The next available BOOST_PP_WHILE iteration. <br/>
     sequence = a possible Boost PP array.
 
     returns = 1 if it is an array, else returns 0.

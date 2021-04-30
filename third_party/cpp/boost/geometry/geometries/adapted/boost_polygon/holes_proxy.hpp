@@ -2,6 +2,10 @@
 
 // Copyright (c) 2010-2012 Barend Gehrels, Amsterdam, the Netherlands.
 
+// This file was modified by Oracle on 2020.
+// Modifications copyright (c) 2020, Oracle and/or its affiliates.
+// Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
+
 // Use, modification and distribution is subject to the Boost Software License,
 // Version 1.0. (See accompanying file LICENSE_1_0.txt or copy at
 // http://www.boost.org/LICENSE_1_0.txt)
@@ -33,12 +37,12 @@ struct holes_proxy
 {
     typedef ring_proxy
         <
-            typename boost::mpl::if_
+            std::conditional_t
                 <
-                    typename boost::is_const<Polygon>,
+                    std::is_const<Polygon>::value,
                     Polygon const,
                     Polygon
-                >::type
+                >
         > proxy_type;
     typedef hole_iterator<Polygon, proxy_type> iterator_type;
 

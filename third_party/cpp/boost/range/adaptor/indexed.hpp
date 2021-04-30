@@ -367,4 +367,29 @@ index(
     } // namespace adaptors
 } // namespace boost
 
+#if !defined(BOOST_NO_CXX11_HDR_TUPLE)
+
+namespace std {
+
+#if defined(BOOST_CLANG)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wmismatched-tags"
+#endif
+
+template<size_t N, class T, class Indexable>
+struct tuple_element<N, boost::range::index_value<T, Indexable>>:
+    boost::tuples::element<N, boost::range::index_value<T, Indexable>> {};
+
+template<class T, class Indexable>
+struct tuple_size<boost::range::index_value<T, Indexable>>:
+    std::integral_constant<std::size_t, 2> {};
+
+#if defined(BOOST_CLANG)
+#pragma clang diagnostic pop
+#endif
+
+} // namespace std
+
+#endif // !defined(BOOST_NO_CXX11_HDR_TUPLE)
+
 #endif // include guard

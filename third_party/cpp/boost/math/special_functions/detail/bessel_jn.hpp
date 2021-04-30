@@ -51,7 +51,7 @@ T bessel_jn(int n, T x, const Policy& pol)
     // Special cases:
     //
     if(asymptotic_bessel_large_x_limit(T(n), x))
-       return factor * asymptotic_bessel_j_large_x_2<T>(T(n), x);
+       return factor * asymptotic_bessel_j_large_x_2<T>(T(n), x, pol);
     if (n == 0)
     {
         return factor * bessel_j0(x);

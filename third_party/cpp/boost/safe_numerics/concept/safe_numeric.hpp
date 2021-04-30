@@ -10,21 +10,21 @@
 #include <limits>
 #include <typetraits>
 #include <boost/concept/usage.hpp>
-#include "concept/numeric.hpp"
+#include "boost/safe_numerics/concept/safe_numeric.hpp"
 
 namespace boost {
 namespace safe_numerics {
 
 template<class T>
 struct SafeNumeric : public Numeric<T> {
-    static_assert(
-        is_safe<T>::value,
-        "std::numeric_limits<T> has not been specialized for this type"
-    );
-    BOOST_CONCEPT_USAGE(SafeNumeric){
+    BOOST_CONCEPT_USAGE(SafeNumeric<T>){
         using t1 = get_exception_policy<T>;
         using t2 = get_promotion_policy<T>;
         using t3 = base_type<T>;
+    }
+    constexpr static bool value = is_safe<T>::value && Numeric<T>::value ;
+    constexpr operator bool (){
+        return value;
     }
 };
 

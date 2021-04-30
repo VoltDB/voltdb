@@ -13,7 +13,9 @@
 #define BOOST_MPI_STATUS_HPP
 
 #include <boost/mpi/config.hpp>
+#include <boost/mpi/datatype.hpp>
 #include <boost/optional.hpp>
+#include <boost/mpl/bool.hpp>
 
 namespace boost { namespace mpi {
 
@@ -68,7 +70,7 @@ class BOOST_MPI_DECL status
    * @returns the number of @c T elements in the message, if it can be
    * determined.
    */
-  template<typename T> optional<int> count() const;
+  template<typename T> optional<int> count() const { return count_impl<T>(is_mpi_datatype<T>()); }
 
   /**
    * References the underlying @c MPI_Status
@@ -100,6 +102,31 @@ class BOOST_MPI_DECL status
   friend class communicator;
   friend class request;
 };
+
+template<typename T> 
+inline optional<int> status::count_impl(mpl::true_) const
+{
+  if (m_count != -1)
+    return m_count;
+
+  int return_value;
+  BOOST_MPI_CHECK_RESULT(MPI_Get_count,
+                         (&m_status, get_mpi_datatype<T>(T()), &return_value));
+  if (return_value == MPI_UNDEFINED)
+    return optional<int>();
+  else
+    /* Cache the result. */
+    return m_count = return_value;
+}
+
+template<typename T> 
+inline optional<int> status::count_impl(mpl::false_) const
+{
+  if (m_count == -1)
+    return optional<int>();
+  else
+    return m_count;
+}
 
 
 } } // end namespace boost::mpi

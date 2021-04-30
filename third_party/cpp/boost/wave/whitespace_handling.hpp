@@ -10,8 +10,8 @@
     file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 =============================================================================*/
 
-#if !defined(WHITESPACE_HANDLING_HPP_INCLUDED)
-#define WHITESPACE_HANDLING_HPP_INCLUDED
+#if !defined(BOOST_WHITESPACE_HANDLING_HPP_INCLUDED)
+#define BOOST_WHITESPACE_HANDLING_HPP_INCLUDED
 
 #include <boost/wave/wave_config.hpp>
 #include <boost/wave/token_ids.hpp>
@@ -292,5 +292,5 @@ eat_whitespace<TokenT>::whitespace(TokenT &token, bool &skipped_newline)
 #include BOOST_ABI_SUFFIX
 #endif
 
-#endif // !defined(WHITESPACE_HANDLING_HPP_INCLUDED)
+#endif // !defined(BOOST_WHITESPACE_HANDLING_HPP_INCLUDED)
 

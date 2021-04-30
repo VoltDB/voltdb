@@ -11,6 +11,7 @@
 #ifndef BOOST_GEOMETRY_FORMULAS_INVERSE_DIFFERENTIAL_QUANTITIES_HPP
 #define BOOST_GEOMETRY_FORMULAS_INVERSE_DIFFERENTIAL_QUANTITIES_HPP
 
+#include <boost/geometry/core/assert.hpp>
 
 #include <boost/geometry/util/condition.hpp>
 #include <boost/geometry/util/math.hpp>
@@ -73,6 +74,8 @@ public:
             CT const sig_12 = dlon / one_minus_f;
             if (BOOST_GEOMETRY_CONDITION(EnableReducedLength))
             {
+                BOOST_GEOMETRY_ASSERT((-math::pi<CT>() <= azimuth && azimuth <= math::pi<CT>()));
+
                 int azi_sign = math::sign(azimuth) >= 0 ? 1 : -1; // for antipodal
                 CT m12 = azi_sign * sin(sig_12) * b;
                 reduced_length = m12;

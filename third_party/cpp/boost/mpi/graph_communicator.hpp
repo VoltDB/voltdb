@@ -28,7 +28,6 @@
 // Headers required to implement graph topologies
 #include <boost/graph/graph_traits.hpp>
 #include <boost/graph/properties.hpp>
-#include <boost/property_map/property_map.hpp>
 #include <boost/iterator/counting_iterator.hpp>
 #include <boost/graph/iteration_macros.hpp>
 #include <boost/shared_array.hpp>
@@ -236,8 +235,8 @@ graph_communicator::setup_graph(const communicator& comm, const Graph& graph,
   BOOST_MPI_CHECK_RESULT(MPI_Graph_create,
                          ((MPI_Comm)comm, 
                           nvertices,
-                          &indices[0],
-                          edges.empty()? (int*)0 : &edges[0],
+                          detail::c_data(indices),
+                          detail::c_data(edges),
                           reorder,
                           &newcomm));
   this->comm_ptr.reset(new MPI_Comm(newcomm), comm_free());

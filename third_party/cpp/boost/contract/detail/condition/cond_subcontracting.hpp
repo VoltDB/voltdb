@@ -143,7 +143,10 @@ public:
         boost::contract::from from,
         boost::contract::virtual_* v,
         C* obj,
-        VR& r
+        VR&
+        #ifndef BOOST_CONTRACT_NO_POSTCONDITIONS // Avoid unused param warning.
+            r
+        #endif
         BOOST_CONTRACT_DETAIL_TVARIADIC_COMMA(BOOST_CONTRACT_MAX_ARGS)
         BOOST_CONTRACT_DETAIL_TVARIADIC_FPARAMS_Z(1,
                 BOOST_CONTRACT_MAX_ARGS, Args, &, args)

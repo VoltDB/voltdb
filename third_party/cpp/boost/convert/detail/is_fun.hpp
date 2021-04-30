@@ -1,4 +1,4 @@
-// Copyright (c) 2009-2016 Vladimir Batov.
+// Copyright (c) 2009-2020 Vladimir Batov.
 // Use, modification and distribution are subject to the Boost Software License,
 // Version 1.0. See http://www.boost.org/LICENSE_1_0.txt.
 
@@ -7,16 +7,14 @@
 
 #include <boost/convert/detail/config.hpp>
 #include <boost/convert/detail/has_member.hpp>
-#include <boost/utility/enable_if.hpp>
-#include <boost/type_traits.hpp>
 #include <boost/function_types/is_function_pointer.hpp>
 #include <boost/function_types/function_arity.hpp>
 #include <boost/function_types/result_type.hpp>
 
 namespace boost { namespace cnv
 {
-    typedef ::boost::type_traits::yes_type yes_type;
-    typedef ::boost::type_traits:: no_type  no_type;
+    using yes_type = ::boost::type_traits::yes_type;
+    using  no_type = ::boost::type_traits:: no_type;
 
     template <bool has_operator, typename Functor, typename TypeOut>
     struct check_functor { BOOST_STATIC_CONSTANT(bool, value = false); };
@@ -30,7 +28,7 @@ namespace boost { namespace cnv
         static yes_type test (TypeOut const&);
         static no_type  test (...);
 
-        static const bool value = sizeof(yes_type) == sizeof(test(((Functor*) 0)->operator()()));
+        static bool BOOST_CONSTEXPR_OR_CONST value = sizeof(yes_type) == sizeof(test(((Functor*) 0)->operator()()));
     };
 
     template<typename Functor, typename TypeOut>

@@ -31,9 +31,11 @@
     debug mode. However an end-user can force the macro 
     to check or not check by defining the macro 
     BOOST_VMD_ASSERT_DATA to 1 or 0 respectively.
-
+  
     sequence = a possible Boost PP seq.
 
+  @code
+  
     returns  = Normally the macro returns nothing. 
     
                If the sequence is a Boost PP seq, nothing is 
@@ -48,6 +50,8 @@
                without producing output if the sequence is not a 
                Boost PP seq.
               
+  @endcode
+  
 */
 
 /** \def BOOST_VMD_ASSERT_IS_SEQ_D(d,sequence)
@@ -62,9 +66,11 @@
     to check or not check by defining the macro 
     BOOST_VMD_ASSERT_DATA to 1 or 0 respectively.
 
-    d        = The next available BOOST_PP_WHILE iteration. 
+    d        = The next available BOOST_PP_WHILE iteration. <br/>
     sequence = a possible Boost PP seq.
 
+  @code
+  
     returns  = Normally the macro returns nothing. 
     
                If the sequence is a Boost PP seq, nothing is 
@@ -79,6 +85,8 @@
                without producing output if the sequence is not a 
                Boost PP seq.
               
+  @endcode
+  
 */
 
 #if !BOOST_VMD_ASSERT_DATA

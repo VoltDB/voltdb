@@ -4,6 +4,10 @@
 // Copyright (c) 2008-2012 Bruno Lalande, Paris, France.
 // Copyright (c) 2009-2012 Mateusz Loskot, London, UK.
 
+// This file was modified by Oracle on 2020.
+// Modifications copyright (c) 2020, Oracle and/or its affiliates.
+// Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
+
 // Parts of Boost.Geometry are redesigned from Geodan's Geographic Library
 // (geolib/GGL), copyright (c) 1995-2010 Geodan, Amsterdam, the Netherlands.
 
@@ -15,14 +19,14 @@
 #define BOOST_GEOMETRY_CORE_INTERIOR_RINGS_HPP
 
 #include <cstddef>
+#include <type_traits>
 
-#include <boost/mpl/assert.hpp>
 #include <boost/range/value_type.hpp>
-#include <boost/type_traits/remove_const.hpp>
 
+#include <boost/geometry/core/interior_type.hpp>
+#include <boost/geometry/core/static_assert.hpp>
 #include <boost/geometry/core/tag.hpp>
 #include <boost/geometry/core/tags.hpp>
-#include <boost/geometry/core/interior_type.hpp>
 
 namespace boost { namespace geometry
 {
@@ -45,11 +49,9 @@ namespace traits
 template <typename Geometry>
 struct interior_rings
 {
-    BOOST_MPL_ASSERT_MSG
-        (
-            false, NOT_IMPLEMENTED_FOR_THIS_GEOMETRY_TYPE
-            , (types<Geometry>)
-        );
+    BOOST_GEOMETRY_STATIC_ASSERT_FALSE(
+        "Not implemented for this Geometry type.",
+        Geometry);
 };
 
 
@@ -79,7 +81,7 @@ struct interior_rings<polygon_tag, Polygon>
     {
         return traits::interior_rings
             <
-                typename boost::remove_const<Polygon>::type
+                typename std::remove_const<Polygon>::type
             >::get(polygon);
     }
 };

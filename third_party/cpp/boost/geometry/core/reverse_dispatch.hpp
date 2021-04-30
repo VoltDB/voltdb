@@ -4,6 +4,10 @@
 // Copyright (c) 2008-2012 Bruno Lalande, Paris, France.
 // Copyright (c) 2009-2012 Mateusz Loskot, London, UK.
 
+// This file was modified by Oracle on 2020.
+// Modifications copyright (c) 2020, Oracle and/or its affiliates.
+// Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
+
 // Parts of Boost.Geometry are redesigned from Geodan's Geographic Library
 // (geolib/GGL), copyright (c) 1995-2010 Geodan, Amsterdam, the Netherlands.
 
@@ -17,9 +21,7 @@
 
 
 #include <cstddef>
-
-#include <boost/mpl/if.hpp>
-#include <boost/type_traits/integral_constant.hpp>
+#include <type_traits>
 
 #include <boost/geometry/core/geometry_id.hpp>
 
@@ -34,18 +36,18 @@ namespace detail
 
 // Different geometries: reverse_dispatch if second ID < first ID
 template <std::size_t GeometryId1, std::size_t GeometryId2>
-struct reverse_dispatch : boost::mpl::if_c
-    <
-        (GeometryId1 > GeometryId2),
-        boost::true_type,
-        boost::false_type
-    >
+struct reverse_dispatch
+    : std::integral_constant
+        <
+            bool,
+            (GeometryId1 > GeometryId2)
+        >
 {};
 
 
 // Same geometry: never reverse_dispatch
 template <std::size_t GeometryId>
-struct reverse_dispatch<GeometryId, GeometryId> : boost::false_type {};
+struct reverse_dispatch<GeometryId, GeometryId> : std::false_type {};
 
 
 } // namespace detail

@@ -2,8 +2,8 @@
 
 // Copyright (c) 2008-2015 Barend Gehrels, Amsterdam, the Netherlands.
 
-// This file was modified by Oracle on 2017, 2018.
-// Modifications copyright (c) 2017-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2017, 2018, 2019.
+// Modifications copyright (c) 2017-2019, Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle.
 
 // Use, modification and distribution is subject to the Boost Software License,
@@ -112,20 +112,14 @@ namespace projections
                 return aacos(.5 * (b * b + c * c - a * a) / (b * c));
             }
 
-            // template class, using CRTP to implement forward/inverse
             template <typename T, typename Parameters>
             struct base_chamb_spheroid
-                : public base_t_f<base_chamb_spheroid<T, Parameters>, T, Parameters>
             {
                 par_chamb<T> m_proj_parm;
 
-                inline base_chamb_spheroid(const Parameters& par)
-                    : base_t_f<base_chamb_spheroid<T, Parameters>, T, Parameters>(*this, par)
-                {}
-
                 // FORWARD(s_forward)  spheroid
                 // Project coordinates from geographic (lon, lat) to cartesian (x, y)
-                inline void fwd(T const& lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
+                inline void fwd(Parameters const& , T const& lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
                 {
                     static const T third = detail::third<T>();
 
@@ -263,10 +257,9 @@ namespace projections
     struct chamb_spheroid : public detail::chamb::base_chamb_spheroid<T, Parameters>
     {
         template <typename Params>
-        inline chamb_spheroid(Params const& params, Parameters const& par)
-            : detail::chamb::base_chamb_spheroid<T, Parameters>(par)
+        inline chamb_spheroid(Params const& params, Parameters & par)
         {
-            detail::chamb::setup_chamb(params, this->m_par, this->m_proj_parm);
+            detail::chamb::setup_chamb(params, par, this->m_proj_parm);
         }
     };
 
@@ -275,7 +268,7 @@ namespace projections
     {
 
         // Static projection
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_chamb, chamb_spheroid, chamb_spheroid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_F(srs::spar::proj_chamb, chamb_spheroid)
 
         // Factory entry(s)
         BOOST_GEOMETRY_PROJECTIONS_DETAIL_FACTORY_ENTRY_F(chamb_entry, chamb_spheroid)

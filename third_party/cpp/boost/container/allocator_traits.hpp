@@ -49,6 +49,11 @@
 
 #ifndef BOOST_CONTAINER_DOXYGEN_INVOKED
 
+#if defined(BOOST_GCC) && (BOOST_GCC >= 40600)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-result"
+#endif
+
 #define BOOST_INTRUSIVE_HAS_MEMBER_FUNCTION_CALLABLE_WITH_FUNCNAME allocate
 #define BOOST_INTRUSIVE_HAS_MEMBER_FUNCTION_CALLABLE_WITH_NS_BEG namespace boost { namespace container { namespace dtl {
 #define BOOST_INTRUSIVE_HAS_MEMBER_FUNCTION_CALLABLE_WITH_NS_END   }}}
@@ -70,6 +75,10 @@
 #define BOOST_INTRUSIVE_HAS_MEMBER_FUNCTION_CALLABLE_WITH_MAX 9
 #include <boost/intrusive/detail/has_member_function_callable_with.hpp>
 
+#if defined(BOOST_GCC) && (BOOST_GCC >= 40600)
+#pragma GCC diagnostic pop
+#endif
+
 #endif   //#ifndef BOOST_CONTAINER_DOXYGEN_INVOKED
 
 namespace boost {
@@ -77,7 +86,7 @@ namespace container {
 
 #ifndef BOOST_CONTAINER_DOXYGEN_INVOKED
 
-template<class T, class VoidAllocator>
+template<class T, class VoidAllocator, class Options>
 class small_vector_allocator;
 
 namespace allocator_traits_detail {
@@ -99,8 +108,8 @@ template<class T>
 struct is_std_allocator< std::allocator<T> >
 {  static const bool value = true; };
 
-template<class T>
-struct is_std_allocator< small_vector_allocator<T, std::allocator<T> > >
+template<class T, class Options>
+struct is_std_allocator< small_vector_allocator<T, std::allocator<T>, Options > >
 {  static const bool value = true; };
 
 template<class Allocator>

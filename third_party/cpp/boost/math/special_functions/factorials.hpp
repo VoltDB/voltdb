@@ -155,7 +155,7 @@ T rising_factorial_imp(T x, int n, const Policy& pol)
    }
    //
    // We don't optimise this for small n, because
-   // tgamma_delta_ratio is alreay optimised for that
+   // tgamma_delta_ratio is already optimised for that
    // use case:
    //
    return 1 / boost::math::tgamma_delta_ratio(x, static_cast<T>(n), pol);
@@ -166,7 +166,7 @@ inline T falling_factorial_imp(T x, unsigned n, const Policy& pol)
 {
    BOOST_STATIC_ASSERT(!boost::is_integral<T>::value);
    BOOST_MATH_STD_USING // ADL of std names
-   if((x == 0) && (n >= 0))
+   if(x == 0)
       return 0;
    if(x < 0)
    {
@@ -187,13 +187,13 @@ inline T falling_factorial_imp(T x, unsigned n, const Policy& pol)
       {
          // If the two end of the range are far apart we have a ratio of two very large
          // numbers, split the calculation up into two blocks:
-         T t1 = x * boost::math::falling_factorial(x - 1, max_factorial<T>::value - 2);
-         T t2 = boost::math::falling_factorial(x - max_factorial<T>::value + 1, n - max_factorial<T>::value + 1);
+         T t1 = x * boost::math::falling_factorial(x - 1, max_factorial<T>::value - 2, pol);
+         T t2 = boost::math::falling_factorial(x - max_factorial<T>::value + 1, n - max_factorial<T>::value + 1, pol);
          if(tools::max_value<T>() / fabs(t1) < fabs(t2))
             return boost::math::sign(t1) * boost::math::sign(t2) * policies::raise_overflow_error<T>("boost::math::falling_factorial<%1%>", 0, pol);
          return t1 * t2;
       }
-      return x * boost::math::falling_factorial(x - 1, n - 1);
+      return x * boost::math::falling_factorial(x - 1, n - 1, pol);
    }
    if(x <= n - 1)
    {
@@ -217,7 +217,7 @@ inline T falling_factorial_imp(T x, unsigned n, const Policy& pol)
    // Simple case: just the ratio of two
    // (positive argument) gamma functions.
    // Note that we don't optimise this for small n,
-   // because tgamma_delta_ratio is alreay optimised
+   // because tgamma_delta_ratio is already optimised
    // for that use case:
    //
    return boost::math::tgamma_delta_ratio(x + 1, -static_cast<T>(n), pol);

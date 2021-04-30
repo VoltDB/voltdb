@@ -2,8 +2,8 @@
 
 // Copyright (c) 2008-2015 Barend Gehrels, Amsterdam, the Netherlands.
 
-// This file was modified by Oracle on 2017, 2018.
-// Modifications copyright (c) 2017-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2017, 2018, 2019.
+// Modifications copyright (c) 2017-2019, Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle.
 
 // Use, modification and distribution is subject to the Boost Software License,
@@ -63,33 +63,27 @@ namespace projections
 
             /* very loosely based upon DMA code by Bradford W. Drew */
 
-            // template class, using CRTP to implement forward/inverse
             template <typename T, typename Parameters>
             struct base_latlong_other
-                : public base_t_fi<base_latlong_other<T, Parameters>, T, Parameters>
             {
-                inline base_latlong_other(const Parameters& par)
-                    : base_t_fi<base_latlong_other<T, Parameters>, T, Parameters>(*this, par)
-                {}
-
                 // FORWARD(forward)
                 // Project coordinates from geographic (lon, lat) to cartesian (x, y)
-                inline void fwd(T const& lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
+                inline void fwd(Parameters const& par, T const& lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
                 {
                     // TODO: in the original code a is not used
                     // different mechanism is probably used instead
-                    xy_x = lp_lon / this->m_par.a;
-                    xy_y = lp_lat / this->m_par.a;
+                    xy_x = lp_lon / par.a;
+                    xy_y = lp_lat / par.a;
                 }
 
                 // INVERSE(inverse)
                 // Project coordinates from cartesian (x, y) to geographic (lon, lat)
-                inline void inv(T const& xy_x, T const& xy_y, T& lp_lon, T& lp_lat) const
+                inline void inv(Parameters const& par, T const& xy_x, T const& xy_y, T& lp_lon, T& lp_lat) const
                 {
                     // TODO: in the original code a is not used
                     // different mechanism is probably used instead
-                    lp_lat = xy_y * this->m_par.a;
-                    lp_lon = xy_x * this->m_par.a;
+                    lp_lat = xy_y * par.a;
+                    lp_lon = xy_x * par.a;
                 }
 
                 static inline std::string get_name()
@@ -124,10 +118,9 @@ namespace projections
     struct latlong_other : public detail::latlong::base_latlong_other<T, Parameters>
     {
         template <typename Params>
-        inline latlong_other(Params const& , Parameters const& par)
-            : detail::latlong::base_latlong_other<T, Parameters>(par)
+        inline latlong_other(Params const& , Parameters & par)
         {
-            detail::latlong::setup_latlong(this->m_par);
+            detail::latlong::setup_latlong(par);
         }
     };
 
@@ -136,10 +129,10 @@ namespace projections
     {
 
         // Static projection
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_lonlat, latlong_other, latlong_other)
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_latlon, latlong_other, latlong_other)
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_latlong, latlong_other, latlong_other)
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_longlat, latlong_other, latlong_other)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI(srs::spar::proj_lonlat, latlong_other)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI(srs::spar::proj_latlon, latlong_other)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI(srs::spar::proj_latlong, latlong_other)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI(srs::spar::proj_longlat, latlong_other)
 
         // Factory entry(s)
         BOOST_GEOMETRY_PROJECTIONS_DETAIL_FACTORY_ENTRY_FI(latlong_entry, latlong_other)

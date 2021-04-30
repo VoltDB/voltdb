@@ -2,8 +2,8 @@
 
 // Copyright (c) 2008-2015 Barend Gehrels, Amsterdam, the Netherlands.
 
-// This file was modified by Oracle on 2017, 2018.
-// Modifications copyright (c) 2017-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2017, 2018, 2019.
+// Modifications copyright (c) 2017-2019, Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle.
 
 // Use, modification and distribution is subject to the Boost Software License,
@@ -125,39 +125,33 @@ namespace projections
                 return(1. + 3.* S * S * C);
             }
 
-            // template class, using CRTP to implement forward/inverse
             template <typename T, typename Parameters>
             struct base_lcca_ellipsoid
-                : public base_t_fi<base_lcca_ellipsoid<T, Parameters>, T, Parameters>
             {
                 par_lcca<T> m_proj_parm;
 
-                inline base_lcca_ellipsoid(const Parameters& par)
-                    : base_t_fi<base_lcca_ellipsoid<T, Parameters>, T, Parameters>(*this, par)
-                {}
-
                 // FORWARD(e_forward)  ellipsoid
                 // Project coordinates from geographic (lon, lat) to cartesian (x, y)
-                inline void fwd(T lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
+                inline void fwd(Parameters const& par, T lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
                 {
                     T S, r, dr;
 
                     S = pj_mlfn(lp_lat, sin(lp_lat), cos(lp_lat), this->m_proj_parm.en) - this->m_proj_parm.M0;
                     dr = fS(S, this->m_proj_parm.C);
                     r = this->m_proj_parm.r0 - dr;
-                    xy_x = this->m_par.k0 * (r * sin( lp_lon *= this->m_proj_parm.l ) );
-                    xy_y = this->m_par.k0 * (this->m_proj_parm.r0 - r * cos(lp_lon) );
+                    xy_x = par.k0 * (r * sin( lp_lon *= this->m_proj_parm.l ) );
+                    xy_y = par.k0 * (this->m_proj_parm.r0 - r * cos(lp_lon) );
                 }
 
                 // INVERSE(e_inverse)  ellipsoid & spheroid
                 // Project coordinates from cartesian (x, y) to geographic (lon, lat)
-                inline void inv(T xy_x, T xy_y, T& lp_lon, T& lp_lat) const
+                inline void inv(Parameters const& par, T xy_x, T xy_y, T& lp_lon, T& lp_lat) const
                 {
                     T theta, dr, S, dif;
                     int i;
 
-                    xy_x /= this->m_par.k0;
-                    xy_y /= this->m_par.k0;
+                    xy_x /= par.k0;
+                    xy_y /= par.k0;
                     theta = atan2(xy_x , this->m_proj_parm.r0 - xy_y);
                     dr = xy_y - xy_x * tan(0.5 * theta);
                     lp_lon = theta / this->m_proj_parm.l;
@@ -169,7 +163,7 @@ namespace projections
                     if (!i) {
                         BOOST_THROW_EXCEPTION( projection_exception(error_tolerance_condition) );
                     }
-                    lp_lat = pj_inv_mlfn(S + this->m_proj_parm.M0, this->m_par.es, this->m_proj_parm.en);
+                    lp_lat = pj_inv_mlfn(S + this->m_proj_parm.M0, par.es, this->m_proj_parm.en);
                 }
 
                 static inline std::string get_name()
@@ -181,7 +175,7 @@ namespace projections
 
             // Lambert Conformal Conic Alternative
             template <typename Parameters, typename T>
-            inline void setup_lcca(Parameters& par, par_lcca<T>& proj_parm)
+            inline void setup_lcca(Parameters const& par, par_lcca<T>& proj_parm)
             {
                 T s2p0, N0, R0, tan0;
 
@@ -224,9 +218,8 @@ namespace projections
     {
         template <typename Params>
         inline lcca_ellipsoid(Params const& , Parameters const& par)
-            : detail::lcca::base_lcca_ellipsoid<T, Parameters>(par)
         {
-            detail::lcca::setup_lcca(this->m_par, this->m_proj_parm);
+            detail::lcca::setup_lcca(par, this->m_proj_parm);
         }
     };
 
@@ -235,7 +228,7 @@ namespace projections
     {
 
         // Static projection
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_lcca, lcca_ellipsoid, lcca_ellipsoid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI(srs::spar::proj_lcca, lcca_ellipsoid)
 
         // Factory entry(s)
         BOOST_GEOMETRY_PROJECTIONS_DETAIL_FACTORY_ENTRY_FI(lcca_entry, lcca_ellipsoid)

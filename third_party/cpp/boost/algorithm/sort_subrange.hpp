@@ -22,6 +22,7 @@
 #include <iterator>         // For std::iterator_traits
 #include <algorithm>        // For nth_element and partial_sort
 
+#include <boost/config.hpp>
 #include <boost/range/begin.hpp>
 #include <boost/range/end.hpp>
 

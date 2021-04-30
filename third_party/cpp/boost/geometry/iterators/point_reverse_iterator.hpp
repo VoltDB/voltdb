@@ -1,8 +1,8 @@
 // Boost.Geometry (aka GGL, Generic Geometry Library)
 
-// Copyright (c) 2014, Oracle and/or its affiliates.
-
+// Copyright (c) 2014-2020, Oracle and/or its affiliates.
 // Contributed and/or modified by Menelaos Karavelas, on behalf of Oracle
+// Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
 // Licensed under the Boost Software License version 1.0.
 // http://www.boost.org/users/license.html
@@ -11,10 +11,9 @@
 #define BOOST_GEOMETRY_ITERATORS_POINT_REVERSE_ITERATOR_HPP
 
 #include <iterator>
+#include <type_traits>
 
-#include <boost/mpl/assert.hpp>
-#include <boost/type_traits/is_convertible.hpp>
-
+#include <boost/geometry/core/static_assert.hpp>
 #include <boost/geometry/iterators/point_iterator.hpp>
 
 namespace boost { namespace geometry
@@ -47,15 +46,15 @@ public:
     point_reverse_iterator(point_reverse_iterator<OtherGeometry> const& other)
         : base_type(other.base())
     {
-        static const bool is_conv = boost::is_convertible
+        static const bool is_conv = std::is_convertible
             <
                 std::reverse_iterator<point_iterator<Geometry> >,
                 std::reverse_iterator<point_iterator<OtherGeometry> >
             >::value;
 
-        BOOST_MPL_ASSERT_MSG((is_conv),
-                             NOT_CONVERTIBLE,
-                             (point_reverse_iterator<OtherGeometry>));
+        BOOST_GEOMETRY_STATIC_ASSERT((is_conv),
+            "Other iterator has to be convertible to member iterator.",
+            point_reverse_iterator<OtherGeometry>);
     }
 };
 

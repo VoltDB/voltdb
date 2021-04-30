@@ -29,7 +29,7 @@
 #include <boost/interprocess/sync/detail/locks.hpp>
 #if !defined(BOOST_INTERPROCESS_FORCE_GENERIC_EMULATION) && defined (BOOST_INTERPROCESS_WINDOWS)
    #include <boost/interprocess/sync/windows/named_condition_any.hpp>
-   #define BOOST_INTERPROCESS_USE_WINDOWS
+   #define BOOST_INTERPROCESS_NAMED_CONDITION_ANY_USE_WINAPI
 #else
    #include <boost/interprocess/sync/shm/named_condition_any.hpp>
 #endif
@@ -55,6 +55,7 @@ class named_condition_any
    named_condition_any(const named_condition_any &);
    named_condition_any &operator=(const named_condition_any &);
    #endif   //#ifndef BOOST_INTERPROCESS_DOXYGEN_INVOKED
+
    public:
    //!Creates a global condition with a name.
    //!If the condition can't be created throws interprocess_exception
@@ -78,6 +79,42 @@ class named_condition_any
    named_condition_any(open_only_t, const char *name)
       :  m_cond(open_only_t(), name)
    {}
+
+   #if defined(BOOST_INTERPROCESS_WCHAR_NAMED_RESOURCES) || defined(BOOST_INTERPROCESS_DOXYGEN_INVOKED)
+
+   //!Creates a global condition with a name.
+   //!If the condition can't be created throws interprocess_exception
+   //! 
+   //!Note: This function is only available on operating systems with
+   //!      native wchar_t APIs (e.g. Windows).
+   named_condition_any(create_only_t, const wchar_t *name, const permissions &perm = permissions())
+      :  m_cond(create_only_t(), name, perm)
+   {}
+
+   //!Opens or creates a global condition with a name.
+   //!If the condition is created, this call is equivalent to
+   //!named_condition_any(create_only_t, ... )
+   //!If the condition is already created, this call is equivalent
+   //!named_condition_any(open_only_t, ... )
+   //!Does not throw
+   //! 
+   //!Note: This function is only available on operating systems with
+   //!      native wchar_t APIs (e.g. Windows).
+   named_condition_any(open_or_create_t, const wchar_t *name, const permissions &perm = permissions())
+      :  m_cond(open_or_create_t(), name, perm)
+   {}
+
+   //!Opens a global condition with a name if that condition is previously
+   //!created. If it is not previously created this function throws
+   //!interprocess_exception.
+   //! 
+   //!Note: This function is only available on operating systems with
+   //!      native wchar_t APIs (e.g. Windows).
+   named_condition_any(open_only_t, const wchar_t *name)
+      :  m_cond(open_only_t(), name)
+   {}
+
+   #endif   //defined(BOOST_INTERPROCESS_WCHAR_NAMED_RESOURCES) || defined(BOOST_INTERPROCESS_DOXYGEN_INVOKED)
 
    //!Destroys *this and indicates that the calling process is finished using
    //!the resource. The destructor function will deallocate
@@ -132,10 +169,22 @@ class named_condition_any
    static bool remove(const char *name)
    {  return condition_any_type::remove(name);  }
 
+   #if defined(BOOST_INTERPROCESS_WCHAR_NAMED_RESOURCES) || defined(BOOST_INTERPROCESS_DOXYGEN_INVOKED)
+
+   //!Erases a named condition from the system.
+   //!Returns false on error. Never throws.
+   //! 
+   //!Note: This function is only available on operating systems with
+   //!      native wchar_t APIs (e.g. Windows).
+   static bool remove(const wchar_t *name)
+   {  return condition_any_type::remove(name);  }
+
+   #endif //defined(BOOST_INTERPROCESS_WCHAR_NAMED_RESOURCES) || defined(BOOST_INTERPROCESS_DOXYGEN_INVOKED)
+
    #if !defined(BOOST_INTERPROCESS_DOXYGEN_INVOKED)
    private:
-   #if defined(BOOST_INTERPROCESS_USE_WINDOWS)
-   typedef ipcdetail::windows_named_condition_any   condition_any_type;
+   #if defined(BOOST_INTERPROCESS_NAMED_CONDITION_ANY_USE_WINAPI)
+   typedef ipcdetail::winapi_named_condition_any   condition_any_type;
    #else
    typedef ipcdetail::shm_named_condition_any       condition_any_type;
    #endif

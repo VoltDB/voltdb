@@ -1,4 +1,4 @@
-//  (C) Copyright Jeremy Siek 2004 
+//  (C) Copyright Jeremy Siek 2004
 //  Distributed under the Boost Software License, Version 1.0. (See
 //  accompanying file LICENSE_1_0.txt or copy at
 //  http://www.boost.org/LICENSE_1_0.txt)
@@ -55,27 +55,24 @@
  * -end example]
  *
  * pedwards@jaj.com  May 1999
-*/
-
+ */
 
 #include <string>
-#include <cstring>    // for strchr
-
+#include <cstring> // for strchr
 
 /*****************************************************************
  * This is the only part of the implementation that I don't like.
  * It can probably be improved upon by the reader...
-*/
+ */
 
-    inline bool
-    isws (char c, char const * const wstr)
-    {
-        using namespace std;
-        return (strchr(wstr,c) != NULL);
-    }
+inline bool isws(char c, char const* const wstr)
+{
+    using namespace std;
+    return (strchr(wstr, c) != NULL);
+}
 
-
-namespace boost {
+namespace boost
+{
 
 /*****************************************************************
  * Simplistic and quite Standard, but a bit slow.  This should be
@@ -84,32 +81,35 @@ namespace boost {
  * I had hoped that "whitespace" would be a trait, but it isn't, so
  * the user must supply it.  Enh, this lets them break up strings on
  * different things easier than traits would anyhow.
-*/
-template <typename Container>
-void
-stringtok (Container &l, std::string const &s, char const * const ws = " \t\n")
+ */
+template < typename Container >
+void stringtok(
+    Container& l, std::string const& s, char const* const ws = " \t\n")
 {
-  typedef std::string::size_type size_type;
-    const size_type  S = s.size();
-          size_type  i = 0;
+    typedef std::string::size_type size_type;
+    const size_type S = s.size();
+    size_type i = 0;
 
-    while (i < S) {
+    while (i < S)
+    {
         // eat leading whitespace
-        while ((i < S) && (isws(s[i],ws)))  ++i;
-        if (i == S)  return;  // nothing left but WS
+        while ((i < S) && (isws(s[i], ws)))
+            ++i;
+        if (i == S)
+            return; // nothing left but WS
 
         // find end of word
-        size_type  j = i+1;
-        while ((j < S) && (!isws(s[j],ws)))  ++j;
+        size_type j = i + 1;
+        while ((j < S) && (!isws(s[j], ws)))
+            ++j;
 
         // add word
-        l.push_back(s.substr(i,j-i));
+        l.push_back(s.substr(i, j - i));
 
         // set up for next loop
-        i = j+1;
+        i = j + 1;
     }
 }
-
 
 } // namespace boost
 

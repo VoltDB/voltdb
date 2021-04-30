@@ -1,6 +1,6 @@
 // Boost.Geometry (aka GGL, Generic Geometry Library)
 
-// Copyright (c) 2014-2018, Oracle and/or its affiliates.
+// Copyright (c) 2014-2020, Oracle and/or its affiliates.
 
 // Contributed and/or modified by Menelaos Karavelas, on behalf of Oracle
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
@@ -12,8 +12,7 @@
 #define BOOST_GEOMETRY_ALGORITHMS_DETAIL_IS_VALID_HAS_INVALID_COORDINATE_HPP
 
 #include <cstddef>
-
-#include <boost/type_traits/is_floating_point.hpp>
+#include <type_traits>
 
 #include <boost/geometry/algorithms/detail/check_iterator_range.hpp>
 #include <boost/geometry/algorithms/validity_failure_type.hpp>
@@ -115,7 +114,7 @@ template
 <
     typename Geometry,
     typename Tag = typename tag<Geometry>::type,
-    bool HasFloatingPointCoordinates = boost::is_floating_point
+    bool HasFloatingPointCoordinates = std::is_floating_point
         <
             typename coordinate_type<Geometry>::type
         >::value

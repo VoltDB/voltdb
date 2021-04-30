@@ -267,7 +267,7 @@
 //
 // 3. Utilities for by-reference embedding
 //
-// When using parsers mutiple times or recursively it can be helpful to embed
+// When using parsers multiple times or recursively it can be helpful to embed
 // them by-reference into the final parser expression.
 // For this purpose the library provides a wrapper template 'parser_reference'.
 // There is also a function template to create a wrapped parser which can deduce
@@ -1001,7 +1001,7 @@ namespace type_of {
         ( concatenate_actions(chain.action(), a) );
   }
 
-  // Expression template for mutiple action chain assignments
+  // Expression template for multiple action chain assignments
   template<class ChainOrChains, class LastChain>
   class action_chains
   {

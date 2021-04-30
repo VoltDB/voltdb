@@ -2,8 +2,8 @@
 
 // Copyright (c) 2008-2015 Barend Gehrels, Amsterdam, the Netherlands.
 
-// This file was modified by Oracle on 2017, 2018.
-// Modifications copyright (c) 2017-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2017, 2018, 2019.
+// Modifications copyright (c) 2017-2019, Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle.
 
 // Use, modification and distribution is subject to the Boost Software License,
@@ -65,20 +65,14 @@ namespace projections
                 T    n, C_y;
             };
 
-            // template class, using CRTP to implement forward/inverse
             template <typename T, typename Parameters>
             struct base_urmfps_spheroid
-                : public base_t_fi<base_urmfps_spheroid<T, Parameters>, T, Parameters>
             {
                 par_urmfps<T> m_proj_parm;
 
-                inline base_urmfps_spheroid(const Parameters& par)
-                    : base_t_fi<base_urmfps_spheroid<T, Parameters>, T, Parameters>(*this, par)
-                {}
-
                 // FORWARD(s_forward)  sphere
                 // Project coordinates from geographic (lon, lat) to cartesian (x, y)
-                inline void fwd(T const& lp_lon, T lp_lat, T& xy_x, T& xy_y) const
+                inline void fwd(Parameters const& , T const& lp_lon, T lp_lat, T& xy_x, T& xy_y) const
                 {
                     lp_lat = aasin(this->m_proj_parm.n * sin(lp_lat));
                     xy_x = C_x * lp_lon * cos(lp_lat);
@@ -87,7 +81,7 @@ namespace projections
 
                 // INVERSE(s_inverse)  sphere
                 // Project coordinates from cartesian (x, y) to geographic (lon, lat)
-                inline void inv(T const& xy_x, T xy_y, T& lp_lon, T& lp_lat) const
+                inline void inv(Parameters const& , T const& xy_x, T xy_y, T& lp_lon, T& lp_lat) const
                 {
                     xy_y /= this->m_proj_parm.C_y;
                     lp_lat = aasin(sin(xy_y) / this->m_proj_parm.n);
@@ -151,10 +145,9 @@ namespace projections
     struct urmfps_spheroid : public detail::urmfps::base_urmfps_spheroid<T, Parameters>
     {
         template <typename Params>
-        inline urmfps_spheroid(Params const& params, Parameters const& par)
-            : detail::urmfps::base_urmfps_spheroid<T, Parameters>(par)
+        inline urmfps_spheroid(Params const& params, Parameters & par)
         {
-            detail::urmfps::setup_urmfps(params, this->m_par, this->m_proj_parm);
+            detail::urmfps::setup_urmfps(params, par, this->m_proj_parm);
         }
     };
 
@@ -174,10 +167,9 @@ namespace projections
     struct wag1_spheroid : public detail::urmfps::base_urmfps_spheroid<T, Parameters>
     {
         template <typename Params>
-        inline wag1_spheroid(Params const& , Parameters const& par)
-            : detail::urmfps::base_urmfps_spheroid<T, Parameters>(par)
+        inline wag1_spheroid(Params const& , Parameters & par)
         {
-            detail::urmfps::setup_wag1(this->m_par, this->m_proj_parm);
+            detail::urmfps::setup_wag1(par, this->m_proj_parm);
         }
     };
 
@@ -186,8 +178,8 @@ namespace projections
     {
 
         // Static projection
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_urmfps, urmfps_spheroid, urmfps_spheroid)
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_wag1, wag1_spheroid, wag1_spheroid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI(srs::spar::proj_urmfps, urmfps_spheroid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI(srs::spar::proj_wag1, wag1_spheroid)
 
         // Factory entry(s)
         BOOST_GEOMETRY_PROJECTIONS_DETAIL_FACTORY_ENTRY_FI(urmfps_entry, urmfps_spheroid)

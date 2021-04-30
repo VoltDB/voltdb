@@ -12,11 +12,13 @@
 #include <boost/contract/detail/declspec.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/noncopyable.hpp>
+#include <boost/config.hpp>
 
 namespace boost { namespace contract { namespace detail {
 
 #ifdef BOOST_MSVC
     #pragma warning(push)
+    #pragma warning(disable: 4275) // Base w/o DLL spec (noncopyable).
     #pragma warning(disable: 4251) // Member w/o DLL spec (mutex_ type).
 #endif
 

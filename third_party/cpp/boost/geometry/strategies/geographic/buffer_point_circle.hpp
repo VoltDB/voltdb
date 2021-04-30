@@ -2,6 +2,10 @@
 
 // Copyright (c) 2018-2019 Barend Gehrels, Amsterdam, the Netherlands.
 
+// This file was modified by Oracle on 2020.
+// Modifications copyright (c) 2020 Oracle and/or its affiliates.
+// Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
+
 // Use, modification and distribution is subject to the Boost Software License,
 // Version 1.0. (See accompanying file LICENSE_1_0.txt or copy at
 // http://www.boost.org/LICENSE_1_0.txt)
@@ -11,9 +15,10 @@
 
 #include <cstddef>
 
-#include <boost/range.hpp>
+#include <boost/range/value_type.hpp>
 
 #include <boost/geometry/util/math.hpp>
+#include <boost/geometry/util/select_calculation_type.hpp>
 
 #include <boost/geometry/strategies/buffer.hpp>
 
@@ -71,10 +76,9 @@ public :
     {
         typedef typename boost::range_value<OutputRange>::type output_point_type;
 
-        typedef typename select_most_precise
+        typedef typename select_calculation_type
             <
-                typename geometry::coordinate_type<Point>::type,
-                typename geometry::coordinate_type<output_point_type>::type,
+                Point, output_point_type,
                 CalculationType
                 //double
             >::type calculation_type;
@@ -88,6 +92,7 @@ public :
             > direct_t;
 
         calculation_type const two_pi = geometry::math::two_pi<calculation_type>();
+        calculation_type const pi = geometry::math::pi<calculation_type>();
 
         calculation_type const diff = two_pi / calculation_type(m_count);
         // TODO: after calculation of some angles is corrected,
@@ -96,6 +101,11 @@ public :
 
         for (std::size_t i = 0; i < m_count; i++, angle += diff)
         {
+            if (angle > pi)
+            {
+                angle -= two_pi;
+            }
+
             typename direct_t::result_type
                 dir_r = direct_t::apply(get_as_radian<0>(point), get_as_radian<1>(point),
                                         buffer_distance, angle,

@@ -8,9 +8,8 @@
 #ifndef BOOST_GIL_IO_GET_WRITER_HPP
 #define BOOST_GIL_IO_GET_WRITER_HPP
 
+#include <boost/gil/detail/mp11.hpp>
 #include <boost/gil/io/get_write_device.hpp>
-
-#include <boost/mpl/and.hpp>
 
 #include <type_traits>
 
@@ -28,7 +27,7 @@ struct get_writer
     FormatTag,
     typename std::enable_if
     <
-        mpl::and_
+        mp11::mp_and
         <
             detail::is_supported_path_spec<String>,
             is_format_tag<FormatTag>
@@ -47,7 +46,7 @@ struct get_writer
     FormatTag,
     typename std::enable_if
     <
-        mpl::and_
+        mp11::mp_and
         <
             detail::is_adaptable_output_device<FormatTag, Device>,
             is_format_tag<FormatTag>
@@ -70,7 +69,7 @@ struct get_dynamic_image_writer
     FormatTag,
     typename std::enable_if
     <
-        mpl::and_
+        mp11::mp_and
         <
             detail::is_supported_path_spec<String>,
             is_format_tag<FormatTag>
@@ -89,7 +88,7 @@ struct get_dynamic_image_writer
     FormatTag,
     typename std::enable_if
     <
-        mpl::and_
+        mp11::mp_and
         <
             detail::is_write_device<FormatTag, Device>,
             is_format_tag<FormatTag>

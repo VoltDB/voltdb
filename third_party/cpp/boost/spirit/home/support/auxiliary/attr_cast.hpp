@@ -3,8 +3,8 @@
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
-#if !defined(SPIRIT_SUPPORT_ATTR_CAST_OCT_06_2009_00535PM)
-#define SPIRIT_SUPPORT_ATTR_CAST_OCT_06_2009_00535PM
+#ifndef BOOST_SPIRIT_SUPPORT_AUXILIARY_ATTR_CAST_HPP
+#define BOOST_SPIRIT_SUPPORT_AUXILIARY_ATTR_CAST_HPP
 
 #if defined(_MSC_VER)
 #pragma once
@@ -12,7 +12,8 @@
 
 #include <boost/spirit/home/support/common_terminals.hpp>
 #include <boost/spirit/home/support/attributes.hpp>
-#include <boost/utility/enable_if.hpp>
+#include <boost/core/enable_if.hpp>
+#include <boost/proto/traits.hpp>
 
 namespace boost { namespace spirit
 {

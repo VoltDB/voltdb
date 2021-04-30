@@ -61,9 +61,8 @@ namespace boost { namespace fusion
         last_type last() const { return fusion::end(seq); }
         typename mpl::if_<traits::is_view<Sequence>, Sequence, Sequence&>::type seq;
 
-    private:
         // silence MSVC warning C4512: assignment operator could not be generated
-        reverse_view& operator= (reverse_view const&);
+        BOOST_DELETED_FUNCTION(reverse_view& operator= (reverse_view const&))
     };
 }}
 

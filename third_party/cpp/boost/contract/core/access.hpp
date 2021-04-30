@@ -43,23 +43,24 @@ namespace boost { namespace contract {
 #endif
 
 /**
-Friend this class to declare invariants and base types as private members.
+Declare this class as friend to program invariants and base types as private
+members.
 
 Declare this class a friend of the user-defined class specifying the contracts
-in order to declare the invariant functions and the base types @c typedef as
+and then invariant functions and the base types @c typedef can be declared as
 non-public members:
 
 @code
-class u :
+class u
     #define BASES public b, private w
-    BASES
+    : BASES
 {
     friend class boost::contract::access;
 
-    typedef BOOST_CONTRACT_BASES(BASES) base_types; // Private.
+    typedef BOOST_CONTRACT_BASE_TYPES(BASES) base_types; // Private.
     #undef BASES
 
-    void invariant() const { ... } // Private.
+    void invariant() const { ... } // Private (same for static and volatile).
 
 public:
     ...
@@ -67,9 +68,10 @@ public:
 @endcode
 
 In real code, programmers will likely chose to declare this class as friend so
-to fully control public interfaces of their user-defined classes.
+to fully control public interfaces of their user-defined classes (this is not
+extensively done in the examples of this documentation only for brevity).
 This class is not intended to be directly used by programmers a part from
-declaring it @c friend (and that is why this class does not have any public
+being declared as @c friend (and that is why this class does not have any public
 member and it is not copyable).
 
 @warning    Not declaring this class friend of user-defined classes will cause
@@ -79,8 +81,8 @@ member and it is not copyable).
             instead fail SFINAE and no compiler error will be reported while
             invariants and subcontracting will be silently skipped at run-time.
             Therefore, programmers must make sure to either declare this class
-            as friend (preferred) or to always declare invariant functions and
-            base types @c typedef as public members.
+            as friend or to always declare invariant functions and base types
+            @c typedef as public members.
 
 @see @RefSect{advanced.access_specifiers, Access Specifiers}
 */

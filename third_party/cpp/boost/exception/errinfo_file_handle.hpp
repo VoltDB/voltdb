@@ -3,8 +3,8 @@
 //Distributed under the Boost Software License, Version 1.0. (See accompanying
 //file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
-#ifndef UUID_F79E6EE26C1211DEB26E929155D89593
-#define UUID_F79E6EE26C1211DEB26E929155D89593
+#ifndef BOOST_EXCEPTION_F79E6EE26C1211DEB26E929155D89593
+#define BOOST_EXCEPTION_F79E6EE26C1211DEB26E929155D89593
 
 #include <stdio.h>
 

@@ -50,7 +50,7 @@ RealType cdf_imp(const cauchy_distribution<RealType, Policy>& dist, const RealTy
    //
    // CDF = -atan(1/x)  ; x < 0
    //
-   // So the proceedure is to calculate the cdf for -fabs(x)
+   // So the procedure is to calculate the cdf for -fabs(x)
    // using the above formula, and then subtract from 1 when required
    // to get the result.
    //
@@ -98,7 +98,7 @@ RealType quantile_imp(
    // the value p may be the probability, or its complement if complement=true.
    //
    // The procedure first performs argument reduction on p to avoid error
-   // when calculating the tangent, then calulates the distance from the
+   // when calculating the tangent, then calculates the distance from the
    // mid-point of the distribution.  This is either added or subtracted
    // from the location parameter depending on whether `complement` is true.
    //
@@ -345,6 +345,13 @@ inline RealType kurtosis_excess(const cauchy_distribution<RealType, Policy>& /*d
       "The Cauchy distribution does not have a kurtosis: "
       "the only possible return value is %1%.",
       std::numeric_limits<RealType>::quiet_NaN(), Policy());
+}
+
+template <class RealType, class Policy>
+inline RealType entropy(const cauchy_distribution<RealType, Policy> & dist)
+{
+   using std::log;
+   return log(2*constants::two_pi<RealType>()*dist.scale());
 }
 
 } // namespace math

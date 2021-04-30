@@ -10,27 +10,28 @@
 
 #include <boost/gil/bit_aligned_pixel_reference.hpp>
 
+#include <type_traits>
+
 namespace boost{ namespace gil {
 
 /// is_bit_aligned metafunctions
 /// \brief Determines whether the given type is bit_aligned.
 
 template< typename PixelRef >
-struct is_bit_aligned : mpl::false_{};
+struct is_bit_aligned : std::false_type {};
 
 template <typename B, typename C, typename L, bool M>
-struct is_bit_aligned<bit_aligned_pixel_reference<B,C,L,M> > : mpl::true_{};
+struct is_bit_aligned<bit_aligned_pixel_reference<B, C, L, M>> : std::true_type {};
 
 template <typename B, typename C, typename L, bool M>
-struct is_bit_aligned<const bit_aligned_pixel_reference<B,C,L,M> > : mpl::true_{};
+struct is_bit_aligned<bit_aligned_pixel_reference<B, C, L, M> const> : std::true_type {};
 
 template <typename B, typename C, typename L>
-struct is_bit_aligned<packed_pixel<B,C,L> > : mpl::true_{};
+struct is_bit_aligned<packed_pixel<B, C, L>> : std::true_type {};
 
 template <typename B, typename C, typename L>
-struct is_bit_aligned<const packed_pixel<B,C,L> > : mpl::true_{};
+struct is_bit_aligned<packed_pixel<B, C, L> const> : std::true_type {};
 
-} // namespace gil
-} // namespace boost
+}} // namespace boost::gil
 
 #endif

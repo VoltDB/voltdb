@@ -294,6 +294,22 @@ end( pull_coroutine< T > &) {
 
 }}}
 
+namespace std {
+
+template< typename T >
+typename boost::coroutines2::detail::pull_coroutine< T >::iterator
+begin( boost::coroutines2::detail::pull_coroutine< T > & c) {
+    return boost::coroutines2::detail::begin( c);
+}
+
+template< typename T >
+typename boost::coroutines2::detail::pull_coroutine< T >::iterator
+end( boost::coroutines2::detail::pull_coroutine< T > & c) {
+    return boost::coroutines2::detail::end( c);
+}
+
+}
+
 #ifdef BOOST_HAS_ABI_HEADERS
 #  include BOOST_ABI_SUFFIX
 #endif

@@ -39,7 +39,7 @@ namespace boost{
          // Screen out NaN's first, if either value is a NaN then the distance is "infinite":
          if((boost::math::isnan)(a) || (boost::math::isnan)(b))
             return max_val;
-         // Screen out infinites:
+         // Screen out infinities:
          if(fabs(b) > max_val)
          {
             if(fabs(a) > max_val)
@@ -88,7 +88,7 @@ namespace boost{
          // Screen out NaN's first, if either value is a NaN then the distance is "infinite":
          if((boost::math::isnan)(a) || (boost::math::isnan)(b))
             return max_val;
-         // Screen out infinites:
+         // Screen out infinities:
          if(fabs(b) > max_val)
          {
             if(fabs(a) > max_val)

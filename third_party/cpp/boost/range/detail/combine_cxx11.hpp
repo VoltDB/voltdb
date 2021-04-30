@@ -15,8 +15,6 @@
 #include <boost/range/end.hpp>
 #include <boost/iterator/zip_iterator.hpp>
 
-#include <fstream>
-
 namespace boost
 {
     namespace range

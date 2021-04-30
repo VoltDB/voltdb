@@ -80,6 +80,13 @@ namespace impl
                 , -xi_hat
               ) - 1.));
         }
+    
+        // make this accumulator serializeable
+        template<class Archive>
+        void serialize(Archive & ar, const unsigned int file_version)
+        { 
+            ar & sign_;
+        }
 
     private:
         short sign_; // if the fit parameters from the mirrored left tail extreme values are used, mirror back the result

@@ -1,6 +1,6 @@
 // Boost.Geometry (aka GGL, Generic Geometry Library)
 
-// Copyright (c) 2014-2017, Oracle and/or its affiliates.
+// Copyright (c) 2014-2020, Oracle and/or its affiliates.
 
 // Contributed and/or modified by Menelaos Karavelas, on behalf of Oracle
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
@@ -13,14 +13,10 @@
 
 #include <cstddef>
 
-#include <boost/range.hpp>
-
-#include <boost/geometry/core/closure.hpp>
-#include <boost/geometry/core/point_type.hpp>
-#include <boost/geometry/core/tags.hpp>
-
-#include <boost/geometry/util/condition.hpp>
-#include <boost/geometry/util/range.hpp>
+#include <boost/range/begin.hpp>
+#include <boost/range/empty.hpp>
+#include <boost/range/end.hpp>
+#include <boost/range/size.hpp>
 
 #include <boost/geometry/algorithms/equals.hpp>
 #include <boost/geometry/algorithms/validity_failure_type.hpp>
@@ -30,6 +26,12 @@
 #include <boost/geometry/algorithms/detail/num_distinct_consecutive_points.hpp>
 
 #include <boost/geometry/algorithms/dispatch/is_valid.hpp>
+
+#include <boost/geometry/core/closure.hpp>
+#include <boost/geometry/core/point_type.hpp>
+#include <boost/geometry/core/tags.hpp>
+
+#include <boost/geometry/util/condition.hpp>
 
 
 namespace boost { namespace geometry
@@ -48,6 +50,8 @@ struct is_valid_linestring
                              VisitPolicy& visitor,
                              Strategy const& strategy)
     {
+        // TODO: Consider checking coordinates based on coordinate system
+        //       Right now they are only checked for infinity in all systems.
         if (has_invalid_coordinate<Linestring>::apply(linestring, visitor))
         {
             return false;
@@ -60,11 +64,8 @@ struct is_valid_linestring
 
         std::size_t num_distinct = detail::num_distinct_consecutive_points
             <
-                Linestring,
-                3u,
-                true,
-                not_equal_to<typename point_type<Linestring>::type>
-            >::apply(linestring);
+                Linestring, 3u, true
+            >::apply(linestring, strategy);
 
         if (num_distinct < 2u)
         {
@@ -77,11 +78,15 @@ struct is_valid_linestring
             return visitor.template apply<no_failure>();
         }
 
+        // TODO: This algorithm iterates over the linestring until a spike is
+        //   found and only then the decision about the validity is made. This
+        //   is done regardless of VisitPolicy.
+        //   An obvious improvement is to avoid calling the algorithm at all if
+        //   spikes are allowed which is the default.
         return ! has_spikes
                     <
                         Linestring, closed
-                    >::apply(linestring, visitor,
-                             strategy.get_side_strategy());
+                    >::apply(linestring, visitor, strategy);
     }
 };
 

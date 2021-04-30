@@ -60,14 +60,14 @@ inline boost::filesystem::path search_path(
         auto p = pp_ / filename;
         for (boost::filesystem::path ext : extensions)
         {
-            boost::filesystem::path pp = p;
-            pp += ext;
+            boost::filesystem::path pp_ext = p;
+            pp_ext += ext;
             boost::system::error_code ec;
-            bool file = boost::filesystem::is_regular_file(pp, ec);
+            bool file = boost::filesystem::is_regular_file(pp_ext, ec);
             if (!ec && file &&
-                ::boost::winapi::sh_get_file_info(pp.native().c_str(), 0, 0, 0, ::boost::winapi::SHGFI_EXETYPE_))
+                ::boost::winapi::sh_get_file_info(pp_ext.native().c_str(), 0, 0, 0, ::boost::winapi::SHGFI_EXETYPE_))
             {
-                return pp;
+                return pp_ext;
             }
         }
     }

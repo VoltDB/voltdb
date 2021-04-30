@@ -35,7 +35,7 @@ BOOST_HANA_NAMESPACE_BEGIN
     //! @include example/functional/apply.cpp
     //!
     //! [1]: http://en.cppreference.com/w/cpp/utility/functional/invoke
-    //! [2]: http://en.cppreference.com/w/cpp/concept/Callable
+    //! [2]: http://en.cppreference.com/w/cpp/named_req/Callable
 #ifdef BOOST_HANA_DOXYGEN_INVOKED
     constexpr auto apply = [](auto&& f, auto&& ...x) -> decltype(auto) {
         return forwarded(f)(forwarded(x)...);

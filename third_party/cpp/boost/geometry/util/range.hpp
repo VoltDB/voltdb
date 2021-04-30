@@ -2,8 +2,8 @@
 
 // Copyright (c) 2007-2012 Barend Gehrels, Amsterdam, the Netherlands.
 
-// This file was modified by Oracle on 2013, 2014, 2015, 2016.
-// Modifications copyright (c) 2013-2016 Oracle and/or its affiliates.
+// This file was modified by Oracle on 2013-2020.
+// Modifications copyright (c) 2013-2020 Oracle and/or its affiliates.
 
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
@@ -16,28 +16,65 @@
 
 #include <algorithm>
 #include <iterator>
+#include <type_traits>
 
 #include <boost/concept_check.hpp>
 #include <boost/config.hpp>
 #include <boost/core/addressof.hpp>
+#include <boost/mpl/has_xxx.hpp>
 #include <boost/range/concepts.hpp>
 #include <boost/range/begin.hpp>
 #include <boost/range/end.hpp>
 #include <boost/range/empty.hpp>
 #include <boost/range/difference_type.hpp>
+#include <boost/range/has_range_iterator.hpp>
 #include <boost/range/iterator.hpp>
 #include <boost/range/rbegin.hpp>
 #include <boost/range/reference.hpp>
 #include <boost/range/size.hpp>
 #include <boost/range/value_type.hpp>
-#include <boost/type_traits/is_convertible.hpp>
 
 #include <boost/geometry/core/assert.hpp>
 #include <boost/geometry/core/mutable_range.hpp>
 
-namespace boost { namespace geometry { namespace range {
+namespace boost { namespace geometry { namespace range
+{
 
-namespace detail {
+namespace detail
+{
+
+BOOST_MPL_HAS_XXX_TRAIT_DEF(iterator_category)
+
+template <typename T>
+struct is_iterator
+    : std::integral_constant
+        <
+            bool,
+            has_iterator_category
+                <
+                    std::iterator_traits<T>
+                >::value
+        >
+{};
+
+
+template <typename T, bool HasIterator = boost::has_range_iterator<T>::value>
+struct is_range_impl
+    : is_iterator
+        <
+            typename boost::range_iterator<T>::type
+        >
+{};
+template <typename T>
+struct is_range_impl<T, false>
+    : std::false_type
+{};
+
+template <typename T>
+struct is_range
+    : is_range_impl<T>
+{};
+
 
 // NOTE: For SinglePassRanges pos could iterate over all elements until the i-th element was met.
 
@@ -217,7 +254,7 @@ namespace detail {
 
 template <typename It,
           typename OutIt,
-          bool UseMove = boost::is_convertible
+          bool UseMove = std::is_convertible
                             <
                                 typename std::iterator_traits<It>::value_type &&,
                                 typename std::iterator_traits<OutIt>::value_type
@@ -305,7 +342,7 @@ erase(Range & rng,
         it = boost::begin(rng)
                 + std::distance(boost::const_begin(rng), cit);
 
-    return erase(rng, it);
+    return range::erase(rng, it);
 }
 
 /*!
@@ -366,7 +403,7 @@ erase(Range & rng,
         last = boost::begin(rng)
                     + std::distance(boost::const_begin(rng), clast);
 
-    return erase(rng, first, last);
+    return range::erase(rng, first, last);
 }
 
 // back_inserter

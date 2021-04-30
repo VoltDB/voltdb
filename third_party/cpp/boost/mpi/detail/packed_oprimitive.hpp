@@ -38,7 +38,7 @@ public:
 
     void const * address() const
     {
-      return &buffer_[0];
+      return detail::c_data(buffer_);
     }
 
     const std::size_t& size() const
@@ -114,7 +114,7 @@ private:
 
     static buffer_type::value_type* get_data(buffer_type& b)
     {
-      return b.empty() ? 0 : &(b[0]);
+      return detail::c_data(b);
     }
 
   buffer_type& buffer_;

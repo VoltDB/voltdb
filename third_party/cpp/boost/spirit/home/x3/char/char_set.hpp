@@ -33,7 +33,7 @@ namespace boost { namespace spirit { namespace x3
             !is_same<unused_type, attribute_type>::value;
 
 
-        char_range(char_type from_, char_type to_)
+        constexpr char_range(char_type from_, char_type to_)
           : from(from_), to(to_) {}
 
         template <typename Char, typename Context>
@@ -41,9 +41,8 @@ namespace boost { namespace spirit { namespace x3
         {
 
             char_type ch = char_type(ch_);  // optimize for token based parsing
-            return ((sizeof(Char) <= sizeof(char_type)) || encoding::ischar(ch_))
-                        && (get_case_compare<encoding>(context)(ch, from) >= 0 )
-                        && (get_case_compare<encoding>(context)(ch , to) <= 0 );
+            return (get_case_compare<encoding>(context)(ch, from) >= 0)
+               && (get_case_compare<encoding>(context)(ch , to) <= 0);
         }
 
         char_type from, to;
@@ -67,18 +66,11 @@ namespace boost { namespace spirit { namespace x3
         {
             using spirit::x3::detail::cast_char;
 
-            typedef typename
-                remove_const<
-                    typename traits::char_type_of<String>::type
-                >::type
-            in_type;
-
-            in_type const* definition =
-                (in_type const*)traits::get_c_string(str);
-            in_type ch = *definition++;
+            auto* definition = traits::get_c_string(str);
+            auto ch = *definition++;
             while (ch)
             {
-                in_type next = *definition++;
+                auto next = *definition++;
                 if (next == '-')
                 {
                     next = *definition++;
@@ -104,8 +96,7 @@ namespace boost { namespace spirit { namespace x3
         template <typename Char, typename Context>
         bool test(Char ch_, Context const& context) const
         {
-            return ((sizeof(Char) <= sizeof(char_type)) || encoding::ischar(ch_))
-                && get_case_compare<encoding>(context).in_set(ch_,chset);
+            return get_case_compare<encoding>(context).in_set(ch_, chset);
         }
 
         support::detail::basic_chset<char_type> chset;

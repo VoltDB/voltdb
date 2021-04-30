@@ -4,6 +4,10 @@
 // Copyright (c) 2008-2012 Barend Gehrels, Amsterdam, the Netherlands.
 // Copyright (c) 2009-2012 Mateusz Loskot, London, UK.
 
+// This file was modified by Oracle on 2020.
+// Modifications copyright (c) 2020, Oracle and/or its affiliates.
+// Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
+
 // Parts of Boost.Geometry are redesigned from Geodan's Geographic Library
 // (geolib/GGL), copyright (c) 1995-2010 Geodan, Amsterdam, the Netherlands.
 
@@ -34,7 +38,7 @@ struct dot_product_maker
 {
     typedef typename select_coordinate_type<P1, P2>::type coordinate_type;
 
-    static inline coordinate_type apply(P1 const& p1, P2 const& p2)
+    static constexpr coordinate_type apply(P1 const& p1, P2 const& p2)
     {
         return get<Dimension>(p1) * get<Dimension>(p2)
             + dot_product_maker<P1, P2, Dimension+1, DimensionCount>::apply(p1, p2);
@@ -46,7 +50,7 @@ struct dot_product_maker<P1, P2, DimensionCount, DimensionCount>
 {
     typedef typename select_coordinate_type<P1, P2>::type coordinate_type;
 
-    static inline coordinate_type apply(P1 const& p1, P2 const& p2)
+    static constexpr coordinate_type apply(P1 const& p1, P2 const& p2)
     {
         return get<DimensionCount>(p1) * get<DimensionCount>(p2);
     }
@@ -64,8 +68,16 @@ struct dot_product_maker<P1, P2, DimensionCount, DimensionCount>
     \param p1 first point
     \param p2 second point
     \return the dot product
+    
+    \qbk{[heading Examples]}
+    \qbk{[dot_product] [dot_product_output]}
+
  */
 template <typename Point1, typename Point2>
+// workaround for VS2015
+#if !defined(_MSC_VER) || (_MSC_VER >= 1910)
+constexpr
+#endif
 inline typename select_coordinate_type<Point1, Point2>::type dot_product(
         Point1 const& p1, Point2 const& p2)
 {

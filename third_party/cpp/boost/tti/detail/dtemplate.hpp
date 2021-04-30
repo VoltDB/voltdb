@@ -14,7 +14,10 @@
 #include <boost/preprocessor/cat.hpp>
 #include <boost/preprocessor/debug/assert.hpp>
 #include <boost/preprocessor/facilities/is_empty.hpp>
+#include <boost/tti/detail/denclosing_type.hpp>
+#include <boost/tti/gen/namespace_gen.hpp>
 #include <boost/type_traits/is_class.hpp>
+#include <boost/type_traits/is_union.hpp>
 
 #define BOOST_TTI_DETAIL_IS_HELPER_BOOST_PP_NIL
 
@@ -54,12 +57,12 @@
   struct trait \
     { \
     typedef typename \
-  	boost::mpl::eval_if \
-  		< \
-  		boost::is_class<BOOST_TTI_DETAIL_TP_T>, \
-  		BOOST_PP_CAT(trait,_tht)<BOOST_TTI_DETAIL_TP_T>, \
-  		boost::mpl::false_ \
-  		>::type type; \
+    boost::mpl::eval_if \
+        < \
+        BOOST_TTI_NAMESPACE::detail::enclosing_type<BOOST_TTI_DETAIL_TP_T>, \
+        BOOST_PP_CAT(trait,_tht)<BOOST_TTI_DETAIL_TP_T>, \
+        boost::mpl::false_ \
+        >::type type; \
     BOOST_STATIC_CONSTANT(bool,value=type::value); \
     }; \
 /**/

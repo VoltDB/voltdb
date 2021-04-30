@@ -2,8 +2,8 @@
 
 // Copyright (c) 2008-2015 Barend Gehrels, Amsterdam, the Netherlands.
 
-// This file was modified by Oracle on 2017, 2018.
-// Modifications copyright (c) 2017-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2017, 2018, 2019.
+// Modifications copyright (c) 2017-2019, Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle.
 
 // Use, modification and distribution is subject to the Boost Software License,
@@ -60,18 +60,12 @@ namespace projections
             static const double RYM = 0.32573500793527994772;
             //static const double third = 0.333333333333333333;
 
-            // template class, using CRTP to implement forward/inverse
             template <typename T, typename Parameters>
             struct base_crast_spheroid
-                : public base_t_fi<base_crast_spheroid<T, Parameters>, T, Parameters>
             {
-                inline base_crast_spheroid(const Parameters& par)
-                    : base_t_fi<base_crast_spheroid<T, Parameters>, T, Parameters>(*this, par)
-                {}
-
                 // FORWARD(s_forward)  spheroid
                 // Project coordinates from geographic (lon, lat) to cartesian (x, y)
-                inline void fwd(T const& lp_lon, T lp_lat, T& xy_x, T& xy_y) const
+                inline void fwd(Parameters const& , T const& lp_lon, T lp_lat, T& xy_x, T& xy_y) const
                 {
                     static const T third = detail::third<T>();
 
@@ -82,7 +76,7 @@ namespace projections
 
                 // INVERSE(s_inverse)  spheroid
                 // Project coordinates from cartesian (x, y) to geographic (lon, lat)
-                inline void inv(T const& xy_x, T const& xy_y, T& lp_lon, T& lp_lat) const
+                inline void inv(Parameters const& , T const& xy_x, T const& xy_y, T& lp_lon, T& lp_lat) const
                 {
                     static const T third = detail::third<T>();
 
@@ -123,10 +117,9 @@ namespace projections
     struct crast_spheroid : public detail::crast::base_crast_spheroid<T, Parameters>
     {
         template <typename Params>
-        inline crast_spheroid(Params const& , Parameters const& par)
-            : detail::crast::base_crast_spheroid<T, Parameters>(par)
+        inline crast_spheroid(Params const& , Parameters & par)
         {
-            detail::crast::setup_crast(this->m_par);
+            detail::crast::setup_crast(par);
         }
     };
 
@@ -135,7 +128,7 @@ namespace projections
     {
 
         // Static projection
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_crast, crast_spheroid, crast_spheroid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI(srs::spar::proj_crast, crast_spheroid)
 
         // Factory entry(s)
         BOOST_GEOMETRY_PROJECTIONS_DETAIL_FACTORY_ENTRY_FI(crast_entry, crast_spheroid)

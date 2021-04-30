@@ -2,8 +2,8 @@
 
 // Copyright (c) 2007-2015 Barend Gehrels, Amsterdam, the Netherlands.
 
-// This file was modified by Oracle on 2013, 2014, 2015, 2017.
-// Modifications copyright (c) 2013-2017 Oracle and/or its affiliates.
+// This file was modified by Oracle on 2013-2020.
+// Modifications copyright (c) 2013-2020 Oracle and/or its affiliates.
 
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
@@ -26,7 +26,7 @@ namespace detail { namespace relate
 {
 
 template <typename Geometry1, typename Geometry2>
-struct result_handler_type<Geometry1, Geometry2, geometry::de9im::matrix, false>
+struct result_handler_type<Geometry1, Geometry2, geometry::de9im::matrix>
 {
     typedef matrix_handler<geometry::de9im::matrix> type;
 };
@@ -57,7 +57,10 @@ struct relation
                 Matrix
             >::type handler;
 
-        resolve_strategy::relate::apply(geometry1, geometry2, handler, strategy);
+        resolve_strategy::relate
+            <
+                Strategy
+            >::apply(geometry1, geometry2, handler, strategy);
 
         return handler.result();
     }

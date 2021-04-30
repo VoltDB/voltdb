@@ -41,6 +41,10 @@ namespace impl
             extractor<SumFeature> sum;
             return numeric::fdiv(sum(args), count(args));
         }
+
+        // serialization is done by accumulators it depends on
+        template<class Archive>
+        void serialize(Archive & ar, const unsigned int file_version) {}
     };
 
     template<typename Sample, typename Tag>
@@ -69,6 +73,12 @@ namespace impl
         result_type result(dont_care) const
         {
             return this->mean;
+        }
+
+        template<class Archive>
+        void serialize(Archive & ar, const unsigned int file_version)
+        { 
+            ar & mean;
         }
 
     private:

@@ -147,7 +147,7 @@ inline std::pair<const pj_datums_type<T>*, int> pj_get_datums()
                             srs::dpar::ellps_airy}
     };
 
-    return std::make_pair(pj_datums, sizeof(pj_datums) / sizeof(pj_datums[0]));
+    return std::make_pair(pj_datums, (int)(sizeof(pj_datums) / sizeof(pj_datums[0])));
 }
 
 static const pj_prime_meridians_type pj_prime_meridians[] =

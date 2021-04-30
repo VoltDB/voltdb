@@ -36,11 +36,13 @@
     
     The variadic parameters are:
     
-    sequence         = A sequence to test as an identifier.
+    sequence         = A sequence to test as an identifier. <br/>
     ids (optional)   = The data may take one of two forms:
                        it is either one or more single identifiers
                        or a single Boost PP tuple of identifiers.
 
+  @code
+  
     returns = Normally the macro returns nothing. 
     
               If the sequence is an identifier, nothing is 
@@ -58,19 +60,29 @@
               without producing output if the sequence is not an
               identifier.
     
+  @endcode
+  
     Identifiers are registered in VMD with:
     
+  @code
+  
         #define BOOST_VMD_REG_XXX (XXX) where XXX is a v-identifier.
     
+  @endcode
+  
     The identifier must be registered to be found.
     
     Identifiers are pre-detected in VMD with:
     
+  @code
+  
         #define BOOST_VMD_DETECT_XXX_XXX where XXX is an identifier.
     
+  @endcode
+  
     If you specify optional ids and have not specified the detection
     of an optional id, that id will never match an identifier.
-    
+  
 */
 
 /** \def BOOST_VMD_ASSERT_IS_IDENTIFIER_D(d,...)
@@ -85,16 +97,18 @@
     to check or not check by defining the macro 
     BOOST_VMD_ASSERT_DATA to 1 or 0 respectively.
 
-    d         = The next available BOOST_PP_WHILE iteration. 
+    d         = The next available BOOST_PP_WHILE iteration. <br/> 
     ...       = variadic parameters
     
     The variadic parameters are:
     
-    sequence         = A sequence to test as an identifier.
+    sequence         = A sequence to test as an identifier. <br/>
     ids (optional)   = The data may take one of two forms:
                        it is either one or more single identifiers
                        or a single Boost PP tuple of identifiers.
 
+  @code
+  
     returns = Normally the macro returns nothing. 
     
               If the sequence is an identifier, nothing is 
@@ -112,16 +126,26 @@
               without producing output if the sequence is not an
               identifier.
     
+  @endcode
+  
     Identifiers are registered in VMD with:
     
+  @code
+  
         #define BOOST_VMD_REG_XXX (XXX) where XXX is a v-identifier.
     
+  @endcode
+  
     The identifier must be registered to be found.
     
     Identifiers are pre-detected in VMD with:
     
+  @code
+  
         #define BOOST_VMD_DETECT_XXX_XXX where XXX is an identifier.
     
+  @endcode
+  
     If you specify optional ids and have not specified the detection
     of an optional id, that id will never match an identifier.
     

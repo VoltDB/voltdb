@@ -74,12 +74,8 @@ public:
 #endif
     };
 
-#if !defined(BOOST_NO_CXX11_DEFAULTED_FUNCTIONS)
-    aligned_allocator_adaptor() = default;
-#else
     aligned_allocator_adaptor()
         : Allocator() { }
-#endif
 
 #if !defined(BOOST_NO_CXX11_RVALUE_REFERENCES)
     template<class A>

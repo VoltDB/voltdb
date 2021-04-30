@@ -34,7 +34,7 @@ inline T powm1_imp(const T x, const T y, const Policy& pol)
          // so just try it and see:
          T l = y * log(x);
          if (l < 0.5)
-            return boost::math::expm1(l);
+            return boost::math::expm1(l, pol);
          if (l > boost::math::tools::log_max_value<T>())
             return boost::math::policies::raise_overflow_error<T>(function, 0, pol);
          // fall through....

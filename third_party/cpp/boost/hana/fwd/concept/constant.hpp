@@ -202,7 +202,7 @@ BOOST_HANA_NAMESPACE_BEGIN
     //! reasons as explained above, this common type is still provided.
     //!
     //!
-    //! [1]: http://en.cppreference.com/w/cpp/concept/LiteralType
+    //! [1]: http://en.cppreference.com/w/cpp/named_req/LiteralType
     template <typename C>
     struct Constant;
 BOOST_HANA_NAMESPACE_END

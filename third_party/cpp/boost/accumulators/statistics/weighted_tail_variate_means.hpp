@@ -179,6 +179,13 @@ namespace impl
             return make_iterator_range(this->tail_means_);
         }
 
+        // make this accumulator serializeable
+        template<class Archive>
+        void serialize(Archive & ar, const unsigned int file_version)
+        {
+            ar & tail_means_;
+        }
+
     private:
 
         mutable array_type tail_means_;

@@ -10,8 +10,8 @@
 #ifndef BOOST_BEAST_HTTP_DETAIL_BASIC_PARSER_HPP
 #define BOOST_BEAST_HTTP_DETAIL_BASIC_PARSER_HPP
 
-#include <boost/beast/core/static_string.hpp>
 #include <boost/beast/core/string.hpp>
+#include <boost/beast/core/detail/char_buffer.hpp>
 #include <boost/beast/http/error.hpp>
 #include <boost/beast/http/detail/rfc7230.hpp>
 #include <boost/config.hpp>
@@ -127,7 +127,7 @@ struct basic_parser_base
     BOOST_BEAST_DECL
     static
     bool
-    parse_dec(char const* it, char const* last, std::uint64_t& v);
+    parse_dec(string_view s, std::uint64_t& v);
 
     BOOST_BEAST_DECL
     static
@@ -182,7 +182,7 @@ struct basic_parser_base
         char const* last,
         string_view& name,
         string_view& value,
-        static_string<max_obs_fold>& buf,
+        beast::detail::char_buffer<max_obs_fold>& buf,
         error_code& ec);
 
     BOOST_BEAST_DECL

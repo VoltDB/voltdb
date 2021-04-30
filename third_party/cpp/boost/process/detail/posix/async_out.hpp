@@ -19,6 +19,8 @@
 #include <memory>
 #include <exception>
 #include <future>
+#include <array>
+#include <boost/process/detail/used_handles.hpp>
 
 namespace boost { namespace process { namespace detail { namespace posix {
 
@@ -45,11 +47,23 @@ inline int apply_out_handles(int handle, std::integral_constant<int, 1>, std::in
 
 template<int p1, int p2, typename Buffer>
 struct async_out_buffer : ::boost::process::detail::posix::handler_base_ext,
-                          ::boost::process::detail::posix::require_io_context
+                          ::boost::process::detail::posix::require_io_context,
+                          ::boost::process::detail::uses_handles
 {
     Buffer & buf;
 
     std::shared_ptr<boost::process::async_pipe> pipe;
+
+    std::array<int, 4> get_used_handles()
+    {
+        const auto pp1 = p1 != -1 ? p1 : p2;
+        const auto pp2 = p2 != -1 ? p2 : p1;
+
+        if (pipe)
+            return {pipe->native_source(), pipe->native_sink(), pp1, pp2};
+        else  //if pipe is not constructed, limit_ds is invoked before -> this also means on_exec_setup gets invoked before.
+            return {pp1, pp2, pp1, pp2};
+    }
 
 
     async_out_buffer(Buffer & buf) : buf(buf)
@@ -131,8 +145,11 @@ struct async_out_future : ::boost::process::detail::posix::handler_base_ext,
                     {
                         std::istream is (buffer_.get());
                         Type arg;
-                        arg.resize(buffer_->size());
-                        is.read(&*arg.begin(), buffer_->size());
+                        if (buffer_->size() > 0)
+                        {
+                            arg.resize(buffer_->size());
+                            is.read(&*arg.begin(), buffer_->size());
+                        }
                         promise_->set_value(std::move(arg));
                     }
                 });

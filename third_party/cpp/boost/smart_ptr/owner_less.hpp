@@ -14,6 +14,8 @@
 //  See http://www.boost.org/libs/smart_ptr/ for documentation.
 //
 
+#include <boost/config.hpp>
+
 namespace boost
 {
 
@@ -23,7 +25,7 @@ template<class T = void> struct owner_less
     typedef T first_argument_type;
     typedef T second_argument_type;
 
-    template<class U, class V> bool operator()( U const & u, V const & v ) const
+    template<class U, class V> bool operator()( U const & u, V const & v ) const BOOST_NOEXCEPT
     {
         return u.owner_before( v );
     }

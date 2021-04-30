@@ -1,5 +1,5 @@
 // Copyright 2014-2015 Renato Tegon Forti, Antony Polukhin.
-// Copyright 2016-2019 Antony Polukhin.
+// Copyright 2016-2021 Antony Polukhin.
 //
 // Distributed under the Boost Software License, Version 1.0.
 // (See accompanying file LICENSE_1_0.txt

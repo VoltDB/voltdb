@@ -22,15 +22,20 @@
 /** \file
 */
 
-/// Expands to a metafunction which tests whether member data or static member with a particular name and type exists.
+/// A macro which expands to a metafunction which tests whether member data or static member data with a particular name and type exists.
 /**
 
-    trait = the name of the metafunction.
+    BOOST_TTI_TRAIT_HAS_DATA is a macro which expands to a metafunction.
+    The metafunction tests whether member data or static member data with a particular
+    name and type exists. The macro takes the form of BOOST_TTI_TRAIT_HAS_DATA(trait,name) where
     
-    name  = the name of the inner member to introspect.
+    trait = the name of the metafunction <br/>
+    name  = the name of the inner data.
 
-    generates a metafunction called "trait" where 'trait' is the macro parameter.
+    BOOST_TTI_TRAIT_HAS_DATA generates a metafunction called "trait" where 'trait' is the macro parameter.
     
+  @code
+  
               template<class BOOST_TTI_TP_T,class BOOST_TTI_TP_TYPE>
               struct trait
                 {
@@ -41,12 +46,19 @@
               The metafunction types and return:
     
                 BOOST_TTI_TP_T    = the enclosing type in which to look for our 'name'
+                                    The enclosing type can be a class, struct, or union.
+                                    If the type is a union, static member data can only
+                                    be found if the C++11 unrestricted union is implemented
+                                    by the compiler being used, since prior to C++11 a union
+                                    could not have static data members.
                 
                 BOOST_TTI_TP_TYPE = The type of the member data or static member.
                 
                 returns  = 'value' is true if the 'name' exists, with the correct data type,
                            otherwise 'value' is false.
                           
+  @endcode
+  
 */
 #define BOOST_TTI_TRAIT_HAS_DATA(trait,name) \
   BOOST_TTI_DETAIL_TRAIT_HAS_DATA(trait,name) \
@@ -63,15 +75,21 @@
     }; \
 /**/
 
-/// Expands to a metafunction which tests whether member data or static member data with a particular name and type exists.
+/// A macro which expands to a metafunction which tests whether member data or static member data with a particular name and type exists.
 /**
 
-    name  = the name of the inner member.
-
-    generates a metafunction called "has_data_name" where 'name' is the macro parameter.
+    BOOST_TTI_HAS_DATA is a macro which expands to a metafunction.
+    The metafunction tests whether member data or static member data with a particular
+    name and type exists. The macro takes the form of BOOST_TTI_HAS_DATA(name) where
     
+    name  = the name of the inner data.
+    
+    BOOST_TTI_HAS_DATA generates a metafunction called "has_data_name" where 'name' is the macro parameter.
+    
+  @code
+  
               template<class BOOST_TTI_TP_T,class BOOST_TTI_TP_TYPE>
-              struct has_data_name
+              struct has_data_'name'
                 {
                 static const value = unspecified;
                 typedef mpl::bool_<true-or-false> type;
@@ -80,12 +98,19 @@
               The metafunction types and return:
     
                 BOOST_TTI_TP_T    = the enclosing type in which to look for our 'name'
+                                    The enclosing type can be a class, struct, or union.
+                                    If the type is a union, static member data can only
+                                    be found if the C++11 unrestricted union is implemented
+                                    by the compiler being used, since prior to C++11 a union
+                                    could not have static data members.
                 
                 BOOST_TTI_TP_TYPE = The type of the member data or static member.
                 
                 returns  = 'value' is true if the 'name' exists, with the correct data type,
                            otherwise 'value' is false.
                           
+  @endcode
+  
 */
 #define BOOST_TTI_HAS_DATA(name) \
   BOOST_TTI_TRAIT_HAS_DATA \

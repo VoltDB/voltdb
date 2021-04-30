@@ -28,7 +28,7 @@ namespace detail
 class codecvt_category_t : public std::error_category
 {
 public:
-    codecvt_category_t(){}
+    codecvt_category_t() = default;
     const char* name() const noexcept override {return "codecvt";}
     std::string message(int ev) const override
     {

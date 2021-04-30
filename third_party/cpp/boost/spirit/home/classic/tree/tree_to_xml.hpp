@@ -7,8 +7,8 @@
   file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 =============================================================================*/
 
-#if !defined(TREE_TO_XML_HPP)
-#define TREE_TO_XML_HPP
+#ifndef BOOST_SPIRIT_CLASSIC_TREE_TREE_TO_XML_HPP
+#define BOOST_SPIRIT_CLASSIC_TREE_TREE_TO_XML_HPP
 
 #include <boost/spirit/home/classic/namespace.hpp>
 
@@ -112,5 +112,5 @@ BOOST_SPIRIT_CLASSIC_NAMESPACE_END
 
 #include <boost/spirit/home/classic/tree/impl/tree_to_xml.ipp>
 
-#endif // !defined(TREE_TO_XML_HPP)
+#endif
 

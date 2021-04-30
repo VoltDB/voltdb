@@ -2,8 +2,8 @@
 
 // Copyright (c) 2011-2012 Barend Gehrels, Amsterdam, the Netherlands.
 
-// This file was modified by Oracle on 2016, 2018.
-// Modifications copyright (c) 2016-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2016-2020.
+// Modifications copyright (c) 2016-2020, Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
 // Use, modification and distribution is subject to the Boost Software License,
@@ -22,9 +22,10 @@
 #include <boost/geometry/util/promote_floating_point.hpp>
 #include <boost/geometry/util/select_calculation_type.hpp>
 
+#include <boost/geometry/strategy/spherical/envelope.hpp>
+
 #include <boost/geometry/strategies/side.hpp>
 #include <boost/geometry/strategies/spherical/disjoint_segment_box.hpp>
-#include <boost/geometry/strategies/spherical/envelope.hpp>
 //#include <boost/geometry/strategies/concepts/side_concept.hpp>
 #include <boost/geometry/strategies/spherical/point_in_point.hpp>
 
@@ -85,6 +86,8 @@ class spherical_side_formula
 {
 
 public :
+    typedef spherical_tag cs_tag;
+
     typedef strategy::envelope::spherical<CalculationType> envelope_strategy_type;
 
     static inline envelope_strategy_type get_envelope_strategy()

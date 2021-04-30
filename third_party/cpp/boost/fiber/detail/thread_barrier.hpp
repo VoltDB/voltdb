@@ -51,9 +51,8 @@ public:
             lk.unlock(); // no pessimization
             cond_.notify_all();
             return true;
-        } else {
-            cond_.wait( lk, [&](){ return cycle != cycle_; });
         }
+        cond_.wait( lk, [&](){ return cycle != cycle_; });
         return false;
     }
 };

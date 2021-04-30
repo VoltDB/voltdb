@@ -14,7 +14,10 @@
 #include <boost/geometry/algorithms/detail/distance/segment_to_box.hpp>
 
 #include <boost/geometry/strategies/cartesian/distance_projected_point.hpp>
+#include <boost/geometry/strategies/cartesian/distance_pythagoras.hpp>
+#include <boost/geometry/strategies/cartesian/distance_pythagoras_point_box.hpp>
 #include <boost/geometry/strategies/cartesian/point_in_point.hpp>
+#include <boost/geometry/strategies/cartesian/side_by_triangle.hpp>
 
 namespace boost { namespace geometry
 {
@@ -43,6 +46,8 @@ struct cartesian_segment_box
           >
     {};
 
+    typedef cartesian_tag cs_tag;
+
     // point-point strategy getters
     struct distance_pp_strategy
     {
@@ -62,6 +67,23 @@ struct cartesian_segment_box
     inline typename distance_ps_strategy::type get_distance_ps_strategy() const
     {
         return typename distance_ps_strategy::type();
+    }
+
+    struct distance_pb_strategy
+    {
+        typedef pythagoras_point_box<CalculationType> type;
+    };
+
+    inline typename distance_pb_strategy::type get_distance_pb_strategy() const
+    {
+        return typename distance_pb_strategy::type();
+    }
+
+    typedef side::side_by_triangle<CalculationType> side_strategy_type;
+
+    static inline side_strategy_type get_side_strategy()
+    {
+        return side_strategy_type();
     }
 
     typedef within::cartesian_point_point equals_point_point_strategy_type;

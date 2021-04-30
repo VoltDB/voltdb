@@ -1,4 +1,5 @@
 // Copyright 2015-2018 Klemens D. Morgenstern
+// Copyright 2019-2021 Antony Polukhin
 //
 // Distributed under the Boost Software License, Version 1.0.
 // (See accompanying file LICENSE_1_0.txt
@@ -7,9 +8,17 @@
 #ifndef BOOST_DLL_IMPORT_CLASS_HPP_
 #define BOOST_DLL_IMPORT_CLASS_HPP_
 
+/// \file boost/dll/import_class.hpp
+/// \warning Extremely experimental! Requires C++11! Will change in next version of Boost! boost/dll/import_class.hpp is not included in boost/dll.hpp
+/// \brief Contains the boost::dll::experimental::import_class function for importing classes.
+
 #include <boost/dll/smart_library.hpp>
 #include <boost/dll/import_mangled.hpp>
 #include <memory>
+
+#if (__cplusplus < 201103L) && (!defined(_MSVC_LANG) || _MSVC_LANG < 201103L)
+#  error This file requires C++11 at least!
+#endif
 
 #ifdef BOOST_HAS_PRAGMA_ONCE
 # pragma once

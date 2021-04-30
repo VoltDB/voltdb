@@ -14,6 +14,8 @@
 
 #include <iterator>
 
+#include <boost/config.hpp>
+
 namespace boost { namespace algorithm {
 
 namespace detail {

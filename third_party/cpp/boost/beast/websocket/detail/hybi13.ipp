@@ -27,18 +27,12 @@ void
 make_sec_ws_key(sec_ws_key_type& key)
 {
     auto g = make_prng(true);
-    char a[16];
-    for(int i = 0; i < 16; i += 4)
-    {
-        auto const v = g();
-        a[i  ] =  v        & 0xff;
-        a[i+1] = (v >>  8) & 0xff;
-        a[i+2] = (v >> 16) & 0xff;
-        a[i+3] = (v >> 24) & 0xff;
-    }
+    std::uint32_t a[4];
+    for (auto& v : a)
+        v = g();
     key.resize(key.max_size());
     key.resize(beast::detail::base64::encode(
-        key.data(), &a[0], 16));
+        key.data(), &a[0], sizeof(a)));
 }
 
 void
@@ -47,11 +41,12 @@ make_sec_ws_accept(
     string_view key)
 {
     BOOST_ASSERT(key.size() <= sec_ws_key_type::max_size_n);
-    static_string<sec_ws_key_type::max_size_n + 36> m(key);
-    m.append("258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
+    using namespace beast::detail::string_literals;
+    auto const guid = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"_sv;
     beast::detail::sha1_context ctx;
     beast::detail::init(ctx);
-    beast::detail::update(ctx, m.data(), m.size());
+    beast::detail::update(ctx, key.data(), key.size());
+    beast::detail::update(ctx, guid.data(), guid.size());
     char digest[beast::detail::sha1_context::digest_size];
     beast::detail::finish(ctx, &digest[0]);
     accept.resize(accept.max_size());

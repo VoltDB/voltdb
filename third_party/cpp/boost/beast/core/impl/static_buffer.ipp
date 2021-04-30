@@ -11,12 +11,8 @@
 #define BOOST_BEAST_IMPL_STATIC_BUFFER_IPP
 
 #include <boost/beast/core/static_buffer.hpp>
-#include <boost/beast/core/detail/type_traits.hpp>
 #include <boost/asio/buffer.hpp>
 #include <boost/throw_exception.hpp>
-#include <algorithm>
-#include <cstring>
-#include <iterator>
 #include <stdexcept>
 
 namespace boost {
@@ -60,7 +56,7 @@ data() const noexcept ->
 auto
 static_buffer_base::
 data() noexcept ->
-    mutable_data_type
+    mutable_buffers_type
 {
     if(in_off_ + in_size_ <= capacity_)
         return {

@@ -141,7 +141,7 @@ public:
    RR const& operator+()const
    { return *this; }
 
-   // RR compatibity:
+   // RR compatibility:
    const ::NTL::ZZ& mantissa() const
    { return m_value.mantissa(); }
    long exponent() const
@@ -838,7 +838,7 @@ namespace ntl{
 namespace detail{
 
 template <class Policy>
-ntl::RR digamma_imp(ntl::RR x, const mpl::int_<0>* , const Policy& pol)
+ntl::RR digamma_imp(ntl::RR x, const std::integral_constant<int, 0>* , const Policy& pol)
 {
    //
    // This handles reflection of negative arguments, and all our

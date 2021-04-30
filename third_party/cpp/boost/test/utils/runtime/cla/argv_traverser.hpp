@@ -48,7 +48,7 @@ public:
     /// Returns new argc
     int         remainder()
     {
-        return m_argc;
+        return static_cast<int>(m_argc);
     }
 
     /// Returns true, if we reached end on input

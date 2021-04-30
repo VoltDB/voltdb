@@ -2,8 +2,8 @@
 
 // Copyright (c) 2008-2015 Barend Gehrels, Amsterdam, the Netherlands.
 
-// This file was modified by Oracle on 2017, 2018.
-// Modifications copyright (c) 2017-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2017, 2018, 2019.
+// Modifications copyright (c) 2017-2019, Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle.
 
 // Use, modification and distribution is subject to the Boost Software License,
@@ -69,20 +69,14 @@ namespace projections
                 detail::en<T> en;
             };
 
-            // template class, using CRTP to implement forward/inverse
             template <typename T, typename Parameters>
             struct base_poly_ellipsoid
-                : public base_t_fi<base_poly_ellipsoid<T, Parameters>, T, Parameters>
             {
                 par_poly<T> m_proj_parm;
 
-                inline base_poly_ellipsoid(const Parameters& par)
-                    : base_t_fi<base_poly_ellipsoid<T, Parameters>, T, Parameters>(*this, par)
-                {}
-
                 // FORWARD(e_forward)  ellipsoid
                 // Project coordinates from geographic (lon, lat) to cartesian (x, y)
-                inline void fwd(T lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
+                inline void fwd(Parameters const& par, T lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
                 {
                     T  ms, sp, cp;
 
@@ -91,7 +85,7 @@ namespace projections
                         xy_y = -this->m_proj_parm.ml0;
                     } else {
                         sp = sin(lp_lat);
-                        ms = fabs(cp = cos(lp_lat)) > tolerance ? pj_msfn(sp, cp, this->m_par.es) / sp : 0.;
+                        ms = fabs(cp = cos(lp_lat)) > tolerance ? pj_msfn(sp, cp, par.es) / sp : 0.;
                         xy_x = ms * sin(lp_lon *= sp);
                         xy_y = (pj_mlfn(lp_lat, sp, cp, this->m_proj_parm.en) - this->m_proj_parm.ml0) + ms * (1. - cos(lp_lon));
                     }
@@ -99,7 +93,7 @@ namespace projections
 
                 // INVERSE(e_inverse)  ellipsoid
                 // Project coordinates from cartesian (x, y) to geographic (lon, lat)
-                inline void inv(T const& xy_x, T xy_y, T& lp_lon, T& lp_lat) const
+                inline void inv(Parameters const& par, T const& xy_x, T xy_y, T& lp_lon, T& lp_lat) const
                 {
                     xy_y += this->m_proj_parm.ml0;
                     if (fabs(xy_y) <= tolerance) {
@@ -116,13 +110,13 @@ namespace projections
                             if (fabs(cp) < i_tolerance) {
                                 BOOST_THROW_EXCEPTION( projection_exception(error_tolerance_condition) );
                             }
-                            c = sp * (mlp = sqrt(1. - this->m_par.es * sp * sp)) / cp;
+                            c = sp * (mlp = sqrt(1. - par.es * sp * sp)) / cp;
                             ml = pj_mlfn(lp_lat, sp, cp, this->m_proj_parm.en);
                             mlb = ml * ml + r;
-                            mlp = this->m_par.one_es / (mlp * mlp * mlp);
+                            mlp = par.one_es / (mlp * mlp * mlp);
                             lp_lat += ( dPhi =
                                 ( ml + ml + c * mlb - 2. * xy_y * (c * ml + 1.) ) / (
-                                this->m_par.es * s2ph * (mlb - 2. * xy_y * ml) / c +
+                                par.es * s2ph * (mlb - 2. * xy_y * ml) / c +
                                 2.* (xy_y - ml) * (c * mlp - 1. / s2ph) - mlp - mlp ));
                             if (fabs(dPhi) <= i_tolerance)
                                 break;
@@ -131,7 +125,7 @@ namespace projections
                             BOOST_THROW_EXCEPTION( projection_exception(error_tolerance_condition) );
                         }
                         c = sin(lp_lat);
-                        lp_lon = asin(xy_x * tan(lp_lat) * sqrt(1. - this->m_par.es * c * c)) / sin(lp_lat);
+                        lp_lon = asin(xy_x * tan(lp_lat) * sqrt(1. - par.es * c * c)) / sin(lp_lat);
                     }
                 }
 
@@ -142,20 +136,14 @@ namespace projections
 
             };
 
-            // template class, using CRTP to implement forward/inverse
             template <typename T, typename Parameters>
             struct base_poly_spheroid
-                : public base_t_fi<base_poly_spheroid<T, Parameters>, T, Parameters>
             {
                 par_poly<T> m_proj_parm;
 
-                inline base_poly_spheroid(const Parameters& par)
-                    : base_t_fi<base_poly_spheroid<T, Parameters>, T, Parameters>(*this, par)
-                {}
-
                 // FORWARD(s_forward)  spheroid
                 // Project coordinates from geographic (lon, lat) to cartesian (x, y)
-                inline void fwd(T const& lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
+                inline void fwd(Parameters const& par, T const& lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
                 {
                     T  cot, E;
 
@@ -165,18 +153,18 @@ namespace projections
                     } else {
                         cot = 1. / tan(lp_lat);
                         xy_x = sin(E = lp_lon * sin(lp_lat)) * cot;
-                        xy_y = lp_lat - this->m_par.phi0 + cot * (1. - cos(E));
+                        xy_y = lp_lat - par.phi0 + cot * (1. - cos(E));
                     }
                 }
 
                 // INVERSE(s_inverse)  spheroid
                 // Project coordinates from cartesian (x, y) to geographic (lon, lat)
-                inline void inv(T const& xy_x, T xy_y, T& lp_lon, T& lp_lat) const
+                inline void inv(Parameters const& par, T const& xy_x, T xy_y, T& lp_lon, T& lp_lat) const
                 {
                     T B, dphi, tp;
                     int i;
 
-                    if (fabs(xy_y = this->m_par.phi0 + xy_y) <= tolerance) {
+                    if (fabs(xy_y = par.phi0 + xy_y) <= tolerance) {
                         lp_lon = xy_x;
                         lp_lat = 0.;
                     } else {
@@ -205,7 +193,7 @@ namespace projections
 
             // Polyconic (American)
             template <typename Parameters, typename T>
-            inline void setup_poly(Parameters& par, par_poly<T>& proj_parm)
+            inline void setup_poly(Parameters const& par, par_poly<T>& proj_parm)
             {
                 if (par.es != 0.0) {
                     proj_parm.en = pj_enfn<T>(par.es);
@@ -236,9 +224,8 @@ namespace projections
     {
         template <typename Params>
         inline poly_ellipsoid(Params const& , Parameters const& par)
-            : detail::poly::base_poly_ellipsoid<T, Parameters>(par)
         {
-            detail::poly::setup_poly(this->m_par, this->m_proj_parm);
+            detail::poly::setup_poly(par, this->m_proj_parm);
         }
     };
 
@@ -260,9 +247,8 @@ namespace projections
     {
         template <typename Params>
         inline poly_spheroid(Params const& , Parameters const& par)
-            : detail::poly::base_poly_spheroid<T, Parameters>(par)
         {
-            detail::poly::setup_poly(this->m_par, this->m_proj_parm);
+            detail::poly::setup_poly(par, this->m_proj_parm);
         }
     };
 
@@ -271,7 +257,7 @@ namespace projections
     {
 
         // Static projection
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_poly, poly_spheroid, poly_ellipsoid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI2(srs::spar::proj_poly, poly_spheroid, poly_ellipsoid)
 
         // Factory entry(s)
         BOOST_GEOMETRY_PROJECTIONS_DETAIL_FACTORY_ENTRY_FI2(poly_entry, poly_spheroid, poly_ellipsoid)

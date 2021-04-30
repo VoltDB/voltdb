@@ -16,15 +16,17 @@
 
 #if BOOST_WINAPI_PARTITION_DESKTOP
 
+#include <boost/winapi/detail/header.hpp>
+
 #if !defined( BOOST_USE_WINDOWS_H )
 extern "C" {
 BOOST_WINAPI_DETAIL_DECLARE_HANDLE(HWND);
 
-BOOST_SYMBOL_IMPORT boost::winapi::BOOL_ BOOST_WINAPI_WINAPI_CC ShowWindow(
+BOOST_WINAPI_IMPORT_EXCEPT_WM boost::winapi::BOOL_ BOOST_WINAPI_WINAPI_CC ShowWindow(
     HWND hWnd,
     int nCmdShow);
 
-BOOST_SYMBOL_IMPORT boost::winapi::BOOL_ BOOST_WINAPI_WINAPI_CC ShowWindowAsync(
+BOOST_WINAPI_IMPORT boost::winapi::BOOL_ BOOST_WINAPI_WINAPI_CC ShowWindowAsync(
     HWND hWnd,
     int nCmdShow);
 } // extern "C"
@@ -95,6 +97,8 @@ BOOST_CONSTEXPR_OR_CONST DWORD_ SW_OTHERUNZOOM_      = 4;
 
 }
 }
+
+#include <boost/winapi/detail/footer.hpp>
 
 #endif // BOOST_WINAPI_PARTITION_DESKTOP
 

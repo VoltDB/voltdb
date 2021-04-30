@@ -9,6 +9,8 @@
 
 #include <boost/spirit/home/x3/string/detail/tst.hpp>
 
+#include <string>
+
 namespace boost { namespace spirit { namespace x3
 {
     struct tst_pass_through

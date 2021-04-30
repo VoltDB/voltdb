@@ -83,7 +83,7 @@ inline type_index runtime_class_construct_type_id(T const*) {
 /// \param base_class_seq A Boost.Preprocessor sequence of the current class' direct bases, or
 /// BOOST_TYPE_INDEX_NO_BASE_CLASS if this class has no direct base classes.
 #define BOOST_TYPE_INDEX_REGISTER_RUNTIME_CLASS(base_class_seq)                                                          \
-    BOOST_TYPE_INDEX_REGISTER_CLASS 																					 \
+    BOOST_TYPE_INDEX_REGISTER_CLASS                                                                                      \
     BOOST_TYPE_INDEX_IMPLEMENT_RUNTIME_CAST(base_class_seq)
 
 /// \def BOOST_TYPE_INDEX_IMPLEMENT_RUNTIME_CAST

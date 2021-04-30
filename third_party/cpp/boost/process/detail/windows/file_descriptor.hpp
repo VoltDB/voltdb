@@ -11,6 +11,7 @@
 #include <boost/winapi/file_management.hpp>
 #include <string>
 #include <boost/filesystem/path.hpp>
+#include <boost/core/exchange.hpp>
 
 namespace boost { namespace process { namespace detail { namespace windows {
 
@@ -90,10 +91,18 @@ struct file_descriptor
 
 }
     file_descriptor(const file_descriptor & ) = delete;
-    file_descriptor(file_descriptor && ) = default;
+    file_descriptor(file_descriptor &&other)
+        : _handle( boost::exchange(other._handle, ::boost::winapi::INVALID_HANDLE_VALUE_) )
+    {
+    }
 
     file_descriptor& operator=(const file_descriptor & ) = delete;
-    file_descriptor& operator=(file_descriptor && ) = default;
+    file_descriptor& operator=(file_descriptor &&other)
+    {
+        if (_handle != ::boost::winapi::INVALID_HANDLE_VALUE_)
+            ::boost::winapi::CloseHandle(_handle);
+        _handle = boost::exchange(other._handle, ::boost::winapi::INVALID_HANDLE_VALUE_);
+    }
 
     ~file_descriptor()
     {

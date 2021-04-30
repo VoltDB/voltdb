@@ -1,6 +1,6 @@
 // Boost.Geometry
 
-// Copyright (c) 2016-2017 Oracle and/or its affiliates.
+// Copyright (c) 2016-2020 Oracle and/or its affiliates.
 
 // Contributed and/or modified by Vissarion Fysikopoulos, on behalf of Oracle
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
@@ -13,10 +13,9 @@
 #define BOOST_GEOMETRY_FORMULAS_MAXIMUM_LATITUDE_HPP
 
 
+#include <boost/geometry/core/static_assert.hpp>
 #include <boost/geometry/formulas/flattening.hpp>
 #include <boost/geometry/formulas/spherical.hpp>
-
-#include <boost/mpl/assert.hpp>
 
 
 namespace boost { namespace geometry { namespace formula
@@ -127,11 +126,9 @@ public:
 template <typename CT, typename CS_Tag>
 struct vertex_latitude
 {
-    BOOST_MPL_ASSERT_MSG
-         (
-             false, NOT_IMPLEMENTED_FOR_THIS_COORDINATE_SYSTEM, (types<CS_Tag>)
-         );
-
+    BOOST_GEOMETRY_STATIC_ASSERT_FALSE(
+        "Not implemented for this coordinate system.",
+        CT, CS_Tag);
 };
 
 template <typename CT>

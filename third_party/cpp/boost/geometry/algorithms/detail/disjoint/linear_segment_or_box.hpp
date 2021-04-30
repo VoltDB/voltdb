@@ -5,8 +5,8 @@
 // Copyright (c) 2009-2014 Mateusz Loskot, London, UK.
 // Copyright (c) 2013-2014 Adam Wulkiewicz, Lodz, Poland.
 
-// This file was modified by Oracle on 2013-2014.
-// Modifications copyright (c) 2013-2014, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2013-2020.
+// Modifications copyright (c) 2013-2020, Oracle and/or its affiliates.
 
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 // Contributed and/or modified by Menelaos Karavelas, on behalf of Oracle
@@ -21,19 +21,14 @@
 #ifndef BOOST_GEOMETRY_ALGORITHMS_DETAIL_DISJOINT_LINEAR_SEGMENT_OR_BOX_HPP
 #define BOOST_GEOMETRY_ALGORITHMS_DETAIL_DISJOINT_LINEAR_SEGMENT_OR_BOX_HPP
 
-#include <boost/range.hpp>
-#include <boost/geometry/util/range.hpp>
-
-#include <boost/geometry/core/closure.hpp>
-
-#include <boost/geometry/geometries/segment.hpp>
-
-#include <boost/geometry/algorithms/not_implemented.hpp>
-
-#include <boost/geometry/views/closeable_view.hpp>
 
 #include <boost/geometry/algorithms/detail/disjoint/multirange_geometry.hpp>
 #include <boost/geometry/algorithms/dispatch/disjoint.hpp>
+#include <boost/geometry/algorithms/not_implemented.hpp>
+#include <boost/geometry/core/closure.hpp>
+#include <boost/geometry/geometries/segment.hpp>
+#include <boost/geometry/util/range.hpp>
+#include <boost/geometry/views/closeable_view.hpp>
 
 
 namespace boost { namespace geometry
@@ -43,6 +38,42 @@ namespace boost { namespace geometry
 #ifndef DOXYGEN_NO_DETAIL
 namespace detail { namespace disjoint
 {
+
+
+template
+<
+    typename SegmentOrBox,
+    typename Tag = typename tag<SegmentOrBox>::type
+>
+struct disjoint_point_segment_or_box
+    : not_implemented<Tag>
+{};
+
+template <typename Segment>
+struct disjoint_point_segment_or_box<Segment, segment_tag>
+{
+    template <typename Point, typename Strategy>
+    static inline bool apply(Point const& point, Segment const& segment, Strategy const& strategy)
+    {
+        return dispatch::disjoint
+            <
+                Point, Segment
+            >::apply(point, segment, strategy);
+    }
+};
+
+template <typename Box>
+struct disjoint_point_segment_or_box<Box, box_tag>
+{
+    template <typename Point, typename Strategy>
+    static inline bool apply(Point const& point, Box const& box, Strategy const& strategy)
+    {
+        return dispatch::disjoint
+            <
+                Point, Box
+            >::apply(point, box, strategy);
+    }
+};
 
 
 template
@@ -83,12 +114,12 @@ struct disjoint_range_segment_or_box
         }
         else if ( count == 1 )
         {
-            return dispatch::disjoint
+            return disjoint_point_segment_or_box
                 <
-                    point_type, SegmentOrBox
+                    SegmentOrBox
                 >::apply(geometry::range::front<view_type const>(view),
                          segment_or_box,
-                         strategy.template get_point_in_geometry_strategy<Range, SegmentOrBox>());
+                         strategy);
         }
         else
         {
@@ -98,7 +129,9 @@ struct disjoint_range_segment_or_box
 
             for ( ; it1 != last ; ++it0, ++it1 )
             {
-                range_segment rng_segment(*it0, *it1);
+                point_type const& p0 = *it0;
+                point_type const& p1 = *it1;
+                range_segment rng_segment(p0, p1);
                 if ( !dispatch::disjoint
                          <
                              range_segment, SegmentOrBox

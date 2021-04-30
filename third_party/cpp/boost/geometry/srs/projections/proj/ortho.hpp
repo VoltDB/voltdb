@@ -2,8 +2,8 @@
 
 // Copyright (c) 2008-2015 Barend Gehrels, Amsterdam, the Netherlands.
 
-// This file was modified by Oracle on 2017, 2018.
-// Modifications copyright (c) 2017-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2017, 2018, 2019.
+// Modifications copyright (c) 2017-2019, Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle.
 
 // Use, modification and distribution is subject to the Boost Software License,
@@ -75,20 +75,14 @@ namespace projections
 
             static const double epsilon10 = 1.e-10;
 
-            // template class, using CRTP to implement forward/inverse
             template <typename T, typename Parameters>
             struct base_ortho_spheroid
-                : public base_t_fi<base_ortho_spheroid<T, Parameters>, T, Parameters>
             {
                 par_ortho<T> m_proj_parm;
 
-                inline base_ortho_spheroid(const Parameters& par)
-                    : base_t_fi<base_ortho_spheroid<T, Parameters>, T, Parameters>(*this, par)
-                {}
-
                 // FORWARD(s_forward)  spheroid
                 // Project coordinates from geographic (lon, lat) to cartesian (x, y)
-                inline void fwd(T const& lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
+                inline void fwd(Parameters const& par, T const& lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
                 {
                     static const T half_pi = detail::half_pi<T>();
 
@@ -114,7 +108,7 @@ namespace projections
                         coslam = - coslam;
                         BOOST_FALLTHROUGH;
                     case s_pole:
-                        if (fabs(lp_lat - this->m_par.phi0) - epsilon10 > half_pi) {
+                        if (fabs(lp_lat - par.phi0) - epsilon10 > half_pi) {
                             BOOST_THROW_EXCEPTION( projection_exception(error_tolerance_condition) );
                         }
                         xy_y = cosphi * coslam;
@@ -125,7 +119,7 @@ namespace projections
 
                 // INVERSE(s_inverse)  spheroid
                 // Project coordinates from cartesian (x, y) to geographic (lon, lat)
-                inline void inv(T xy_x, T xy_y, T& lp_lon, T& lp_lat) const
+                inline void inv(Parameters const& par, T xy_x, T xy_y, T& lp_lon, T& lp_lat) const
                 {
                     static const T half_pi = detail::half_pi<T>();
 
@@ -139,7 +133,7 @@ namespace projections
                     }
                     cosc = sqrt(1. - sinc * sinc); /* in this range OK */
                     if (fabs(rh) <= epsilon10) {
-                        lp_lat = this->m_par.phi0;
+                        lp_lat = par.phi0;
                         lp_lon = 0.0;
                     } else {
                         switch (this->m_proj_parm.mode) {
@@ -213,10 +207,9 @@ namespace projections
     struct ortho_spheroid : public detail::ortho::base_ortho_spheroid<T, Parameters>
     {
         template <typename Params>
-        inline ortho_spheroid(Params const& , Parameters const& par)
-            : detail::ortho::base_ortho_spheroid<T, Parameters>(par)
+        inline ortho_spheroid(Params const& , Parameters & par)
         {
-            detail::ortho::setup_ortho(this->m_par, this->m_proj_parm);
+            detail::ortho::setup_ortho(par, this->m_proj_parm);
         }
     };
 
@@ -225,7 +218,7 @@ namespace projections
     {
 
         // Static projection
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_ortho, ortho_spheroid, ortho_spheroid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI(srs::spar::proj_ortho, ortho_spheroid)
 
         // Factory entry(s)
         BOOST_GEOMETRY_PROJECTIONS_DETAIL_FACTORY_ENTRY_FI(ortho_entry, ortho_spheroid)

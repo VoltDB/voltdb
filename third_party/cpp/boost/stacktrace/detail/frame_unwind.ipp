@@ -1,4 +1,4 @@
-// Copyright Antony Polukhin, 2016-2019.
+// Copyright Antony Polukhin, 2016-2021.
 //
 // Distributed under the Boost Software License, Version 1.0. (See
 // accompanying file LICENSE_1_0.txt or copy at
@@ -59,6 +59,9 @@ public:
 
 std::string to_string(const frame* frames, std::size_t size) {
     std::string res;
+    if (size == 0) {
+        return res;
+    }
     res.reserve(64 * size);
 
     to_string_impl impl;
@@ -82,6 +85,10 @@ std::string to_string(const frame* frames, std::size_t size) {
 
 
 std::string frame::name() const {
+    if (!addr_) {
+        return std::string();
+    }
+
 #if !defined(BOOST_WINDOWS) && !defined(__CYGWIN__)
     ::Dl_info dli;
     const bool dl_ok = !!::dladdr(const_cast<void*>(addr_), &dli); // `dladdr` on Solaris accepts nonconst addresses
@@ -93,6 +100,10 @@ std::string frame::name() const {
 }
 
 std::string to_string(const frame& f) {
+    if (!f) {
+        return std::string();
+    }
+
     boost::stacktrace::detail::to_string_impl impl;
     return impl(f.address());
 }

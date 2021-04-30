@@ -10,6 +10,10 @@
 #ifndef BOOST_DETAIL_WINAPI_HANDLES_HPP
 #define BOOST_DETAIL_WINAPI_HANDLES_HPP
 
+#include <boost/config/header_deprecated.hpp>
+
+BOOST_HEADER_DEPRECATED("<boost/winapi/handles.hpp>")
+
 #include <boost/winapi/handles.hpp>
 #include <boost/detail/winapi/detail/deprecated_namespace.hpp>
 

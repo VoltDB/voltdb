@@ -1,6 +1,6 @@
 // Boost.Geometry (aka GGL, Generic Geometry Library)
 
-// Copyright (c) 2014-2017, Oracle and/or its affiliates.
+// Copyright (c) 2014-2020, Oracle and/or its affiliates.
 
 // Contributed and/or modified by Menelaos Karavelas, on behalf of Oracle
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
@@ -12,10 +12,13 @@
 #define BOOST_GEOMETRY_ALGORITHMS_DETAIL_IS_VALID_HAS_SPIKES_HPP
 
 #include <algorithm>
+#include <type_traits>
 
 #include <boost/core/ignore_unused.hpp>
-#include <boost/range.hpp>
-#include <boost/type_traits/is_same.hpp>
+#include <boost/range/begin.hpp>
+#include <boost/range/end.hpp>
+#include <boost/range/rbegin.hpp>
+#include <boost/range/rend.hpp>
 
 #include <boost/geometry/core/assert.hpp>
 #include <boost/geometry/core/point_type.hpp>
@@ -28,7 +31,7 @@
 
 #include <boost/geometry/views/closeable_view.hpp>
 
-#include <boost/geometry/algorithms/equals.hpp>
+#include <boost/geometry/algorithms/detail/equals/point_point.hpp>
 #include <boost/geometry/algorithms/validity_failure_type.hpp>
 #include <boost/geometry/algorithms/detail/point_is_spike_or_equal.hpp>
 #include <boost/geometry/io/dsv/write.hpp>
@@ -42,73 +45,71 @@ namespace boost { namespace geometry
 namespace detail { namespace is_valid
 {
 
-template <typename Point>
-struct equal_to
-{
-    Point const& m_point;
-
-    equal_to(Point const& point)
-        : m_point(point)
-    {}
-
-    template <typename OtherPoint>
-    inline bool operator()(OtherPoint const& other) const
-    {
-        return geometry::equals(m_point, other);
-    }
-};
-
-template <typename Point>
-struct not_equal_to
-{
-    Point const& m_point;
-
-    not_equal_to(Point const& point)
-        : m_point(point)
-    {}
-
-    template <typename OtherPoint>
-    inline bool operator()(OtherPoint const& other) const
-    {
-        return ! geometry::equals(other, m_point);
-    }
-};
-
-
 
 template <typename Range, closure_selector Closure>
 struct has_spikes
 {
-    template <typename Iterator>
+    template <typename Iterator, typename Strategy>
     static inline Iterator find_different_from_first(Iterator first,
-                                                     Iterator last)
+                                                     Iterator last,
+                                                     Strategy const& strategy)
     {
-        typedef not_equal_to<typename point_type<Range>::type> not_equal;
-
-        BOOST_GEOMETRY_ASSERT(first != last);
-
-        Iterator second = first;
-        ++second;
-        return std::find_if(second, last, not_equal(*first));
+        if (first == last)
+            return last;
+        auto const& front = *first;
+        ++first;
+        return std::find_if(first, last, [&](auto const& pt) {
+            return ! equals::equals_point_point(pt, front, strategy);
+        });
     }
 
-    template <typename VisitPolicy, typename SideStrategy>
+    template <typename View, typename VisitPolicy, typename Strategy>
+    static inline bool apply_at_closure(View const& view, VisitPolicy& visitor,
+                                        Strategy const& strategy,
+                                        bool is_linear)
+    {
+        boost::ignore_unused(visitor);
+
+        typedef typename boost::range_iterator<View const>::type iterator;
+
+        iterator cur = boost::begin(view);
+        typename boost::range_reverse_iterator
+            <
+                View const
+            >::type prev = find_different_from_first(boost::rbegin(view),
+                                                     boost::rend(view),
+                                                     strategy);
+
+        iterator next = find_different_from_first(cur, boost::end(view),
+                                                  strategy);
+        if (detail::is_spike_or_equal(*next, *cur, *prev, strategy.side()))
+        {
+            return ! visitor.template apply<failure_spikes>(is_linear, *cur);
+        }
+        else
+        {
+            return ! visitor.template apply<no_failure>();
+        }
+    }
+
+
+    template <typename VisitPolicy, typename Strategy>
     static inline bool apply(Range const& range, VisitPolicy& visitor,
-                             SideStrategy const& strategy)
+                             Strategy const& strategy)
     {
         boost::ignore_unused(visitor);
 
         typedef typename closeable_view<Range const, Closure>::type view_type;
         typedef typename boost::range_iterator<view_type const>::type iterator; 
 
-        bool const is_linear
-            = boost::is_same<typename tag<Range>::type, linestring_tag>::value;
+        bool const is_linestring
+            = std::is_same<typename tag<Range>::type, linestring_tag>::value;
 
         view_type const view(range);
 
         iterator prev = boost::begin(view);
 
-        iterator cur = find_different_from_first(prev, boost::end(view));
+        iterator cur = find_different_from_first(prev, boost::end(view), strategy);
         if (cur == boost::end(view))
         {
             // the range has only one distinct point, so it
@@ -116,7 +117,7 @@ struct has_spikes
             return ! visitor.template apply<no_failure>();
         }
 
-        iterator next = find_different_from_first(cur, boost::end(view));
+        iterator next = find_different_from_first(cur, boost::end(view), strategy);
         if (next == boost::end(view))
         {
             // the range has only two distinct points, so it
@@ -130,35 +131,20 @@ struct has_spikes
             // in is_spike_or_equal, but this order calls the side
             // strategy in the way to correctly detect the spikes,
             // also in geographic cases going over the pole
-            if (detail::is_spike_or_equal(*next, *cur, *prev, strategy))
+            if (detail::is_spike_or_equal(*next, *cur, *prev, strategy.side()))
             {
                 return
-                    ! visitor.template apply<failure_spikes>(is_linear, *cur);
+                    ! visitor.template apply<failure_spikes>(is_linestring, *cur);
             }
             prev = cur;
             cur = next;
-            next = find_different_from_first(cur, boost::end(view));
+            next = find_different_from_first(cur, boost::end(view), strategy);
         }
 
-        if (geometry::equals(range::front(view), range::back(view)))
+        if (equals::equals_point_point(range::front(view), range::back(view),
+                                       strategy))
         {
-            iterator cur = boost::begin(view);
-            typename boost::range_reverse_iterator
-                <
-                    view_type const
-                >::type prev = find_different_from_first(boost::rbegin(view),
-                                                         boost::rend(view));
-
-            iterator next = find_different_from_first(cur, boost::end(view));
-            if (detail::is_spike_or_equal(*next, *cur, *prev, strategy))
-            {
-                return
-                    ! visitor.template apply<failure_spikes>(is_linear, *cur);
-            }
-            else
-            {
-                return ! visitor.template apply<no_failure>();
-            }
+            return apply_at_closure(view, visitor, strategy, is_linestring);
         }
 
         return ! visitor.template apply<no_failure>();

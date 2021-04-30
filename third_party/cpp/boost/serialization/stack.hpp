@@ -29,7 +29,7 @@
 #define STD std
 #endif
 
-namespace boost { 
+namespace boost {
 namespace serialization {
 namespace detail{
 
@@ -54,7 +54,7 @@ template<class Archive, class T, class C>
 inline void serialize(
     Archive & ar,
     std::stack< T, C> & t,
-    const unsigned int file_version 
+    const unsigned int file_version
 ){
     typedef typename mpl::eval_if<
         typename Archive::is_saving,

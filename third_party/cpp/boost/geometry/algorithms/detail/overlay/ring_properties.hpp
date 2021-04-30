@@ -56,8 +56,8 @@ struct ring_properties
         , parent_area(-1)
     {}
 
-    template <typename RingOrBox, typename AreaStrategy>
-    inline ring_properties(RingOrBox const& ring_or_box, AreaStrategy const& strategy)
+    template <typename RingOrBox, typename Strategy>
+    inline ring_properties(RingOrBox const& ring_or_box, Strategy const& strategy)
         : reversed(false)
         , discarded(false)
         , parent_area(-1)

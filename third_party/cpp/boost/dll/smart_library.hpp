@@ -1,4 +1,5 @@
 //  Copyright 2016 Klemens Morgenstern
+//  Copyright 2019-2021 Antony Polukhin
 //
 // Distributed under the Boost Software License, Version 1.0.
 // (See accompanying file LICENSE_1_0.txt
@@ -8,24 +9,18 @@
 #define BOOST_DLL_SMART_LIBRARY_HPP_
 
 /// \file boost/dll/smart_library.hpp
-/// \warning Extremely experimental! Requires C++14! Will change in next version of Boost! boost/dll/smart_library.hpp is not included in boost/dll.hpp
+/// \warning Extremely experimental! Requires C++11! Will change in next version of Boost! boost/dll/smart_library.hpp is not included in boost/dll.hpp
 /// \brief Contains the boost::dll::experimental::smart_library class for loading mangled symbols.
 
-#include <boost/predef.h>
-
-#if BOOST_COMP_GNUC || BOOST_COMP_CLANG || BOOST_COMP_HPACC || BOOST_COMP_IBM
-
-#if BOOST_OS_WINDOWS && BOOST_COMP_CLANG
-#warning "Clang-win is not supported"
-#include <boost/dll/detail/demangling/msvc.hpp>
+#include <boost/dll/config.hpp>
+#if defined(_MSC_VER) // MSVC, Clang-cl, and ICC on Windows
+#   include <boost/dll/detail/demangling/msvc.hpp>
 #else
-#include <boost/dll/detail/demangling/itanium.hpp>
+#   include <boost/dll/detail/demangling/itanium.hpp>
 #endif
 
-#elif BOOST_COMP_MSVC
-#include <boost/dll/detail/demangling/msvc.hpp>
-#else
-#error "Compiler not supported"
+#if (__cplusplus < 201103L) && (!defined(_MSVC_LANG) || _MSVC_LANG < 201103L)
+#  error This file requires C++11 at least!
 #endif
 
 #include <boost/dll/shared_library.hpp>
@@ -444,14 +439,14 @@ void get(const smart_library& sm, const std::string &name);
 #endif
 
 template<class T>
-T& get(const smart_library& sm, const std::string &name, typename boost::enable_if<boost::is_object<T>,T>::type* = nullptr)
+typename boost::enable_if<boost::is_object<T>, T&>::type get(const smart_library& sm, const std::string &name)
 
 {
     return sm.get_variable<T>(name);
 }
 
 template<class T>
-auto get(const smart_library& sm, const std::string &name, typename boost::enable_if<boost::is_function<T>>::type* = nullptr)
+typename boost::enable_if<boost::is_function<T>, T&>::type get(const smart_library& sm, const std::string &name)
 {
     return sm.get_function<T>(name);
 }

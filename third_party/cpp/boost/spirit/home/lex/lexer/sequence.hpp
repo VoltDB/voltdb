@@ -3,8 +3,8 @@
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying 
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
-#if !defined(SPIRIT_LEX_SEQUENCE_MAR_28_2007_0610PM)
-#define SPIRIT_LEX_SEQUENCE_MAR_28_2007_0610PM
+#ifndef BOOST_SPIRIT_LEX_LEXER_SEQUENCE_HPP
+#define BOOST_SPIRIT_LEX_LEXER_SEQUENCE_HPP
 
 #if defined(_MSC_VER)
 #pragma once
@@ -15,6 +15,8 @@
 #include <boost/spirit/home/lex/meta_compiler.hpp>
 #include <boost/spirit/home/lex/detail/sequence_function.hpp>
 #include <boost/fusion/include/any.hpp>
+#include <boost/proto/operators.hpp>
+#include <boost/proto/tags.hpp>
 
 namespace boost { namespace spirit
 {

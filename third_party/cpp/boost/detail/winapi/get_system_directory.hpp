@@ -10,6 +10,10 @@
 #ifndef BOOST_DETAIL_WINAPI_GET_SYSTEM_DIRECTORY_HPP_
 #define BOOST_DETAIL_WINAPI_GET_SYSTEM_DIRECTORY_HPP_
 
+#include <boost/config/header_deprecated.hpp>
+
+BOOST_HEADER_DEPRECATED("<boost/winapi/get_system_directory.hpp>")
+
 #include <boost/winapi/get_system_directory.hpp>
 #include <boost/detail/winapi/detail/deprecated_namespace.hpp>
 

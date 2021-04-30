@@ -452,7 +452,7 @@ normalize_test_case_name( const_string name )
     }
 
     // sanitize all chars that might be used in runtime filters
-    static const char to_replace[] = { ':', '*', '@', '+', '!', '/' };
+    static const char to_replace[] = { ':', '*', '@', '+', '!', '/', ',' };
     for(std::size_t index = 0;
         index < sizeof(to_replace)/sizeof(to_replace[0]);
         index++) {

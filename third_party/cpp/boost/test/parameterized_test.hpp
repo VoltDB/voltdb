@@ -20,7 +20,7 @@
 #include <boost/type_traits/remove_reference.hpp>
 #include <boost/type_traits/remove_const.hpp>
 
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 #include <boost/function/function1.hpp>
 
 #include <boost/test/detail/suppress_warnings.hpp>

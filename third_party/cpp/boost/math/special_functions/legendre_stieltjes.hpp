@@ -214,7 +214,7 @@ public:
 
             const Real x_nk = boost::math::tools::newton_raphson_iterate(f, x_nk_guess,
                                                   p.first, p.second,
-                                                  2*std::numeric_limits<Real>::digits10,
+                                                  tools::digits<Real>(),
                                                   number_of_iterations);
 
             BOOST_ASSERT(p.first < x_nk);

@@ -67,7 +67,7 @@ BOOST_CLBL_TRAITS_INLINE_VAR
 //->
 constexpr bool is_invocable_v = //see below
 //<-
-    detail::is_invocable_impl<detail::traits<T>, Args...>::type::value;
+    detail::is_invocable_impl<T, Args...>::type::value;
 //->
 
 // only available when variable templates are supported

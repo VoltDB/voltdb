@@ -71,7 +71,7 @@
 // (like others including the poisson, negative binomial & Bernoulli)
 // is strictly defined as a discrete function: only integral values of k are envisaged.
 // However because of the method of calculation using a continuous gamma function,
-// it is convenient to treat it as if a continous function,
+// it is convenient to treat it as if a continuous function,
 // and permit non-integral values of k.
 // To enforce the strict mathematical model, users should use floor or ceil functions
 // on k outside this function to ensure that k is integral.
@@ -679,7 +679,7 @@ namespace boost
         // Metrika  (Metrika)  ISSN 0026-1335   CODEN MTRKA8
         // 1993, vol. 40, no3-4, pp. 185-189 (4 ref.)
 
-        // Bounds for median and 50 percetage point of binomial and negative binomial distribution
+        // Bounds for median and 50 percentage point of binomial and negative binomial distribution
         // Metrika, ISSN   0026-1335 (Print) 1435-926X (Online)
         // Volume 41, Number 1 / December, 1994, DOI   10.1007/BF01895303
          BOOST_MATH_STD_USING // ADL of std functions.

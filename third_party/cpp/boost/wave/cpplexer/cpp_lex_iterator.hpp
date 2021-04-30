@@ -10,8 +10,8 @@
     LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 =============================================================================*/
 
-#if !defined(CPP_LEX_ITERATOR_HPP_AF0C37E3_CBD8_4F33_A225_51CF576FA61F_INCLUDED)
-#define CPP_LEX_ITERATOR_HPP_AF0C37E3_CBD8_4F33_A225_51CF576FA61F_INCLUDED
+#if !defined(BOOST_CPP_LEX_ITERATOR_HPP_AF0C37E3_CBD8_4F33_A225_51CF576FA61F_INCLUDED)
+#define BOOST_CPP_LEX_ITERATOR_HPP_AF0C37E3_CBD8_4F33_A225_51CF576FA61F_INCLUDED
 
 #include <string>
 
@@ -67,7 +67,7 @@ public:
         { return *this; }   // nothing to do here
 #endif
 
-// interface to the iterator_policies::split_functor_input policy
+    // interface to the iterator_policies::split_functor_input policy
     typedef TokenT result_type;
     typedef lex_iterator_functor_shim unique;
     typedef lex_input_interface<TokenT>* shared;
@@ -200,15 +200,15 @@ public:
     {
         typedef typename TokenT::position_type position_type;
 
-    // set the new position in the current token
-    token_type const& currtoken = this->base_type::dereference(*this);
-    position_type currpos = currtoken.get_position();
+        // set the new position in the current token
+        token_type const& currtoken = this->base_type::dereference(*this);
+        position_type currpos = currtoken.get_position();
 
         currpos.set_file(pos.get_file());
         currpos.set_line(pos.get_line());
         const_cast<token_type&>(currtoken).set_position(currpos);
 
-    // set the new position for future tokens as well
+        // set the new position for future tokens as well
         if (token_type::string_type::npos !=
             currtoken.get_value().find_first_of('\n'))
         {
@@ -240,4 +240,4 @@ public:
 
 #undef BOOST_WAVE_EOF_PREFIX
 
-#endif // !defined(CPP_LEX_ITERATOR_HPP_AF0C37E3_CBD8_4F33_A225_51CF576FA61F_INCLUDED)
+#endif // !defined(BOOST_CPP_LEX_ITERATOR_HPP_AF0C37E3_CBD8_4F33_A225_51CF576FA61F_INCLUDED)

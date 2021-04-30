@@ -9,6 +9,7 @@
 #ifndef BOOST_LOCKFREE_FREELIST_HPP_INCLUDED
 #define BOOST_LOCKFREE_FREELIST_HPP_INCLUDED
 
+#include <cstring>
 #include <limits>
 #include <memory>
 
@@ -59,6 +60,7 @@ public:
     {
         for (std::size_t i = 0; i != n; ++i) {
             T * node = Alloc::allocate(1);
+            std::memset(node, 0, sizeof(T));
 #ifdef BOOST_LOCKFREE_FREELIST_INIT_RUNS_DTOR
             destruct<false>(node);
 #else
@@ -72,6 +74,7 @@ public:
     {
         for (std::size_t i = 0; i != count; ++i) {
             T * node = Alloc::allocate(1);
+            std::memset(node, 0, sizeof(T));
             deallocate<ThreadSafe>(node);
         }
     }
@@ -178,8 +181,11 @@ private:
 
         for(;;) {
             if (!old_pool.get_ptr()) {
-                if (!Bounded)
-                    return Alloc::allocate(1);
+                if (!Bounded) {
+                    T *ptr = Alloc::allocate(1);
+                    std::memset(ptr, 0, sizeof(T));
+                    return ptr;
+                }
                 else
                     return 0;
             }
@@ -200,8 +206,11 @@ private:
         tagged_node_ptr old_pool = pool_.load(memory_order_relaxed);
 
         if (!old_pool.get_ptr()) {
-            if (!Bounded)
-                return Alloc::allocate(1);
+            if (!Bounded) {
+                T *ptr = Alloc::allocate(1);
+                std::memset(ptr, 0, sizeof(T));
+                return ptr;
+            }
             else
                 return 0;
         }
@@ -339,7 +348,9 @@ struct compiletime_sized_freelist_storage
     // unused ... only for API purposes
     template <typename Allocator>
     compiletime_sized_freelist_storage(Allocator const & /* alloc */, std::size_t /* count */)
-    {}
+    {
+        data.fill(0);
+    }
 
     T * nodes(void) const
     {
@@ -369,6 +380,7 @@ struct runtime_sized_freelist_storage:
         if (count > 65535)
             boost::throw_exception(std::runtime_error("boost.lockfree: freelist size is limited to a maximum of 65535 objects"));
         nodes_ = allocator_type::allocate(count);
+        std::memset(nodes_, 0, sizeof(T) * count);
     }
 
     ~runtime_sized_freelist_storage(void)

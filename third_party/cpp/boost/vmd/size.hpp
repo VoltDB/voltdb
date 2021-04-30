@@ -41,7 +41,7 @@
 
     \brief Returns the size of a sequence. Re-entrant version.
 
-    d         = The next available BOOST_PP_WHILE iteration. 
+    d         = The next available BOOST_PP_WHILE iteration. <br/>
     sequence  = A sequence to test.
 
     returns   = If the sequence is empty returns 0, else returns the number of elements

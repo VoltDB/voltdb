@@ -13,20 +13,24 @@
 #include <boost/gil/image.hpp>
 #include <boost/gil/point.hpp>
 #include <boost/gil/virtual_locator.hpp>
-
-#include <boost/mpl/if.hpp>
-#include <boost/type_traits/is_integral.hpp>
+#include <boost/gil/detail/is_channel_integral.hpp>
+#include <boost/gil/detail/mp11.hpp>
 
 #include <cstddef>
 #include <memory>
 
-namespace boost{ namespace gil {
+namespace boost { namespace gil {
 
 template< typename Locator >
-struct get_pixel_type_locator : mpl::if_< typename is_bit_aligned< typename Locator::value_type >::type
-                                        , typename Locator::reference
-                                        , typename Locator::value_type
-                                        > {};
+struct get_pixel_type_locator
+{
+    using type = mp11::mp_if
+        <
+            typename is_bit_aligned<typename Locator::value_type>::type,
+            typename Locator::reference,
+            typename Locator::value_type
+        >;
+};
 
 // used for virtual locator
 template< typename IndicesLoc
@@ -110,7 +114,7 @@ struct indexed_image_deref_fn
     PaletteLoc,
     typename std::enable_if
     <
-        std::is_integral<typename IndicesLoc::value_type>::value
+        detail::is_channel_integral<typename IndicesLoc::value_type>::value
     >::type
 > : indexed_image_deref_fn_base<IndicesLoc, PaletteLoc>
 {

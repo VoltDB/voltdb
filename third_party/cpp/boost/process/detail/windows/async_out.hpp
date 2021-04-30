@@ -16,6 +16,7 @@
 #include <boost/winapi/error_codes.hpp>
 #include <boost/asio/read.hpp>
 #include <boost/process/detail/handler_base.hpp>
+#include <boost/process/detail/used_handles.hpp>
 #include <boost/process/detail/windows/asio_fwd.hpp>
 
 #include <istream>
@@ -108,11 +109,17 @@ struct async_out_buffer : ::boost::process::detail::windows::handler_base_ext,
 
 template<int p1, int p2, typename Type>
 struct async_out_future : ::boost::process::detail::windows::handler_base_ext,
-                          ::boost::process::detail::windows::require_io_context
+                          ::boost::process::detail::windows::require_io_context,
+                          ::boost::process::detail::uses_handles
 {
     std::shared_ptr<boost::process::async_pipe> pipe;
     std::shared_ptr<std::promise<Type>> promise = std::make_shared<std::promise<Type>>();
     std::shared_ptr<boost::asio::streambuf> buffer = std::make_shared<boost::asio::streambuf>();
+
+    ::boost::winapi::HANDLE_ get_used_handles() const
+    {
+        return std::move(*pipe).sink().native_handle();
+    }
 
 
     async_out_future(std::future<Type> & fut)

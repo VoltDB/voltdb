@@ -22,7 +22,7 @@ namespace boost { namespace spirit { namespace x3
         static bool const handles_container = true;
         static bool const has_attribute = true;
 
-        list(Left const& left, Right const& right)
+        constexpr list(Left const& left, Right const& right)
           : base_type(left, right) {}
 
         template <typename Iterator, typename Context
@@ -48,7 +48,7 @@ namespace boost { namespace spirit { namespace x3
     };
 
     template <typename Left, typename Right>
-    inline list<
+    constexpr list<
         typename extension::as_parser<Left>::value_type
       , typename extension::as_parser<Right>::value_type>
     operator%(Left const& left, Right const& right)

@@ -24,6 +24,7 @@
 
 #include <cstdio>
 #include <sstream>
+#include <type_traits>
 #include <vector>
 
 namespace boost { namespace gil {
@@ -100,7 +101,7 @@ public:
             io_error( "Image header was not read." );
         }
 
-        using is_read_and_convert_t = typename is_same
+        using is_read_and_convert_t = typename std::is_same
             <
                 ConversionPolicy,
                 detail::read_and_no_convert
@@ -165,10 +166,7 @@ struct raw_type_format_checker
     bool apply()
     {
         using view_t = typename Image::view_t;
-
-        return is_allowed< view_t >( _info
-                                   , mpl::true_()
-                                   );
+        return is_allowed<view_t>(_info, std::true_type{});
     }
 
 private:
@@ -202,8 +200,8 @@ public:
               )
     {}
 
-    template< typename Images >
-    void apply( any_image< Images >& images )
+    template< typename ...Images >
+    void apply( any_image< Images... >& images )
     {
         detail::raw_type_format_checker format_checker( this->_info );
 

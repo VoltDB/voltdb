@@ -7,6 +7,7 @@
 #ifndef BOOST_FIBERS_SPINLOCK_TTAS_ADAPTIVE_H
 #define BOOST_FIBERS_SPINLOCK_TTAS_ADAPTIVE_H
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cmath>

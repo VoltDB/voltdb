@@ -2,8 +2,8 @@
 
 // Copyright (c) 2008-2015 Barend Gehrels, Amsterdam, the Netherlands.
 
-// This file was modified by Oracle on 2017, 2018.
-// Modifications copyright (c) 2017-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2017, 2018, 2019.
+// Modifications copyright (c) 2017-2019, Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle.
 
 // Use, modification and distribution is subject to the Boost Software License,
@@ -93,20 +93,14 @@ namespace projections
                 proj_parm.c3 += fc * cos(lam * 3.);
             }
 
-            // template class, using CRTP to implement forward/inverse
             template <typename T, typename Parameters>
             struct base_lsat_ellipsoid
-                : public base_t_fi<base_lsat_ellipsoid<T, Parameters>, T, Parameters>
             {
                 par_lsat<T> m_proj_parm;
 
-                inline base_lsat_ellipsoid(const Parameters& par)
-                    : base_t_fi<base_lsat_ellipsoid<T, Parameters>, T, Parameters>(*this, par)
-                {}
-
                 // FORWARD(e_forward)  ellipsoid
                 // Project coordinates from geographic (lon, lat) to cartesian (x, y)
-                inline void fwd(T const& lp_lon, T lp_lat, T& xy_x, T& xy_y) const
+                inline void fwd(Parameters const& par, T const& lp_lon, T lp_lat, T& xy_x, T& xy_y) const
                 {
                     static const T fourth_pi = detail::fourth_pi<T>();
                     static const T half_pi = detail::half_pi<T>();
@@ -143,7 +137,7 @@ namespace projections
                             c = cos(lamt);
                             if (fabs(c) < tolerance)
                                 lamt -= tolerance;
-                            xlam = (this->m_par.one_es * tanphi * this->m_proj_parm.sa + sin(lamt) * this->m_proj_parm.ca) / c;
+                            xlam = (par.one_es * tanphi * this->m_proj_parm.sa + sin(lamt) * this->m_proj_parm.ca) / c;
                             lamdp = atan(xlam) + fac;
                             if (fabs(fabs(sav) - fabs(lamdp)) < tolerance)
                                 break;
@@ -158,8 +152,8 @@ namespace projections
                     }
                     if (l) {
                         sp = sin(lp_lat);
-                        phidp = aasin((this->m_par.one_es * this->m_proj_parm.ca * sp - this->m_proj_parm.sa * cos(lp_lat) *
-                            sin(lamt)) / sqrt(1. - this->m_par.es * sp * sp));
+                        phidp = aasin((par.one_es * this->m_proj_parm.ca * sp - this->m_proj_parm.sa * cos(lp_lat) *
+                            sin(lamt)) / sqrt(1. - par.es * sp * sp));
                         tanph = log(tan(fourth_pi + .5 * phidp));
                         sd = sin(lamdp);
                         sdsq = sd * sd;
@@ -175,7 +169,7 @@ namespace projections
 
                 // INVERSE(e_inverse)  ellipsoid
                 // Project coordinates from cartesian (x, y) to geographic (lon, lat)
-                inline void inv(T const& xy_x, T const& xy_y, T& lp_lon, T& lp_lat) const
+                inline void inv(Parameters const& par, T const& xy_x, T const& xy_y, T& lp_lon, T& lp_lat) const
                 {
                     static const T fourth_pi = detail::fourth_pi<T>();
                     static const T half_pi = detail::half_pi<T>();
@@ -205,7 +199,7 @@ namespace projections
                         lamdp -= tolerance;
                     spp = sin(phidp);
                     sppsq = spp * spp;
-                    lamt = atan(((1. - sppsq * this->m_par.rone_es) * tan(lamdp) *
+                    lamt = atan(((1. - sppsq * par.rone_es) * tan(lamdp) *
                         this->m_proj_parm.ca - spp * this->m_proj_parm.sa * sqrt((1. + this->m_proj_parm.q * dd) * (
                         1. - sppsq) - sppsq * this->m_proj_parm.u) / cos(lamdp)) / (1. - sppsq
                         * (1. + this->m_proj_parm.u)));
@@ -214,10 +208,10 @@ namespace projections
                     lamt -= half_pi * (1. - scl) * sl;
                     lp_lon = lamt - this->m_proj_parm.p22 * lamdp;
                     if (fabs(this->m_proj_parm.sa) < tolerance)
-                        lp_lat = aasin(spp / sqrt(this->m_par.one_es * this->m_par.one_es + this->m_par.es * sppsq));
+                        lp_lat = aasin(spp / sqrt(par.one_es * par.one_es + par.es * sppsq));
                     else
                         lp_lat = atan((tan(lamdp) * cos(lamt) - this->m_proj_parm.ca * sin(lamt)) /
-                            (this->m_par.one_es * this->m_proj_parm.sa));
+                            (par.one_es * this->m_proj_parm.sa));
                 }
 
                 static inline std::string get_name()
@@ -307,10 +301,9 @@ namespace projections
     struct lsat_ellipsoid : public detail::lsat::base_lsat_ellipsoid<T, Parameters>
     {
         template <typename Params>
-        inline lsat_ellipsoid(Params const& params, Parameters const& par)
-            : detail::lsat::base_lsat_ellipsoid<T, Parameters>(par)
+        inline lsat_ellipsoid(Params const& params, Parameters & par)
         {
-            detail::lsat::setup_lsat(params, this->m_par, this->m_proj_parm);
+            detail::lsat::setup_lsat(params, par, this->m_proj_parm);
         }
     };
 
@@ -319,7 +312,7 @@ namespace projections
     {
 
         // Static projection
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_lsat, lsat_ellipsoid, lsat_ellipsoid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI(srs::spar::proj_lsat, lsat_ellipsoid)
 
         // Factory entry(s)
         BOOST_GEOMETRY_PROJECTIONS_DETAIL_FACTORY_ENTRY_FI(lsat_entry, lsat_ellipsoid)

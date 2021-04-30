@@ -10,12 +10,7 @@
 #ifndef BOOST_BEAST_IMPL_STATIC_BUFFER_HPP
 #define BOOST_BEAST_IMPL_STATIC_BUFFER_HPP
 
-#include <boost/beast/core/detail/type_traits.hpp>
 #include <boost/asio/buffer.hpp>
-#include <boost/throw_exception.hpp>
-#include <algorithm>
-#include <cstring>
-#include <iterator>
 #include <stdexcept>
 
 namespace boost {

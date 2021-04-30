@@ -1,4 +1,4 @@
-/* Copyright 2016-2018 Joaquin M Lopez Munoz.
+/* Copyright 2016-2020 Joaquin M Lopez Munoz.
  * Distributed under the Boost Software License, Version 1.0.
  * (See accompanying file LICENSE_1_0.txt or copy at
  * http://www.boost.org/LICENSE_1_0.txt)
@@ -15,6 +15,7 @@
 
 #include <boost/detail/workaround.hpp>
 #include <functional>
+#include <iterator>
 #include <memory>
 #include <type_traits>
 #include <typeinfo>
@@ -183,7 +184,6 @@ private:
   /* std::unordered_map(const allocator_type&),
    * std::unordered_map(const unordered_map&,const allocator_type&) and
    * std::unordered_map(unordered_map&&,const allocator_type&) not available.
-   * We make move construction decay to copy construction.
    */
 
   template<typename UnorderedMap>
@@ -200,10 +200,17 @@ private:
     const typename std::decay<UnorderedMap>::type::allocator_type& al)
   {
     using RawUnorderedMap=typename std::decay<UnorderedMap>::type;
+    using iterator=typename std::conditional<
+      !std::is_lvalue_reference<UnorderedMap>::value&&
+      !std::is_const<UnorderedMap>::value,
+      std::move_iterator<typename RawUnorderedMap::iterator>,
+      typename RawUnorderedMap::const_iterator
+    >::type;
 
     return RawUnorderedMap{
-      x.begin(),x.end(),0,typename RawUnorderedMap::hasher{},
-      typename RawUnorderedMap::key_equal{},al
+      iterator{x.begin()},iterator{x.end()},0,
+      typename RawUnorderedMap::hasher{},typename RawUnorderedMap::key_equal{},
+      al
     };
   }
 #else

@@ -13,12 +13,12 @@ namespace boost {
 namespace safe_numerics {
 
 template <class T>
-class Integer : public Numeric<T> {
-    // integer types must have the corresponding numeric trait.
-    static_assert(
-        std::numeric_limits<T>::is_integer,
-        "Fails to fulfill requirements for an integer type"
-    );
+struct Integer : public Numeric<T> {
+    constexpr static bool value =
+        std::numeric_limits<T>::is_integer && Numeric<T>::value ;
+    constexpr operator bool (){
+        return value;
+    }
 };
 
 } // safe_numerics

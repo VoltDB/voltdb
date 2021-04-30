@@ -67,11 +67,7 @@ class priority_queue:
 
     typedef typename heap_base_maker::type super_t;
     typedef typename super_t::internal_type internal_type;
-#ifdef BOOST_NO_CXX11_ALLOCATOR
-    typedef typename heap_base_maker::allocator_argument::template rebind<internal_type>::other internal_type_allocator;
-#else
-    typedef typename std::allocator_traits<typename heap_base_maker::allocator_argument>::template rebind_alloc<internal_type> internal_type_allocator;
-#endif
+    typedef typename boost::allocator_rebind<typename heap_base_maker::allocator_argument, internal_type>::type internal_type_allocator;
     typedef std::vector<internal_type, internal_type_allocator> container_type;
 
     template <typename Heap1, typename Heap2>
@@ -87,9 +83,6 @@ class priority_queue:
         typedef detail::stable_heap_iterator<T, typename container_type::const_iterator, super_t> iterator;
         typedef iterator const_iterator;
         typedef typename container_type::allocator_type allocator_type;
-#ifndef BOOST_NO_CXX11_ALLOCATOR
-        typedef typename std::allocator_traits<allocator_type> allocator_traits;
-#endif
     };
 #endif
 
@@ -99,9 +92,6 @@ public:
     typedef typename implementation_defined::difference_type difference_type;
     typedef typename implementation_defined::value_compare value_compare;
     typedef typename implementation_defined::allocator_type allocator_type;
-#ifndef BOOST_NO_CXX11_ALLOCATOR
-    typedef typename implementation_defined::allocator_traits allocator_traits;
-#endif
     typedef typename implementation_defined::reference reference;
     typedef typename implementation_defined::const_reference const_reference;
     typedef typename implementation_defined::pointer pointer;

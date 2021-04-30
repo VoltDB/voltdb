@@ -13,11 +13,9 @@
 
 #include <boost/spirit/home/qi/detail/string_parse.hpp>
 #include <boost/spirit/home/qi/stream/detail/match_manip.hpp>
-#include <boost/spirit/home/qi/stream/detail/iterator_source.hpp>
 #include <boost/spirit/home/support/detail/hold_any.hpp>
-
-#include <iosfwd>
-#include <sstream>
+#include <boost/proto/traits.hpp>
+#include <istream>
 
 ///////////////////////////////////////////////////////////////////////////////
 namespace boost { namespace spirit
@@ -44,6 +42,37 @@ namespace boost { namespace spirit { namespace qi
     using spirit::stream_type;
     using spirit::wstream_type;
 
+namespace detail
+{
+    template <typename Iterator>
+    struct psbuf
+      : std::basic_streambuf<typename std::iterator_traits<Iterator>::value_type>
+    {
+        psbuf(Iterator first_, Iterator const& last_)
+          : first(first_), last(last_) {}
+
+        // silence MSVC warning C4512: assignment operator could not be generated
+        BOOST_DELETED_FUNCTION(psbuf& operator=(psbuf const&))
+
+    protected:
+        typename psbuf::int_type underflow() BOOST_OVERRIDE
+        {
+            return first == last ? psbuf::traits_type::eof()
+                                 : psbuf::traits_type::to_int_type(*first);
+        }
+
+        typename psbuf::int_type uflow() BOOST_OVERRIDE
+        {
+            return first == last ? psbuf::traits_type::eof()
+                                 : psbuf::traits_type::to_int_type(*first++);
+        }
+
+    public:
+        Iterator first;
+        Iterator const& last;
+    };
+}
+
     template <typename Char = char, typename T = spirit::basic_hold_any<char> >
     struct stream_parser
       : primitive_parser<stream_parser<Char, T> >
@@ -60,25 +89,15 @@ namespace boost { namespace spirit { namespace qi
           , Context& /*context*/, Skipper const& skipper
           , Attribute& attr_) const
         {
-            typedef qi::detail::iterator_source<Iterator> source_device;
-            typedef boost::iostreams::stream<source_device> instream;
-
             qi::skip_over(first, last, skipper);
 
-            instream in(first, last);           // copies 'first'
+            detail::psbuf<Iterator> pseudobuf(first, last);
+            std::basic_istream<Char> in(&pseudobuf);
             in >> attr_;                        // use existing operator>>()
 
             // advance the iterator if everything is ok
             if (in) {
-                if (!in.eof()) {
-                    typedef typename
-                        boost::iterator_difference<Iterator>::type diff_type;
-
-                    diff_type pos = static_cast<diff_type>(in.tellg());
-                    std::advance(first, pos);
-                } else {
-                    first = last;
-                }
+                first = pseudobuf.first;
                 return true;
             }
 

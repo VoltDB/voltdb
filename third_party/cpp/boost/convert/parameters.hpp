@@ -1,4 +1,4 @@
-// Copyright (c) 2009-2016 Vladimir Batov.
+// Copyright (c) 2009-2020 Vladimir Batov.
 // Use, modification and distribution are subject to the Boost Software License,
 // Version 1.0. See http://www.boost.org/LICENSE_1_0.txt.
 
@@ -6,6 +6,8 @@
 #define BOOST_CONVERT_PARAMETERS_HPP
 
 #include <boost/parameter/name.hpp>
+#include <boost/parameter/is_argument_pack.hpp>
+#include <boost/mpl/has_key.hpp>
 
 namespace boost { namespace cnv
 {
@@ -23,6 +25,7 @@ namespace boost { namespace cnv
         BOOST_PARAMETER_NAME((precision, type) precision)
         BOOST_PARAMETER_NAME((   skipws, type)    skipws)
         BOOST_PARAMETER_NAME((uppercase, type) uppercase)
+        BOOST_PARAMETER_NAME((lowercase, type) lowercase)
         BOOST_PARAMETER_NAME((    width, type)     width)
     }
 }}

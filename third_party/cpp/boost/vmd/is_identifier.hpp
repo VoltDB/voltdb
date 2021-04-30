@@ -34,22 +34,34 @@
     The data may take one of two forms; it is either one or more single identifiers
     or a single Boost PP tuple of identifiers.
 
+  @code
+  
     returns   = 1 if the parameter is an identifier, otherwise 0.
                 
                 If the parameter is not an identifier, 
                 or if optional identifiers are specified and the identifier
                 does not match any of the optional identifiers, the macro returns 0.
                 
+  @endcode
+  
     Identifiers are registered in VMD with:
     
+  @code
+  
         #define BOOST_VMD_REG_XXX (XXX) where XXX is a v-identifier.
     
+  @endcode
+  
     The identifier must be registered to be found.
     
     Identifiers are pre-detected in VMD with:
     
+  @code
+  
         #define BOOST_VMD_DETECT_XXX_XXX where XXX is an identifier.
     
+  @endcode
+  
     If you specify optional identifiers and have not specified the detection
     of an optional identifier, that optional identifier will never match the input.
                 
@@ -71,7 +83,7 @@
 
     \brief Tests whether a parameter is an identifier. Re-entrant version.
 
-    d         = The next available BOOST_PP_WHILE iteration. 
+    d         = The next available BOOST_PP_WHILE iteration. <br/>
     ...       = variadic parameters
     
     The first variadic parameter is required and it is the input to test.
@@ -80,22 +92,34 @@
     The data may take one of two forms; it is either one or more single identifiers
     or a single Boost PP tuple of identifiers.
 
+  @code
+  
     returns   = 1 if the parameter is an identifier, otherwise 0.
                 
                 If the parameter is not an identifier, 
                 or if optional identifiers are specified and the identifier
                 does not match any of the optional identifiers, the macro returns 0.
                 
+  @endcode
+  
     Identifiers are registered in VMD with:
     
+  @code
+  
         #define BOOST_VMD_REG_XXX (XXX) where XXX is a v-identifier.
     
+  @endcode
+  
     The identifier must be registered to be found.
     
     Identifiers are pre-detected in VMD with:
     
+  @code
+  
         #define BOOST_VMD_DETECT_XXX_XXX where XXX is an identifier.
     
+  @endcode
+  
     If you specify optional identifiers and have not specified the detection
     of an optional identifier, that optional identifier will never match the input.
                 

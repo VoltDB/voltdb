@@ -5,8 +5,8 @@
 // Copyright (c) 2009-2015 Mateusz Loskot, London, UK.
 // Copyright (c) 2013-2015 Adam Wulkiewicz, Lodz, Poland.
 
-// This file was modified by Oracle on 2013-2018.
-// Modifications copyright (c) 2013-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2013-2020.
+// Modifications copyright (c) 2013-2020, Oracle and/or its affiliates.
 
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 // Contributed and/or modified by Menelaos Karavelas, on behalf of Oracle
@@ -43,8 +43,23 @@ namespace detail { namespace disjoint
     \note Is used from other algorithms, declared separately
         to avoid circular references
  */
-template <typename Box1, typename Box2, typename Strategy>
-inline bool disjoint_box_box(Box1 const& box1, Box2 const& box2, Strategy const&)
+template
+<
+    typename Box1, typename Box2, typename Strategy,
+    std::enable_if_t<strategies::detail::is_umbrella_strategy<Strategy>::value, int> = 0
+>
+inline bool disjoint_box_box(Box1 const& box1, Box2 const& box2, Strategy const& strategy)
+{
+    typedef decltype(strategy.disjoint(box1, box2)) strategy_type;
+    return strategy_type::apply(box1, box2);
+}
+
+template
+<
+    typename Box1, typename Box2, typename Strategy,
+    std::enable_if_t<! strategies::detail::is_umbrella_strategy<Strategy>::value, int> = 0
+>
+inline bool disjoint_box_box(Box1 const& box1, Box2 const& box2, Strategy const& )
 {
     return Strategy::apply(box1, box2);
 }
@@ -63,9 +78,10 @@ template <typename Box1, typename Box2, std::size_t DimensionCount>
 struct disjoint<Box1, Box2, DimensionCount, box_tag, box_tag, false>
 {
     template <typename Strategy>
-    static inline bool apply(Box1 const& box1, Box2 const& box2, Strategy const&)
+    static inline bool apply(Box1 const& box1, Box2 const& box2, Strategy const& strategy)
     {
-        return Strategy::apply(box1, box2);
+        typedef decltype(strategy.disjoint(box1, box2)) strategy_type;
+        return strategy_type::apply(box1, box2);
     }
 };
 

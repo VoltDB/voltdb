@@ -1,6 +1,6 @@
 // Boost.Geometry (aka GGL, Generic Geometry Library)
 
-// Copyright (c) 2014, 2018, Oracle and/or its affiliates.
+// Copyright (c) 2014, 2018, 2019, Oracle and/or its affiliates.
 
 // Contributed and/or modified by Menelaos Karavelas, on behalf of Oracle
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
@@ -25,10 +25,10 @@ namespace detail { namespace is_valid
 
 
 #ifdef BOOST_GEOMETRY_TEST_DEBUG
-template <typename OutputStream, typename TurnPoint>
+template <typename OutputStream, typename TurnPoint, typename CSTag>
 inline void
 debug_print_complement_graph(OutputStream& os,
-                             complement_graph<TurnPoint> const& graph)
+                             complement_graph<TurnPoint, CSTag> const& graph)
 {
     typedef typename complement_graph<TurnPoint>::vertex_handle vertex_handle;
 
@@ -58,9 +58,9 @@ debug_print_complement_graph(OutputStream& os,
     }
 }
 #else
-template <typename OutputStream, typename TurnPoint>
+template <typename OutputStream, typename TurnPoint, typename CSTag>
 inline void debug_print_complement_graph(OutputStream&,
-                                         complement_graph<TurnPoint> const&)
+                                         complement_graph<TurnPoint, CSTag> const&)
 {
 }
 #endif

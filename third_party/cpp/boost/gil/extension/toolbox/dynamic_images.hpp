@@ -10,9 +10,6 @@
 
 #include <boost/gil/extension/dynamic_image/dynamic_image_all.hpp>
 
-#include <boost/mpl/at.hpp>
-#include <boost/mpl/size.hpp>
-
 namespace boost { namespace gil {
 
 // need this for various meta functions.

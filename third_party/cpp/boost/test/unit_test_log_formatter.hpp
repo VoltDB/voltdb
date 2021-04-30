@@ -172,6 +172,7 @@ public:
     }
 
     /// Deprecated version of this interface
+    /// @deprecated
     virtual void        test_unit_skipped( std::ostream& /* os */, test_unit const& /* tu */) {}
 
     /// Invoked when a test unit is aborted
@@ -324,4 +325,3 @@ protected:
 #include <boost/test/detail/enable_warnings.hpp>
 
 #endif // BOOST_TEST_UNIT_TEST_LOG_FORMATTER_HPP_071894GER
-

@@ -1,6 +1,6 @@
 // Boost.Geometry (aka GGL, Generic Geometry Library)
 
-// Copyright (c) 2016-2017 Oracle and/or its affiliates.
+// Copyright (c) 2016-2021 Oracle and/or its affiliates.
 // Contributed and/or modified by Vissarion Fisikopoulos, on behalf of Oracle
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
@@ -12,11 +12,13 @@
 #define BOOST_GEOMETRY_STRATEGIES_SPHERICAL_AZIMUTH_HPP
 
 
-#include <boost/geometry/strategies/azimuth.hpp>
+#include <type_traits>
+
 #include <boost/geometry/formulas/spherical.hpp>
 
-#include <boost/mpl/if.hpp>
-#include <boost/type_traits/is_void.hpp>
+#include <boost/geometry/strategies/azimuth.hpp>
+
+#include <boost/geometry/util/select_most_precise.hpp>
 
 
 namespace boost { namespace geometry
@@ -25,61 +27,58 @@ namespace boost { namespace geometry
 namespace strategy { namespace azimuth
 {
 
-template
-<
-    typename CalculationType = void
->
+template <typename CalculationType = void>
 class spherical
 {
-public :
+public:
+    template <typename T1, typename T2>
+    struct result_type
+        : geometry::select_most_precise
+              <
+                  T1, T2, CalculationType
+              >
+    {};
 
-    inline spherical()
-    {}
-
-    template <typename T>
-    inline void apply(T const& lon1_rad, T const& lat1_rad,
-                      T const& lon2_rad, T const& lat2_rad,
-                      T& a1, T& a2) const
+    template <typename T1, typename T2, typename Result>
+    static inline void apply(T1 const& lon1_rad, T1 const& lat1_rad,
+                             T2 const& lon2_rad, T2 const& lat2_rad,
+                             Result& a1, Result& a2)
     {
         compute<true, true>(lon1_rad, lat1_rad,
                             lon2_rad, lat2_rad,
                             a1, a2);
     }
-    template <typename T>
-    inline void apply(T const& lon1_rad, T const& lat1_rad,
-                      T const& lon2_rad, T const& lat2_rad,
-                      T& a1) const
+    template <typename T1, typename T2, typename Result>
+    static inline void apply(T1 const& lon1_rad, T1 const& lat1_rad,
+                             T2 const& lon2_rad, T2 const& lat2_rad,
+                             Result& a1)
     {
         compute<true, false>(lon1_rad, lat1_rad,
                              lon2_rad, lat2_rad,
                              a1, a1);
     }
-    template <typename T>
-    inline void apply_reverse(T const& lon1_rad, T const& lat1_rad,
-                              T const& lon2_rad, T const& lat2_rad,
-                              T& a2) const
+    template <typename T1, typename T2, typename Result>
+    static inline void apply_reverse(T1 const& lon1_rad, T1 const& lat1_rad,
+                                     T2 const& lon2_rad, T2 const& lat2_rad,
+                                     Result& a2)
     {
         compute<false, true>(lon1_rad, lat1_rad,
                              lon2_rad, lat2_rad,
                              a2, a2);
     }
 
-private :
-
+private:
     template
     <
         bool EnableAzimuth,
         bool EnableReverseAzimuth,
-        typename T
+        typename T1, typename T2, typename Result
     >
-    inline void compute(T const& lon1_rad, T const& lat1_rad,
-                        T const& lon2_rad, T const& lat2_rad,
-                        T& a1, T& a2) const
+    static inline void compute(T1 const& lon1_rad, T1 const& lat1_rad,
+                               T2 const& lon2_rad, T2 const& lat2_rad,
+                               Result& a1, Result& a2)
     {
-        typedef typename boost::mpl::if_
-            <
-                boost::is_void<CalculationType>, T, CalculationType
-            >::type calc_t;
+        typedef typename result_type<T1, T2>::type calc_t;
 
         geometry::formula::result_spherical<calc_t>
             result = geometry::formula::spherical_azimuth
@@ -105,19 +104,12 @@ private :
 namespace services
 {
 
-template <typename CalculationType>
-struct default_strategy<spherical_equatorial_tag, CalculationType>
+template <>
+struct default_strategy<spherical_equatorial_tag>
 {
-    typedef strategy::azimuth::spherical<CalculationType> type;
+    typedef strategy::azimuth::spherical<> type;
 };
 
-/*
-template <typename CalculationType>
-struct default_strategy<spherical_polar_tag, CalculationType>
-{
-    typedef strategy::azimuth::spherical<CalculationType> type;
-};
-*/
 }
 
 #endif // DOXYGEN_NO_STRATEGY_SPECIALIZATIONS

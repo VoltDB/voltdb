@@ -132,6 +132,8 @@ private:
                                 , 1
                                 );
         }
+
+        jpeg_finish_compress ( this->get() );
     }
 };
 
@@ -158,8 +160,8 @@ public:
               )
     {}
 
-    template< typename Views >
-    void apply( const any_image_view< Views >& views )
+    template< typename ...Views >
+    void apply( const any_image_view< Views... >& views )
     {
         detail::dynamic_io_fnobj< detail::jpeg_write_is_supported
                                 , parent_t

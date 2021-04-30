@@ -24,7 +24,7 @@
 // of the distribution header, AFTER the distribution and its core
 // property accessors have been defined: this is so that compilers
 // that implement 2-phase lookup and early-type-checking of templates
-// can find the definitions refered to herein.
+// can find the definitions referred to herein.
 //
 
 #include <boost/type_traits/is_same.hpp>

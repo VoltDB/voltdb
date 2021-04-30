@@ -16,6 +16,7 @@
 #include <boost/geometry/algorithms/detail/signed_size_type.hpp>
 #include <boost/geometry/algorithms/detail/overlay/segment_identifier.hpp>
 #include <boost/geometry/algorithms/detail/overlay/overlay_type.hpp>
+#include <boost/geometry/policies/robustness/segment_ratio.hpp>
 
 namespace boost { namespace geometry
 {
@@ -33,6 +34,7 @@ enum method_type
     method_touch_interior,
     method_collinear,
     method_equal,
+    method_start,
     method_error
 };
 
@@ -76,7 +78,7 @@ struct turn_operation
 template
 <
     typename Point,
-    typename SegmentRatio,
+    typename SegmentRatio = geometry::segment_ratio<typename coordinate_type<Point>::type>,
     typename Operation = turn_operation<Point, SegmentRatio>,
     typename Container = boost::array<Operation, 2>
 >
@@ -92,7 +94,6 @@ struct turn_info
     bool touch_only; // True in case of method touch(interior) and lines do not cross
     signed_size_type cluster_id; // For multiple turns on same location, > 0. Else -1. 0 is unused.
     bool discarded;
-
     bool has_colocated_both; // Colocated with a uu turn (for union) or ii (other)
 
     Container operations;

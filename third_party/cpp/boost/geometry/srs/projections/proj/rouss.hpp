@@ -2,8 +2,8 @@
 
 // Copyright (c) 2008-2015 Barend Gehrels, Amsterdam, the Netherlands.
 
-// This file was modified by Oracle on 2017, 2018.
-// Modifications copyright (c) 2017-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2017, 2018, 2019.
+// Modifications copyright (c) 2017-2019, Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle.
 
 // Use, modification and distribution is subject to the Boost Software License,
@@ -67,20 +67,14 @@ namespace projections
                 mdist<T> en;
             };
 
-            // template class, using CRTP to implement forward/inverse
             template <typename T, typename Parameters>
             struct base_rouss_ellipsoid
-                : public base_t_fi<base_rouss_ellipsoid<T, Parameters>, T, Parameters>
             {
                 par_rouss<T> m_proj_parm;
 
-                inline base_rouss_ellipsoid(const Parameters& par)
-                    : base_t_fi<base_rouss_ellipsoid<T, Parameters>, T, Parameters>(*this, par)
-                {}
-
                 // FORWARD(e_forward)  ellipsoid
                 // Project coordinates from geographic (lon, lat) to cartesian (x, y)
-                inline void fwd(T const& lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
+                inline void fwd(Parameters const& par, T const& lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
                 {
                     T s, al, cp, sp, al2, s2;
 
@@ -88,20 +82,20 @@ namespace projections
                     sp = sin(lp_lat);
                     s = proj_mdist(lp_lat, sp, cp,  this->m_proj_parm.en) - this->m_proj_parm.s0;
                     s2 = s * s;
-                    al = lp_lon * cp / sqrt(1. - this->m_par.es * sp * sp);
+                    al = lp_lon * cp / sqrt(1. - par.es * sp * sp);
                     al2 = al * al;
-                    xy_x = this->m_par.k0 * al*(1.+s2*(this->m_proj_parm.A1+s2*this->m_proj_parm.A4)-al2*(this->m_proj_parm.A2+s*this->m_proj_parm.A3+s2*this->m_proj_parm.A5
+                    xy_x = par.k0 * al*(1.+s2*(this->m_proj_parm.A1+s2*this->m_proj_parm.A4)-al2*(this->m_proj_parm.A2+s*this->m_proj_parm.A3+s2*this->m_proj_parm.A5
                                 +al2*this->m_proj_parm.A6));
-                    xy_y = this->m_par.k0 * (al2*(this->m_proj_parm.B1+al2*this->m_proj_parm.B4)+
+                    xy_y = par.k0 * (al2*(this->m_proj_parm.B1+al2*this->m_proj_parm.B4)+
                         s*(1.+al2*(this->m_proj_parm.B3-al2*this->m_proj_parm.B6)+s2*(this->m_proj_parm.B2+s2*this->m_proj_parm.B8)+
                         s*al2*(this->m_proj_parm.B5+s*this->m_proj_parm.B7)));
                 }
 
                 // INVERSE(e_inverse)  ellipsoid
                 // Project coordinates from cartesian (x, y) to geographic (lon, lat)
-                inline void inv(T const& xy_x, T const& xy_y, T& lp_lon, T& lp_lat) const
+                inline void inv(Parameters const& par, T const& xy_x, T const& xy_y, T& lp_lon, T& lp_lat) const
                 {
-                    T s, al, x = xy_x / this->m_par.k0, y = xy_y / this->m_par.k0, x2, y2;
+                    T s, al, x = xy_x / par.k0, y = xy_y / par.k0, x2, y2;
 
                     x2 = x * x;
                     y2 = y * y;
@@ -112,7 +106,7 @@ namespace projections
                         x2*(this->m_proj_parm.D4+y*(this->m_proj_parm.D6+y*this->m_proj_parm.D10)-x2*this->m_proj_parm.D9));
                     lp_lat=proj_inv_mdist(s, this->m_proj_parm.en);
                     s = sin(lp_lat);
-                    lp_lon=al * sqrt(1. - this->m_par.es * s * s)/cos(lp_lat);
+                    lp_lon=al * sqrt(1. - par.es * s * s)/cos(lp_lat);
                 }
 
                 static inline std::string get_name()
@@ -124,7 +118,7 @@ namespace projections
 
             // Roussilhe Stereographic
             template <typename Parameters, typename T>
-            inline void setup_rouss(Parameters& par, par_rouss<T>& proj_parm)
+            inline void setup_rouss(Parameters const& par, par_rouss<T>& proj_parm)
             {
                 T N0, es2, t, t2, R_R0_2, R_R0_4;
 
@@ -192,9 +186,8 @@ namespace projections
     {
         template <typename Params>
         inline rouss_ellipsoid(Params const& , Parameters const& par)
-            : detail::rouss::base_rouss_ellipsoid<T, Parameters>(par)
         {
-            detail::rouss::setup_rouss(this->m_par, this->m_proj_parm);
+            detail::rouss::setup_rouss(par, this->m_proj_parm);
         }
     };
 
@@ -203,7 +196,7 @@ namespace projections
     {
 
         // Static projection
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_rouss, rouss_ellipsoid, rouss_ellipsoid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI(srs::spar::proj_rouss, rouss_ellipsoid)
 
         // Factory entry(s)
         BOOST_GEOMETRY_PROJECTIONS_DETAIL_FACTORY_ENTRY_FI(rouss_entry, rouss_ellipsoid)

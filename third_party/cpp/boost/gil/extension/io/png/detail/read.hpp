@@ -17,9 +17,12 @@
 #include <boost/gil/io/conversion_policies.hpp>
 #include <boost/gil/io/device.hpp>
 #include <boost/gil/io/dynamic_io_new.hpp>
+#include <boost/gil/io/error.hpp>
 #include <boost/gil/io/reader_base.hpp>
 #include <boost/gil/io/row_buffer_helper.hpp>
 #include <boost/gil/io/typedefs.hpp>
+
+#include <type_traits>
 
 namespace boost { namespace gil {
 
@@ -81,6 +84,12 @@ public:
     template< typename View >
     void apply( const View& view )
     {
+        // guard from errors in the following functions
+        if (setjmp( png_jmpbuf( this->get_struct() )))
+        {
+            io_error("png is invalid");
+        }
+
         // The info structures are filled at this point.
 
         // Now it's time for some transformations.
@@ -184,7 +193,7 @@ public:
                     default: io_error( "png_reader::read_data(): unknown combination of color type and bit depth" );
                 }
                 #else
-                    io_error( "gray_alpha isn't enabled. Use ENABLE_GRAY_ALPHA when building application." );
+                    io_error( "gray_alpha isn't enabled. Define BOOST_GIL_IO_ENABLE_GRAY_ALPHA when building application." );
                 #endif // BOOST_GIL_IO_ENABLE_GRAY_ALPHA
 
 
@@ -228,11 +237,17 @@ private:
             >
     void read_rows( const View& view )
     {
+        // guard from errors in the following functions
+        if (setjmp( png_jmpbuf( this->get_struct() )))
+        {
+            io_error("png is invalid");
+        }
+
         using row_buffer_helper_t = detail::row_buffer_helper_view<ImagePixel>;
 
         using it_t = typename row_buffer_helper_t::iterator_t;
 
-        using is_read_and_convert_t = typename is_same
+        using is_read_and_convert_t = typename std::is_same
             <
                 ConversionPolicy,
                 detail::read_and_no_convert
@@ -394,8 +409,8 @@ public:
               )
     {}
 
-    template< typename Images >
-    void apply( any_image< Images >& images )
+    template< typename ...Images >
+    void apply( any_image< Images... >& images )
     {
         detail::png_type_format_checker format_checker( this->_info._bit_depth
                                                       , this->_info._color_type

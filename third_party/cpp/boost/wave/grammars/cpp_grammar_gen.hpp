@@ -8,8 +8,8 @@
     LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 =============================================================================*/
 
-#if !defined(CPP_GRAMMAR_GEN_HPP_80CB8A59_5411_4E45_B406_62531A12FB99_INCLUDED)
-#define CPP_GRAMMAR_GEN_HPP_80CB8A59_5411_4E45_B406_62531A12FB99_INCLUDED
+#if !defined(BOOST_CPP_GRAMMAR_GEN_HPP_80CB8A59_5411_4E45_B406_62531A12FB99_INCLUDED)
+#define BOOST_CPP_GRAMMAR_GEN_HPP_80CB8A59_5411_4E45_B406_62531A12FB99_INCLUDED
 
 #include <boost/wave/wave_config.hpp>
 #include <boost/wave/language_support.hpp>
@@ -86,7 +86,7 @@ struct BOOST_WAVE_DECL cpp_grammar_gen
 //             boost::pool_allocator<boost::spirit::nil_t>
         > node_factory_type;
 
-//  parse the cpp_grammar and return the resulting parse tree
+    //  parse the cpp_grammar and return the resulting parse tree
     static boost::spirit::classic::tree_parse_info<iterator_type, node_factory_type>
     parse_cpp_grammar (iterator_type const &first, iterator_type const &last,
         position_type const &act_pos, bool &found_eof,
@@ -107,4 +107,4 @@ struct BOOST_WAVE_DECL cpp_grammar_gen
 #include BOOST_ABI_SUFFIX
 #endif
 
-#endif // !defined(CPP_GRAMMAR_GEN_HPP_80CB8A59_5411_4E45_B406_62531A12FB99_INCLUDED)
+#endif // !defined(BOOST_CPP_GRAMMAR_GEN_HPP_80CB8A59_5411_4E45_B406_62531A12FB99_INCLUDED)

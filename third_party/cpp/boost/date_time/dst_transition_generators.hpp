@@ -7,7 +7,7 @@
 #ifndef DATE_TIME_DATE_DST_TRANSITION_DAY_GEN_HPP__
 #define DATE_TIME_DATE_DST_TRANSITION_DAY_GEN_HPP__
 
-
+#include <string>
 
 namespace boost {
 namespace date_time {

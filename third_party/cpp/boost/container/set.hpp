@@ -597,7 +597,8 @@ class set
    private:
    typedef std::pair<iterator, bool> insert_return_pair;
    public:
-   BOOST_MOVE_CONVERSION_AWARE_CATCH(insert, value_type, insert_return_pair, this->priv_insert)
+   BOOST_MOVE_CONVERSION_AWARE_CATCH
+      (insert, value_type, insert_return_pair, this->base_t::insert_unique_convertible)
    #endif
 
    #if defined(BOOST_CONTAINER_DOXYGEN_INVOKED)
@@ -620,7 +621,8 @@ class set
    //! <b>Complexity</b>: Logarithmic.
    iterator insert(const_iterator p, value_type &&x);
    #else
-   BOOST_MOVE_CONVERSION_AWARE_CATCH_1ARG(insert, value_type, iterator, this->priv_insert, const_iterator, const_iterator)
+   BOOST_MOVE_CONVERSION_AWARE_CATCH_1ARG
+      (insert, value_type, iterator, this->base_t::insert_unique_hint_convertible, const_iterator, const_iterator)
    #endif
 
    //! <b>Requires</b>: first, last are not iterators into *this.
@@ -631,7 +633,7 @@ class set
    //! <b>Complexity</b>: At most N log(size()+N) (N is the distance from first to last)
    template <class InputIterator>
    BOOST_CONTAINER_FORCEINLINE void insert(InputIterator first, InputIterator last)
-   {  this->base_t::insert_unique(first, last);  }
+   {  this->base_t::insert_unique_range(first, last);  }
 
 #if !defined(BOOST_NO_CXX11_HDR_INITIALIZER_LIST)
    //! <b>Effects</b>: inserts each element from the range [il.begin(),il.end()) if and only
@@ -639,7 +641,7 @@ class set
    //!
    //! <b>Complexity</b>: At most N log(size()+N) (N is the distance from il.begin() to il.end())
    BOOST_CONTAINER_FORCEINLINE void insert(std::initializer_list<value_type> il)
-   {  this->base_t::insert_unique(il.begin(), il.end()); }
+   {  this->base_t::insert_unique_range(il.begin(), il.end()); }
 #endif
 
    //! @copydoc ::boost::container::map::insert(node_type&&)
@@ -718,7 +720,7 @@ class set
       BOOST_NOEXCEPT_IF(  allocator_traits_type::is_always_equal::value
                                  && boost::container::dtl::is_nothrow_swappable<Compare>::value );
 
-   //! <b>Effects</b>: erase(a.begin(),a.end()).
+   //! <b>Effects</b>: erase(begin(),end()).
    //!
    //! <b>Postcondition</b>: size() == 0.
    //!
@@ -774,7 +776,8 @@ class set
    //! <b>Returns</b>: The number of elements with key equivalent to x.
    //!
    //! <b>Complexity</b>: log(size())+count(k)
-   BOOST_CONTAINER_FORCEINLINE size_type count(const key_type& x) const
+   BOOST_CONTAINER_ATTRIBUTE_NODISCARD BOOST_CONTAINER_FORCEINLINE
+      size_type count(const key_type& x) const
    {  return static_cast<size_type>(this->base_t::find(x) != this->base_t::cend());  }
 
    //! <b>Requires</b>: This overload is available only if
@@ -784,7 +787,8 @@ class set
    //!
    //! <b>Complexity</b>: log(size())+count(k)
    template<typename K>
-   BOOST_CONTAINER_FORCEINLINE size_type count(const K& x) const
+   BOOST_CONTAINER_ATTRIBUTE_NODISCARD BOOST_CONTAINER_FORCEINLINE
+      size_type count(const K& x) const
    {  return static_cast<size_type>(this->find(x) != this->cend());  }
 
    #if defined(BOOST_CONTAINER_DOXYGEN_INVOKED)
@@ -806,13 +810,13 @@ class set
    bool contains(const K& x) const;
 
    //! <b>Returns</b>: An iterator pointing to the first element with key not less
-   //!   than k, or a.end() if such an element is not found.
+   //!   than x, or end() if such an element is not found.
    //!
    //! <b>Complexity</b>: Logarithmic
    iterator lower_bound(const key_type& x);
 
    //! <b>Returns</b>: A const iterator pointing to the first element with key not
-   //!   less than k, or a.end() if such an element is not found.
+   //!   less than x, or end() if such an element is not found.
    //!
    //! <b>Complexity</b>: Logarithmic
    const_iterator lower_bound(const key_type& x) const;
@@ -821,7 +825,7 @@ class set
    //! key_compare::is_transparent exists.
    //!
    //! <b>Returns</b>: An iterator pointing to the first element with key not less
-   //!   than k, or a.end() if such an element is not found.
+   //!   than x, or end() if such an element is not found.
    //!
    //! <b>Complexity</b>: Logarithmic
    template<typename K>
@@ -831,20 +835,20 @@ class set
    //! key_compare::is_transparent exists.
    //!
    //! <b>Returns</b>: A const iterator pointing to the first element with key not
-   //!   less than k, or a.end() if such an element is not found.
+   //!   less than x, or end() if such an element is not found.
    //!
    //! <b>Complexity</b>: Logarithmic
    template<typename K>
    const_iterator lower_bound(const K& x) const;
 
-   //! <b>Returns</b>: An iterator pointing to the first element with key not less
+   //! <b>Returns</b>: An iterator pointing to the first element with key greater
    //!   than x, or end() if such an element is not found.
    //!
    //! <b>Complexity</b>: Logarithmic
    iterator upper_bound(const key_type& x);
 
-   //! <b>Returns</b>: A const iterator pointing to the first element with key not
-   //!   less than x, or end() if such an element is not found.
+   //! <b>Returns</b>: A const iterator pointing to the first element with key
+   //!   greater than x, or end() if such an element is not found.
    //!
    //! <b>Complexity</b>: Logarithmic
    const_iterator upper_bound(const key_type& x) const;
@@ -852,7 +856,7 @@ class set
    //! <b>Requires</b>: This overload is available only if
    //! key_compare::is_transparent exists.
    //!
-   //! <b>Returns</b>: An iterator pointing to the first element with key not less
+   //! <b>Returns</b>: An iterator pointing to the first element with key greater
    //!   than x, or end() if such an element is not found.
    //!
    //! <b>Complexity</b>: Logarithmic
@@ -862,8 +866,8 @@ class set
    //! <b>Requires</b>: This overload is available only if
    //! key_compare::is_transparent exists.
    //!
-   //! <b>Returns</b>: A const iterator pointing to the first element with key not
-   //!   less than x, or end() if such an element is not found.
+   //! <b>Returns</b>: A const iterator pointing to the first element with key
+   //!   greater than x, or end() if such an element is not found.
    //!
    //! <b>Complexity</b>: Logarithmic
    template<typename K>
@@ -943,20 +947,11 @@ class set
    //! <b>Effects</b>: x.swap(y)
    //!
    //! <b>Complexity</b>: Constant.
-   friend void swap(set& x, set& y);
+   friend void swap(set& x, set& y)
+      BOOST_NOEXCEPT_IF(  allocator_traits_type::is_always_equal::value
+                                 && boost::container::dtl::is_nothrow_swappable<Compare>::value );
 
    #endif   //#if defined(BOOST_CONTAINER_DOXYGEN_INVOKED)
-
-   #ifndef BOOST_CONTAINER_DOXYGEN_INVOKED
-   private:
-   template <class KeyType>
-   BOOST_CONTAINER_FORCEINLINE std::pair<iterator, bool> priv_insert(BOOST_FWD_REF(KeyType) x)
-   {  return this->base_t::insert_unique(::boost::forward<KeyType>(x));  }
-
-   template <class KeyType>
-   BOOST_CONTAINER_FORCEINLINE iterator priv_insert(const_iterator p, BOOST_FWD_REF(KeyType) x)
-   {  return this->base_t::insert_unique(p, ::boost::forward<KeyType>(x)); }
-   #endif   //#ifndef BOOST_CONTAINER_DOXYGEN_INVOKED
 };
 
 #ifndef BOOST_CONTAINER_NO_CXX17_CTAD
@@ -1024,13 +1019,11 @@ set(ordered_unique_range_t, InputIterator, InputIterator, Compare const&, Alloca
 
 //!has_trivial_destructor_after_move<> == true_type
 //!specialization for optimizations
-template <class Key, class Compare, class Options, class Allocator>
+template <class Key, class Compare, class Allocator, class Options>
 struct has_trivial_destructor_after_move<boost::container::set<Key, Compare, Allocator, Options> >
 {
-   typedef typename ::boost::container::allocator_traits<Allocator>::pointer pointer;
-   static const bool value = ::boost::has_trivial_destructor_after_move<Allocator>::value &&
-                             ::boost::has_trivial_destructor_after_move<pointer>::value &&
-                             ::boost::has_trivial_destructor_after_move<Compare>::value;
+   typedef ::boost::container::dtl::tree<Key, void, Compare, Allocator, Options> tree;
+   static const bool value = ::boost::has_trivial_destructor_after_move<tree>::value;
 };
 
 namespace container {
@@ -1393,7 +1386,7 @@ class multiset
    //!   is inserted right before p.
    iterator insert(value_type &&x);
    #else
-   BOOST_MOVE_CONVERSION_AWARE_CATCH(insert, value_type, iterator, this->priv_insert)
+   BOOST_MOVE_CONVERSION_AWARE_CATCH(insert, value_type, iterator, this->base_t::insert_equal_convertible)
    #endif
 
    #if defined(BOOST_CONTAINER_DOXYGEN_INVOKED)
@@ -1417,7 +1410,8 @@ class multiset
    //!   is inserted right before p.
    iterator insert(const_iterator p, value_type &&x);
    #else
-   BOOST_MOVE_CONVERSION_AWARE_CATCH_1ARG(insert, value_type, iterator, this->priv_insert, const_iterator, const_iterator)
+   BOOST_MOVE_CONVERSION_AWARE_CATCH_1ARG
+      (insert, value_type, iterator, this->base_t::insert_equal_hint_convertible, const_iterator, const_iterator)
    #endif
 
    //! <b>Requires</b>: first, last are not iterators into *this.
@@ -1427,12 +1421,12 @@ class multiset
    //! <b>Complexity</b>: At most N log(size()+N) (N is the distance from first to last)
    template <class InputIterator>
    BOOST_CONTAINER_FORCEINLINE void insert(InputIterator first, InputIterator last)
-   {  this->base_t::insert_equal(first, last);  }
+   {  this->base_t::insert_equal_range(first, last);  }
 
 #if !defined(BOOST_NO_CXX11_HDR_INITIALIZER_LIST)
    //! @copydoc ::boost::container::set::insert(std::initializer_list<value_type>)
    BOOST_CONTAINER_FORCEINLINE void insert(std::initializer_list<value_type> il)
-   {  this->base_t::insert_equal(il.begin(), il.end());  }
+   {  this->base_t::insert_equal_range(il.begin(), il.end());  }
 #endif
 
    //! @copydoc ::boost::container::multimap::insert(node_type&&)
@@ -1608,21 +1602,11 @@ class multiset
    //! <b>Effects</b>: x.swap(y)
    //!
    //! <b>Complexity</b>: Constant.
-   friend void swap(multiset& x, multiset& y);
+   friend void swap(multiset& x, multiset& y)
+      BOOST_NOEXCEPT_IF(  allocator_traits_type::is_always_equal::value
+                                 && boost::container::dtl::is_nothrow_swappable<Compare>::value );
 
    #endif   //#if defined(BOOST_CONTAINER_DOXYGEN_INVOKED)
-
-   #ifndef BOOST_CONTAINER_DOXYGEN_INVOKED
-   private:
-   template <class KeyType>
-   BOOST_CONTAINER_FORCEINLINE iterator priv_insert(BOOST_FWD_REF(KeyType) x)
-   {  return this->base_t::insert_equal(::boost::forward<KeyType>(x));  }
-
-   template <class KeyType>
-   BOOST_CONTAINER_FORCEINLINE iterator priv_insert(const_iterator p, BOOST_FWD_REF(KeyType) x)
-   {  return this->base_t::insert_equal(p, ::boost::forward<KeyType>(x)); }
-
-   #endif   //#ifndef BOOST_CONTAINER_DOXYGEN_INVOKED
 };
 
 #ifndef BOOST_CONTAINER_NO_CXX17_CTAD
@@ -1693,10 +1677,8 @@ multiset(ordered_range_t, InputIterator, InputIterator, Compare const&, Allocato
 template <class Key, class Compare, class Allocator, class Options>
 struct has_trivial_destructor_after_move<boost::container::multiset<Key, Compare, Allocator, Options> >
 {
-   typedef typename ::boost::container::allocator_traits<Allocator>::pointer pointer;
-   static const bool value = ::boost::has_trivial_destructor_after_move<Allocator>::value &&
-                             ::boost::has_trivial_destructor_after_move<pointer>::value &&
-                             ::boost::has_trivial_destructor_after_move<Compare>::value;
+   typedef ::boost::container::dtl::tree<Key, void, Compare, Allocator, Options> tree;
+   static const bool value = ::boost::has_trivial_destructor_after_move<tree>::value;
 };
 
 namespace container {

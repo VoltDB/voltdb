@@ -1,5 +1,5 @@
 /* Failure observers for outcome type
-(C) 2017-2019 Niall Douglas <http://www.nedproductions.biz/> (59 commits)
+(C) 2017-2021 Niall Douglas <http://www.nedproductions.biz/> (7 commits)
 File Created: Oct 2017
 
 
@@ -42,15 +42,15 @@ namespace detail
     struct search_detail_adl
     {
     };
-    BOOST_OUTCOME_TEMPLATE(class S)                                                                        //
-    BOOST_OUTCOME_TREQUIRES(BOOST_OUTCOME_TEXPR(basic_outcome_failure_exception_from_error(std::declval<S>())))  //
+    // Do NOT use template requirements here!
+    template <class S, typename = decltype(basic_outcome_failure_exception_from_error(std::declval<S>()))>
     inline auto _delayed_lookup_basic_outcome_failure_exception_from_error(const S &ec, search_detail_adl /*unused*/)
     {
       // ADL discovered
       return basic_outcome_failure_exception_from_error(ec);
     }
   }                                        // namespace adl
-#if defined(_MSC_VER) && _MSC_VER <= 1920  // VS2019
+#if defined(_MSC_VER) && _MSC_VER <= 1923  // VS2019
   // VS2017 and VS2019 with /permissive- chokes on the correct form due to over eager early instantiation.
   template <class S, class P> inline void _delayed_lookup_basic_outcome_failure_exception_from_error(...) { static_assert(sizeof(S) == 0, "No specialisation for these error and exception types available!"); }
 #else
@@ -72,11 +72,11 @@ namespace detail
       try
 #endif
       {
-        if((this->_state._status & detail::status_have_exception) != 0)
+        if(this->_state._status.have_exception())
         {
           return this->assume_exception();
         }
-        if((this->_state._status & detail::status_have_error) != 0)
+        if(this->_state._status.have_error())
         {
           return _delayed_lookup_basic_outcome_failure_exception_from_error(this->assume_error(), adl::search_detail_adl());
         }

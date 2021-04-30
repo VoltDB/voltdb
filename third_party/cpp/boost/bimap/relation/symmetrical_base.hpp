@@ -32,7 +32,7 @@ namespace boost {
 namespace bimaps {
 namespace relation {
 
-/// \brief Base of symetrical tagged types.
+/// \brief Base of symmetrical tagged types.
 /**
 
                                                            **/

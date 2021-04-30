@@ -254,7 +254,7 @@ class mutant_relation;
 /// \brief A std::pair signature compatible class that allows you to control
 ///        the internal structure of the data.
 /**
-This class allows you to specify the order in wich the two data types will be
+This class allows you to specify the order in which the two data types will be
 in the layout of the class.
                                                                                **/
 

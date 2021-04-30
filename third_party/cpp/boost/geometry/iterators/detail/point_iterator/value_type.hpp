@@ -1,8 +1,9 @@
 // Boost.Geometry (aka GGL, Generic Geometry Library)
 
-// Copyright (c) 2014, Oracle and/or its affiliates.
+// Copyright (c) 2014-2020, Oracle and/or its affiliates.
 
 // Contributed and/or modified by Menelaos Karavelas, on behalf of Oracle
+// Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
 // Licensed under the Boost Software License version 1.0.
 // http://www.boost.org/users/license.html
@@ -10,8 +11,8 @@
 #ifndef BOOST_GEOMETRY_ITERATORS_DETAIL_POINT_ITERATOR_VALUE_TYPE_HPP
 #define BOOST_GEOMETRY_ITERATORS_DETAIL_POINT_ITERATOR_VALUE_TYPE_HPP
 
-#include <boost/type_traits/is_const.hpp>
-#include <boost/mpl/if.hpp>
+
+#include <type_traits>
 
 #include <boost/geometry/core/point_type.hpp>
 
@@ -28,12 +29,12 @@ namespace detail { namespace point_iterator
 template <typename Geometry>
 struct value_type
 {
-    typedef typename boost::mpl::if_c
+    typedef std::conditional_t
         <
-            !boost::is_const<Geometry>::type::value,
+            ! std::is_const<Geometry>::value,
             typename geometry::point_type<Geometry>::type,
             typename geometry::point_type<Geometry>::type const
-        >::type type;
+        > type;
 };
 
 

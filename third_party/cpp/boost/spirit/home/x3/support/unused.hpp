@@ -10,19 +10,12 @@
 
 #include <iosfwd>
 
-#if defined(BOOST_MSVC)
-# pragma warning(push)
-# pragma warning(disable: 4522) // multiple assignment operators specified warning
-#endif
-
 ///////////////////////////////////////////////////////////////////////////////
 namespace boost { namespace spirit { namespace x3
 {
     struct unused_type
     {
-        unused_type()
-        {
-        }
+        unused_type() = default;
 
         template <typename T>
         unused_type(T const&)
@@ -43,18 +36,6 @@ namespace boost { namespace spirit { namespace x3
             return *this;
         }
 
-        unused_type const&
-        operator=(unused_type const&) const
-        {
-            return *this;
-        }
-
-        unused_type&
-        operator=(unused_type const&)
-        {
-            return *this;
-        }
-
         // unused_type can also masquerade as an empty context (see context.hpp)
 
         template <typename ID>
@@ -62,23 +43,19 @@ namespace boost { namespace spirit { namespace x3
         {
             return {};
         }
+
+        friend std::ostream& operator<<(std::ostream& out, unused_type const&)
+        {
+            return out;
+        }
+
+        friend std::istream& operator>>(std::istream& in, unused_type&)
+        {
+            return in;
+        }
     };
 
-    auto const unused = unused_type{};
-
-    inline std::ostream& operator<<(std::ostream& out, unused_type const&)
-    {
-        return out;
-    }
-
-    inline std::istream& operator>>(std::istream& in, unused_type&)
-    {
-        return in;
-    }
+    constexpr auto unused = unused_type{};
 }}}
-
-#if defined(BOOST_MSVC)
-# pragma warning(pop)
-#endif
 
 #endif

@@ -2,8 +2,8 @@
 
 // Copyright (c) 2008-2015 Barend Gehrels, Amsterdam, the Netherlands.
 
-// This file was modified by Oracle on 2017, 2018.
-// Modifications copyright (c) 2017-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2017, 2018, 2019.
+// Modifications copyright (c) 2017-2019, Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle.
 
 // Use, modification and distribution is subject to the Boost Software License,
@@ -75,20 +75,14 @@ namespace projections
                 bool ellips;
             };
 
-            // template class, using CRTP to implement forward/inverse
             template <typename T, typename Parameters>
             struct base_eqdc_ellipsoid
-                : public base_t_fi<base_eqdc_ellipsoid<T, Parameters>, T, Parameters>
             {
                 par_eqdc<T> m_proj_parm;
 
-                inline base_eqdc_ellipsoid(const Parameters& par)
-                    : base_t_fi<base_eqdc_ellipsoid<T, Parameters>, T, Parameters>(*this, par)
-                {}
-
                 // FORWARD(e_forward)  sphere & ellipsoid
                 // Project coordinates from geographic (lon, lat) to cartesian (x, y)
-                inline void fwd(T lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
+                inline void fwd(Parameters const& , T lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
                 {
                     T rho = 0.0;
 
@@ -100,7 +94,7 @@ namespace projections
 
                 // INVERSE(e_inverse)  sphere & ellipsoid
                 // Project coordinates from cartesian (x, y) to geographic (lon, lat)
-                inline void inv(T xy_x, T xy_y, T& lp_lon, T& lp_lat) const
+                inline void inv(Parameters const& par, T xy_x, T xy_y, T& lp_lon, T& lp_lat) const
                 {
                     static T const half_pi = detail::half_pi<T>();
 
@@ -114,7 +108,7 @@ namespace projections
                         }
                         lp_lat = this->m_proj_parm.c - rho;
                         if (this->m_proj_parm.ellips)
-                            lp_lat = pj_inv_mlfn(lp_lat, this->m_par.es, this->m_proj_parm.en);
+                            lp_lat = pj_inv_mlfn(lp_lat, par.es, this->m_proj_parm.en);
                         lp_lon = atan2(xy_x, xy_y) / this->m_proj_parm.n;
                     } else {
                         lp_lon = 0.;
@@ -193,9 +187,8 @@ namespace projections
     {
         template <typename Params>
         inline eqdc_ellipsoid(Params const& params, Parameters const& par)
-            : detail::eqdc::base_eqdc_ellipsoid<T, Parameters>(par)
         {
-            detail::eqdc::setup_eqdc(params, this->m_par, this->m_proj_parm);
+            detail::eqdc::setup_eqdc(params, par, this->m_proj_parm);
         }
     };
 
@@ -204,7 +197,7 @@ namespace projections
     {
 
         // Static projection
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_eqdc, eqdc_ellipsoid, eqdc_ellipsoid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI(srs::spar::proj_eqdc, eqdc_ellipsoid)
 
         // Factory entry(s)
         BOOST_GEOMETRY_PROJECTIONS_DETAIL_FACTORY_ENTRY_FI(eqdc_entry, eqdc_ellipsoid)

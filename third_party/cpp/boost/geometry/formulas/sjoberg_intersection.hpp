@@ -1,6 +1,6 @@
 // Boost.Geometry
 
-// Copyright (c) 2016-2017 Oracle and/or its affiliates.
+// Copyright (c) 2016-2019 Oracle and/or its affiliates.
 
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
@@ -819,8 +819,14 @@ private:
         // Newton-Raphson method
         for (int i = 0; i < max_iterations_02; ++i)
         {
-            CT const sin_beta = sin(beta);
             CT const cos_beta = cos(beta);
+
+            if (math::equals(cos_beta, c0))
+            {
+                return false;
+            }
+
+            CT const sin_beta = sin(beta);
             CT const cos_beta_sqr = math::sqr(cos_beta);
             CT const G = c1 - e_sqr * cos_beta_sqr;
 
@@ -834,6 +840,10 @@ private:
                 if (is_beta_ok)
                 {
                     CT const H = cos_beta_sqr - geod1.Cj_sqr;
+                    if (math::equals(H, c0))
+                    {
+                        return false;
+                    }
                     f1 = geod1.Cj / cos_beta * math::sqrt(G / H);
                 }
                 else
@@ -849,6 +859,15 @@ private:
                 if (is_beta_ok)
                 {
                     CT const H = cos_beta_sqr - geod2.Cj_sqr;
+                    if (math::equals(H, c0))
+                    {
+                        // NOTE: This may happen for segment nearly
+                        // at the equator. Detected for (radian):
+                        // (-0.0872665 -0.0872665, -0.0872665 0.0872665)
+                        // x
+                        // (0 1.57e-07, -0.392699 1.57e-07)
+                        return false;
+                    }
                     f2 = geod2.Cj / cos_beta * math::sqrt(G / H);
                 }
                 else
@@ -865,7 +884,7 @@ private:
             //   3. f1-f2 may be 0 which means that the intermediate point is on the vertex
             //      In this case it's not possible to check if this is the correct result
             //   4. f1-f2 may also be 0 in other cases, e.g.
-            //      geodesics are symetrical wrt equator and longitude directions are different
+            //      geodesics are symmetrical wrt equator and longitude directions are different
 
             CT const dbeta_denom = f1 - f2;
             //CT const dbeta_denom = math::abs(f1) + math::abs(f2);

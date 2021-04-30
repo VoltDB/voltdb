@@ -1,5 +1,5 @@
-#ifndef DYNAMIC_PROPERTY_MAP_RG09302004_HPP
-#define DYNAMIC_PROPERTY_MAP_RG09302004_HPP
+#ifndef BOOST_PROPERTY_MAP_DYNAMIC_PROPERTY_MAP_HPP
+#define BOOST_PROPERTY_MAP_DYNAMIC_PROPERTY_MAP_HPP
 
 // Copyright 2004-5 The Trustees of Indiana University.
 
@@ -349,4 +349,4 @@ ignore_other_properties(const std::string&,
 
 } // namespace boost
 
-#endif // DYNAMIC_PROPERTY_MAP_RG09302004_HPP
+#endif // BOOST_PROPERTY_MAP_DYNAMIC_PROPERTY_MAP_HPP

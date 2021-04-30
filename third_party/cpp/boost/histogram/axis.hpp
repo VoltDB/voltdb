@@ -7,6 +7,17 @@
 #ifndef BOOST_HISTOGRAM_AXIS_HPP
 #define BOOST_HISTOGRAM_AXIS_HPP
 
+/**
+  \file boost/histogram/axis.hpp
+  Includes all axis headers of the Boost.Histogram library.
+
+  Extra header not automatically included:
+    - [boost/histogram/axis/ostream.hpp][1]
+
+  [1]: histogram/reference.html#header.boost.histogram.axis.ostream_hpp
+*/
+
+#include <boost/histogram/axis/boolean.hpp>
 #include <boost/histogram/axis/category.hpp>
 #include <boost/histogram/axis/integer.hpp>
 #include <boost/histogram/axis/regular.hpp>

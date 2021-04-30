@@ -8,8 +8,8 @@
     License, Version 1.0. (See accompanying file LICENSE_1_0.txt or copy at
     http://www.boost.org/LICENSE_1_0.txt)
 =============================================================================*/
-#ifndef POSITION_ITERATOR_IPP
-#define POSITION_ITERATOR_IPP
+#ifndef BOOST_SPIRIT_CLASSIC_ITERATOR_IMPL_POSITION_ITERATOR_IPP
+#define BOOST_SPIRIT_CLASSIC_ITERATOR_IMPL_POSITION_ITERATOR_IPP
 
 #include <boost/config.hpp>
 #include <boost/iterator_adaptors.hpp>

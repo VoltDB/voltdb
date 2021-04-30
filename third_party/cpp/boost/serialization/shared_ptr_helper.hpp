@@ -101,20 +101,20 @@ public:
 
     struct non_polymorphic {
         template<class U>
-        static const boost::serialization::extended_type_info * 
+        static const boost::serialization::extended_type_info *
         get_object_type(U & ){
             return & boost::serialization::singleton<
-                typename 
+                typename
                 boost::serialization::type_info_implementation< U >::type
             >::get_const_instance();
         }
     };
     struct polymorphic {
         template<class U>
-        static const boost::serialization::extended_type_info * 
+        static const boost::serialization::extended_type_info *
         get_object_type(U & u){
             return boost::serialization::singleton<
-                typename 
+                typename
                 boost::serialization::type_info_implementation< U >::type
             >::get_const_instance().get_derived_extended_type_info(u);
         }

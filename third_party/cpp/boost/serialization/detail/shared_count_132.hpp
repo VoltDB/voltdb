@@ -40,8 +40,8 @@
 
 #include <boost/config.hpp> // msvc 6.0 needs this for warning suppression
 #if defined(BOOST_NO_STDC_NAMESPACE)
-namespace std{ 
-    using ::size_t; 
+namespace std{
+    using ::size_t;
 } // namespace std
 #endif
 
@@ -357,7 +357,7 @@ public:
     template<class Y>
     explicit shared_count(std::auto_ptr<Y> & r): pi_(
         new sp_counted_base_impl<
-            Y *, 
+            Y *,
             boost::checked_deleter<Y>
         >(r.get(), boost::checked_deleter<Y>()))
 #if defined(BOOST_SP_ENABLE_DEBUG_HOOKS)
@@ -367,7 +367,7 @@ public:
         r.release();
     }
 
-#endif 
+#endif
 
     ~shared_count() // nothrow
     {

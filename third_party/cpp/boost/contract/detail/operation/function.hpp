@@ -10,6 +10,7 @@
 #include <boost/contract/core/exception.hpp>
 #include <boost/contract/core/config.hpp>
 #include <boost/contract/detail/condition/cond_post.hpp>
+#include <boost/contract/detail/exception.hpp>
 #if     !defined(BOOST_CONTRACT_ALL_DISABLE_NO_ASSERTION) && ( \
         !defined(BOOST_CONTRACT_NO_PRECONDITIONS) || \
         !defined(BOOST_CONTRACT_NO_POSTCONDITIONS) || \
@@ -63,7 +64,7 @@ public:
                 checking k;
             #endif
             
-            if(std::uncaught_exception()) {
+            if(uncaught_exception()) {
                 #ifndef BOOST_CONTRACT_NO_EXCEPTS
                     this->check_except();
                 #endif

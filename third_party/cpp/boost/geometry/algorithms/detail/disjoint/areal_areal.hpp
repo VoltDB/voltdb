@@ -5,8 +5,8 @@
 // Copyright (c) 2009-2014 Mateusz Loskot, London, UK.
 // Copyright (c) 2013-2014 Adam Wulkiewicz, Lodz, Poland.
 
-// This file was modified by Oracle on 2013-2019.
-// Modifications copyright (c) 2013-2019, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2013-2020.
+// Modifications copyright (c) 2013-2020, Oracle and/or its affiliates.
 
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 // Contributed and/or modified by Menelaos Karavelas, on behalf of Oracle
@@ -30,7 +30,7 @@
 #include <boost/geometry/algorithms/detail/disjoint/linear_linear.hpp>
 #include <boost/geometry/algorithms/detail/disjoint/segment_box.hpp>
 
-#include <boost/geometry/iterators/segment_iterator.hpp>
+#include <boost/geometry/algorithms/for_each.hpp>
 
 
 namespace boost { namespace geometry
@@ -51,46 +51,19 @@ inline bool point_on_border_covered_by(Geometry1 const& geometry1,
         && geometry::covered_by(pt, geometry2, strategy);
 }
 
-/*!
-\tparam Strategy point_in_geometry strategy
-*/
-template<typename Geometry, typename Strategy>
-struct check_each_ring_for_within
-{
-    bool not_disjoint;
-    Geometry const& m_geometry;
-    Strategy const& m_strategy;
-
-    inline check_each_ring_for_within(Geometry const& g,
-                                      Strategy const& strategy)
-        : not_disjoint(false)
-        , m_geometry(g)
-        , m_strategy(strategy)
-    {}
-
-    template <typename Range>
-    inline void apply(Range const& range)
-    {
-        not_disjoint = not_disjoint
-                    || point_on_border_covered_by(range, m_geometry, m_strategy);
-    }
-};
-
 
 /*!
 \tparam Strategy point_in_geometry strategy
 */
-template <typename FirstGeometry, typename SecondGeometry, typename Strategy>
-inline bool rings_containing(FirstGeometry const& geometry1,
-                             SecondGeometry const& geometry2,
+template <typename Geometry1, typename Geometry2, typename Strategy>
+inline bool rings_containing(Geometry1 const& geometry1,
+                             Geometry2 const& geometry2,
                              Strategy const& strategy)
 {
-    check_each_ring_for_within
-        <
-            FirstGeometry, Strategy
-        > checker(geometry1, strategy);
-    geometry::detail::for_each_range(geometry2, checker);
-    return checker.not_disjoint;
+    return geometry::detail::any_range_of(geometry2, [&](auto const& range)
+    {
+        return point_on_border_covered_by(range, geometry1, strategy);
+    });
 }
 
 
@@ -117,10 +90,8 @@ struct areal_areal
         // We check that using a point on the border (external boundary),
         // and see if that is contained in the other geometry. And vice versa.
 
-        if ( rings_containing(geometry1, geometry2,
-                              strategy.template get_point_in_geometry_strategy<Geometry2, Geometry1>())
-          || rings_containing(geometry2, geometry1,
-                              strategy.template get_point_in_geometry_strategy<Geometry1, Geometry2>()) )
+        if ( rings_containing(geometry1, geometry2, strategy)
+          || rings_containing(geometry2, geometry1, strategy) )
         {
             return false;
         }
@@ -141,10 +112,10 @@ struct areal_box
                              Box const& box,
                              Strategy const& strategy)
     {
-        if ( ! for_each_segment(geometry::segments_begin(areal),
-                                geometry::segments_end(areal),
-                                box,
-                                strategy.get_disjoint_segment_box_strategy()) )
+        if (! geometry::all_segments_of(areal, [&](auto const& s)
+              {
+                  return disjoint_segment_box::apply(s, box, strategy);
+              }) )
         {
             return false;
         }
@@ -152,29 +123,11 @@ struct areal_box
         // If there is no intersection of any segment and box,
         // the box might be located inside areal geometry
 
-        if ( point_on_border_covered_by(box, areal,
-                strategy.template get_point_in_geometry_strategy<Box, Areal>()) )
+        if ( point_on_border_covered_by(box, areal, strategy) )
         {
             return false;
         }
 
-        return true;
-    }
-
-private:
-    template <typename SegIter, typename Strategy>
-    static inline bool for_each_segment(SegIter first,
-                                        SegIter last,
-                                        Box const& box,
-                                        Strategy const& strategy)
-    {
-        for ( ; first != last ; ++first)
-        {
-            if (! disjoint_segment_box::apply(*first, box, strategy))
-            {
-                return false;
-            }
-        }
         return true;
     }
 };

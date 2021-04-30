@@ -25,41 +25,35 @@
 // from odeint
 // (that is, it lets odeint treat the eigen matrices correctly, knowing
 // how to add, multiply, compute the norm, etc)
-
 namespace Eigen {
 
-
 template<typename D>
 inline const
-typename Eigen::CwiseUnaryOp<
-          typename Eigen::internal::scalar_add_op<
-               typename Eigen::internal::traits<D>::Scalar>,
-          const D >
+typename Eigen::CwiseBinaryOp<
+    internal::scalar_sum_op<typename internal::traits<D>::Scalar>,
+    typename DenseBase<D>::ConstantReturnType,
+    const D>
 operator+(const typename Eigen::MatrixBase<D> &m,
           const typename Eigen::internal::traits<D>::Scalar &s) {
-     return Eigen::CwiseUnaryOp<
-          typename Eigen::internal::scalar_add_op<
-               typename Eigen::internal::traits<D>::Scalar>,
-          const D >(m.derived(),Eigen::internal::scalar_add_op<
-                    typename Eigen::internal::traits<D>::Scalar>(s));
+    return CwiseBinaryOp<
+        internal::scalar_sum_op<typename internal::traits<D>::Scalar>,
+        typename DenseBase<D>::ConstantReturnType,
+        const D>(DenseBase<D>::Constant(m.rows(), m.cols(), s), m.derived());
 }
 
 template<typename D>
 inline const
-typename Eigen::CwiseUnaryOp<
-          typename Eigen::internal::scalar_add_op<
-               typename Eigen::internal::traits<D>::Scalar>,
-          const D >
+typename Eigen::CwiseBinaryOp<
+    internal::scalar_sum_op<typename internal::traits<D>::Scalar>,
+    typename DenseBase<D>::ConstantReturnType,
+    const D>
 operator+(const typename Eigen::internal::traits<D>::Scalar &s,
-const typename Eigen::MatrixBase<D> &m) {
-     return Eigen::CwiseUnaryOp<
-          typename Eigen::internal::scalar_add_op<
-               typename Eigen::internal::traits<D>::Scalar>,
-          const D >(m.derived(),Eigen::internal::scalar_add_op<
-                    typename Eigen::internal::traits<D>::Scalar>(s));
+          const typename Eigen::MatrixBase<D> &m) {
+    return CwiseBinaryOp<
+        internal::scalar_sum_op<typename internal::traits<D>::Scalar>,
+        typename DenseBase<D>::ConstantReturnType,
+        const D>(DenseBase<D>::Constant(m.rows(), m.cols(), s), m.derived());
 }
-
-
 
 template<typename D1,typename D2>
 inline const
@@ -82,12 +76,7 @@ abs( const Eigen::MatrixBase< D > &m ) {
     return m.cwiseAbs();
 }
 
-
-
 } // end Eigen namespace
-
-
-
 
 
 namespace boost {

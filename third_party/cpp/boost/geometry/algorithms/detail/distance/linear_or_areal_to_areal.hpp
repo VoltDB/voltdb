@@ -1,8 +1,9 @@
 // Boost.Geometry (aka GGL, Generic Geometry Library)
 
-// Copyright (c) 2014, Oracle and/or its affiliates.
+// Copyright (c) 2014, 2019, Oracle and/or its affiliates.
 
 // Contributed and/or modified by Menelaos Karavelas, on behalf of Oracle
+// Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
 // Licensed under the Boost Software License version 1.0.
 // http://www.boost.org/users/license.html
@@ -40,7 +41,8 @@ struct linear_to_areal
                                     Areal const& areal,
                                     Strategy const& strategy)
     {
-        if ( geometry::intersects(linear, areal) )
+        if ( geometry::intersects(linear, areal,
+                                  strategy.get_relate_segment_segment_strategy()) )
         {
             return 0;
         }
@@ -74,7 +76,8 @@ struct areal_to_areal
                                     Areal2 const& areal2,
                                     Strategy const& strategy)
     {
-        if ( geometry::intersects(areal1, areal2) )
+        if ( geometry::intersects(areal1, areal2,
+                                  strategy.get_relate_segment_segment_strategy()) )
         {
             return 0;
         }

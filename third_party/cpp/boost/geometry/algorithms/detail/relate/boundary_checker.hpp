@@ -1,6 +1,6 @@
 // Boost.Geometry (aka GGL, Generic Geometry Library)
 
-// Copyright (c) 2014-2018 Oracle and/or its affiliates.
+// Copyright (c) 2014-2020 Oracle and/or its affiliates.
 
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
@@ -30,27 +30,29 @@ namespace detail { namespace relate {
 
 enum boundary_query { boundary_front, boundary_back, boundary_any };
 
-template <typename Geometry,
-          typename WithinStrategy, // Point/Point equals (within) strategy
-          typename Tag = typename geometry::tag<Geometry>::type>
+template
+<
+    typename Geometry,
+    typename Strategy,
+    typename Tag = typename geometry::tag<Geometry>::type
+>
 class boundary_checker {};
 
-template <typename Geometry, typename WithinStrategy>
-class boundary_checker<Geometry, WithinStrategy, linestring_tag>
+template <typename Geometry, typename Strategy>
+class boundary_checker<Geometry, Strategy, linestring_tag>
 {
     typedef typename point_type<Geometry>::type point_type;
 
 public:
-    typedef WithinStrategy equals_strategy_type;
-
-    boundary_checker(Geometry const& g)
-        : has_boundary( boost::size(g) >= 2
-                     && !detail::equals::equals_point_point(range::front(g),
-                                                            range::back(g),
-                                                            equals_strategy_type()) )
+    boundary_checker(Geometry const& g, Strategy const& s)
+        : m_has_boundary( boost::size(g) >= 2
+                       && ! detail::equals::equals_point_point(range::front(g),
+                                                               range::back(g),
+                                                               s) )
 #ifdef BOOST_GEOMETRY_DEBUG_RELATE_BOUNDARY_CHECKER
-        , geometry(g)
+        , m_geometry(g)
 #endif
+        , m_strategy(s)
     {}
 
     template <boundary_query BoundaryQuery>
@@ -60,30 +62,34 @@ public:
 #ifdef BOOST_GEOMETRY_DEBUG_RELATE_BOUNDARY_CHECKER
         // may give false positives for INT
         BOOST_GEOMETRY_ASSERT( (BoundaryQuery == boundary_front || BoundaryQuery == boundary_any)
-                   && detail::equals::equals_point_point(pt, range::front(geometry), WithinStrategy())
+                   && detail::equals::equals_point_point(pt, range::front(m_geometry), m_strategy)
                    || (BoundaryQuery == boundary_back || BoundaryQuery == boundary_any)
-                   && detail::equals::equals_point_point(pt, range::back(geometry), WithinStrategy()) );
+                   && detail::equals::equals_point_point(pt, range::back(m_geometry), m_strategy) );
 #endif
-        return has_boundary;
+        return m_has_boundary;
+    }
+
+    Strategy const& strategy() const
+    {
+        return m_strategy;
     }
 
 private:
-    bool has_boundary;
+    bool m_has_boundary;
 #ifdef BOOST_GEOMETRY_DEBUG_RELATE_BOUNDARY_CHECKER
-    Geometry const& geometry;
+    Geometry const& m_geometry;
 #endif
+    Strategy const& m_strategy;
 };
 
-template <typename Geometry, typename WithinStrategy>
-class boundary_checker<Geometry, WithinStrategy, multi_linestring_tag>
+template <typename Geometry, typename Strategy>
+class boundary_checker<Geometry, Strategy, multi_linestring_tag>
 {
     typedef typename point_type<Geometry>::type point_type;
 
 public:
-    typedef WithinStrategy equals_strategy_type;
-
-    boundary_checker(Geometry const& g)
-        : is_filled(false), geometry(g)
+    boundary_checker(Geometry const& g, Strategy const& s)
+        : m_is_filled(false), m_geometry(g), m_strategy(s)
     {}
 
     // First call O(NlogN)
@@ -91,20 +97,22 @@ public:
     template <boundary_query BoundaryQuery>
     bool is_endpoint_boundary(point_type const& pt) const
     {
+        typedef geometry::less<point_type, -1, typename Strategy::cs_tag> less_type;
+
         typedef typename boost::range_size<Geometry>::type size_type;
-        size_type multi_count = boost::size(geometry);
+        size_type multi_count = boost::size(m_geometry);
 
         if ( multi_count < 1 )
             return false;
 
-        if ( ! is_filled )
+        if ( ! m_is_filled )
         {
             //boundary_points.clear();
-            boundary_points.reserve(multi_count * 2);
+            m_boundary_points.reserve(multi_count * 2);
 
             typedef typename boost::range_iterator<Geometry const>::type multi_iterator;
-            for ( multi_iterator it = boost::begin(geometry) ;
-                  it != boost::end(geometry) ; ++ it )
+            for ( multi_iterator it = boost::begin(m_geometry) ;
+                  it != boost::end(m_geometry) ; ++ it )
             {
                 typename boost::range_reference<Geometry const>::type
                     ls = *it;
@@ -124,46 +132,52 @@ public:
                 point_reference back_pt = range::back(ls);
 
                 // linear ring or point - no boundary
-                if (! equals::equals_point_point(front_pt, back_pt, equals_strategy_type()))
+                if (! equals::equals_point_point(front_pt, back_pt, m_strategy))
                 {
                     // do not add points containing NaN coordinates
                     // because they cannot be reasonably compared, e.g. with MSVC
                     // an assertion failure is reported in std::equal_range()
                     if (! geometry::has_nan_coordinate(front_pt))
                     {
-                        boundary_points.push_back(front_pt);
+                        m_boundary_points.push_back(front_pt);
                     }
                     if (! geometry::has_nan_coordinate(back_pt))
                     {
-                        boundary_points.push_back(back_pt);
+                        m_boundary_points.push_back(back_pt);
                     }
                 }
             }
 
-            std::sort(boundary_points.begin(),
-                      boundary_points.end(),
-                      geometry::less<point_type>());
+            std::sort(m_boundary_points.begin(),
+                      m_boundary_points.end(),
+                      less_type());
 
-            is_filled = true;
+            m_is_filled = true;
         }
 
         std::size_t equal_points_count
             = boost::size(
-                std::equal_range(boundary_points.begin(),
-                                 boundary_points.end(),
+                std::equal_range(m_boundary_points.begin(),
+                                 m_boundary_points.end(),
                                  pt,
-                                 geometry::less<point_type>())
+                                 less_type())
             );
 
         return equal_points_count % 2 != 0;// && equal_points_count > 0; // the number is odd and > 0
     }
 
-private:
-    mutable bool is_filled;
-    // TODO: store references/pointers instead of points?
-    mutable std::vector<point_type> boundary_points;
+    Strategy const& strategy() const
+    {
+        return m_strategy;
+    }
 
-    Geometry const& geometry;
+private:
+    mutable bool m_is_filled;
+    // TODO: store references/pointers instead of points?
+    mutable std::vector<point_type> m_boundary_points;
+
+    Geometry const& m_geometry;
+    Strategy const& m_strategy;
 };
 
 }} // namespace detail::relate

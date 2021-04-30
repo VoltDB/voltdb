@@ -1,4 +1,4 @@
-// Copyright Antony Polukhin, 2016-2019.
+// Copyright Antony Polukhin, 2016-2021.
 //
 // Distributed under the Boost Software License, Version 1.0. (See
 // accompanying file LICENSE_1_0.txt or copy at
@@ -98,7 +98,7 @@ public:
 };
 
 
-static std::string mingw_demangling_workaround(const std::string& s) {
+inline std::string mingw_demangling_workaround(const std::string& s) {
 #ifdef BOOST_GCC
     if (s.empty()) {
         return s;
@@ -112,6 +112,17 @@ static std::string mingw_demangling_workaround(const std::string& s) {
 #else
     return s;
 #endif
+}
+
+inline void trim_right_zeroes(std::string& s) {
+    // MSVC-9 does not have back() and pop_back() functions in std::string
+    while (!s.empty()) {
+        const std::size_t last = static_cast<std::size_t>(s.size() - 1);
+        if (s[last] != '\0') {
+            break;
+        }
+        s.resize(last);
+    }
 }
 
 class debugging_symbols: boost::noncopyable {
@@ -217,6 +228,7 @@ public:
                 &size,
                 0
             ));
+            trim_right_zeroes(result);
         } else if (res) {
             result = name;
         }
@@ -301,6 +313,7 @@ public:
             &size,
             0
         ));
+        trim_right_zeroes(result.first);
         result.second = line_num;
 
         if (!res) {

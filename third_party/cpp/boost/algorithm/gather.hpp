@@ -22,8 +22,10 @@
 
 #include <algorithm>                // for std::stable_partition
 #include <functional>
+#include <utility>                  // for std::make_pair
 
-#include <boost/bind.hpp>           // for boost::bind
+#include <boost/config.hpp>
+#include <boost/bind/bind.hpp>      // for boost::bind
 #include <boost/range/begin.hpp>    // for boost::begin(range)
 #include <boost/range/end.hpp>      // for boost::end(range)
 
@@ -80,13 +82,14 @@ namespace boost { namespace algorithm {
 */
 
 template <
-    typename BidirectionalIterator,  // Iter models BidirectionalIterator
-    typename Pred>                   // Pred models UnaryPredicate
+    typename BidirectionalIterator,  // models BidirectionalIterator
+    typename Pred>                   // models UnaryPredicate
 std::pair<BidirectionalIterator, BidirectionalIterator> gather 
         ( BidirectionalIterator first, BidirectionalIterator last, BidirectionalIterator pivot, Pred pred )
 {
 //  The first call partitions everything up to (but not including) the pivot element,
 //  while the second call partitions the rest of the sequence.
+    using namespace boost::placeholders;
     return std::make_pair (
         std::stable_partition ( first, pivot, !boost::bind<bool> ( pred, _1 )),
         std::stable_partition ( pivot, last,   boost::bind<bool> ( pred, _1 )));

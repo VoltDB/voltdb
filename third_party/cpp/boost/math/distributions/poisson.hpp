@@ -25,7 +25,7 @@
 // is strictly defined as a discrete function:
 // only integral values of k are envisaged.
 // However because the method of calculation uses a continuous gamma function,
-// it is convenient to treat it as if a continous function,
+// it is convenient to treat it as if a continuous function,
 // and permit non-integral values of k.
 // To enforce the strict mathematical model, users should use floor or ceil functions
 // on k outside this function to ensure that k is integral.
@@ -235,7 +235,7 @@ namespace boost
     template <class RealType, class Policy>
     inline RealType kurtosis(const poisson_distribution<RealType, Policy>& dist)
     { // kurtosis is 4th moment about the mean = u4 / sd ^ 4
-      // http://en.wikipedia.org/wiki/Curtosis
+      // http://en.wikipedia.org/wiki/Kurtosis
       // kurtosis can range from -2 (flat top) to +infinity (sharp peak & heavy tails).
       // http://www.itl.nist.gov/div898/handbook/eda/section3/eda35b.htm
       return 3 + 1 / dist.mean(); // NIST.
@@ -288,7 +288,7 @@ namespace boost
       // (like others including the binomial, negative binomial & Bernoulli)
       // is strictly defined as a discrete function: only integral values of k are envisaged.
       // However because of the method of calculation using a continuous gamma function,
-      // it is convenient to treat it as if it is a continous function
+      // it is convenient to treat it as if it is a continuous function
       // and permit non-integral values of k.
       // To enforce the strict mathematical model, users should use floor or ceil functions
       // outside this function to ensure that k is integral.
@@ -337,7 +337,7 @@ namespace boost
       // (like others including the binomial, negative binomial & Bernoulli)
       // is strictly defined as a discrete function: only integral values of k are envisaged.
       // However because of the method of calculation using a continuous gamma function,
-      // it is convenient to treat it as is it is a continous function
+      // it is convenient to treat it as is it is a continuous function
       // and permit non-integral values of k.
       // To enforce the strict mathematical model, users should use floor or ceil functions
       // outside this function to ensure that k is integral.

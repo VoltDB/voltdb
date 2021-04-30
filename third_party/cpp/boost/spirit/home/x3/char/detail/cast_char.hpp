@@ -26,6 +26,10 @@ namespace boost { namespace spirit { namespace x3 { namespace detail
     template <typename TargetChar, typename SourceChar>
     TargetChar cast_char(SourceChar ch)
     {
+#if defined(_MSC_VER)
+# pragma warning(push)
+# pragma warning(disable: 4127) // conditional expression is constant
+#endif
         if (is_signed<TargetChar>::value != is_signed<SourceChar>::value)
         {
             if (is_signed<SourceChar>::value)
@@ -46,6 +50,9 @@ namespace boost { namespace spirit { namespace x3 { namespace detail
             // source and target has same signedness
             return TargetChar(ch); // just cast
         }
+#if defined(_MSC_VER)
+# pragma warning(pop)
+#endif
     }
 }}}}
 

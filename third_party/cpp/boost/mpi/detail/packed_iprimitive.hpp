@@ -39,12 +39,12 @@ public:
 
     void* address ()
     {
-      return &buffer_[0];
+      return detail::c_data(buffer_);
     }
 
     void const* address () const
     {
-      return &buffer_[0];
+      return detail::c_data(buffer_);
     }
 
     const std::size_t& size() const

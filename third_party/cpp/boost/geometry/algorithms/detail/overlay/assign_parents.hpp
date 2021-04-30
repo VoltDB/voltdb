@@ -3,8 +3,8 @@
 // Copyright (c) 2007-2012 Barend Gehrels, Amsterdam, the Netherlands.
 // Copyright (c) 2017 Adam Wulkiewicz, Lodz, Poland.
 
-// This file was modified by Oracle on 2017, 2018.
-// Modifications copyright (c) 2017-2018 Oracle and/or its affiliates.
+// This file was modified by Oracle on 2017-2020.
+// Modifications copyright (c) 2017-2020 Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
 // Use, modification and distribution is subject to the Boost Software License,
@@ -14,8 +14,10 @@
 #ifndef BOOST_GEOMETRY_ALGORITHMS_DETAIL_OVERLAY_ASSIGN_PARENTS_HPP
 #define BOOST_GEOMETRY_ALGORITHMS_DETAIL_OVERLAY_ASSIGN_PARENTS_HPP
 
-#include <boost/range.hpp>
+#include <boost/range/begin.hpp>
+#include <boost/range/end.hpp>
 
+#include <boost/geometry/core/coordinate_type.hpp>
 #include <boost/geometry/algorithms/envelope.hpp>
 #include <boost/geometry/algorithms/expand.hpp>
 #include <boost/geometry/algorithms/detail/partition.hpp>
@@ -125,26 +127,42 @@ struct ring_info_helper
 };
 
 
+template <typename Strategy>
 struct ring_info_helper_get_box
 {
+    ring_info_helper_get_box(Strategy const& strategy)
+        : m_strategy(strategy)
+    {}
+
     template <typename Box, typename InputItem>
-    static inline void apply(Box& total, InputItem const& item)
+    inline void apply(Box& total, InputItem const& item) const
     {
-        geometry::expand(total, item.envelope);
+        assert_coordinate_type_equal(total, item.envelope);
+        geometry::expand(total, item.envelope, m_strategy);
     }
+
+    Strategy const& m_strategy;
 };
 
-template <typename DisjointBoxBoxStrategy>
-struct ring_info_helper_ovelaps_box
+template <typename Strategy>
+struct ring_info_helper_overlaps_box
 {
+    ring_info_helper_overlaps_box(Strategy const& strategy)
+        : m_strategy(strategy)
+    {}
+
     template <typename Box, typename InputItem>
-    static inline bool apply(Box const& box, InputItem const& item)
+    inline bool apply(Box const& box, InputItem const& item) const
     {
+        assert_coordinate_type_equal(box, item.envelope);
         return ! geometry::detail::disjoint::disjoint_box_box(
-                    box, item.envelope, DisjointBoxBoxStrategy());
+                    box, item.envelope, m_strategy);
     }
+
+    Strategy const& m_strategy;
 };
 
+// Segments intersection Strategy
 template
 <
     typename Geometry1,
@@ -190,7 +208,7 @@ struct assign_visitor
         {
             ring_info_type& inner_in_map = m_ring_map[inner.id];
 
-            if (geometry::covered_by(inner_in_map.point, outer.envelope)
+            if (geometry::covered_by(inner_in_map.point, outer.envelope, m_strategy)
                && within_selected_input(inner_in_map, inner.id, outer.id,
                                         m_geometry1, m_geometry2, m_collection,
                                         m_strategy)
@@ -237,10 +255,10 @@ inline void assign_parents(Geometry1 const& geometry1,
     typedef typename RingMap::mapped_type ring_info_type;
     typedef typename ring_info_type::point_type point_type;
     typedef model::box<point_type> box_type;
-    typedef typename Strategy::template area_strategy
+    typedef typename geometry::area_result
         <
-            point_type
-        >::type::template result_type<point_type>::type area_result_type;
+            point_type, Strategy // TODO: point_type is technically incorrect
+        >::type area_result_type;
 
     typedef typename RingMap::iterator map_iterator_type;
 
@@ -266,15 +284,15 @@ inline void assign_parents(Geometry1 const& geometry1,
             {
                 case 0 :
                     geometry::envelope(get_ring<tag1>::apply(it->first, geometry1),
-                                       item.envelope, strategy.get_envelope_strategy());
+                                       item.envelope, strategy);
                     break;
                 case 1 :
                     geometry::envelope(get_ring<tag2>::apply(it->first, geometry2),
-                                       item.envelope, strategy.get_envelope_strategy());
+                                       item.envelope, strategy);
                     break;
                 case 2 :
                     geometry::envelope(get_ring<void>::apply(it->first, collection),
-                                       item.envelope, strategy.get_envelope_strategy());
+                                       item.envelope, strategy);
                     break;
             }
 
@@ -329,16 +347,12 @@ inline void assign_parents(Geometry1 const& geometry1,
                 Strategy
             > visitor(geometry1, geometry2, collection, ring_map, strategy, check_for_orientation);
 
-        typedef ring_info_helper_ovelaps_box
-            <
-                typename Strategy::disjoint_box_box_strategy_type
-            > overlaps_box_type;
-
         geometry::partition
             <
                 box_type
-            >::apply(vector, visitor, ring_info_helper_get_box(),
-                     overlaps_box_type());
+            >::apply(vector, visitor,
+                     ring_info_helper_get_box<Strategy>(strategy),
+                     ring_info_helper_overlaps_box<Strategy>(strategy));
     }
 
     if (check_for_orientation)

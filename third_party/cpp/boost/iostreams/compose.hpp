@@ -378,7 +378,7 @@ compose( const Filter& flt, const FilterOrDevice& fod
          BOOST_IOSTREAMS_DISABLE_IF_STREAM(T) )
 { return compose(flt, fod, is_std_io<FilterOrDevice>()); }
 
-# if !BOOST_WORKAROUND(__BORLANDC__, < 0x600) && \
+# if !BOOST_WORKAROUND(BOOST_BORLANDC, < 0x600) && \
      !defined(__GNUC__) // ---------------------------------------------------//
 
 template<typename Filter, typename FilterOrDevice>

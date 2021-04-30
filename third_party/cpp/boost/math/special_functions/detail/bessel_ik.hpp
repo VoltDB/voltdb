@@ -68,7 +68,7 @@ inline T bessel_i_small_z_series(T v, T x, const Policy& pol)
 
    cyl_bessel_i_small_z<T, Policy> s(v, x);
    boost::uintmax_t max_iter = policies::get_max_series_iterations<Policy>();
-#if BOOST_WORKAROUND(__BORLANDC__, BOOST_TESTED_AT(0x582))
+#if BOOST_WORKAROUND(BOOST_BORLANDC, BOOST_TESTED_AT(0x582))
    T zero = 0;
    T result = boost::math::tools::sum_series(s, boost::math::policies::get_epsilon<T, Policy>(), max_iter, zero);
 #else
@@ -104,7 +104,7 @@ int temme_ik(T v, T x, T* K, T* K1, const Policy& pol)
     b = exp(v * a);
     sigma = -a * v;
     c = abs(v) < tools::epsilon<T>() ?
-       T(1) : T(boost::math::sin_pi(v) / (v * pi<T>()));
+       T(1) : T(boost::math::sin_pi(v, pol) / (v * pi<T>()));
     d = abs(sigma) < tools::epsilon<T>() ?
         T(1) : T(sinh(sigma) / sigma);
     gamma1 = abs(v) < tools::epsilon<T>() ?
@@ -424,7 +424,7 @@ int bessel_ik(T v, T x, T* I, T* K, int kind, const Policy& pol)
     if (reflect)
     {
         T z = (u + n % 2);
-        T fact = (2 / pi<T>()) * (boost::math::sin_pi(z) * Kv);
+        T fact = (2 / pi<T>()) * (boost::math::sin_pi(z, pol) * Kv);
         if(fact == 0)
            *I = Iv;
         else if(tools::max_value<T>() * scale < fact)

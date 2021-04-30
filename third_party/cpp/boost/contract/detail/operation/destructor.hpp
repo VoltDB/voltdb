@@ -11,6 +11,7 @@
 #include <boost/contract/core/config.hpp>
 #include <boost/contract/detail/condition/cond_inv.hpp>
 #include <boost/contract/detail/none.hpp>
+#include <boost/contract/detail/exception.hpp>
 #if     !defined(BOOST_CONTRACT_ALL_DISABLE_NO_ASSERTION) && ( \
         !defined(BOOST_CONTRACT_NO_INVARIANTS) || \
         !defined(BOOST_CONTRACT_NO_POSTCONDITIONS) || \
@@ -77,7 +78,7 @@ public:
             // language allows for that (even if in C++11 dtors declarations are
             // implicitly noexcept(true) unless specified otherwise) so this
             // library must handle such a case.
-            if(std::uncaught_exception()) {
+            if(uncaught_exception()) {
                 #ifndef BOOST_CONTRACT_NO_EXIT_INVARIANTS
                     this->check_exit_all_inv();
                 #endif

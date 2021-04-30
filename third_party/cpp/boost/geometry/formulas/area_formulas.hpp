@@ -1,6 +1,6 @@
 // Boost.Geometry
 
-// Copyright (c) 2015-2018 Oracle and/or its affiliates.
+// Copyright (c) 2015-2021 Oracle and/or its affiliates.
 
 // Contributed and/or modified by Vissarion Fysikopoulos, on behalf of Oracle
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
@@ -14,6 +14,8 @@
 
 #include <boost/geometry/core/radian_access.hpp>
 #include <boost/geometry/formulas/flattening.hpp>
+#include <boost/geometry/formulas/mean_radius.hpp>
+#include <boost/geometry/formulas/karney_inverse.hpp>
 #include <boost/geometry/util/math.hpp>
 #include <boost/math/special_functions/hypot.hpp>
 
@@ -31,10 +33,11 @@ namespace boost { namespace geometry { namespace formula
 https://arxiv.org/pdf/1109.4448.pdf
 */
 
-template <
-        typename CT,
-        std::size_t SeriesOrder = 2,
-        bool ExpandEpsN = true
+template
+<
+    typename CT,
+    std::size_t SeriesOrder = 2,
+    bool ExpandEpsN = true
 >
 class area_formulas
 {
@@ -170,7 +173,6 @@ public:
 
     static inline void evaluate_coeffs_n(CT const& n, CT coeffs_n[])
     {
-
         switch (SeriesOrder) {
         case 0:
             coeffs_n[0] = CT(2)/CT(3);
@@ -325,9 +327,9 @@ public:
         Given the set of coefficients coeffs1[] evaluate on var2 and return
         the set of coefficients coeffs2[]
     */
-
+    template <typename CoeffsType>
     static inline void evaluate_coeffs_var2(CT const& var2,
-                                            CT const coeffs1[],
+                                            CoeffsType const coeffs1[],
                                             CT coeffs2[])
     {
         std::size_t begin(0), end(0);
@@ -344,16 +346,17 @@ public:
     /*
         Compute the spherical excess of a geodesic (or shperical) segment
     */
-    template <
-                bool LongSegment,
-                typename PointOfSegment
-             >
+    template
+    <
+        bool LongSegment,
+        typename PointOfSegment
+    >
     static inline CT spherical(PointOfSegment const& p1,
                                PointOfSegment const& p2)
     {
         CT excess;
 
-        if(LongSegment) // not for segments parallel to equator
+        if (LongSegment) // not for segments parallel to equator
         {
             CT cbet1 = cos(geometry::get_as_radian<1>(p1));
             CT sbet1 = sin(geometry::get_as_radian<1>(p1));
@@ -407,93 +410,106 @@ public:
     /*
         Compute the ellipsoidal correction of a geodesic (or shperical) segment
     */
-    template <
-                template <typename, bool, bool, bool, bool, bool> class Inverse,
-                typename PointOfSegment,
-                typename SpheroidConst
-             >
-    static inline return_type_ellipsoidal ellipsoidal(PointOfSegment const& p1,
-                                                      PointOfSegment const& p2,
-                                                      SpheroidConst const& spheroid_const)
+    template
+    <
+        template <typename, bool, bool, bool, bool, bool> class Inverse,
+        typename PointOfSegment,
+        typename SpheroidConst
+    >
+    static inline auto ellipsoidal(PointOfSegment const& p1,
+                                   PointOfSegment const& p2,
+                                   SpheroidConst const& spheroid_const)
     {
         return_type_ellipsoidal result;
 
+        CT const lon1r = get_as_radian<0>(p1);
+        CT const lat1r = get_as_radian<1>(p1);
+        CT const lon2r = get_as_radian<0>(p2);
+        CT const lat2r = get_as_radian<1>(p2);
+
         // Azimuth Approximation
 
-        typedef Inverse<CT, false, true, true, false, false> inverse_type;
-        typedef typename inverse_type::result_type inverse_result;
+        using inverse_type = Inverse<CT, true, true, true, false, false>;
+        auto i_res = inverse_type::apply(lon1r, lat1r, lon2r, lat2r, spheroid_const.m_spheroid);
 
-        inverse_result i_res = inverse_type::apply(get_as_radian<0>(p1),
-                                                   get_as_radian<1>(p1),
-                                                   get_as_radian<0>(p2),
-                                                   get_as_radian<1>(p2),
-                                                   spheroid_const.m_spheroid);
-
-        CT alp1 = i_res.azimuth;
-        CT alp2 = i_res.reverse_azimuth;
+        CT const alp1 = i_res.azimuth;
+        CT const alp2 = i_res.reverse_azimuth;
 
         // Constants
 
         CT const ep = spheroid_const.m_ep;
-        CT const f = formula::flattening<CT>(spheroid_const.m_spheroid);
-        CT const one_minus_f = CT(1) - f;
-        std::size_t const series_order_plus_one = SeriesOrder + 1;
-        std::size_t const series_order_plus_two = SeriesOrder + 2;
+        CT const one_minus_f = CT(1) - spheroid_const.m_f;
 
         // Basic trigonometric computations
+        // the compiler could optimize here using sincos function
+        // TODO: optimization: those quantities are already computed in inverse formula
+        // at least in some inverse formulas, so do not compute them again here
+        /*
+        CT sin_bet1 = sin(lat1r);
+        CT cos_bet1 = cos(lat1r);
+        CT sin_bet2 = sin(lat2r);
+        CT cos_bet2 = cos(lat2r);
 
-        CT tan_bet1 = tan(get_as_radian<1>(p1)) * one_minus_f;
-        CT tan_bet2 = tan(get_as_radian<1>(p2)) * one_minus_f;
-        CT cos_bet1 = cos(atan(tan_bet1));
-        CT cos_bet2 = cos(atan(tan_bet2));
-        CT sin_bet1 = tan_bet1 * cos_bet1;
-        CT sin_bet2 = tan_bet2 * cos_bet2;
-        CT sin_alp1 = sin(alp1);
-        CT cos_alp1 = cos(alp1);
-        CT cos_alp2 = cos(alp2);
-        CT sin_alp0 = sin_alp1 * cos_bet1;
+        sin_bet1 *= one_minus_f;
+        sin_bet2 *= one_minus_f;
+        normalize(sin_bet1, cos_bet1);
+        normalize(sin_bet2, cos_bet2);
+        */
+
+        CT const tan_bet1 = tan(lat1r) * one_minus_f;
+        CT const tan_bet2 = tan(lat2r) * one_minus_f;
+        CT const cos_bet1 = cos(atan(tan_bet1));
+        CT const cos_bet2 = cos(atan(tan_bet2));
+        CT const sin_bet1 = tan_bet1 * cos_bet1;
+        CT const sin_bet2 = tan_bet2 * cos_bet2;
+
+        CT const sin_alp1 = sin(alp1);
+        CT const cos_alp1 = cos(alp1);
+        CT const cos_alp2 = cos(alp2);
+        CT const sin_alp0 = sin_alp1 * cos_bet1;
 
         // Spherical term computation
 
-        CT sin_omg1 = sin_alp0 * sin_bet1;
-        CT cos_omg1 = cos_alp1 * cos_bet1;
-        CT sin_omg2 = sin_alp0 * sin_bet2;
-        CT cos_omg2 = cos_alp2 * cos_bet2;
-        CT cos_omg12 =  cos_omg1 * cos_omg2 + sin_omg1 * sin_omg2;
         CT excess;
 
-        bool meridian = get<0>(p2) - get<0>(p1) == CT(0)
-              || get<1>(p1) == CT(90) || get<1>(p1) == -CT(90)
-              || get<1>(p2) == CT(90) || get<1>(p2) == -CT(90);
+        auto const half_pi = math::pi<CT>() / 2;
+        bool meridian = lon2r - lon1r == CT(0)
+            || lat1r == half_pi || lat1r == -half_pi
+            || lat2r == half_pi || lat2r == -half_pi;
 
-        if (!meridian && cos_omg12 > -CT(0.7)
-                      && sin_bet2 - sin_bet1 < CT(1.75)) // short segment
+        if (!meridian && (i_res.distance)
+            < mean_radius<CT>(spheroid_const.m_spheroid) / CT(638))  // short segment
         {
-            CT sin_omg12 =  cos_omg1 * sin_omg2 - sin_omg1 * cos_omg2;
+            CT tan_lat1 = tan(lat1r / 2.0);
+            CT tan_lat2 = tan(lat2r / 2.0);
+
+            excess = CT(2.0)
+                * atan(((tan_lat1 + tan_lat2) / (CT(1) + tan_lat1 * tan_lat2))
+                * tan((lon2r - lon1r) / 2));
+        }
+        else
+        {
+            /* in some cases this formula gives more accurate results
+             *
+             *             CT sin_omg12 =  cos_omg1 * sin_omg2 - sin_omg1 * cos_omg2;
             normalize(sin_omg12, cos_omg12);
 
             CT cos_omg12p1 = CT(1) + cos_omg12;
             CT cos_bet1p1 = CT(1) + cos_bet1;
             CT cos_bet2p1 = CT(1) + cos_bet2;
             excess = CT(2) * atan2(sin_omg12 * (sin_bet1 * cos_bet2p1 + sin_bet2 * cos_bet1p1),
-                                cos_omg12p1 * (sin_bet1 * sin_bet2 + cos_bet1p1 * cos_bet2p1));
-        }
-        else
-        {
-            /*
-                    CT sin_alp2 = sin(alp2);
-                    CT sin_alp12 = sin_alp2 * cos_alp1 - cos_alp2 * sin_alp1;
-                    CT cos_alp12 = cos_alp2 * cos_alp1 + sin_alp2 * sin_alp1;
-                    excess = atan2(sin_alp12, cos_alp12);
+                                   cos_omg12p1 * (sin_bet1 * sin_bet2 + cos_bet1p1 * cos_bet2p1));
             */
-                    excess = alp2 - alp1;
+
+            excess = alp2 - alp1;
         }
 
         result.spherical_term = excess;
 
         // Ellipsoidal term computation (uses integral approximation)
 
-        CT cos_alp0 = math::sqrt(CT(1) - math::sqr(sin_alp0));
+        CT const cos_alp0 = math::sqrt(CT(1) - math::sqr(sin_alp0));
+        //CT const cos_alp0 = hypot(cos_alp1, sin_alp1 * sin_bet1);
         CT cos_sig1 = cos_alp1 * cos_bet1;
         CT cos_sig2 = cos_alp2 * cos_bet2;
         CT sin_sig1 = sin_bet1;
@@ -503,41 +519,36 @@ public:
         normalize(sin_sig2, cos_sig2);
 
         CT coeffs[SeriesOrder + 1];
-        const std::size_t coeffs_var_size = (series_order_plus_two
-                                            * series_order_plus_one) / 2;
-        CT coeffs_var[coeffs_var_size];
 
-        if(ExpandEpsN){ // expand by eps and n
-
-            CT k2 = math::sqr(ep * cos_alp0);
-            CT sqrt_k2_plus_one = math::sqrt(CT(1) + k2);
-            CT eps = (sqrt_k2_plus_one - CT(1)) / (sqrt_k2_plus_one + CT(1));
-            CT n = f / (CT(2) - f);
-
-            // Generate and evaluate the polynomials on n
-            // to get the series coefficients (that depend on eps)
-            evaluate_coeffs_n(n, coeffs_var);
+        if (ExpandEpsN) // expand by eps and n
+        {
+            CT const k2 = math::sqr(ep * cos_alp0);
+            CT const sqrt_k2_plus_one = math::sqrt(CT(1) + k2);
+            CT const eps = (sqrt_k2_plus_one - CT(1)) / (sqrt_k2_plus_one + CT(1));
 
             // Generate and evaluate the polynomials on eps (i.e. var2 = eps)
             // to get the final series coefficients
-            evaluate_coeffs_var2(eps, coeffs_var, coeffs);
+            evaluate_coeffs_var2(eps, spheroid_const.m_coeffs_var, coeffs);
+        }
+        else
+        { // expand by k2 and ep
 
-        }else{ // expand by k2 and ep
+            CT const k2 = math::sqr(ep * cos_alp0);
+            CT const ep2 = math::sqr(ep);
 
-            CT k2 = math::sqr(ep * cos_alp0);
-            CT ep2 = math::sqr(ep);
+            CT coeffs_var[((SeriesOrder+2)*(SeriesOrder+1))/2];
 
             // Generate and evaluate the polynomials on ep2
             evaluate_coeffs_ep(ep2, coeffs_var);
 
             // Generate and evaluate the polynomials on k2 (i.e. var2 = k2)
             evaluate_coeffs_var2(k2, coeffs_var, coeffs);
-
         }
 
         // Evaluate the trigonometric sum
-        CT I12 = clenshaw_sum(cos_sig2, coeffs, coeffs + series_order_plus_one)
-               - clenshaw_sum(cos_sig1, coeffs, coeffs + series_order_plus_one);
+        constexpr auto series_order_plus_one = SeriesOrder + 1;
+        CT const I12 = clenshaw_sum(cos_sig2, coeffs, coeffs + series_order_plus_one)
+            - clenshaw_sum(cos_sig1, coeffs, coeffs + series_order_plus_one);
 
         // The part of the ellipsodal correction that depends on
         // point coordinates

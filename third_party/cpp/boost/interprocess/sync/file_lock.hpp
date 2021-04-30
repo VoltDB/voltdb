@@ -51,7 +51,7 @@ class file_lock
    public:
    //!Constructs an empty file mapping.
    //!Does not throw
-   file_lock()
+   file_lock() BOOST_NOEXCEPT
       :  m_file_hnd(file_handle_t(ipcdetail::invalid_file()))
    {}
 
@@ -59,17 +59,26 @@ class file_lock
    //!exist or there are no operating system resources.
    file_lock(const char *name);
 
+   #if defined(BOOST_INTERPROCESS_WCHAR_NAMED_RESOURCES) || defined(BOOST_INTERPROCESS_DOXYGEN_INVOKED)
+   //!Opens a file lock. Throws interprocess_exception if the file does not
+   //!exist or there are no operating system resources.
+   //! 
+   //!Note: This function is only available on operating systems with
+   //!      native wchar_t APIs (e.g. Windows).
+   file_lock(const wchar_t *name);
+   #endif
+
    //!Moves the ownership of "moved"'s file mapping object to *this.
    //!After the call, "moved" does not represent any file mapping object.
    //!Does not throw
-   file_lock(BOOST_RV_REF(file_lock) moved)
+   file_lock(BOOST_RV_REF(file_lock) moved) BOOST_NOEXCEPT
       :  m_file_hnd(file_handle_t(ipcdetail::invalid_file()))
    {  this->swap(moved);   }
 
    //!Moves the ownership of "moved"'s file mapping to *this.
    //!After the call, "moved" does not represent any file mapping.
    //!Does not throw
-   file_lock &operator=(BOOST_RV_REF(file_lock) moved)
+   file_lock &operator=(BOOST_RV_REF(file_lock) moved) BOOST_NOEXCEPT
    {
       file_lock tmp(boost::move(moved));
       this->swap(tmp);
@@ -81,7 +90,7 @@ class file_lock
 
    //!Swaps two file_locks.
    //!Does not throw.
-   void swap(file_lock &other)
+   void swap(file_lock &other) BOOST_NOEXCEPT
    {
       file_handle_t tmp = m_file_hnd;
       m_file_hnd = other.m_file_hnd;
@@ -90,25 +99,43 @@ class file_lock
 
    //Exclusive locking
 
+   //!Requires: The calling thread does not own the mutex.
+   //!
    //!Effects: The calling thread tries to obtain exclusive ownership of the mutex,
    //!   and if another thread has exclusive, or sharable ownership of
    //!   the mutex, it waits until it can obtain the ownership.
    //!Throws: interprocess_exception on error.
+   //!
+   //!Note: A program may deadlock if the thread that has ownership calls 
+   //!   this function. If the implementation can detect the deadlock,
+   //!   an exception could be thrown.
    void lock();
 
+   //!Requires: The calling thread does not own the mutex.
+   //!
    //!Effects: The calling thread tries to acquire exclusive ownership of the mutex
    //!   without waiting. If no other thread has exclusive, or sharable
    //!   ownership of the mutex this succeeds.
    //!Returns: If it can acquire exclusive ownership immediately returns true.
    //!   If it has to wait, returns false.
    //!Throws: interprocess_exception on error.
+   //! 
+   //!Note: A program may deadlock if the thread that has ownership calls 
+   //!   this function. If the implementation can detect the deadlock,
+   //!   an exception could be thrown.
    bool try_lock();
 
+   //!Requires: The calling thread does not own the mutex.
+   //!
    //!Effects: The calling thread tries to acquire exclusive ownership of the mutex
    //!   waiting if necessary until no other thread has exclusive, or sharable
    //!   ownership of the mutex or abs_time is reached.
    //!Returns: If acquires exclusive ownership, returns true. Otherwise returns false.
    //!Throws: interprocess_exception on error.
+   //! 
+   //!Note: A program may deadlock if the thread that has ownership calls 
+   //!   this function. If the implementation can detect the deadlock,
+   //!   an exception could be thrown.
    bool timed_lock(const boost::posix_time::ptime &abs_time);
 
    //!Precondition: The thread must have exclusive ownership of the mutex.
@@ -118,10 +145,16 @@ class file_lock
 
    //Sharable locking
 
+   //!Requires: The calling thread does not own the mutex.
+   //!
    //!Effects: The calling thread tries to obtain sharable ownership of the mutex,
    //!   and if another thread has exclusive ownership of the mutex, waits until
    //!   it can obtain the ownership.
    //!Throws: interprocess_exception on error.
+   //!
+   //!Note: A program may deadlock if the thread that owns a mutex object calls 
+   //!   this function. If the implementation can detect the deadlock,
+   //!   an exception could be thrown.
    void lock_sharable();
 
    //!Effects: The calling thread tries to acquire sharable ownership of the mutex
@@ -159,6 +192,20 @@ inline file_lock::file_lock(const char *name)
       throw interprocess_exception(err);
    }
 }
+
+#if defined(BOOST_INTERPROCESS_WCHAR_NAMED_RESOURCES) || defined(BOOST_INTERPROCESS_DOXYGEN_INVOKED)
+
+inline file_lock::file_lock(const wchar_t *name)
+{
+   m_file_hnd = ipcdetail::open_existing_file(name, read_write);
+
+   if(m_file_hnd == ipcdetail::invalid_file()){
+      error_info err(system_error_code());
+      throw interprocess_exception(err);
+   }
+}
+
+#endif //defined(BOOST_INTERPROCESS_WCHAR_NAMED_RESOURCES) || defined(BOOST_INTERPROCESS_DOXYGEN_INVOKED)
 
 inline file_lock::~file_lock()
 {

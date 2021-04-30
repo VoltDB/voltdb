@@ -4,8 +4,8 @@
     Distributed under the Boost Software License, Version 1.0. (See accompanying
     file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 =============================================================================*/
-#if !defined(SPIRIT_X3_WITH_MAY_02_2014_0749AM)
-#define SPIRIT_X3_WITH_MAY_02_2014_0749AM
+#ifndef BOOST_SPIRIT_X3_DIRECTIVE_WITH_HPP
+#define BOOST_SPIRIT_X3_DIRECTIVE_WITH_HPP
 
 #include <boost/spirit/home/x3/support/unused.hpp>
 #include <boost/spirit/home/x3/core/parser.hpp>
@@ -21,7 +21,7 @@ namespace boost { namespace spirit { namespace x3
     {
         typedef unary_parser<Subject, Derived> base_type;
         mutable T val;
-        with_value_holder(Subject const& subject, T&& val)
+        constexpr with_value_holder(Subject const& subject, T&& val)
           : base_type(subject)
           , val(std::forward<T>(val)) {}
     };
@@ -32,7 +32,7 @@ namespace boost { namespace spirit { namespace x3
     {
         typedef unary_parser<Subject, Derived> base_type;
         T& val;
-        with_value_holder(Subject const& subject, T& val)
+        constexpr with_value_holder(Subject const& subject, T& val)
           : base_type(subject)
           , val(val) {}
     };
@@ -47,7 +47,7 @@ namespace boost { namespace spirit { namespace x3
 
         typedef Subject subject_type;
 
-        with_directive(Subject const& subject, T&& val)
+        constexpr with_directive(Subject const& subject, T&& val)
           : base_type(subject, std::forward<T>(val)) {}
 
         template <typename Iterator, typename Context
@@ -69,7 +69,7 @@ namespace boost { namespace spirit { namespace x3
         T&& val;
 
         template <typename Subject>
-        with_directive<typename extension::as_parser<Subject>::value_type, ID, T>
+        constexpr with_directive<typename extension::as_parser<Subject>::value_type, ID, T>
         operator[](Subject const& subject) const
         {
             return { as_parser(subject), std::forward<T>(val) };
@@ -77,7 +77,7 @@ namespace boost { namespace spirit { namespace x3
     };
 
     template <typename ID, typename T>
-    inline with_gen<ID, T> with(T&& val)
+    constexpr with_gen<ID, T> with(T&& val)
     {
         return { std::forward<T>(val) };
     }

@@ -126,7 +126,7 @@ public:
         m_t_old = m_t;
         m_t += m_dt;
         toggle_current_state();
-        return std::make_pair( m_t_old , m_dt );
+        return std::make_pair( m_t_old , m_t );
     }
 
     /*

@@ -4,8 +4,8 @@
 // Copyright (c) 2008-2012 Bruno Lalande, Paris, France.
 // Copyright (c) 2009-2012 Mateusz Loskot, London, UK.
 
-// This file was modified by Oracle on 2014, 2016, 2017, 2018.
-// Modifications copyright (c) 2014-2018 Oracle and/or its affiliates.
+// This file was modified by Oracle on 2014, 2016, 2017, 2018, 2020.
+// Modifications copyright (c) 2014-2020 Oracle and/or its affiliates.
 
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
@@ -28,6 +28,10 @@
 #include <boost/geometry/core/tag.hpp>
 #include <boost/geometry/core/tags.hpp>
 
+#if defined(BOOST_GEOMETRY_ENABLE_ACCESS_DEBUGGING)
+#include <boost/geometry/core/assert.hpp>
+#endif
+
 
 namespace boost { namespace geometry
 {
@@ -49,16 +53,39 @@ public:
     spheroid(RadiusType const& a, RadiusType const& b)
         : m_a(a)
         , m_b(b)
-    {}
+    {
+#if defined(BOOST_GEOMETRY_ENABLE_ACCESS_DEBUGGING)
+        m_created = 1;
+#endif
+    }
 
     spheroid()
         : m_a(RadiusType(6378137.0))
         , m_b(RadiusType(6356752.3142451793))
-    {}
+    {
+#if defined(BOOST_GEOMETRY_ENABLE_ACCESS_DEBUGGING)
+        m_created = 1;
+#endif
+    }
+
+#if defined(BOOST_GEOMETRY_ENABLE_ACCESS_DEBUGGING)
+    ~spheroid()
+    {
+        m_created = 0;
+    }
+#endif
 
     template <std::size_t I>
     RadiusType get_radius() const
     {
+#if defined(BOOST_GEOMETRY_ENABLE_ACCESS_DEBUGGING)
+        if (m_created != 1)
+        {
+            int a = 10;
+        }
+        BOOST_GEOMETRY_ASSERT(m_created == 1);
+#endif
+
         BOOST_STATIC_ASSERT(I < 3);
 
         return I < 2 ? m_a : m_b;
@@ -67,6 +94,10 @@ public:
     template <std::size_t I>
     void set_radius(RadiusType const& radius)
     {
+#if defined(BOOST_GEOMETRY_ENABLE_ACCESS_DEBUGGING)
+        BOOST_GEOMETRY_ASSERT(m_created == 1);
+#endif
+
         BOOST_STATIC_ASSERT(I < 3);
 
         (I < 2 ? m_a : m_b) = radius;
@@ -74,6 +105,10 @@ public:
 
 private:
     RadiusType m_a, m_b; // equatorial radius, polar radius
+
+#if defined(BOOST_GEOMETRY_ENABLE_ACCESS_DEBUGGING)
+    int m_created;
+#endif
 };
 
 } // namespace srs

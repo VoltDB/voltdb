@@ -10,8 +10,8 @@
     LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 =============================================================================*/
 
-#if !defined(CPP_RE_HPP_B76C4F5E_63E9_4B8A_9975_EC32FA6BF027_INCLUDED)
-#define CPP_RE_HPP_B76C4F5E_63E9_4B8A_9975_EC32FA6BF027_INCLUDED
+#if !defined(BOOST_CPP_RE_HPP_B76C4F5E_63E9_4B8A_9975_EC32FA6BF027_INCLUDED)
+#define BOOST_CPP_RE_HPP_B76C4F5E_63E9_4B8A_9975_EC32FA6BF027_INCLUDED
 
 #include <boost/assert.hpp>
 
@@ -43,7 +43,7 @@
     }                                                                         \
     /**/
 
-#include <iostream>
+#include <iosfwd>
 
 ///////////////////////////////////////////////////////////////////////////////
 #define BOOST_WAVE_UPDATE_CURSOR()                                            \
@@ -407,4 +407,4 @@ boost::wave::token_id scan(Scanner<Iterator> *s)
 #include BOOST_ABI_SUFFIX
 #endif
 
-#endif // !defined(CPP_RE_HPP_B76C4F5E_63E9_4B8A_9975_EC32FA6BF027_INCLUDED)
+#endif // !defined(BOOST_CPP_RE_HPP_B76C4F5E_63E9_4B8A_9975_EC32FA6BF027_INCLUDED)

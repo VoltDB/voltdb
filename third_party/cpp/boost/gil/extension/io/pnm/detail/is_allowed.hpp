@@ -10,11 +10,13 @@
 
 #include <boost/gil/extension/io/pnm/tags.hpp>
 
+#include <type_traits>
+
 namespace boost { namespace gil { namespace detail {
 
 template< typename View >
 bool is_allowed( const image_read_info< pnm_tag >& info
-               , mpl::true_   // is read_and_no_convert
+               , std::true_type   // is read_and_no_convert
                )
 {
     pnm_image_type::type asc_type = is_read_supported< typename get_pixel_type< View >::type
@@ -38,7 +40,7 @@ bool is_allowed( const image_read_info< pnm_tag >& info
 
 template< typename View >
 bool is_allowed( const image_read_info< pnm_tag >& /* info */
-               , mpl::false_  // is read_and_convert
+               , std::false_type  // is read_and_convert
                )
 {
     return true;

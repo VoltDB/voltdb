@@ -7,8 +7,8 @@ file(GLOB include_files
   RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}"
   "${CMAKE_CURRENT_SOURCE_DIR}/*.hpp"
 )
-add_custom_target(concepts SOURCES ${include_files})
-set_target_properties(concepts PROPERTIES FOLDER "safe_numerics")
+add_custom_target(concept SOURCES ${include_files})
+set_target_properties(concept PROPERTIES FOLDER "safe_numerics")
 
 # end headers in IDE
 ####################

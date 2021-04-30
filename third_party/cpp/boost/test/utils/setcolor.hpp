@@ -23,6 +23,7 @@
 // STL
 #include <iostream>
 #include <cstdio>
+#include <cassert>
 
 #include <boost/test/detail/suppress_warnings.hpp>
 
@@ -78,11 +79,14 @@ struct term_color { enum _ {
 #ifndef _WIN32
 class setcolor {
 public:
+    typedef int state;
+
     // Constructor
     explicit    setcolor( bool is_color_output = false,
                           term_attr::_  attr = term_attr::NORMAL,
                           term_color::_ fg   = term_color::ORIGINAL,
-                          term_color::_ bg   = term_color::ORIGINAL )
+                          term_color::_ bg   = term_color::ORIGINAL,
+                          state* /* unused */= NULL)
     : m_is_color_output(is_color_output)
     {
         m_command_size = std::sprintf( m_control_command, "%c[%c;3%c;4%cm",
@@ -90,6 +94,17 @@ public:
           static_cast<char>(attr + '0'),
           static_cast<char>(fg + '0'),
           static_cast<char>(bg + '0'));
+    }
+
+    explicit    setcolor(bool is_color_output,
+                         state* /* unused */)
+    : m_is_color_output(is_color_output)
+    {
+        m_command_size = std::sprintf(m_control_command, "%c[%c;3%c;4%cm",
+          0x1B,
+          static_cast<char>(term_attr::NORMAL + '0'),
+          static_cast<char>(term_color::ORIGINAL + '0'),
+          static_cast<char>(term_color::ORIGINAL + '0'));
     }
 
     friend std::ostream&
@@ -114,7 +129,7 @@ class setcolor {
 
 protected:
   void set_console_color(std::ostream& os, WORD *attributes = NULL) const {
-    if (!m_is_color_output) {
+    if (!m_is_color_output || m_state_saved) {
       return;
     }
     DWORD console_type;
@@ -132,14 +147,30 @@ protected:
     if(hConsole == INVALID_HANDLE_VALUE || hConsole == NULL )
       return;
 
-    if(attributes != NULL) {
-      SetConsoleTextAttribute(hConsole, *attributes);
+    state console_attributes;
+    if(attributes != NULL || (m_restore_state && m_s)) {
+      if (attributes != NULL) {
+        console_attributes = *attributes;
+      }
+      else {
+        console_attributes = *m_s;
+        *m_s = state();
+      }
+      SetConsoleTextAttribute(hConsole, console_attributes);
       return;
     }
 
     CONSOLE_SCREEN_BUFFER_INFO consoleInfo;
     GetConsoleScreenBufferInfo(hConsole, &consoleInfo);
-    saved_attributes = consoleInfo.wAttributes;
+    console_attributes = consoleInfo.wAttributes;
+
+    if (!m_state_saved && m_s) {
+      assert(!m_restore_state);
+      // we can save the state only the first time this object is used
+      // for modifying the console.
+      *m_s = console_attributes;
+      m_state_saved = true;
+    }
 
     WORD fg_attr = 0;
     switch(m_fg)
@@ -168,9 +199,9 @@ protected:
     case term_color::YELLOW:
       fg_attr = FOREGROUND_RED | FOREGROUND_GREEN;
       break;
-    case term_color::ORIGINAL:    
+    case term_color::ORIGINAL:
     default:
-      fg_attr = saved_attributes & (FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
+      fg_attr = console_attributes & (FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
       break;
     }
 
@@ -192,9 +223,9 @@ protected:
     case term_color::BLUE:
       bg_attr = BACKGROUND_BLUE;
       break;
-    case term_color::ORIGINAL:    
+    case term_color::ORIGINAL:
     default:
-      bg_attr = saved_attributes & (BACKGROUND_RED | BACKGROUND_GREEN | BACKGROUND_BLUE);
+      bg_attr = console_attributes & (BACKGROUND_RED | BACKGROUND_GREEN | BACKGROUND_BLUE);
       break;
     }
 
@@ -216,16 +247,34 @@ protected:
   }
 
 public:
+  typedef WORD state;
+
   // Constructor
   explicit    setcolor( 
     bool is_color_output = false,
     term_attr::_  attr = term_attr::NORMAL,
     term_color::_ fg   = term_color::ORIGINAL,
-    term_color::_ bg   = term_color::ORIGINAL ) 
+    term_color::_ bg   = term_color::ORIGINAL,
+    state* s           = NULL)
   : m_is_color_output(is_color_output)
   , m_attr(attr)
   , m_fg(fg)
   , m_bg(bg)
+  , m_s(s)
+  , m_restore_state(false)
+  , m_state_saved(false)
+  {}
+
+  explicit    setcolor(
+    bool is_color_output,
+    state* s)
+  : m_is_color_output(is_color_output)
+  , m_attr(term_attr::NORMAL)
+  , m_fg(term_color::ORIGINAL)
+  , m_bg(term_color::ORIGINAL)
+  , m_s(s)
+  , m_restore_state(true)
+  , m_state_saved(false)
   {}
 
   friend std::ostream&
@@ -240,10 +289,12 @@ private:
   term_attr::_ m_attr;
   term_color::_ m_fg;
   term_color::_ m_bg;
-
-protected:
-  // Data members
-  mutable WORD saved_attributes;
+  state* m_s;
+  // indicates that the instance has been initialized to restore a previously
+  // stored state
+  bool m_restore_state; 
+  // indicates the first time we pull and set the console information.
+  mutable bool m_state_saved;
 };
 
 #endif
@@ -251,53 +302,29 @@ protected:
 // **************                 scope_setcolor               ************** //
 // ************************************************************************** //
 
-#ifndef _WIN32
-
 struct scope_setcolor {
-    scope_setcolor() : m_os( 0 ) {}
-    explicit    scope_setcolor( bool is_color_output,
-                                std::ostream& os,
-                                term_attr::_  attr = term_attr::NORMAL,
-                                term_color::_ fg   = term_color::ORIGINAL,
-                                term_color::_ bg   = term_color::ORIGINAL )
-    : m_os( &os )
-    , m_is_color_output( is_color_output )
-    {
-        os << setcolor( is_color_output, attr, fg, bg );
-    }
-    ~scope_setcolor()
-    {
-        if( m_os )
-            *m_os << setcolor( m_is_color_output );
-    }
-private:
-    scope_setcolor(const scope_setcolor& r);
-    scope_setcolor& operator=(const scope_setcolor& r);
-    // Data members
-    std::ostream* m_os;
-    bool m_is_color_output;
-};
-
-#else
-
-struct scope_setcolor : setcolor {
-  scope_setcolor() : m_os( 0 ) {}
-  explicit    scope_setcolor( 
+  scope_setcolor() 
+  : m_os( 0 )
+  , m_state()
+  , m_is_color_output(false)
+  {}
+  
+  explicit    scope_setcolor(
     bool is_color_output,
     std::ostream& os,
     term_attr::_  attr = term_attr::NORMAL,
     term_color::_ fg   = term_color::ORIGINAL,
     term_color::_ bg   = term_color::ORIGINAL )
-  : setcolor(is_color_output, attr, fg, bg)
-  , m_os( &os )
+  : m_os( &os )
+  , m_is_color_output(is_color_output)
   {
-    os << *this;
+    os << setcolor(is_color_output, attr, fg, bg, &m_state);
   }
 
   ~scope_setcolor()
   {
     if (m_os) {
-      set_console_color(*m_os, &this->saved_attributes);
+      *m_os << setcolor(m_is_color_output, &m_state);
     }
   }
 private:
@@ -305,10 +332,10 @@ private:
   scope_setcolor& operator=(const scope_setcolor& r);
   // Data members
   std::ostream* m_os;
+  setcolor::state m_state;
+  bool m_is_color_output;
 };
 
-
-#endif
 
 #define BOOST_TEST_SCOPE_SETCOLOR( is_color_output, os, attr, color )               \
     utils::scope_setcolor const sc(is_color_output, os, utils::attr, utils::color); \

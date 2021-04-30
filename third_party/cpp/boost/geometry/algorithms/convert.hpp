@@ -5,8 +5,8 @@
 // Copyright (c) 2009-2012 Mateusz Loskot, London, UK.
 // Copyright (c) 2014 Adam Wulkiewicz, Lodz, Poland.
 
-// This file was modified by Oracle on 2017.
-// Modifications copyright (c) 2017, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2017-2020.
+// Modifications copyright (c) 2017-2020, Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
 // Parts of Boost.Geometry are redesigned from Geodan's Geographic Library
@@ -21,12 +21,13 @@
 
 
 #include <cstddef>
+#include <type_traits>
 
 #include <boost/numeric/conversion/cast.hpp>
-#include <boost/range.hpp>
-#include <boost/type_traits/is_array.hpp>
-#include <boost/type_traits/remove_reference.hpp>
-
+#include <boost/range/begin.hpp>
+#include <boost/range/end.hpp>
+#include <boost/range/size.hpp>
+#include <boost/range/value_type.hpp>
 #include <boost/variant/apply_visitor.hpp>
 #include <boost/variant/static_visitor.hpp>
 #include <boost/variant/variant_fwd.hpp>
@@ -34,7 +35,6 @@
 #include <boost/geometry/arithmetic/arithmetic.hpp>
 #include <boost/geometry/algorithms/not_implemented.hpp>
 #include <boost/geometry/algorithms/clear.hpp>
-#include <boost/geometry/algorithms/for_each.hpp>
 #include <boost/geometry/algorithms/detail/assign_box_corners.hpp>
 #include <boost/geometry/algorithms/detail/assign_indexed_point.hpp>
 #include <boost/geometry/algorithms/detail/convert_point_to_point.hpp>
@@ -227,7 +227,7 @@ struct polygon_to_polygon
         // Container should be resizeable
         traits::resize
             <
-                typename boost::remove_reference
+                typename std::remove_reference
                 <
                     typename traits::interior_mutable_type<Polygon2>::type
                 >::type
@@ -296,10 +296,15 @@ template
     typename Tag1 = typename tag_cast<typename tag<Geometry1>::type, multi_tag>::type,
     typename Tag2 = typename tag_cast<typename tag<Geometry2>::type, multi_tag>::type,
     std::size_t DimensionCount = dimension<Geometry1>::type::value,
-    bool UseAssignment = boost::is_same<Geometry1, Geometry2>::value
-                         && !boost::is_array<Geometry1>::value
+    bool UseAssignment = std::is_same<Geometry1, Geometry2>::value
+                         && !std::is_array<Geometry1>::value
 >
-struct convert: not_implemented<Tag1, Tag2, boost::mpl::int_<DimensionCount> >
+struct convert
+    : not_implemented
+        <
+            Tag1, Tag2,
+            std::integral_constant<std::size_t, DimensionCount>
+        >
 {};
 
 
@@ -457,7 +462,7 @@ struct convert<Polygon, Ring, polygon_tag, ring_tag, DimensionCount, false>
 
 // Dispatch for multi <-> multi, specifying their single-version as policy.
 // Note that, even if the multi-types are mutually different, their single
-// version types might be the same and therefore we call boost::is_same again
+// version types might be the same and therefore we call std::is_same again
 
 template <typename Multi1, typename Multi2, std::size_t DimensionCount>
 struct convert<Multi1, Multi2, multi_tag, multi_tag, DimensionCount, false>

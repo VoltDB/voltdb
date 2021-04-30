@@ -16,7 +16,6 @@
 #include <boost/config.hpp>
 #include <boost/function.hpp>
 #include <boost/mpl/vector.hpp>
-#include <boost/type_traits/add_reference.hpp>
 #include <boost/type_traits/is_convertible.hpp>
 #include <boost/type_traits/is_same.hpp>
 
@@ -39,6 +38,10 @@
 #include <boost/spirit/home/qi/nonterminal/detail/parser_binder.hpp>
 #include <boost/spirit/home/qi/nonterminal/nonterminal_fwd.hpp>
 #include <boost/spirit/home/qi/skip_over.hpp>
+
+#include <boost/proto/extends.hpp>
+#include <boost/proto/traits.hpp>
+#include <boost/type_traits/is_reference.hpp>
 
 #if defined(BOOST_MSVC)
 # pragma warning(push)
@@ -127,7 +130,10 @@ namespace boost { namespace spirit { namespace qi
         typedef typename
             spirit::detail::attr_from_sig<sig_type>::type
         attr_type;
-        typedef typename add_reference<attr_type>::type attr_reference_type;
+        BOOST_STATIC_ASSERT_MSG(
+            !is_reference<attr_type>::value,
+            "Reference qualifier on Qi rule attribute is meaningless");
+        typedef attr_type& attr_reference_type;
 
         // parameter_types is a sequence of types passed as parameters to the rule
         typedef typename

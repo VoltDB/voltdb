@@ -51,7 +51,7 @@
     The macro checks that the sequence is a Boost PP seq.
     It returns 1 if it is a seq, else if returns 0.
     
-    d        = The next available BOOST_PP_WHILE iteration. 
+    d        = The next available BOOST_PP_WHILE iteration. <br/>
     sequence = a possible Boost PP seq
 
     returns = 1 if it a seq, else returns 0.

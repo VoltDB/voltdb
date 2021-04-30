@@ -1,5 +1,5 @@
 /* Traits for Outcome
-(C) 2018-2019 Niall Douglas <http://www.nedproductions.biz/> (59 commits)
+(C) 2018-2021 Niall Douglas <http://www.nedproductions.biz/> (3 commits)
 File Created: March 2018
 
 
@@ -81,6 +81,7 @@ namespace trait
     template <> struct _is_exception_ptr_available<std::exception_ptr>
     {
       static constexpr bool value = true;
+      using type = std::exception_ptr;
     };
   }  // namespace detail
 

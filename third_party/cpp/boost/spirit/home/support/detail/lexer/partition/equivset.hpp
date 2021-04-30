@@ -3,8 +3,8 @@
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file licence_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
-#ifndef BOOST_LEXER_EQUIVSET_HPP
-#define BOOST_LEXER_EQUIVSET_HPP
+#ifndef BOOST_SPIRIT_SUPPORT_DETAIL_LEXER_PARTITION_EQUIVSET_HPP
+#define BOOST_SPIRIT_SUPPORT_DETAIL_LEXER_PARTITION_EQUIVSET_HPP
 
 #include <algorithm>
 #include "../parser/tree/node.hpp"

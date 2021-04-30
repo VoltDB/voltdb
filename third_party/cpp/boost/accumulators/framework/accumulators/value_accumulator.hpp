@@ -30,7 +30,7 @@ namespace impl
 
         template<typename Args>
         value_accumulator_impl(Args const &args)
-          : val(args[parameter::keyword<Tag>::get()])
+          : val(args[parameter::keyword<Tag>::instance])
         {
         }
 

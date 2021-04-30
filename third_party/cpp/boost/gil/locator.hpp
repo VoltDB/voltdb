@@ -230,7 +230,7 @@ struct is_planar<pixel_2d_locator_base<Loc,XIt,YIt> > : public is_planar<XIt> {}
 template <typename StepIterator>
 class memory_based_2d_locator : public pixel_2d_locator_base<memory_based_2d_locator<StepIterator>, typename iterator_adaptor_get_base<StepIterator>::type, StepIterator> {
     using this_t = memory_based_2d_locator<StepIterator>;
-    GIL_CLASS_REQUIRE(StepIterator, boost::gil, StepIteratorConcept)
+    BOOST_GIL_CLASS_REQUIRE(StepIterator, boost::gil, StepIteratorConcept)
 public:
     using parent_t = pixel_2d_locator_base<memory_based_2d_locator<StepIterator>, typename iterator_adaptor_get_base<StepIterator>::type, StepIterator>;
     using const_t = memory_based_2d_locator<typename const_iterator_type<StepIterator>::type>; // same as this type, but over const values
@@ -261,6 +261,7 @@ public:
     memory_based_2d_locator(x_iterator xit, std::ptrdiff_t row_bytes) : _p(xit,row_bytes) {}
     template <typename X> memory_based_2d_locator(const memory_based_2d_locator<X>& pl) : _p(pl._p) {}
     memory_based_2d_locator(const memory_based_2d_locator& pl) : _p(pl._p) {}
+    memory_based_2d_locator& operator=(memory_based_2d_locator const& other) = default;
 
     bool                  operator==(const this_t& p)  const { return _p==p._p; }
 

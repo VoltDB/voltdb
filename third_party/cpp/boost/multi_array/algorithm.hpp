@@ -1,5 +1,5 @@
-#ifndef BOOST_ALGORITHM_RG071801_HPP
-#define BOOST_ALGORITHM_RG071801_HPP
+#ifndef BOOST_MULTI_ARRAY_ALGORITHM_HPP
+#define BOOST_MULTI_ARRAY_ALGORITHM_HPP
 
 //
 //
@@ -100,4 +100,4 @@ copy_n(InputIter first, Size count, OutputIter result) {
 } // namespace detail
 } // namespace boost
 
-#endif // BOOST_ALGORITHM_RG071801_HPP
+#endif

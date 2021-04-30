@@ -177,7 +177,7 @@ BOOST_HANA_NAMESPACE_BEGIN
     //!
     //!
     //! [1]: http://en.wikipedia.org/wiki/Total_order
-    //! [2]: http://en.cppreference.com/w/cpp/concept/LessThanComparable
+    //! [2]: http://en.cppreference.com/w/cpp/named_req/LessThanComparable
     //! [3]: http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2012/n3351.pdf
     //! [4]: http://en.wikipedia.org/wiki/Strict_weak_ordering
     template <typename Ord>

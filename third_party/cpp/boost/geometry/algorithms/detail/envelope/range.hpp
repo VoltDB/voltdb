@@ -4,8 +4,8 @@
 // Copyright (c) 2008-2015 Bruno Lalande, Paris, France.
 // Copyright (c) 2009-2015 Mateusz Loskot, London, UK.
 
-// This file was modified by Oracle on 2015, 2016, 2018.
-// Modifications copyright (c) 2015-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2015-2020.
+// Modifications copyright (c) 2015-2020, Oracle and/or its affiliates.
 
 // Contributed and/or modified by Vissarion Fysikopoulos, on behalf of Oracle
 // Contributed and/or modified by Menelaos Karavelas, on behalf of Oracle
@@ -64,7 +64,7 @@ struct envelope_range
             dispatch::envelope
                 <
                     value_type
-                >::apply(*it, mbr, strategy.get_element_envelope_strategy());
+                >::apply(*it, mbr, strategy);
 
             // consider now the remaining elements in the range (if any)
             for (++it; it != last; ++it)
@@ -72,7 +72,7 @@ struct envelope_range
                 dispatch::expand
                     <
                         Box, value_type
-                    >::apply(mbr, *it, strategy.get_element_expand_strategy());
+                    >::apply(mbr, *it, strategy);
             }
         }
     }
@@ -80,7 +80,9 @@ struct envelope_range
     template <typename Range, typename Box, typename Strategy>
     static inline void apply(Range const& range, Box& mbr, Strategy const& strategy)
     {
-        return apply(Strategy::begin(range), Strategy::end(range), mbr, strategy);
+        using strategy_t = decltype(strategy.envelope(range, mbr));
+        return apply(strategy_t::begin(range), strategy_t::end(range),
+                     mbr, strategy);
     }
 };
 
@@ -94,16 +96,20 @@ struct envelope_multi_range
                              Box& mbr,
                              Strategy const& strategy)
     {
-        apply(boost::begin(multirange), boost::end(multirange), mbr, strategy);
+        using range_t = typename boost::range_value<MultiRange>::type;
+        using strategy_t = decltype(strategy.envelope(std::declval<range_t>(), mbr));
+        using state_t = typename strategy_t::template multi_state<Box>;
+        apply<state_t>(boost::begin(multirange), boost::end(multirange), mbr, strategy);
     }
 
-    template <typename Iter, typename Box, typename Strategy>
+private:
+    template <typename State, typename Iter, typename Box, typename Strategy>
     static inline void apply(Iter it,
                              Iter last,
                              Box& mbr,
                              Strategy const& strategy)
     {
-        typename Strategy::template multi_state<Box> state;
+        State state;
         for (; it != last; ++it)
         {
             if (! geometry::is_empty(*it))

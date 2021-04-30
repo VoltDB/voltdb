@@ -4,8 +4,8 @@
 // Copyright (c) 2008-2015 Barend Gehrels, Amsterdam, the Netherlands.
 // Copyright (c) 2009-2015 Mateusz Loskot, London, UK.
 
-// This file was modified by Oracle on 2014-2017.
-// Modifications copyright (c) 2014-2017, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2014-2020.
+// Modifications copyright (c) 2014-2020, Oracle and/or its affiliates.
 
 // Contributed and/or modified by Vissarion Fysikopoulos, on behalf of Oracle
 // Contributed and/or modified by Menelaos Karavelas, on behalf of Oracle
@@ -18,10 +18,11 @@
 #ifndef BOOST_GEOMETRY_STRATEGIES_SPHERICAL_DISTANCE_CROSS_TRACK_POINT_BOX_HPP
 #define BOOST_GEOMETRY_STRATEGIES_SPHERICAL_DISTANCE_CROSS_TRACK_POINT_BOX_HPP
 
+
+#include <type_traits>
+
 #include <boost/config.hpp>
 #include <boost/concept_check.hpp>
-#include <boost/mpl/if.hpp>
-#include <boost/type_traits/is_void.hpp>
 
 #include <boost/geometry/core/access.hpp>
 #include <boost/geometry/core/assert.hpp>
@@ -222,19 +223,19 @@ public:
             Strategy
         >::type pp_comparable_strategy;
 
-    typedef typename boost::mpl::if_
+    typedef std::conditional_t
         <
-            boost::is_same
+            std::is_same
                 <
                     pp_comparable_strategy,
                     Strategy
-                >,
+                >::value,
             typename strategy::distance::services::comparable_type
                 <
                     typename distance_ps_strategy::type
                 >::type,
             typename distance_ps_strategy::type
-        >::type ps_strategy_type;
+        > ps_strategy_type;
 
     // constructors
 
@@ -372,9 +373,9 @@ struct default_strategy
     typedef cross_track_point_box
         <
             void,
-            typename boost::mpl::if_
+            std::conditional_t
                 <
-                    boost::is_void<Strategy>,
+                    std::is_void<Strategy>::value,
                     typename default_strategy
                         <
                             point_tag, point_tag,
@@ -382,7 +383,7 @@ struct default_strategy
                             spherical_equatorial_tag, spherical_equatorial_tag
                         >::type,
                     Strategy
-                >::type
+                >
         > type;
 };
 

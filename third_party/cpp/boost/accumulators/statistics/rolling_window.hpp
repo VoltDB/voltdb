@@ -21,6 +21,45 @@
 #include <boost/accumulators/framework/parameters/accumulator.hpp>
 #include <boost/accumulators/numeric/functional.hpp>
 #include <boost/accumulators/statistics_fwd.hpp>
+#include <boost/serialization/split_free.hpp>
+
+namespace boost { namespace serialization {
+
+// implement serialization for boost::circular_buffer
+template <class Archive, class T>
+void save(Archive& ar, const circular_buffer<T>& b, const unsigned int /* version */)
+{
+    typename circular_buffer<T>::size_type size = b.size();
+    ar << b.capacity();
+    ar << size;
+    const typename circular_buffer<T>::const_array_range one = b.array_one();
+    const typename circular_buffer<T>::const_array_range two = b.array_two();
+    ar.save_binary(one.first, one.second*sizeof(T));
+    ar.save_binary(two.first, two.second*sizeof(T));
+}
+
+template <class Archive, class T>
+void load(Archive& ar, circular_buffer<T>& b, const unsigned int /* version */)
+{
+    typename circular_buffer<T>::capacity_type capacity;
+    typename circular_buffer<T>::size_type size;
+    ar >> capacity;
+    b.set_capacity(capacity);
+    ar >> size;
+    b.clear();
+    const typename circular_buffer<T>::pointer buff = new T[size*sizeof(T)];
+    ar.load_binary(buff, size*sizeof(T));
+    b.insert(b.begin(), buff, buff+size);
+    delete[] buff;
+}
+
+template<class Archive, class T>
+inline void serialize(Archive & ar, circular_buffer<T>& b, const unsigned int version)
+{
+    split_free(ar, b, version);
+}
+
+} } // end namespace boost::serialization
 
 namespace boost { namespace accumulators
 {
@@ -83,6 +122,12 @@ namespace impl
             return result_type(this->buffer_.begin(), this->buffer_.end());
         }
 
+        template<class Archive>
+        void serialize(Archive & ar, const unsigned int version)
+        {
+            ar & buffer_;
+        }
+
     private:
         circular_buffer<Sample> buffer_;
     };
@@ -112,6 +157,10 @@ namespace impl
         {
             return rolling_window_plus1(args).advance_begin(is_rolling_window_plus1_full(args));
         }
+        
+        // serialization is done by accumulators it depends on
+        template<class Archive>
+        void serialize(Archive & ar, const unsigned int file_version) {}
     };
 
 } // namespace impl

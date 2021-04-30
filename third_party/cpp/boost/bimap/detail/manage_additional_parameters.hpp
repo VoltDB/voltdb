@@ -83,7 +83,7 @@ struct manage_additional_parameters
     struct case_NNN
     {
         typedef left_based set_type_of_relation;
-        typedef std::allocator<void> allocator;
+        typedef std::allocator<char> allocator;
         typedef ::boost::mpl::na additional_info;
     };
 
@@ -110,7 +110,7 @@ struct manage_additional_parameters
     struct case_SNN
     {
         typedef AP1 set_type_of_relation;
-        typedef std::allocator<void> allocator;
+        typedef std::allocator<char> allocator;
         typedef ::boost::mpl::na additional_info;
     };
 
@@ -137,7 +137,7 @@ struct manage_additional_parameters
     struct case_HNN
     {
         typedef left_based set_type_of_relation;
-        typedef std::allocator<void> allocator;
+        typedef std::allocator<char> allocator;
         typedef BOOST_DEDUCED_TYPENAME AP1::value_type additional_info;
     };
 
@@ -151,7 +151,7 @@ struct manage_additional_parameters
     struct case_SHN
     {
         typedef AP1 set_type_of_relation;
-        typedef std::allocator<void> allocator;
+        typedef std::allocator<char> allocator;
         typedef BOOST_DEDUCED_TYPENAME AP2::value_type additional_info;
     };
 

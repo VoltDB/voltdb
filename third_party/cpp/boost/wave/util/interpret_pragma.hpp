@@ -8,8 +8,8 @@
     LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 =============================================================================*/
 
-#if !defined(INTERPRET_PRAGMA_HPP_B1F2315E_C5CE_4ED1_A343_0EF548B7942A_INCLUDED)
-#define INTERPRET_PRAGMA_HPP_B1F2315E_C5CE_4ED1_A343_0EF548B7942A_INCLUDED
+#if !defined(BOOST_INTERPRET_PRAGMA_HPP_B1F2315E_C5CE_4ED1_A343_0EF548B7942A_INCLUDED)
+#define BOOST_INTERPRET_PRAGMA_HPP_B1F2315E_C5CE_4ED1_A343_0EF548B7942A_INCLUDED
 
 #include <string>
 #include <list>
@@ -115,7 +115,7 @@ interpret_pragma(ContextT &ctx, typename ContextT::token_type const &act_token,
                 return false;
             }
 
-        // remove the falsely matched surrounding parenthesis's
+            // remove the falsely matched surrounding parenthesis's
             if (values.size() >= 2) {
                 BOOST_ASSERT(T_LEFTPAREN == values.front() && T_RIGHTPAREN == values.back());
                 values.erase(values.begin());
@@ -123,12 +123,12 @@ interpret_pragma(ContextT &ctx, typename ContextT::token_type const &act_token,
                 values.erase((++rit).base());
             }
 
-        // decode the option (call the context_policy hook)
+            // decode the option (call the context_policy hook)
             if (!ctx.get_hooks().interpret_pragma(
                   ctx.derived(), pending, option, values, act_token))
             {
-            // unknown #pragma option
-            string_type option_str ((*it).get_value());
+                // unknown #pragma option
+                string_type option_str((*it).get_value());
 
                 option_str += option.get_value();
                 if (values.size() > 0) {
@@ -145,13 +145,13 @@ interpret_pragma(ContextT &ctx, typename ContextT::token_type const &act_token,
         }
 #if BOOST_WAVE_SUPPORT_PRAGMA_ONCE != 0
         else if ((*it).get_value() == "once") {
-        // #pragma once
+            // #pragma once
             return ctx.add_pragma_once_header(act_token, ctx.get_current_filename());
         }
 #endif
 #if BOOST_WAVE_SUPPORT_PRAGMA_MESSAGE != 0
         else if ((*it).get_value() == "message") {
-        // #pragma message(...) or #pragma message ...
+            // #pragma message(...) or #pragma message ...
             using namespace boost::spirit::classic;
             ContainerT values;
 
@@ -178,14 +178,14 @@ interpret_pragma(ContextT &ctx, typename ContextT::token_type const &act_token,
                 return false;
             }
 
-        // remove the falsely matched closing parenthesis/newline
+            // remove the falsely matched closing parenthesis/newline
             if (values.size() > 0) {
                 BOOST_ASSERT(T_RIGHTPAREN == values.back() || T_NEWLINE == values.back());
                 typename ContainerT::reverse_iterator rit = values.rbegin();
                 values.erase((++rit).base());
             }
 
-        // output the message itself
+            // output the message itself
             typename ContextT::string_type msg(impl::as_string(values));
             BOOST_WAVE_THROW_CTX(ctx, preprocess_exception,
                 pragma_message_directive,
@@ -207,4 +207,4 @@ interpret_pragma(ContextT &ctx, typename ContextT::token_type const &act_token,
 #include BOOST_ABI_SUFFIX
 #endif
 
-#endif // !defined(INTERPRET_PRAGMA_HPP_B1F2315E_C5CE_4ED1_A343_0EF548B7942A_INCLUDED)
+#endif // !defined(BOOST_INTERPRET_PRAGMA_HPP_B1F2315E_C5CE_4ED1_A343_0EF548B7942A_INCLUDED)

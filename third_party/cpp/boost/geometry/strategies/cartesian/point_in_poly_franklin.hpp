@@ -4,8 +4,8 @@
 // Copyright (c) 2008-2012 Bruno Lalande, Paris, France.
 // Copyright (c) 2009-2012 Mateusz Loskot, London, UK.
 
-// This file was modified by Oracle on 2018.
-// Modifications copyright (c) 2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2018, 2019.
+// Modifications copyright (c) 2018, 2019, Oracle and/or its affiliates.
 
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
@@ -51,48 +51,52 @@ namespace strategy { namespace within
 
 template
 <
-    typename Point,
-    typename PointOfSegment = Point,
+    typename Point_,                   // for backward compatibility
+    typename PointOfSegment_ = Point_, // for backward compatibility
     typename CalculationType = void
 >
 class franklin
 {
-    typedef typename select_calculation_type
-        <
-            Point,
-            PointOfSegment,
-            CalculationType
-        >::type calculation_type;
+    template <typename Point, typename PointOfSegment>
+    struct calculation_type
+        : select_calculation_type
+            <
+                Point,
+                PointOfSegment,
+                CalculationType
+            >
+    {};
 
-        /*! subclass to keep state */
-        class crossings
-        {
-            bool crosses;
+    /*! subclass to keep state */
+    class crossings
+    {
+        bool crosses;
 
-        public :
+    public :
 
-            friend class franklin;
-            inline crossings()
-                : crosses(false)
-            {}
-        };
+        friend class franklin;
+        inline crossings()
+            : crosses(false)
+        {}
+    };
 
 public :
 
-    typedef Point point_type;
-    typedef PointOfSegment segment_point_type;
     typedef crossings state_type;
 
+    template <typename Point, typename PointOfSegment>
     static inline bool apply(Point const& point,
             PointOfSegment const& seg1, PointOfSegment const& seg2,
             crossings& state)
     {
-        calculation_type const& px = get<0>(point);
-        calculation_type const& py = get<1>(point);
-        calculation_type const& x1 = get<0>(seg1);
-        calculation_type const& y1 = get<1>(seg1);
-        calculation_type const& x2 = get<0>(seg2);
-        calculation_type const& y2 = get<1>(seg2);
+        typedef typename calculation_type<Point, PointOfSegment>::type calc_t;
+
+        calc_t const& px = get<0>(point);
+        calc_t const& py = get<1>(point);
+        calc_t const& x1 = get<0>(seg1);
+        calc_t const& y1 = get<1>(seg1);
+        calc_t const& x2 = get<0>(seg2);
+        calc_t const& y2 = get<1>(seg2);
 
         if (
             ( (y2 <= py && py < y1) || (y1 <= py && py < y2) )

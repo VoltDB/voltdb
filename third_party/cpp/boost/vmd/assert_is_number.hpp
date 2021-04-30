@@ -34,6 +34,8 @@
 
     sequence = a possible number.
 
+  @code
+  
     returns  = Normally the macro returns nothing. 
     
                If the sequence is a number, nothing is 
@@ -48,6 +50,8 @@
                without producing output if the sequence is not a 
                number.
     
+  @endcode
+  
 */
 
 #if !BOOST_VMD_ASSERT_DATA

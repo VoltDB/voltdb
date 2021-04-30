@@ -166,7 +166,7 @@ namespace boost { namespace spirit
             BOOST_THROW_EXCEPTION(bad_type_exception
               ("no less-than comparison for this utree type",
                utree_type::invalid_type));
-            return false; // no less than comparison for nil
+            BOOST_UNREACHABLE_RETURN(false) // no less than comparison for nil
         }
 
         bool operator()(utree::nil_type, utree::nil_type) const
@@ -174,7 +174,7 @@ namespace boost { namespace spirit
             BOOST_THROW_EXCEPTION(bad_type_exception
               ("no less-than comparison for this utree type",
                utree_type::nil_type));
-            return false; // no less than comparison for nil
+            BOOST_UNREACHABLE_RETURN(false) // no less than comparison for nil
         }
 
         bool operator()(any_ptr const&, any_ptr const&) const
@@ -182,7 +182,7 @@ namespace boost { namespace spirit
             BOOST_THROW_EXCEPTION(bad_type_exception
               ("no less-than comparison for this utree type",
                utree_type::any_type));
-            return false; // no less than comparison for any_ptr
+            BOOST_UNREACHABLE_RETURN(false) // no less than comparison for any_ptr
         }
 
         bool operator()(function_base const&, function_base const&) const
@@ -190,7 +190,7 @@ namespace boost { namespace spirit
             BOOST_THROW_EXCEPTION(bad_type_exception
               ("no less-than comparison for this utree type",
                utree_type::function_type));
-            return false; // no less than comparison of functions
+            BOOST_UNREACHABLE_RETURN(false) // no less than comparison of functions
         }
     };
 
@@ -439,19 +439,21 @@ namespace boost { namespace spirit
         }
     };
 
-#define BOOST_SPIRIT_UTREE_CREATE_FUNCTION(name, expr, base)                  \
+#define BOOST_SPIRIT_UTREE_CREATE_FUNCTION_BINARY                             \
+        template <typename Lhs, typename Rhs>                                 \
+        static utree eval(Lhs const& a, Rhs const& b)                         \
+        /***/
+
+#define BOOST_SPIRIT_UTREE_CREATE_FUNCTION_UNARY                              \
+        template <typename Operand>                                           \
+        static utree eval(Operand const& a)                                   \
+        /***/
+
+#define BOOST_SPIRIT_UTREE_CREATE_FUNCTION(arity, name, expr, base)           \
     struct BOOST_PP_CAT(function_impl_, name)                                 \
     {                                                                         \
-        template <typename A, typename B>                                     \
-        static utree eval(A const& a, B const& b)                             \
+        BOOST_SPIRIT_UTREE_CREATE_FUNCTION_##arity                            \
         {                                                                     \
-            return utree(expr);                                               \
-        }                                                                     \
-        template <typename A>                                                 \
-        static utree eval(A const& a)                                         \
-        {                                                                     \
-            static int b;                                                     \
-            (void) b;                                                         \
             return utree(expr);                                               \
         }                                                                     \
     };                                                                        \
@@ -459,16 +461,16 @@ namespace boost { namespace spirit
         BOOST_PP_CAT(base, BOOST_PP_CAT(_, name)) = {};                       \
     /***/
 
-#define BOOST_SPIRIT_UTREE_CREATE_ARITHMETIC_FUNCTION(name, expr)             \
-    BOOST_SPIRIT_UTREE_CREATE_FUNCTION(name, expr, arithmetic_function)       \
+#define BOOST_SPIRIT_UTREE_CREATE_ARITHMETIC_FUNCTION(arity, name, expr)      \
+    BOOST_SPIRIT_UTREE_CREATE_FUNCTION(arity, name, expr, arithmetic_function)\
     /***/
 
-#define BOOST_SPIRIT_UTREE_CREATE_INTEGRAL_FUNCTION(name, expr)               \
-    BOOST_SPIRIT_UTREE_CREATE_FUNCTION(name, expr, integral_function)         \
+#define BOOST_SPIRIT_UTREE_CREATE_INTEGRAL_FUNCTION(arity, name, expr)        \
+    BOOST_SPIRIT_UTREE_CREATE_FUNCTION(arity, name, expr, integral_function)  \
     /***/
 
-#define BOOST_SPIRIT_UTREE_CREATE_LOGICAL_FUNCTION(name, expr)                \
-    BOOST_SPIRIT_UTREE_CREATE_FUNCTION(name, expr, logical_function)          \
+#define BOOST_SPIRIT_UTREE_CREATE_LOGICAL_FUNCTION(arity, name, expr)         \
+    BOOST_SPIRIT_UTREE_CREATE_FUNCTION(arity, name, expr, logical_function)   \
     /***/
 
     inline bool operator==(utree const& a, utree const& b)
@@ -519,30 +521,36 @@ namespace boost { namespace spirit
     }
 #endif
 
-    BOOST_SPIRIT_UTREE_CREATE_LOGICAL_FUNCTION(and_, a&&b)
-    BOOST_SPIRIT_UTREE_CREATE_LOGICAL_FUNCTION(or_, a||b)
-    BOOST_SPIRIT_UTREE_CREATE_LOGICAL_FUNCTION(not_, !a)
+    BOOST_SPIRIT_UTREE_CREATE_LOGICAL_FUNCTION(BINARY, and_, a&&b)
+    BOOST_SPIRIT_UTREE_CREATE_LOGICAL_FUNCTION(BINARY, or_,  a||b)
+    BOOST_SPIRIT_UTREE_CREATE_LOGICAL_FUNCTION(UNARY,  not_, !a)
 
-    BOOST_SPIRIT_UTREE_CREATE_ARITHMETIC_FUNCTION(plus, a+b)
-    BOOST_SPIRIT_UTREE_CREATE_ARITHMETIC_FUNCTION(minus, a-b)
-    BOOST_SPIRIT_UTREE_CREATE_ARITHMETIC_FUNCTION(times, a*b)
-    BOOST_SPIRIT_UTREE_CREATE_ARITHMETIC_FUNCTION(divides, a/b)
-    BOOST_SPIRIT_UTREE_CREATE_INTEGRAL_FUNCTION(modulus, a%b)
-    BOOST_SPIRIT_UTREE_CREATE_ARITHMETIC_FUNCTION(negate, -a)
+    BOOST_SPIRIT_UTREE_CREATE_ARITHMETIC_FUNCTION(BINARY, plus,    a+b)
+    BOOST_SPIRIT_UTREE_CREATE_ARITHMETIC_FUNCTION(BINARY, minus,   a-b)
+    BOOST_SPIRIT_UTREE_CREATE_ARITHMETIC_FUNCTION(BINARY, times,   a*b)
+    BOOST_SPIRIT_UTREE_CREATE_ARITHMETIC_FUNCTION(BINARY, divides, a/b)
+    BOOST_SPIRIT_UTREE_CREATE_INTEGRAL_FUNCTION  (BINARY, modulus, a%b)
+    BOOST_SPIRIT_UTREE_CREATE_ARITHMETIC_FUNCTION(UNARY,  negate,  -a)
 
-    BOOST_SPIRIT_UTREE_CREATE_INTEGRAL_FUNCTION(bitand_, a&b)
-    BOOST_SPIRIT_UTREE_CREATE_INTEGRAL_FUNCTION(bitor_, a|b)
-    BOOST_SPIRIT_UTREE_CREATE_INTEGRAL_FUNCTION(bitxor_, a^b)
-    BOOST_SPIRIT_UTREE_CREATE_INTEGRAL_FUNCTION(shift_left, a<<b)
-    BOOST_SPIRIT_UTREE_CREATE_INTEGRAL_FUNCTION(shift_right, a>>b)
-#if defined(__GNUC__) && (__GNUC__ >= 7)
-# pragma GCC diagnostic push
-# pragma GCC diagnostic ignored "-Wbool-operation" // '~' on an expression of type bool
-#endif
-    BOOST_SPIRIT_UTREE_CREATE_INTEGRAL_FUNCTION(invert, ~a)
-#if defined(__GNUC__) && (__GNUC__ >= 7)
-# pragma GCC diagnostic pop
-#endif
+    BOOST_SPIRIT_UTREE_CREATE_INTEGRAL_FUNCTION(BINARY, bitand_,     a&b)
+    BOOST_SPIRIT_UTREE_CREATE_INTEGRAL_FUNCTION(BINARY, bitor_,      a|b)
+    BOOST_SPIRIT_UTREE_CREATE_INTEGRAL_FUNCTION(BINARY, bitxor_,     a^b)
+    BOOST_SPIRIT_UTREE_CREATE_INTEGRAL_FUNCTION(BINARY, shift_left,  a<<b)
+    BOOST_SPIRIT_UTREE_CREATE_INTEGRAL_FUNCTION(BINARY, shift_right, a>>b)
+    BOOST_SPIRIT_UTREE_CREATE_INTEGRAL_FUNCTION(UNARY,  invert,      ~a)
+
+    // avoid `'~' on an expression of type bool` warning
+    template <> inline utree function_impl_invert::eval<bool>(bool const& a)
+    {
+        return utree(!a);
+    }
+
+#undef BOOST_SPIRIT_UTREE_CREATE_FUNCTION_BINARY
+#undef BOOST_SPIRIT_UTREE_CREATE_FUNCTION_UNARY
+#undef BOOST_SPIRIT_UTREE_CREATE_FUNCTION
+#undef BOOST_SPIRIT_UTREE_CREATE_LOGICAL_FUNCTION
+#undef BOOST_SPIRIT_UTREE_CREATE_INTEGRAL_FUNCTION
+#undef BOOST_SPIRIT_UTREE_CREATE_ARITHMETIC_FUNCTION
 
     inline utree operator&&(utree const& a, utree const& b)
     {

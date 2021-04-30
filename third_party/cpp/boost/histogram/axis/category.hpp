@@ -8,13 +8,16 @@
 #define BOOST_HISTOGRAM_AXIS_CATEGORY_HPP
 
 #include <algorithm>
+#include <boost/core/nvp.hpp>
 #include <boost/histogram/axis/iterator.hpp>
+#include <boost/histogram/axis/metadata_base.hpp>
 #include <boost/histogram/axis/option.hpp>
-#include <boost/histogram/detail/compressed_pair.hpp>
-#include <boost/histogram/detail/meta.hpp>
+#include <boost/histogram/detail/detect.hpp>
+#include <boost/histogram/detail/relaxed_equal.hpp>
 #include <boost/histogram/fwd.hpp>
 #include <boost/throw_exception.hpp>
 #include <stdexcept>
+#include <string>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -40,22 +43,27 @@ namespace axis {
   and `overflow` are mutually exclusive.
 */
 template <class Value, class MetaData, class Options, class Allocator>
-class category : public iterator_mixin<category<Value, MetaData, Options, Allocator>> {
+class category : public iterator_mixin<category<Value, MetaData, Options, Allocator>>,
+                 public metadata_base_t<MetaData> {
+  // these must be private, so that they are not automatically inherited
   using value_type = Value;
-  using metadata_type = detail::replace_default<MetaData, std::string>;
+  using metadata_base = metadata_base_t<MetaData>;
+  using metadata_type = typename metadata_base::metadata_type;
   using options_type = detail::replace_default<Options, option::overflow_t>;
+  using allocator_type = Allocator;
+  using vector_type = std::vector<value_type, allocator_type>;
+
   static_assert(!options_type::test(option::underflow),
                 "category axis cannot have underflow");
   static_assert(!options_type::test(option::circular),
                 "category axis cannot be circular");
-  static_assert(!options_type::test(option::growth) ||
-                    !options_type::test(option::overflow),
-                "growing category axis cannot have overflow");
-  using allocator_type = Allocator;
-  using vector_type = std::vector<value_type, allocator_type>;
+  static_assert(!(options_type::test(option::growth) &&
+                  options_type::test(option::overflow)),
+                "growing category axis cannot have entries in overflow bin");
 
 public:
-  explicit category(allocator_type alloc = {}) : vec_meta_(vector_type(alloc)) {}
+  constexpr category() = default;
+  explicit category(allocator_type alloc) : vec_(alloc) {}
 
   /** Construct from iterator range of unique values.
    *
@@ -66,8 +74,12 @@ public:
    */
   template <class It, class = detail::requires_iterator<It>>
   category(It begin, It end, metadata_type meta = {}, allocator_type alloc = {})
-      : vec_meta_(vector_type(begin, end, alloc), std::move(meta)) {
-    if (size() == 0) BOOST_THROW_EXCEPTION(std::invalid_argument("bins > 0 required"));
+      : metadata_base(std::move(meta)), vec_(alloc) {
+    if (std::distance(begin, end) < 0)
+      BOOST_THROW_EXCEPTION(
+          std::invalid_argument("end must be reachable by incrementing begin"));
+    vec_.reserve(std::distance(begin, end));
+    while (begin != end) vec_.emplace_back(*begin++);
   }
 
   /** Construct axis from iterable sequence of unique values.
@@ -92,57 +104,65 @@ public:
            allocator_type alloc = {})
       : category(list.begin(), list.end(), std::move(meta), std::move(alloc)) {}
 
-  /// Constructor used by algorithm::reduce to shrink and rebin.
+  /// Constructor used by algorithm::reduce to shrink and rebin (not for users).
   category(const category& src, index_type begin, index_type end, unsigned merge)
-      : category(src.vec_meta_.first().begin() + begin,
-                 src.vec_meta_.first().begin() + end, src.metadata()) {
+      // LCOV_EXCL_START: gcc-8 is missing the delegated ctor for no reason
+      : category(src.vec_.begin() + begin, src.vec_.begin() + end, src.metadata(),
+                 src.get_allocator())
+  // LCOV_EXCL_STOP
+  {
     if (merge > 1)
       BOOST_THROW_EXCEPTION(std::invalid_argument("cannot merge bins for category axis"));
   }
 
   /// Return index for value argument.
   index_type index(const value_type& x) const noexcept {
-    const auto beg = vec_meta_.first().begin();
-    const auto end = vec_meta_.first().end();
+    const auto beg = vec_.begin();
+    const auto end = vec_.end();
     return static_cast<index_type>(std::distance(beg, std::find(beg, end, x)));
   }
 
   /// Returns index and shift (if axis has grown) for the passed argument.
-  auto update(const value_type& x) {
+  std::pair<index_type, index_type> update(const value_type& x) {
     const auto i = index(x);
-    if (i < size()) return std::make_pair(i, 0);
-    vec_meta_.first().emplace_back(x);
-    return std::make_pair(i, -1);
+    if (i < size()) return {i, 0};
+    vec_.emplace_back(x);
+    return {i, -1};
   }
 
   /// Return value for index argument.
   /// Throws `std::out_of_range` if the index is out of bounds.
-  decltype(auto) value(index_type idx) const {
+  auto value(index_type idx) const
+      -> std::conditional_t<std::is_scalar<value_type>::value, value_type,
+                            const value_type&> {
     if (idx < 0 || idx >= size())
       BOOST_THROW_EXCEPTION(std::out_of_range("category index out of range"));
-    return vec_meta_.first()[idx];
+    return vec_[idx];
   }
 
-  /// Return value for index argument.
-  decltype(auto) bin(index_type idx) const noexcept { return value(idx); }
+  /// Return value for index argument; alias for value(...).
+  decltype(auto) bin(index_type idx) const { return value(idx); }
 
   /// Returns the number of bins, without over- or underflow.
-  index_type size() const noexcept {
-    return static_cast<index_type>(vec_meta_.first().size());
-  }
+  index_type size() const noexcept { return static_cast<index_type>(vec_.size()); }
+
   /// Returns the options.
   static constexpr unsigned options() noexcept { return options_type::value; }
-  /// Returns reference to metadata.
-  metadata_type& metadata() noexcept { return vec_meta_.second(); }
-  /// Returns reference to const metadata.
-  const metadata_type& metadata() const noexcept { return vec_meta_.second(); }
+
+  /// Whether the axis is inclusive (see axis::traits::is_inclusive).
+  static constexpr bool inclusive() noexcept {
+    return options() & (option::overflow | option::growth);
+  }
+
+  /// Indicate that the axis is not ordered.
+  static constexpr bool ordered() noexcept { return false; }
 
   template <class V, class M, class O, class A>
   bool operator==(const category<V, M, O, A>& o) const noexcept {
-    const auto& a = vec_meta_.first();
-    const auto& b = o.vec_meta_.first();
-    return std::equal(a.begin(), a.end(), b.begin(), b.end()) &&
-           detail::relaxed_equal(metadata(), o.metadata());
+    const auto& a = vec_;
+    const auto& b = o.vec_;
+    return std::equal(a.begin(), a.end(), b.begin(), b.end(), detail::relaxed_equal{}) &&
+           detail::relaxed_equal{}(this->metadata(), o.metadata());
   }
 
   template <class V, class M, class O, class A>
@@ -150,13 +170,16 @@ public:
     return !operator==(o);
   }
 
-  auto get_allocator() const { return vec_meta_.first().get_allocator(); }
+  allocator_type get_allocator() const { return vec_.get_allocator(); }
 
   template <class Archive>
-  void serialize(Archive&, unsigned);
+  void serialize(Archive& ar, unsigned /* version */) {
+    ar& make_nvp("seq", vec_);
+    ar& make_nvp("meta", this->metadata());
+  }
 
 private:
-  detail::compressed_pair<vector_type, metadata_type> vec_meta_;
+  vector_type vec_;
 
   template <class V, class M, class O, class A>
   friend class category;
@@ -165,15 +188,13 @@ private:
 #if __cpp_deduction_guides >= 201606
 
 template <class T>
-category(std::initializer_list<T>)->category<T>;
-
-category(std::initializer_list<const char*>)->category<std::string>;
-
-template <class T>
-category(std::initializer_list<T>, const char*)->category<T>;
+category(std::initializer_list<T>)
+    ->category<detail::replace_cstring<std::decay_t<T>>, null_type>;
 
 template <class T, class M>
-category(std::initializer_list<T>, const M&)->category<T, M>;
+category(std::initializer_list<T>, M)
+    ->category<detail::replace_cstring<std::decay_t<T>>,
+               detail::replace_cstring<std::decay_t<M>>>;
 
 #endif
 

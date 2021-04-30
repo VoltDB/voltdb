@@ -1,6 +1,6 @@
 // Boost.Geometry
 
-// Copyright (c) 2015, Oracle and/or its affiliates.
+// Copyright (c) 2015-2020, Oracle and/or its affiliates.
 
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
@@ -11,10 +11,9 @@
 #ifndef BOOST_GEOMETRY_ALGORITHMS_DETAIL_EXPAND_EXPAND_BY_EPSILON_HPP
 #define BOOST_GEOMETRY_ALGORITHMS_DETAIL_EXPAND_EXPAND_BY_EPSILON_HPP
 
-#include <cstddef>
 #include <algorithm>
-
-#include <boost/type_traits/is_floating_point.hpp>
+#include <cstddef>
+#include <type_traits>
 
 #include <boost/geometry/core/access.hpp>
 #include <boost/geometry/core/coordinate_dimension.hpp>
@@ -36,11 +35,7 @@ template
     typename Point,
     template <typename> class PlusOrMinus,
     std::size_t I = 0,
-    std::size_t D = dimension<Point>::value,
-    bool Enable = boost::is_floating_point
-                    <
-                        typename coordinate_type<Point>::type
-                    >::value
+    std::size_t D = dimension<Point>::value
 >
 struct corner_by_epsilon
 {
@@ -48,11 +43,23 @@ struct corner_by_epsilon
     {
         typedef typename coordinate_type<Point>::type coord_type;
         coord_type const coord = get<I>(point);
-        coord_type const eps = math::scaled_epsilon(coord);
+        coord_type const seps = math::scaled_epsilon(coord);
         
-        set<I>(point, PlusOrMinus<coord_type>()(coord, eps));
+        set<I>(point, PlusOrMinus<coord_type>()(coord, seps));
 
         corner_by_epsilon<Point, PlusOrMinus, I+1>::apply(point);
+    }
+
+    static inline void apply(Point & point,
+                             typename coordinate_type<Point>::type const& eps)
+    {
+        typedef typename coordinate_type<Point>::type coord_type;
+        coord_type const coord = get<I>(point);
+        coord_type const seps = math::scaled_epsilon(coord, eps);
+
+        set<I>(point, PlusOrMinus<coord_type>()(coord, seps));
+
+        corner_by_epsilon<Point, PlusOrMinus, I + 1>::apply(point);
     }
 };
 
@@ -60,35 +67,50 @@ template
 <
     typename Point,
     template <typename> class PlusOrMinus,
-    std::size_t I,
     std::size_t D
 >
-struct corner_by_epsilon<Point, PlusOrMinus, I, D, false>
+struct corner_by_epsilon<Point, PlusOrMinus, D, D>
 {
     static inline void apply(Point const&) {}
+    static inline void apply(Point const&, typename coordinate_type<Point>::type const&) {}
 };
 
 template
 <
-    typename Point,
-    template <typename> class PlusOrMinus,
-    std::size_t D,
-    bool Enable
+    typename Box,
+    bool Enable = ! std::is_integral<typename coordinate_type<Box>::type>::value
 >
-struct corner_by_epsilon<Point, PlusOrMinus, D, D, Enable>
+struct expand_by_epsilon
 {
-    static inline void apply(Point const&) {}
+    static inline void apply(Box & box)
+    {
+        typedef detail::indexed_point_view<Box, min_corner> min_type;
+        min_type min_point(box);
+        corner_by_epsilon<min_type, std::minus>::apply(min_point);
+
+        typedef detail::indexed_point_view<Box, max_corner> max_type;
+        max_type max_point(box);
+        corner_by_epsilon<max_type, std::plus>::apply(max_point);
+    }
+
+    static inline void apply(Box & box,
+                             typename coordinate_type<Box>::type const& eps)
+    {
+        typedef detail::indexed_point_view<Box, min_corner> min_type;
+        min_type min_point(box);
+        corner_by_epsilon<min_type, std::minus>::apply(min_point, eps);
+
+        typedef detail::indexed_point_view<Box, max_corner> max_type;
+        max_type max_point(box);
+        corner_by_epsilon<max_type, std::plus>::apply(max_point, eps);
+    }
 };
 
-template
-<
-    typename Point,
-    template <typename> class PlusOrMinus,
-    std::size_t D
->
-struct corner_by_epsilon<Point, PlusOrMinus, D, D, false>
+template <typename Box>
+struct expand_by_epsilon<Box, false>
 {
-    static inline void apply(Point const&) {}
+    static inline void apply(Box &) {}
+    static inline void apply(Box &, typename coordinate_type<Box>::type const&) {}
 };
 
 } // namespace expand
@@ -96,13 +118,14 @@ struct corner_by_epsilon<Point, PlusOrMinus, D, D, false>
 template <typename Box>
 inline void expand_by_epsilon(Box & box)
 {
-    typedef detail::indexed_point_view<Box, min_corner> min_type;
-    min_type min_point(box);
-    expand::corner_by_epsilon<min_type, std::minus>::apply(min_point);
+    expand::expand_by_epsilon<Box>::apply(box);
+}
 
-    typedef detail::indexed_point_view<Box, max_corner> max_type;
-    max_type max_point(box);
-    expand::corner_by_epsilon<max_type, std::plus>::apply(max_point);
+template <typename Box>
+inline void expand_by_epsilon(Box & box,
+                              typename coordinate_type<Box>::type const& eps)
+{
+    expand::expand_by_epsilon<Box>::apply(box, eps);
 }
 
 } // namespace detail

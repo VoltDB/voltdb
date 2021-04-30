@@ -2,8 +2,8 @@
 
 // Copyright (c) 2008-2012 Barend Gehrels, Amsterdam, the Netherlands.
 
-// This file was modified by Oracle on 2017, 2018.
-// Modifications copyright (c) 2017-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2017, 2018, 2020.
+// Modifications copyright (c) 2017-2020, Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
 // Use, modification and distribution is subject to the Boost Software License,
@@ -1807,7 +1807,7 @@ namespace detail
             {3782, srs::dpar::parameters<>(proj_tmerc)(lat_0,0)(lon_0,-120)(k,0.9999)(x_0,0)(y_0,0)(ellps_grs80)(units_m)(no_defs)},
             {3783, srs::dpar::parameters<>(proj_tmerc)(lat_0,-25.06855261111111)(lon_0,-130.1129671111111)(k,1)(x_0,14200)(y_0,15500)(ellps_wgs84)(towgs84,srs::detail::towgs84<>(0,0,0,0,0,0,0))(units_m)(no_defs)},
             {3784, srs::dpar::parameters<>(proj_utm)(zone,9)(south)(ellps_intl)(towgs84,srs::detail::towgs84<>(185,165,42,0,0,0,0))(units_m)(no_defs)},
-            {3785, srs::dpar::parameters<>(proj_merc)(lon_0,0)(k,1)(x_0,0)(y_0,0)(r,6378137)(towgs84,srs::detail::towgs84<>(0,0,0,0,0,0,0))(units_m)(no_defs)},
+            {3785, srs::dpar::parameters<>(proj_merc)(lat_ts,0)(lon_0,0)(k,1)(x_0,0)(y_0,0)(r,6378137)(units_m)(no_defs)},
             {3786, srs::dpar::parameters<>(proj_eqc)(lat_ts,0)(lat_0,0)(lon_0,0)(x_0,0)(y_0,0)(r,6371007)(units_m)(no_defs)},
             {3787, srs::dpar::parameters<>(proj_tmerc)(lat_0,0)(lon_0,15)(k,0.9999)(x_0,500000)(y_0,-5000000)(ellps_bessel)(towgs84,srs::detail::towgs84<>(577.326,90.129,463.919,5.137,1.474,5.297,2.4232))(units_m)(no_defs)},
             {3788, srs::dpar::parameters<>(proj_tmerc)(lat_0,0)(lon_0,166)(k,1)(x_0,3500000)(y_0,10000000)(ellps_grs80)(towgs84,srs::detail::towgs84<>(0,0,0,0,0,0,0))(units_m)(no_defs)},

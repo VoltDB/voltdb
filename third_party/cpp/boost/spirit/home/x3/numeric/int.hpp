@@ -42,7 +42,7 @@ namespace boost { namespace spirit { namespace x3
 
 #define BOOST_SPIRIT_X3_INT_PARSER(int_type, name)                              \
     typedef int_parser<int_type> name##type;                                    \
-    name##type const name = {};                                                 \
+    constexpr name##type name = {};                                             \
     /***/
 
     BOOST_SPIRIT_X3_INT_PARSER(long, long_)

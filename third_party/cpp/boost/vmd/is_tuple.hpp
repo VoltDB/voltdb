@@ -32,7 +32,7 @@
     
     sequence = a possible tuple
 
-    returns = 1 if the sequence is a Boost PP tuple.
+    returns = 1 if the sequence is a Boost PP tuple,
               0 if it is not.
               
 */

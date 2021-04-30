@@ -1,4 +1,4 @@
-// Copyright Antony Polukhin, 2016-2019.
+// Copyright Antony Polukhin, 2016-2021.
 //
 // Distributed under the Boost Software License, Version 1.0. (See
 // accompanying file LICENSE_1_0.txt or copy at
@@ -78,12 +78,12 @@ std::size_t this_thread_frames::collect(native_frame_ptr_t* out_frames, std::siz
     // NOTE: There is no way to pass "skip" count to backtrace function so we need to perform left shift operation.
     // If number of elements in result backtrace is >= max_frames_count then "skip" elements are wasted.
     if (frames_count && skip) {
-    	if (skip >= frames_count) {
-    		frames_count = 0;
-    	} else {
-    		std::copy(out_frames + skip, out_frames + frames_count, out_frames);
-    		frames_count -= skip;
-    	}
+        if (skip >= frames_count) {
+            frames_count = 0;
+        } else {
+            std::copy(out_frames + skip, out_frames + frames_count, out_frames);
+            frames_count -= skip;
+        }
     }
 #else
     boost::stacktrace::detail::unwind_state state = { skip, out_frames, out_frames + max_frames_count };

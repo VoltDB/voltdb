@@ -8,11 +8,8 @@
 #ifndef BOOST_GIL_GRAY_HPP
 #define BOOST_GIL_GRAY_HPP
 
-#include <boost/mpl/range_c.hpp>
-#include <boost/mpl/vector_c.hpp>
-#include <boost/type_traits.hpp>
-
 #include <boost/gil/utilities.hpp>
+#include <boost/gil/detail/mp11.hpp>
 
 namespace boost { namespace gil {
 
@@ -21,12 +18,12 @@ namespace boost { namespace gil {
 struct gray_color_t {};
 
 /// \ingroup ColorSpaceModel
-using gray_t = mpl::vector1<gray_color_t>;
+using gray_t = mp11::mp_list<gray_color_t>;
 
 /// \ingroup LayoutModel
 using gray_layout_t = layout<gray_t>;
 
-} }  // namespace boost::gil
+}}  // namespace boost::gil
 
 #endif
 

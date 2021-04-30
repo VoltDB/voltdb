@@ -3,8 +3,8 @@
 // Copyright (c) 2007-2012 Barend Gehrels, Amsterdam, the Netherlands.
 // Copyright (c) 2013 Adam Wulkiewicz, Lodz, Poland.
 
-// This file was modified by Oracle on 2013, 2014, 2016, 2017, 2018.
-// Modifications copyright (c) 2013-2018 Oracle and/or its affiliates.
+// This file was modified by Oracle on 2013-2020.
+// Modifications copyright (c) 2013-2020 Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
 // Parts of Boost.Geometry are redesigned from Geodan's Geographic Library
@@ -23,6 +23,8 @@
 #include <boost/geometry/util/math.hpp>
 #include <boost/geometry/util/select_calculation_type.hpp>
 
+#include <boost/geometry/strategy/cartesian/expand_point.hpp>
+
 #include <boost/geometry/strategies/cartesian/point_in_box.hpp>
 #include <boost/geometry/strategies/cartesian/disjoint_box_box.hpp>
 #include <boost/geometry/strategies/cartesian/side_by_triangle.hpp>
@@ -40,8 +42,8 @@ namespace strategy { namespace within
 /*!
 \brief Within detection using winding rule in cartesian coordinate system.
 \ingroup strategies
-\tparam Point \tparam_point
-\tparam PointOfSegment \tparam_segment_point
+\tparam Point_ \tparam_point
+\tparam PointOfSegment_ \tparam_segment_point
 \tparam CalculationType \tparam_calculation
 \author Barend Gehrels
 
@@ -52,20 +54,21 @@ namespace strategy { namespace within
  */
 template
 <
-    typename Point,
-    typename PointOfSegment = Point,
+    typename Point_ = void, // for backward compatibility
+    typename PointOfSegment_ = Point_, // for backward compatibility
     typename CalculationType = void
 >
 class cartesian_winding
 {
-    typedef side::side_by_triangle<CalculationType> side_strategy_type;
-
-    typedef typename select_calculation_type
-        <
-            Point,
-            PointOfSegment,
-            CalculationType
-        >::type calculation_type;
+    template <typename Point, typename PointOfSegment>
+    struct calculation_type
+        : select_calculation_type
+            <
+                Point,
+                PointOfSegment,
+                CalculationType
+            >
+    {};
     
     /*! subclass to keep state */
     class counter
@@ -89,6 +92,17 @@ class cartesian_winding
     };
 
 public:
+    typedef cartesian_tag cs_tag;
+
+    typedef side::side_by_triangle<CalculationType> side_strategy_type;
+
+    static inline side_strategy_type get_side_strategy()
+    {
+        return side_strategy_type();
+    }
+
+    typedef expand::cartesian_point expand_point_strategy_type;
+
     typedef typename side_strategy_type::envelope_strategy_type envelope_strategy_type;
 
     static inline envelope_strategy_type get_envelope_strategy()
@@ -118,10 +132,9 @@ public:
     typedef covered_by::cartesian_point_box disjoint_point_box_strategy_type;
 
     // Typedefs and static methods to fulfill the concept
-    typedef Point point_type;
-    typedef PointOfSegment segment_point_type;
     typedef counter state_type;
 
+    template <typename Point, typename PointOfSegment>
     static inline bool apply(Point const& point,
                              PointOfSegment const& s1, PointOfSegment const& s2,
                              counter& state)
@@ -169,6 +182,7 @@ public:
     }
 
 private:
+    template <typename Point, typename PointOfSegment>
     static inline int check_segment(Point const& point,
                                     PointOfSegment const& seg1,
                                     PointOfSegment const& seg2,
@@ -183,15 +197,18 @@ private:
         return calculate_count(point, seg1, seg2, eq1, eq2);
     }
 
+    template <typename Point, typename PointOfSegment>
     static inline bool check_touch(Point const& point,
                                    PointOfSegment const& seg1,
                                    PointOfSegment const& seg2,
                                    counter& state,
                                    bool& eq1, bool& eq2)
     {
-        calculation_type const px = get<0>(point);
-        calculation_type const s1x = get<0>(seg1);
-        calculation_type const s2x = get<0>(seg2);
+        typedef typename calculation_type<Point, PointOfSegment>::type calc_t;
+
+        calc_t const px = get<0>(point);
+        calc_t const s1x = get<0>(seg1);
+        calc_t const s2x = get<0>(seg2);
 
         eq1 = math::equals(s1x, px);
         eq2 = math::equals(s2x, px);
@@ -200,9 +217,9 @@ private:
         // The only thing which has to be done is check if point is ON segment
         if (eq1 && eq2)
         {
-            calculation_type const py = get<1>(point);
-            calculation_type const s1y = get<1>(seg1);
-            calculation_type const s2y = get<1>(seg2);
+            calc_t const py = get<1>(point);
+            calc_t const s1y = get<1>(seg1);
+            calc_t const s2y = get<1>(seg2);
             if ((s1y <= py && s2y >= py) || (s2y <= py && s1y >= py))
             {
                 state.m_touches = true;
@@ -212,14 +229,17 @@ private:
         return false;
     }
 
+    template <typename Point, typename PointOfSegment>
     static inline int calculate_count(Point const& point,
                                       PointOfSegment const& seg1,
                                       PointOfSegment const& seg2,
                                       bool eq1, bool eq2)
     {
-        calculation_type const p = get<0>(point);
-        calculation_type const s1 = get<0>(seg1);
-        calculation_type const s2 = get<0>(seg2);
+        typedef typename calculation_type<Point, PointOfSegment>::type calc_t;
+
+        calc_t const p = get<0>(point);
+        calc_t const s1 = get<0>(seg1);
+        calc_t const s2 = get<0>(seg2);
 
         return eq1 ? (s2 > p ?  1 : -1)  // Point on level s1, E/W depending on s2
              : eq2 ? (s1 > p ? -1 :  1)  // idem
@@ -228,6 +248,7 @@ private:
              : 0;
     }
 
+    template <typename Point, typename PointOfSegment>
     static inline int side_equal(Point const& point,
                                  PointOfSegment const& se,
                                  int count)
@@ -251,21 +272,13 @@ namespace services
 template <typename PointLike, typename Geometry, typename AnyTag1, typename AnyTag2>
 struct default_strategy<PointLike, Geometry, AnyTag1, AnyTag2, pointlike_tag, polygonal_tag, cartesian_tag, cartesian_tag>
 {
-    typedef cartesian_winding
-        <
-            typename geometry::point_type<PointLike>::type,
-            typename geometry::point_type<Geometry>::type
-        > type;
+    typedef cartesian_winding<> type;
 };
 
 template <typename PointLike, typename Geometry, typename AnyTag1, typename AnyTag2>
 struct default_strategy<PointLike, Geometry, AnyTag1, AnyTag2, pointlike_tag, linear_tag, cartesian_tag, cartesian_tag>
 {
-    typedef cartesian_winding
-        <
-            typename geometry::point_type<PointLike>::type,
-            typename geometry::point_type<Geometry>::type
-        > type;
+    typedef cartesian_winding<> type;
 };
 
 } // namespace services
@@ -283,21 +296,13 @@ namespace strategy { namespace covered_by { namespace services
 template <typename PointLike, typename Geometry, typename AnyTag1, typename AnyTag2>
 struct default_strategy<PointLike, Geometry, AnyTag1, AnyTag2, pointlike_tag, polygonal_tag, cartesian_tag, cartesian_tag>
 {
-    typedef within::cartesian_winding
-        <
-            typename geometry::point_type<PointLike>::type,
-            typename geometry::point_type<Geometry>::type
-        > type;
+    typedef within::cartesian_winding<> type;
 };
 
 template <typename PointLike, typename Geometry, typename AnyTag1, typename AnyTag2>
 struct default_strategy<PointLike, Geometry, AnyTag1, AnyTag2, pointlike_tag, linear_tag, cartesian_tag, cartesian_tag>
 {
-    typedef within::cartesian_winding
-        <
-            typename geometry::point_type<PointLike>::type,
-            typename geometry::point_type<Geometry>::type
-        > type;
+    typedef within::cartesian_winding<> type;
 };
 
 }}} // namespace strategy::covered_by::services

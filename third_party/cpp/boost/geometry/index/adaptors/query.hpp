@@ -4,12 +4,18 @@
 //
 // Copyright (c) 2011-2013 Adam Wulkiewicz, Lodz, Poland.
 //
+// This file was modified by Oracle on 2020.
+// Modifications copyright (c) 2020 Oracle and/or its affiliates.
+// Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
+//
 // Use, modification and distribution is subject to the Boost Software License,
 // Version 1.0. (See accompanying file LICENSE_1_0.txt or copy at
 // http://www.boost.org/LICENSE_1_0.txt)
 
 #ifndef BOOST_GEOMETRY_INDEX_ADAPTORS_QUERY_HPP
 #define BOOST_GEOMETRY_INDEX_ADAPTORS_QUERY_HPP
+
+#include <boost/geometry/core/static_assert.hpp>
 
 /*!
 \defgroup adaptors Adaptors (boost::geometry::index::adaptors::)
@@ -24,10 +30,9 @@ namespace detail {
 template <typename Index>
 class query_range
 {
-    BOOST_MPL_ASSERT_MSG(
-        (false),
-        NOT_IMPLEMENTED_FOR_THIS_INDEX,
-        (query_range));
+    BOOST_GEOMETRY_STATIC_ASSERT_FALSE(
+        "Not implemented for this Index type.",
+        Index);
 
     typedef int* iterator;
     typedef const int* const_iterator;

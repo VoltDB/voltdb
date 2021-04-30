@@ -9,16 +9,23 @@
 #define BOOST_ACCUMULATORS_FRAMEWORK_ACCUMULATOR_SET_HPP_EAN_28_10_2005
 
 #include <boost/version.hpp>
+#include <boost/mpl/bool.hpp>
+#include <boost/mpl/if.hpp>
 #include <boost/mpl/apply.hpp>
 #include <boost/mpl/assert.hpp>
 #include <boost/mpl/protect.hpp>
 #include <boost/mpl/identity.hpp>
 #include <boost/mpl/is_sequence.hpp>
 #include <boost/type_traits/is_same.hpp>
-#include <boost/type_traits/is_base_and_derived.hpp>
-#include <boost/parameter/parameters.hpp>
+#include <boost/type_traits/is_base_of.hpp>
+#include <boost/type_traits/remove_const.hpp>
+#include <boost/type_traits/remove_reference.hpp>
+#include <boost/core/enable_if.hpp>
+#include <boost/parameter/is_argument_pack.hpp>
 #include <boost/preprocessor/repetition/repeat_from_to.hpp>
+#include <boost/preprocessor/repetition/enum_params.hpp>
 #include <boost/preprocessor/repetition/enum_binary_params.hpp>
+#include <boost/preprocessor/repetition/enum_trailing_params.hpp>
 #include <boost/accumulators/accumulators_fwd.hpp>
 #include <boost/accumulators/framework/depends_on.hpp>
 #include <boost/accumulators/framework/accumulator_concept.hpp>
@@ -54,7 +61,7 @@ namespace detail
         }
 
     private:
-        accumulator_visitor &operator =(accumulator_visitor const &);
+        //accumulator_visitor &operator =(accumulator_visitor const &);
         Args const &args;
     };
 
@@ -63,14 +70,6 @@ namespace detail
     {
         return accumulator_visitor<Args>(args);
     }
-
-    typedef
-        parameter::parameters<
-            parameter::required<tag::accumulator>
-          , parameter::optional<tag::sample>
-          // ... and others which are not specified here...
-        >
-    accumulator_params;
 
     ///////////////////////////////////////////////////////////////////////////////
     // accumulator_set_base
@@ -82,8 +81,36 @@ namespace detail
     // is_accumulator_set
     template<typename T>
     struct is_accumulator_set
-      : is_base_and_derived<accumulator_set_base, T>
+      : mpl::if_<
+            boost::is_base_of<
+                accumulator_set_base
+              , typename boost::remove_const<
+                    typename boost::remove_reference<T>::type
+                >::type
+            >
+          , mpl::true_
+          , mpl::false_
+        >::type
     {
+    };
+
+    // function object that serialize an accumulator
+    template<typename Archive>
+    struct serialize_accumulator
+    {
+        serialize_accumulator(Archive & _ar, const unsigned int _file_version) :
+            ar(_ar), file_version(_file_version)
+        {}
+
+        template<typename Accumulator>
+        void operator ()(Accumulator &accumulator)
+        {
+            accumulator.serialize(ar, file_version);
+        }
+
+    private:
+        Archive& ar;
+        const unsigned int file_version;
     };
 
 } // namespace detail
@@ -140,13 +167,13 @@ struct accumulator_set
       : accumulators(
             detail::make_acc_list(
                 accumulators_mpl_vector()
-              , detail::accumulator_params()(*this)
+              , (boost::accumulators::accumulator = *this)
             )
         )
     {
         // Add-ref the Features that the user has specified
         this->template visit_if<detail::contains_feature_of_<Features> >(
-            detail::make_add_ref_visitor(detail::accumulator_params()(*this))
+            detail::make_add_ref_visitor(boost::accumulators::accumulator = *this)
         );
     }
 
@@ -154,17 +181,48 @@ struct accumulator_set
     ///
     /// \param a1 Optional named parameter to be passed to all the accumulators
     template<typename A1>
-    explicit accumulator_set(A1 const &a1)
-      : accumulators(
+    explicit accumulator_set(
+        A1 const &a1
+      , typename boost::enable_if<
+            parameter::is_argument_pack<A1>
+          , detail::_enabler
+        >::type = detail::_enabler()
+    ) : accumulators(
             detail::make_acc_list(
                 accumulators_mpl_vector()
-              , detail::accumulator_params()(*this, a1)
+              , (boost::accumulators::accumulator = *this, a1)
             )
         )
     {
         // Add-ref the Features that the user has specified
         this->template visit_if<detail::contains_feature_of_<Features> >(
-            detail::make_add_ref_visitor(detail::accumulator_params()(*this))
+            detail::make_add_ref_visitor(boost::accumulators::accumulator = *this)
+        );
+    }
+
+    /// \overload
+    ///
+    /// \param a1 Optional sample parameter to be passed to all the accumulators
+    template<typename A1>
+    explicit accumulator_set(
+        A1 const &a1
+      , typename boost::disable_if<
+            parameter::is_argument_pack<A1>
+          , detail::_enabler
+        >::type = detail::_enabler()
+    ) : accumulators(
+            detail::make_acc_list(
+                accumulators_mpl_vector()
+              , (
+                    boost::accumulators::accumulator = *this
+                  , boost::accumulators::sample = a1
+                )
+            )
+        )
+    {
+        // Add-ref the Features that the user has specified
+        this->template visit_if<detail::contains_feature_of_<Features> >(
+            detail::make_add_ref_visitor(boost::accumulators::accumulator = *this)
         );
     }
 
@@ -174,19 +232,47 @@ struct accumulator_set
     ///
 #define BOOST_ACCUMULATORS_ACCUMULATOR_SET_CTOR(z, n, _)                                \
     template<BOOST_PP_ENUM_PARAMS_Z(z, n, typename A)>                                  \
-    accumulator_set(BOOST_PP_ENUM_BINARY_PARAMS_Z(z, n, A, const &a))                   \
-      : accumulators(                                                                   \
+    accumulator_set(                                                                    \
+        BOOST_PP_ENUM_BINARY_PARAMS_Z(z, n, A, const &a)                                \
+      , typename boost::enable_if<                                                      \
+            parameter::is_argument_pack<A0>                                             \
+          , detail::_enabler                                                            \
+        >::type = detail::_enabler()                                                    \
+    ) : accumulators(                                                                   \
             detail::make_acc_list(                                                      \
                 accumulators_mpl_vector()                                               \
-              , detail::accumulator_params()(                                           \
-                    *this BOOST_PP_ENUM_TRAILING_PARAMS_Z(z, n, a)                      \
+              , (                                                                       \
+                    boost::accumulators::accumulator = *this                            \
+                    BOOST_PP_ENUM_TRAILING_PARAMS_Z(z, n, a)                            \
                 )                                                                       \
             )                                                                           \
         )                                                                               \
     {                                                                                   \
         /* Add-ref the Features that the user has specified */                          \
         this->template visit_if<detail::contains_feature_of_<Features> >(               \
-            detail::make_add_ref_visitor(detail::accumulator_params()(*this))           \
+            detail::make_add_ref_visitor(boost::accumulators::accumulator = *this)      \
+        );                                                                              \
+    }                                                                                   \
+    template<BOOST_PP_ENUM_PARAMS_Z(z, n, typename A)>                                  \
+    accumulator_set(                                                                    \
+        BOOST_PP_ENUM_BINARY_PARAMS_Z(z, n, A, const &a)                                \
+      , typename boost::disable_if<                                                     \
+            parameter::is_argument_pack<A0>                                             \
+          , detail::_enabler                                                            \
+        >::type = detail::_enabler()                                                    \
+    ) : accumulators(                                                                   \
+            detail::make_acc_list(                                                      \
+                accumulators_mpl_vector()                                               \
+              , (                                                                       \
+                    boost::accumulators::accumulator = *this                            \
+                  , boost::accumulators::sample = BOOST_PP_ENUM_PARAMS_Z(z, n, a)       \
+                )                                                                       \
+            )                                                                           \
+        )                                                                               \
+    {                                                                                   \
+        /* Add-ref the Features that the user has specified */                          \
+        this->template visit_if<detail::contains_feature_of_<Features> >(               \
+            detail::make_add_ref_visitor(boost::accumulators::accumulator = *this)      \
         );                                                                              \
     }
 
@@ -239,17 +325,7 @@ struct accumulator_set
     {
         this->visit(
             detail::make_accumulator_visitor(
-                detail::accumulator_params()(*this)
-            )
-        );
-    }
-
-    template<typename A1>
-    void operator ()(A1 const &a1)
-    {
-        this->visit(
-            detail::make_accumulator_visitor(
-                detail::accumulator_params()(*this, a1)
+                boost::accumulators::accumulator = *this
             )
         );
     }
@@ -260,12 +336,37 @@ struct accumulator_set
     ///
 #define BOOST_ACCUMULATORS_ACCUMULATOR_SET_FUN_OP(z, n, _)                              \
     template<BOOST_PP_ENUM_PARAMS_Z(z, n, typename A)>                                  \
-    void operator ()(BOOST_PP_ENUM_BINARY_PARAMS_Z(z, n, A, const &a))                  \
+    void operator ()(                                                                   \
+        BOOST_PP_ENUM_BINARY_PARAMS_Z(z, n, A, const &a)                                \
+      , typename boost::enable_if<                                                      \
+            parameter::is_argument_pack<A0>                                             \
+          , detail::_enabler                                                            \
+        >::type = detail::_enabler()                                                    \
+    )                                                                                   \
     {                                                                                   \
         this->visit(                                                                    \
             detail::make_accumulator_visitor(                                           \
-                detail::accumulator_params()(                                           \
-                    *this BOOST_PP_ENUM_TRAILING_PARAMS_Z(z, n, a)                      \
+                (                                                                       \
+                    boost::accumulators::accumulator = *this                            \
+                    BOOST_PP_ENUM_TRAILING_PARAMS_Z(z, n, a)                            \
+                )                                                                       \
+            )                                                                           \
+        );                                                                              \
+    }                                                                                   \
+    template<BOOST_PP_ENUM_PARAMS_Z(z, n, typename A)>                                  \
+    void operator ()(                                                                   \
+        BOOST_PP_ENUM_BINARY_PARAMS_Z(z, n, A, const &a)                                \
+      , typename boost::disable_if<                                                     \
+            parameter::is_argument_pack<A0>                                             \
+          , detail::_enabler                                                            \
+        >::type = detail::_enabler()                                                    \
+    )                                                                                   \
+    {                                                                                   \
+        this->visit(                                                                    \
+            detail::make_accumulator_visitor(                                           \
+                (                                                                       \
+                    boost::accumulators::accumulator = *this                            \
+                  , boost::accumulators::sample = BOOST_PP_ENUM_PARAMS_Z(z, n, a)       \
                 )                                                                       \
             )                                                                           \
         );                                                                              \
@@ -274,7 +375,7 @@ struct accumulator_set
     /// INTERNAL ONLY
     ///
     BOOST_PP_REPEAT_FROM_TO(
-        2
+        1
       , BOOST_PP_INC(BOOST_ACCUMULATORS_MAX_ARGS)
       , BOOST_ACCUMULATORS_ACCUMULATOR_SET_FUN_OP
       , _
@@ -329,13 +430,21 @@ struct accumulator_set
         the_feature;
 
         (*fusion::find_if<detail::matches_feature<Feature> >(this->accumulators))
-            .drop(detail::accumulator_params()(*this));
+            .drop(boost::accumulators::accumulator = *this);
 
         // Also drop accumulators that this feature depends on
         typedef typename the_feature::dependencies dependencies;
         this->template visit_if<detail::contains_feature_of_<dependencies> >(
-            detail::make_drop_visitor(detail::accumulator_params()(*this))
+            detail::make_drop_visitor(boost::accumulators::accumulator = *this)
         );
+    }
+
+    // make the accumulator set serializeable
+    template<class Archive>
+    void serialize(Archive & ar, const unsigned int file_version)
+    {
+        detail::serialize_accumulator<Archive> serializer(ar, file_version);
+        fusion::for_each(this->accumulators, serializer);
     }
 
 private:
@@ -365,6 +474,15 @@ find_accumulator(AccumulatorSet const &acc)
     return acc.template extract<Feature>();
 }
 
+template<typename Feature, typename AccumulatorSet>
+typename mpl::apply<AccumulatorSet, Feature>::type::result_type
+extract_result(AccumulatorSet const &acc)
+{
+    return find_accumulator<Feature>(acc).result(
+        boost::accumulators::accumulator = acc
+    );
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 // extract_result
 //   extract a result from an accumulator set
@@ -380,18 +498,43 @@ find_accumulator(AccumulatorSet const &acc)
     extract_result(                                                         \
         AccumulatorSet const &acc                                           \
         BOOST_PP_ENUM_TRAILING_BINARY_PARAMS_Z(z, n, A, const &a)           \
+      , typename boost::enable_if<                                          \
+            parameter::is_argument_pack<A0>                                 \
+          , detail::_enabler                                                \
+        >::type                                                             \
     )                                                                       \
     {                                                                       \
         return find_accumulator<Feature>(acc).result(                       \
-            detail::accumulator_params()(                                   \
-                acc                                                         \
+            (                                                               \
+                boost::accumulators::accumulator = acc                      \
                 BOOST_PP_ENUM_TRAILING_PARAMS_Z(z, n, a)                    \
             )                                                               \
         );                                                                  \
+    }                                                                       \
+    template<                                                               \
+        typename Feature                                                    \
+      , typename AccumulatorSet                                             \
+        BOOST_PP_ENUM_TRAILING_PARAMS_Z(z, n, typename A)                   \
+    >                                                                       \
+    typename mpl::apply<AccumulatorSet, Feature>::type::result_type         \
+    extract_result(                                                         \
+        AccumulatorSet const &acc                                           \
+        BOOST_PP_ENUM_TRAILING_BINARY_PARAMS_Z(z, n, A, const &a)           \
+      , typename boost::disable_if<                                         \
+            parameter::is_argument_pack<A0>                                 \
+          , detail::_enabler                                                \
+        >::type                                                             \
+    )                                                                       \
+    {                                                                       \
+        return find_accumulator<Feature>(acc).result((                      \
+            boost::accumulators::accumulator = acc                          \
+          , boost::accumulators::sample = BOOST_PP_ENUM_PARAMS_Z(z, n, a)   \
+        ));                                                                 \
     }
 
-BOOST_PP_REPEAT(
-    BOOST_PP_INC(BOOST_ACCUMULATORS_MAX_ARGS)
+BOOST_PP_REPEAT_FROM_TO(
+    1
+  , BOOST_PP_INC(BOOST_ACCUMULATORS_MAX_ARGS)
   , BOOST_ACCUMULATORS_EXTRACT_RESULT_FUN
   , _
 )

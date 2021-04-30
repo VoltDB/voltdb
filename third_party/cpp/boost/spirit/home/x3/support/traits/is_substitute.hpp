@@ -46,7 +46,7 @@ namespace boost { namespace spirit { namespace x3 { namespace traits
         {};
 
         template <typename T, typename Attribute, typename Enable = void>
-        struct is_substitute_impl : is_same<T, Attribute> {};
+        struct is_substitute_impl : mpl::false_ {};
 
         template <typename T, typename Attribute>
         struct is_substitute_impl<T, Attribute,
@@ -75,16 +75,15 @@ namespace boost { namespace spirit { namespace x3 { namespace traits
             typename enable_if<
                 is_variant<Attribute>
             >::type>
-          : mpl::or_<
-                is_same<T, Attribute>
-              , variant_has_substitute<Attribute, T>
-            >
+          : variant_has_substitute<Attribute, T>
         {};
     }
 
     template <typename T, typename Attribute, typename Enable /*= void*/>
     struct is_substitute
-        : detail::is_substitute_impl<T, Attribute> {};
+        : mpl::or_<
+              is_same<T, Attribute>,
+              detail::is_substitute_impl<T, Attribute>> {};
 
     // for reference T
     template <typename T, typename Attribute, typename Enable>

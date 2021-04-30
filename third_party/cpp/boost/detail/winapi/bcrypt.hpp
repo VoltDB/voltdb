@@ -10,6 +10,10 @@
 #ifndef BOOST_DETAIL_WINAPI_BCRYPT_HPP_
 #define BOOST_DETAIL_WINAPI_BCRYPT_HPP_
 
+#include <boost/config/header_deprecated.hpp>
+
+BOOST_HEADER_DEPRECATED("<boost/winapi/bcrypt.hpp>")
+
 #include <boost/winapi/bcrypt.hpp>
 #include <boost/detail/winapi/detail/deprecated_namespace.hpp>
 

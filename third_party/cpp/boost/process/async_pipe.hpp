@@ -47,6 +47,8 @@ public:
      */
     typedef platform_specific handle_type;
 
+    typedef typename handle_type::executor_type executor_type;
+
     /** Construct a new async_pipe, does automatically open the pipe.
      * Initializes source and sink with the same io_context.
      * @note Windows creates a named pipe here, where the name is automatically generated.

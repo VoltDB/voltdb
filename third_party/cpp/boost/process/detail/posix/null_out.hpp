@@ -13,17 +13,27 @@
 
 #include <boost/process/detail/posix/handler.hpp>
 #include <boost/process/detail/posix/file_descriptor.hpp>
-
+#include <boost/process/detail/used_handles.hpp>
 #include <unistd.h>
+#include <array>
+
 namespace boost { namespace process { namespace detail { namespace posix {
 
 template<int p1, int p2>
-struct null_out : handler_base_ext
+struct null_out : handler_base_ext, ::boost::process::detail::uses_handles
 {
     file_descriptor sink{"/dev/null", file_descriptor::write};
     
     template <typename Executor>
     void on_exec_setup(Executor &e) const;
+
+    std::array<int, 3> get_used_handles()
+    {
+        const auto pp1 = p1 != -1 ? p1 : p2;
+        const auto pp2 = p2 != -1 ? p2 : p1;
+
+        return {sink.handle(), pp1, pp2};
+    }
 };
 
 template<>

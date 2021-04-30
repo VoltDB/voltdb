@@ -24,7 +24,6 @@ namespace boost { namespace proto
             struct any
             {
                 template<typename T> any(T const &) {}
-                any operator=(any);
                 any operator[](any);
                 #define M0(Z, N, DATA) any operator()(BOOST_PP_ENUM_PARAMS_Z(Z, N, any BOOST_PP_INTERCEPT));
                 BOOST_PP_REPEAT(BOOST_PROTO_MAX_ARITY, M0, ~)

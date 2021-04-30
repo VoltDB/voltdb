@@ -45,6 +45,8 @@
 #define BOOST_MPI_PYTHON_FORWARD_ONLY
 #include <boost/mpi/python.hpp>
 
+#include "bytesobject.h"
+
 /************************************************************************
  * Boost.Python Serialization Section                                   *
  ************************************************************************/
@@ -140,8 +142,8 @@ class BOOST_MPI_PYTHON_DECL pickle {
   struct data_t;
 
 public:
-  static str dumps(object obj, int protocol = -1);
-  static object loads(str s);
+  static object dumps(object obj, int protocol = -1);
+  static object loads(object s);
   
 private:
   static void initialize_data();
@@ -399,10 +401,10 @@ save_impl(Archiver& ar, const boost::python::object& obj,
           const unsigned int /*version*/,
           mpl::false_ /*has_direct_serialization*/)
 {
-  boost::python::str py_string = boost::python::pickle::dumps(obj);
-  int len = boost::python::extract<int>(py_string.attr("__len__")());
-  const char* string = boost::python::extract<const char*>(py_string);
-  ar << len << boost::serialization::make_array(string, len);
+  boost::python::object bytes = boost::python::pickle::dumps(obj);
+  int   sz    = PyBytes_Size(bytes.ptr());
+  char *data  = PyBytes_AsString(bytes.ptr());  
+  ar << sz << boost::serialization::make_array(data, sz);
 }
 
 /// Try to save a Python object by directly serializing it; fall back
@@ -441,11 +443,10 @@ load_impl(Archiver& ar, boost::python::object& obj,
 {
   int len;
   ar >> len;
-
-  boost::scoped_array<char> string(new char[len]);
-  ar >> boost::serialization::make_array(string.get(), len);
-  boost::python::str py_string(string.get(), len);
-  obj = boost::python::pickle::loads(py_string);
+  boost::scoped_array<char> data(new char[len]);
+  ar >> boost::serialization::make_array(data.get(), len);
+  boost::python::object bytes(boost::python::handle<>(PyBytes_FromStringAndSize(data.get(), len)));
+  obj = boost::python::pickle::loads(bytes);
 }
 
 /// Try to load a Python object by directly deserializing it; fall back
@@ -487,7 +488,6 @@ save(Archiver& ar, const boost::python::object& obj,
 {
   typedef Archiver OArchiver;
   typedef typename input_archiver<OArchiver>::type IArchiver;
-
   detail::save_impl(ar, obj, version, 
                     has_direct_serialization<IArchiver, OArchiver>());
 }
@@ -499,7 +499,6 @@ load(Archiver& ar, boost::python::object& obj,
 {
   typedef Archiver IArchiver;
   typedef typename output_archiver<IArchiver>::type OArchiver;
-
   detail::load_impl(ar, obj, version, 
                     has_direct_serialization<IArchiver, OArchiver>());
 }

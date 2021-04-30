@@ -10,6 +10,10 @@
 #ifndef BOOST_DETAIL_WINAPI_BASIC_TYPES_HPP
 #define BOOST_DETAIL_WINAPI_BASIC_TYPES_HPP
 
+#include <boost/config/header_deprecated.hpp>
+
+BOOST_HEADER_DEPRECATED("<boost/winapi/basic_types.hpp>")
+
 #include <boost/winapi/basic_types.hpp>
 #include <boost/detail/winapi/detail/deprecated_namespace.hpp>
 

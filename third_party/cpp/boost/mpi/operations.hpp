@@ -23,7 +23,8 @@
 #include <boost/mpl/if.hpp>
 #include <boost/mpl/and.hpp>
 #include <boost/mpi/datatype.hpp>
-#include <boost/utility/enable_if.hpp>
+#include <boost/core/enable_if.hpp>
+#include <boost/core/uncaught_exceptions.hpp>
 #include <functional>
 
 namespace boost { namespace mpi {
@@ -302,7 +303,7 @@ namespace detail {
 
     ~user_op()
     {
-      if (std::uncaught_exception()) {
+      if (boost::core::uncaught_exceptions() > 0) {
         // Ignore failure cases: there are obviously other problems
         // already, and we don't want to cause program termination if
         // MPI_Op_free fails.

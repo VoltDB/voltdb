@@ -4,10 +4,11 @@
 // Copyright (c) 2008-2014 Bruno Lalande, Paris, France.
 // Copyright (c) 2009-2014 Mateusz Loskot, London, UK.
 
-// This file was modified by Oracle on 2014.
-// Modifications copyright (c) 2014, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2014, 2019.
+// Modifications copyright (c) 2014, 2019, Oracle and/or its affiliates.
 
 // Contributed and/or modified by Menelaos Karavelas, on behalf of Oracle
+// Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
 // Parts of Boost.Geometry are redesigned from Geodan's Geographic Library
 // (geolib/GGL), copyright (c) 1995-2010 Geodan, Amsterdam, the Netherlands.
@@ -35,9 +36,10 @@ namespace boost { namespace geometry
 namespace resolve_strategy
 {
 
+template <typename Strategy>
 struct comparable_distance
 {
-    template <typename Geometry1, typename Geometry2, typename Strategy>
+    template <typename Geometry1, typename Geometry2>
     static inline
     typename comparable_distance_result<Geometry1, Geometry2, Strategy>::type
     apply(Geometry1 const& geometry1,
@@ -59,7 +61,11 @@ struct comparable_distance
                              Strategy
                          >::apply(strategy));
     }
+};
 
+template <>
+struct comparable_distance<default_strategy>
+{
     template <typename Geometry1, typename Geometry2>
     static inline typename comparable_distance_result
         <
@@ -101,9 +107,10 @@ struct comparable_distance
           Geometry2 const& geometry2,
           Strategy const& strategy)
     {
-        return resolve_strategy::comparable_distance::apply(geometry1,
-                                                            geometry2,
-                                                            strategy);
+        return resolve_strategy::comparable_distance
+            <
+                Strategy
+            >::apply(geometry1, geometry2, strategy);
     }
 };
 

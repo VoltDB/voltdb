@@ -4,9 +4,8 @@
 // Copyright (c) 2008-2014 Barend Gehrels, Amsterdam, the Netherlands.
 // Copyright (c) 2009-2014 Mateusz Loskot, London, UK.
 
-// This file was modified by Oracle on 2014, 2018.
-// Modifications copyright (c) 2014-2018, Oracle and/or its affiliates.
-
+// This file was modified by Oracle on 2014-2020.
+// Modifications copyright (c) 2014-2020, Oracle and/or its affiliates.
 // Contributed and/or modified by Menelaos Karavelas, on behalf of Oracle
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
@@ -21,10 +20,10 @@
 #define BOOST_GEOMETRY_STRATEGIES_CARTESIAN_DISTANCE_PROJECTED_POINT_HPP
 
 
+#include <type_traits>
+
 #include <boost/concept_check.hpp>
 #include <boost/core/ignore_unused.hpp>
-#include <boost/mpl/if.hpp>
-#include <boost/type_traits/is_void.hpp>
 
 #include <boost/geometry/core/access.hpp>
 #include <boost/geometry/core/point_type.hpp>
@@ -38,8 +37,7 @@
 #include <boost/geometry/strategies/default_distance_result.hpp>
 #include <boost/geometry/strategies/cartesian/distance_pythagoras.hpp>
 #include <boost/geometry/strategies/cartesian/point_in_point.hpp>
-
-#include <boost/geometry/util/select_coordinate_type.hpp>
+#include <boost/geometry/strategies/cartesian/intersection.hpp>
 
 // Helper geometry (projected point on line)
 #include <boost/geometry/geometries/point.hpp>
@@ -79,6 +77,26 @@ class projected_point
 {
 public :
     typedef within::cartesian_point_point equals_point_point_strategy_type;
+
+    typedef intersection::cartesian_segments
+        <
+            CalculationType
+        > relate_segment_segment_strategy_type;
+
+    static inline relate_segment_segment_strategy_type get_relate_segment_segment_strategy()
+    {
+        return relate_segment_segment_strategy_type();
+    }
+
+    typedef within::cartesian_winding
+        <
+            void, void, CalculationType
+        > point_in_geometry_strategy_type;
+
+    static inline point_in_geometry_strategy_type get_point_in_geometry_strategy()
+    {
+        return point_in_geometry_strategy_type();
+    }
 
     // The three typedefs below are necessary to calculate distances
     // from segments defined in integer coordinates.
@@ -245,19 +263,19 @@ struct default_strategy
     >
 {
     typedef strategy::distance::projected_point
-    <
-        void,
-        typename boost::mpl::if_
-            <
-                boost::is_void<Strategy>,
-                typename default_strategy
-                    <
-                        point_tag, point_tag, Point, PointOfSegment,
-                        cartesian_tag, cartesian_tag
-                    >::type,
-                Strategy
-            >::type
-    > type;
+        <
+            void,
+            std::conditional_t
+                <
+                    std::is_void<Strategy>::value,
+                    typename default_strategy
+                        <
+                            point_tag, point_tag, Point, PointOfSegment,
+                            cartesian_tag, cartesian_tag
+                        >::type,
+                    Strategy
+                >
+        > type;
 };
 
 template <typename PointOfSegment, typename Point, typename Strategy>

@@ -8,10 +8,11 @@
 
 #include <algorithm>
 #include <iterator>
-#include <boost/type_traits/is_complex.hpp>
+#include <tuple>
 #include <boost/assert.hpp>
-#include <boost/multiprecision/detail/number_base.hpp>
+#include <boost/config/header_deprecated.hpp>
 
+BOOST_HEADER_DEPRECATED("<boost/math/statistics/univariate_statistics.hpp>");
 
 namespace boost::math::tools {
 
@@ -30,12 +31,47 @@ auto mean(ForwardIterator first, ForwardIterator last)
         }
         return mu;
     }
+    else if constexpr (std::is_same_v<typename std::iterator_traits<ForwardIterator>::iterator_category, std::random_access_iterator_tag>)
+    {
+        size_t elements = std::distance(first, last);
+        Real mu0 = 0;
+        Real mu1 = 0;
+        Real mu2 = 0;
+        Real mu3 = 0;
+        Real i = 1;
+        auto end = last - (elements % 4);
+        for(auto it = first; it != end;  it += 4) {
+            Real inv = Real(1)/i;
+            Real tmp0 = (*it - mu0);
+            Real tmp1 = (*(it+1) - mu1);
+            Real tmp2 = (*(it+2) - mu2);
+            Real tmp3 = (*(it+3) - mu3);
+            // please generate a vectorized fma here
+            mu0 += tmp0*inv;
+            mu1 += tmp1*inv;
+            mu2 += tmp2*inv;
+            mu3 += tmp3*inv;
+            i += 1;
+        }
+        Real num1 = Real(elements  - (elements %4))/Real(4);
+        Real num2 = num1 + Real(elements % 4);
+
+        for (auto it = end; it != last; ++it)
+        {
+            mu3 += (*it-mu3)/i;
+            i += 1;
+        }
+
+        return (num1*(mu0+mu1+mu2) + num2*mu3)/Real(elements);
+    }
     else
     {
-        Real mu = 0;
-        Real i = 1;
-        for(auto it = first; it != last; ++it) {
-            mu = mu + (*it - mu)/i;
+        auto it = first;
+        Real mu = *it;
+        Real i = 2;
+        while(++it != last)
+        {
+            mu += (*it - mu)/i;
             i += 1;
         }
         return mu;

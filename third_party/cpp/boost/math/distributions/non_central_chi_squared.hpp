@@ -46,7 +46,7 @@ namespace boost
             // Computing discrete mixtures of continuous
             // distributions: noncentral chisquare, noncentral t
             // and the distribution of the square of the sample
-            // multiple correlation coeficient.
+            // multiple correlation coefficient.
             // D. Benton, K. Krishnamoorthy.
             // Computational Statistics & Data Analysis 43 (2003) 249 - 267
             //
@@ -107,7 +107,7 @@ namespace boost
             //
             // Now backwards iteration: the gamma
             // function recurrences are unstable in this
-            // direction, we rely on the terms deminishing in size
+            // direction, we rely on the terms diminishing in size
             // faster than we introduce cancellation errors.
             // For this reason it's very important that we start
             // *before* the largest term so that backwards iteration
@@ -141,7 +141,7 @@ namespace boost
             // This uses a stable forward iteration to sum the
             // CDF, unfortunately this can not be used for large
             // values of the non-centrality parameter because:
-            // * The first term may underfow to zero.
+            // * The first term may underflow to zero.
             // * We may need an extra-ordinary number of terms
             //   before we reach the first *significant* term.
             //
@@ -191,7 +191,7 @@ namespace boost
             // Computing discrete mixtures of continuous
             // distributions: noncentral chisquare, noncentral t
             // and the distribution of the square of the sample
-            // multiple correlation coeficient.
+            // multiple correlation coefficient.
             // D. Benton, K. Krishnamoorthy.
             // Computational Statistics & Data Analysis 43 (2003) 249 - 267
             //

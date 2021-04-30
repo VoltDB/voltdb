@@ -73,7 +73,7 @@ namespace beast {
     be invoked by the executor associated with the stream upon construction.
     The type of executor used with this stream must meet the following
     requirements:
-    
+
     @li Function objects submitted to the executor shall never run
         concurrently with each other.
 
@@ -182,7 +182,7 @@ namespace beast {
 
     @tparam Executor A type meeting the requirements of <em>Executor</em> to
     be used for submitting all completion handlers which do not already have an
-    associated executor. If this type is omitted, the default of `net::executor`
+    associated executor. If this type is omitted, the default of `net::any_io_executor`
     will be used.
 
     @par Thread Safety
@@ -197,7 +197,7 @@ namespace beast {
 */
 template<
     class Protocol,
-    class Executor = net::executor,
+    class Executor = net::any_io_executor,
     class RatePolicy = unlimited_rate_policy
 >
 class basic_stream
@@ -217,6 +217,15 @@ public:
     */
     using executor_type = beast::executor_type<socket_type>;
 
+    /// Rebinds the stream type to another executor.
+    template<class Executor1>
+    struct rebind_executor
+    {
+        /// The stream type when rebound to the specified executor.
+        using other = basic_stream<
+            Protocol, Executor1, RatePolicy>;
+    };
+
     /// The protocol type.
     using protocol_type = Protocol;
 
@@ -224,7 +233,8 @@ public:
     using endpoint_type = typename Protocol::endpoint;
 
 private:
-    static_assert(net::is_executor<Executor>::value,
+    static_assert(
+        net::is_executor<Executor>::value || net::execution::is_executor<Executor>::value,
         "Executor type requirements not met");
 
     struct impl_type
@@ -237,7 +247,15 @@ private:
 
         op_state read;
         op_state write;
-        net::steady_timer timer; // rate timer
+#if 0
+        net::basic_waitable_timer<
+            std::chrono::steady_clock,
+            net::wait_traits<
+                std::chrono::steady_clock>,
+            Executor> timer; // rate timer;
+#else
+        net::steady_timer timer;
+#endif
         int waiting = 0;
 
         impl_type(impl_type&&) = default;
@@ -274,8 +292,8 @@ private:
         template<class Executor2>
         void on_timer(Executor2 const& ex2);
 
-        void reset();       // set timeouts to never
-        void close();       // cancel everything
+        void reset();           // set timeouts to never
+        void close() noexcept;  // cancel everything
     };
 
     // We use shared ownership for the state so it can
@@ -284,6 +302,7 @@ private:
     // but the implementation is still waiting on a timer.
     boost::shared_ptr<impl_type> impl_;
 
+    template<class Executor2>
     struct timeout_handler;
 
     struct ops;
@@ -367,7 +386,7 @@ public:
 
     /** Move constructor
 
-        @param other The other object from which the move will occur. 
+        @param other The other object from which the move will occur.
 
         @note Following the move, the moved-from object is in the
         same state as if newly constructed.
@@ -438,7 +457,7 @@ public:
     */
     void
     expires_after(
-        std::chrono::nanoseconds expiry_time);
+        net::steady_timer::duration expiry_time);
 
     /** Set the timeout for the next logical operation.
 
@@ -490,7 +509,7 @@ public:
     //--------------------------------------------------------------------------
 
     /** Get the executor associated with the object.
-    
+
         This function may be used to obtain the executor object that the
         stream uses to dispatch completion handlers without an assocaited
         executor.
@@ -498,7 +517,7 @@ public:
         @return A copy of the executor that stream will use to dispatch handlers.
     */
     executor_type
-    get_executor() const noexcept
+    get_executor() noexcept
     {
         return impl_->ex();
     }
@@ -525,7 +544,7 @@ public:
     }
 
     /** Connect the stream to the specified endpoint.
-        
+
         This function is used to connect the underlying socket to the
         specified remote endpoint. The function call will block until
         the connection is successfully made or an error occurs.
@@ -534,7 +553,7 @@ public:
         closed state upon failure.
 
         @param ep The remote endpoint to connect to.
-        
+
         @param ec Set to indicate what error occurred, if any.
 
         @see connect
@@ -546,7 +565,7 @@ public:
     }
 
     /** Establishes a connection by trying each endpoint in a sequence.
-    
+
         This function attempts to connect the stream to one of a sequence of
         endpoints by trying each endpoint until a connection is successfully
         established.
@@ -556,11 +575,11 @@ public:
 
         The algorithm, known as a <em>composed operation</em>, is implemented
         in terms of calls to the underlying socket's `connect` function.
-    
+
         @param endpoints A sequence of endpoints.
-    
+
         @returns The successfully connected endpoint.
-    
+
         @throws system_error Thrown on failure. If the sequence is
         empty, the associated error code is `net::error::not_found`.
         Otherwise, contains the error from the last connection attempt.
@@ -579,7 +598,7 @@ public:
     }
 
     /** Establishes a connection by trying each endpoint in a sequence.
-    
+
         This function attempts to connect the stream to one of a sequence of
         endpoints by trying each endpoint until a connection is successfully
         established.
@@ -589,16 +608,16 @@ public:
 
         The algorithm, known as a <em>composed operation</em>, is implemented
         in terms of calls to the underlying socket's `connect` function.
-        
+
         @param endpoints A sequence of endpoints.
-    
+
         @param ec Set to indicate what error occurred, if any. If the sequence is
         empty, set to `net::error::not_found`. Otherwise, contains the error
         from the last connection attempt.
-    
+
         @returns On success, the successfully connected endpoint. Otherwise, a
         default-constructed endpoint.
-    */    
+    */
     template<class EndpointSequence
     #if ! BOOST_BEAST_DOXYGEN
         ,class = typename std::enable_if<
@@ -616,27 +635,27 @@ public:
     }
 
     /** Establishes a connection by trying each endpoint in a sequence.
-    
+
         This function attempts to connect the stream to one of a sequence of
         endpoints by trying each endpoint until a connection is successfully
         established.
         The underlying socket is automatically opened if needed.
         An automatically opened socket is not returned to the
         closed state upon failure.
-    
+
         The algorithm, known as a <em>composed operation</em>, is implemented
         in terms of calls to the underlying socket's `connect` function.
-    
+
         @param begin An iterator pointing to the start of a sequence of endpoints.
-    
+
         @param end An iterator pointing to the end of a sequence of endpoints.
-    
+
         @returns An iterator denoting the successfully connected endpoint.
-    
+
         @throws system_error Thrown on failure. If the sequence is
         empty, the associated error code is `net::error::not_found`.
         Otherwise, contains the error from the last connection attempt.
-    */    
+    */
     template<class Iterator>
     Iterator
     connect(
@@ -646,25 +665,25 @@ public:
     }
 
     /** Establishes a connection by trying each endpoint in a sequence.
-    
+
         This function attempts to connect the stream to one of a sequence of
         endpoints by trying each endpoint until a connection is successfully
         established.
         The underlying socket is automatically opened if needed.
         An automatically opened socket is not returned to the
         closed state upon failure.
-    
+
         The algorithm, known as a <em>composed operation</em>, is implemented
         in terms of calls to the underlying socket's `connect` function.
-        
+
         @param begin An iterator pointing to the start of a sequence of endpoints.
-    
+
         @param end An iterator pointing to the end of a sequence of endpoints.
-    
+
         @param ec Set to indicate what error occurred, if any. If the sequence is
         empty, set to boost::asio::error::not_found. Otherwise, contains the error
         from the last connection attempt.
-    
+
         @returns On success, an iterator denoting the successfully connected
         endpoint. Otherwise, the end iterator.
     */
@@ -678,7 +697,7 @@ public:
     }
 
     /** Establishes a connection by trying each endpoint in a sequence.
-    
+
         This function attempts to connect the stream to one of a sequence of
         endpoints by trying each endpoint until a connection is successfully
         established.
@@ -688,9 +707,9 @@ public:
 
         The algorithm, known as a <em>composed operation</em>, is implemented
         in terms of calls to the underlying socket's `connect` function.
-        
+
         @param endpoints A sequence of endpoints.
-    
+
         @param connect_condition A function object that is called prior to each
         connection attempt. The signature of the function object must be:
         @code
@@ -703,9 +722,9 @@ public:
         indicate success. The @c next parameter is the next endpoint to be tried.
         The function object should return true if the next endpoint should be tried,
         and false if it should be skipped.
-    
+
         @returns The successfully connected endpoint.
-    
+
         @throws boost::system::system_error Thrown on failure. If the sequence is
         empty, the associated error code is `net::error::not_found`.
         Otherwise, contains the error from the last connection attempt.
@@ -779,7 +798,7 @@ public:
     }
 
     /** Establishes a connection by trying each endpoint in a sequence.
-    
+
         This function attempts to connect the stream to one of a sequence of
         endpoints by trying each endpoint until a connection is successfully
         established.
@@ -789,11 +808,11 @@ public:
 
         The algorithm, known as a <em>composed operation</em>, is implemented
         in terms of calls to the underlying socket's `connect` function.
-        
+
         @param begin An iterator pointing to the start of a sequence of endpoints.
-    
+
         @param end An iterator pointing to the end of a sequence of endpoints.
-    
+
         @param connect_condition A function object that is called prior to each
         connection attempt. The signature of the function object must be:
         @code
@@ -806,13 +825,13 @@ public:
         indicate success. The @c next parameter is the next endpoint to be tried.
         The function object should return true if the next endpoint should be tried,
         and false if it should be skipped.
-    
+
         @returns An iterator denoting the successfully connected endpoint.
-    
+
         @throws boost::system::system_error Thrown on failure. If the sequence is
         empty, the associated @c error_code is `net::error::not_found`.
         Otherwise, contains the error from the last connection attempt.
-    */  
+    */
     template<
         class Iterator, class ConnectCondition>
     Iterator
@@ -824,7 +843,7 @@ public:
     }
 
     /** Establishes a connection by trying each endpoint in a sequence.
-    
+
         This function attempts to connect the stream to one of a sequence of
         endpoints by trying each endpoint until a connection is successfully
         established.
@@ -834,11 +853,11 @@ public:
 
         The algorithm, known as a <em>composed operation</em>, is implemented
         in terms of calls to the underlying socket's `connect` function.
-        
+
         @param begin An iterator pointing to the start of a sequence of endpoints.
-    
+
         @param end An iterator pointing to the end of a sequence of endpoints.
-    
+
         @param connect_condition A function object that is called prior to each
         connection attempt. The signature of the function object must be:
         @code
@@ -851,11 +870,11 @@ public:
         indicate success. The @c next parameter is the next endpoint to be tried.
         The function object should return true if the next endpoint should be tried,
         and false if it should be skipped.
-    
+
         @param ec Set to indicate what error occurred, if any. If the sequence is
         empty, set to `net::error::not_found`. Otherwise, contains the error
         from the last connection attempt.
-    
+
         @returns On success, an iterator denoting the successfully connected
         endpoint. Otherwise, the end iterator.
     */
@@ -885,7 +904,7 @@ public:
 
         @param ep The remote endpoint to which the underlying socket will be
         connected. Copies will be made of the endpoint object as required.
-        
+
         @param handler The completion handler to invoke when the operation
         completes. The implementation takes ownership of the handler by
         performing a decay-copy. The equivalent function signature of
@@ -902,14 +921,19 @@ public:
 
         @see async_connect
     */
-    template<class ConnectHandler>
+    template<
+        BOOST_BEAST_ASYNC_TPARAM1 ConnectHandler =
+            net::default_completion_token_t<executor_type>
+    >
     BOOST_BEAST_ASYNC_RESULT1(ConnectHandler)
     async_connect(
         endpoint_type const& ep,
-        ConnectHandler&& handler);
+        ConnectHandler&& handler =
+            net::default_completion_token_t<
+                executor_type>{});
 
     /** Establishes a connection by trying each endpoint in a sequence asynchronously.
-   
+
         This function attempts to connect the stream to one of a sequence of
         endpoints by trying each endpoint until a connection is successfully
         established.
@@ -924,10 +948,10 @@ public:
         If the timeout timer expires while the operation is outstanding,
         the current connection attempt will be canceled and the completion
         handler will be invoked with the error @ref error::timeout.
-    
+
         @param endpoints A sequence of endpoints. This this object must meet
         the requirements of <em>EndpointSequence</em>.
-    
+
         @param handler The completion handler to invoke when the operation
         completes. The implementation takes ownership of the handler by
         performing a decay-copy. The equivalent function signature of
@@ -938,7 +962,7 @@ public:
             // net::error::not_found. Otherwise, contains the
             // error from the last connection attempt.
             error_code const& error,
-    
+
             // On success, the successfully connected endpoint.
             // Otherwise, a default-constructed endpoint.
             typename Protocol::endpoint const& endpoint
@@ -951,20 +975,26 @@ public:
     */
     template<
         class EndpointSequence,
-        class RangeConnectHandler
+        BOOST_ASIO_COMPLETION_TOKEN_FOR(
+            void(error_code, typename Protocol::endpoint))
+            RangeConnectHandler =
+                net::default_completion_token_t<executor_type>
     #if ! BOOST_BEAST_DOXYGEN
         ,class = typename std::enable_if<
             net::is_endpoint_sequence<
                 EndpointSequence>::value>::type
     #endif
     >
-    BOOST_ASIO_INITFN_RESULT_TYPE(RangeConnectHandler,void (error_code, typename Protocol::endpoint))
+    BOOST_ASIO_INITFN_RESULT_TYPE(
+        RangeConnectHandler,
+        void(error_code, typename Protocol::endpoint))
     async_connect(
         EndpointSequence const& endpoints,
-        RangeConnectHandler&& handler);
+        RangeConnectHandler&& handler =
+            net::default_completion_token_t<executor_type>{});
 
     /** Establishes a connection by trying each endpoint in a sequence asynchronously.
-    
+
         This function attempts to connect the stream to one of a sequence of
         endpoints by trying each endpoint until a connection is successfully
         established.
@@ -982,7 +1012,7 @@ public:
 
         @param endpoints A sequence of endpoints. This this object must meet
         the requirements of <em>EndpointSequence</em>.
-    
+
         @param connect_condition A function object that is called prior to each
         connection attempt. The signature of the function object must be:
         @code
@@ -1006,7 +1036,7 @@ public:
             // net::error::not_found. Otherwise, contains the
             // error from the last connection attempt.
             error_code const& error,
-    
+
             // On success, the successfully connected endpoint.
             // Otherwise, a default-constructed endpoint.
             typename Protocol::endpoint const& endpoint
@@ -1038,21 +1068,28 @@ public:
     template<
         class EndpointSequence,
         class ConnectCondition,
-        class RangeConnectHandler
+        BOOST_ASIO_COMPLETION_TOKEN_FOR(
+            void(error_code, typename Protocol::endpoint))
+            RangeConnectHandler =
+                net::default_completion_token_t<executor_type>
     #if ! BOOST_BEAST_DOXYGEN
         ,class = typename std::enable_if<
             net::is_endpoint_sequence<
                 EndpointSequence>::value>::type
     #endif
     >
-    BOOST_ASIO_INITFN_RESULT_TYPE(RangeConnectHandler,void (error_code, typename Protocol::endpoint))
+    BOOST_ASIO_INITFN_RESULT_TYPE(
+        RangeConnectHandler,
+        void(error_code, typename Protocol::endpoint))
     async_connect(
         EndpointSequence const& endpoints,
         ConnectCondition connect_condition,
-        RangeConnectHandler&& handler);
+        RangeConnectHandler&& handler =
+            net::default_completion_token_t<
+                executor_type>{});
 
     /** Establishes a connection by trying each endpoint in a sequence asynchronously.
-    
+
         This function attempts to connect the stream to one of a sequence of
         endpoints by trying each endpoint until a connection is successfully
         established.
@@ -1067,9 +1104,9 @@ public:
         If the timeout timer expires while the operation is outstanding,
         the current connection attempt will be canceled and the completion
         handler will be invoked with the error @ref error::timeout.
-    
+
         @param begin An iterator pointing to the start of a sequence of endpoints.
-    
+
         @param end An iterator pointing to the end of a sequence of endpoints.
 
         @param handler The completion handler to invoke when the operation
@@ -1082,7 +1119,7 @@ public:
             // net::error::not_found. Otherwise, contains the
             // error from the last connection attempt.
             error_code const& error,
-    
+
             // On success, an iterator denoting the successfully
             // connected endpoint. Otherwise, the end iterator.
             Iterator iterator
@@ -1095,14 +1132,20 @@ public:
     */
     template<
         class Iterator,
-        class IteratorConnectHandler>
-    BOOST_ASIO_INITFN_RESULT_TYPE(IteratorConnectHandler,void (error_code, Iterator))
+        BOOST_ASIO_COMPLETION_TOKEN_FOR(
+            void(error_code, Iterator))
+            IteratorConnectHandler =
+                net::default_completion_token_t<executor_type>>
+    BOOST_ASIO_INITFN_RESULT_TYPE(
+        IteratorConnectHandler,
+        void(error_code, Iterator))
     async_connect(
         Iterator begin, Iterator end,
-        IteratorConnectHandler&& handler);
+        IteratorConnectHandler&& handler =
+            net::default_completion_token_t<executor_type>{});
 
     /** Establishes a connection by trying each endpoint in a sequence asynchronously.
-    
+
         This function attempts to connect the stream to one of a sequence of
         endpoints by trying each endpoint until a connection is successfully
         established.
@@ -1113,17 +1156,17 @@ public:
         If the timeout timer expires while the operation is outstanding,
         the current connection attempt will be canceled and the completion
         handler will be invoked with the error @ref error::timeout.
-    
+
         @param begin An iterator pointing to the start of a sequence of endpoints.
 
         @param end An iterator pointing to the end of a sequence of endpoints.
-    
+
         @param connect_condition A function object that is called prior to each
         connection attempt. The signature of the function object must be:
         @code
         bool connect_condition(
             error_code const& ec,
-            Iterator next);
+            typename Protocol::endpoint const& next);
         @endcode
 
         @param handler The completion handler to invoke when the operation
@@ -1136,7 +1179,7 @@ public:
             // net::error::not_found. Otherwise, contains the
             // error from the last connection attempt.
             error_code const& error,
-    
+
             // On success, an iterator denoting the successfully
             // connected endpoint. Otherwise, the end iterator.
             Iterator iterator
@@ -1150,19 +1193,25 @@ public:
     template<
         class Iterator,
         class ConnectCondition,
-        class IteratorConnectHandler>
-    BOOST_ASIO_INITFN_RESULT_TYPE(IteratorConnectHandler,void (error_code, Iterator))
+        BOOST_ASIO_COMPLETION_TOKEN_FOR(
+            void(error_code, Iterator))
+            IteratorConnectHandler =
+                net::default_completion_token_t<executor_type>>
+    BOOST_ASIO_INITFN_RESULT_TYPE(
+        IteratorConnectHandler,
+        void(error_code, Iterator))
     async_connect(
         Iterator begin, Iterator end,
         ConnectCondition connect_condition,
-        IteratorConnectHandler&& handler);
+        IteratorConnectHandler&& handler =
+            net::default_completion_token_t<executor_type>{});
 
     //--------------------------------------------------------------------------
 
     /** Read some data.
 
         This function is used to read some data from the stream.
-        
+
         The call blocks until one of the following is true:
 
         @li One or more bytes are read from the stream.
@@ -1172,11 +1221,11 @@ public:
         @param buffers The buffers into which the data will be read. If the
         size of the buffers is zero bytes, the call always returns
         immediately with no error.
-        
+
         @returns The number of bytes read.
-        
+
         @throws system_error Thrown on failure.
-        
+
         @note The `read_some` operation may not receive all of the requested
         number of bytes. Consider using the function `net::read` if you need
         to ensure that the requested amount of data is read before the
@@ -1202,11 +1251,11 @@ public:
         @param buffers The buffers into which the data will be read. If the
         size of the buffers is zero bytes, the call always returns
         immediately with no error.
-        
+
         @param ec Set to indicate what error occurred, if any.
 
         @returns The number of bytes read.
-                
+
         @note The `read_some` operation may not receive all of the requested
         number of bytes. Consider using the function `net::read` if you need
         to ensure that the requested amount of data is read before the
@@ -1224,7 +1273,7 @@ public:
     /** Read some data asynchronously.
 
         This function is used to asynchronously read data from the stream.
-        
+
         This call always returns immediately. The asynchronous operation
         will continue until one of the following conditions is true:
 
@@ -1247,7 +1296,7 @@ public:
         Although the buffers object may be copied as necessary, ownership of the
         underlying memory blocks is retained by the caller, which must guarantee
         that they remain valid until the handler is called.
-        
+
         @param handler The completion handler to invoke when the operation
         completes. The implementation takes ownership of the handler by
         performing a decay-copy. The equivalent function signature of
@@ -1268,16 +1317,22 @@ public:
         to ensure that the requested amount of data is read before the asynchronous
         operation completes.
     */
-    template<class MutableBufferSequence, class ReadHandler>
+    template<
+        class MutableBufferSequence,
+        BOOST_BEAST_ASYNC_TPARAM2 ReadHandler =
+            net::default_completion_token_t<executor_type>
+    >
     BOOST_BEAST_ASYNC_RESULT2(ReadHandler)
     async_read_some(
         MutableBufferSequence const& buffers,
-        ReadHandler&& handler);
+        ReadHandler&& handler =
+            net::default_completion_token_t<executor_type>{}
+    );
 
     /** Write some data.
 
         This function is used to write some data to the stream.
-        
+
         The call blocks until one of the following is true:
 
         @li One or more bytes are written to the stream.
@@ -1289,9 +1344,9 @@ public:
         with no error.
 
         @returns The number of bytes written.
-        
+
         @throws system_error Thrown on failure.
-        
+
         @note The `write_some` operation may not transmit all of the requested
         number of bytes. Consider using the function `net::write` if you need
         to ensure that the requested amount of data is written before the
@@ -1307,7 +1362,7 @@ public:
     /** Write some data.
 
         This function is used to write some data to the stream.
-        
+
         The call blocks until one of the following is true:
 
         @li One or more bytes are written to the stream.
@@ -1321,9 +1376,9 @@ public:
         @param ec Set to indicate what error occurred, if any.
 
         @returns The number of bytes written.
-        
+
         @throws system_error Thrown on failure.
-        
+
         @note The `write_some` operation may not transmit all of the requested
         number of bytes. Consider using the function `net::write` if you need
         to ensure that the requested amount of data is written before the
@@ -1341,7 +1396,7 @@ public:
     /** Write some data asynchronously.
 
         This function is used to asynchronously write data to the underlying socket.
-        
+
         This call always returns immediately. The asynchronous operation
         will continue until one of the following conditions is true:
 
@@ -1364,7 +1419,7 @@ public:
         Although the buffers object may be copied as necessary, ownership of the
         underlying memory blocks is retained by the caller, which must guarantee
         that they remain valid until the handler is called.
-        
+
         @param handler The completion handler to invoke when the operation
         completes. The implementation takes ownership of the handler by
         performing a decay-copy. The equivalent function signature of
@@ -1385,11 +1440,16 @@ public:
         to ensure that the requested amount of data is sent before the asynchronous
         operation completes.
     */
-    template<class ConstBufferSequence, class WriteHandler>
+    template<
+        class ConstBufferSequence,
+        BOOST_BEAST_ASYNC_TPARAM2 WriteHandler =
+            net::default_completion_token_t<Executor>
+    >
     BOOST_BEAST_ASYNC_RESULT2(WriteHandler)
     async_write_some(
         ConstBufferSequence const& buffers,
-        WriteHandler&& handler);
+        WriteHandler&& handler =
+            net::default_completion_token_t<Executor>{});
 };
 
 } // beast

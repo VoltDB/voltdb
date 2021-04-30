@@ -1,8 +1,9 @@
 // Boost.Geometry (aka GGL, Generic Geometry Library)
 
-// Copyright (c) 2014, Oracle and/or its affiliates.
+// Copyright (c) 2014, 2019, 2020 Oracle and/or its affiliates.
 
 // Contributed and/or modified by Menelaos Karavelas, on behalf of Oracle
+// Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
 // Licensed under the Boost Software License version 1.0.
 // http://www.boost.org/users/license.html
@@ -10,7 +11,9 @@
 #ifndef BOOST_GEOMETRY_ALGORITHMS_DETAIL_DISTANCE_MULTIPOINT_TO_GEOMETRY_HPP
 #define BOOST_GEOMETRY_ALGORITHMS_DETAIL_DISTANCE_MULTIPOINT_TO_GEOMETRY_HPP
 
-#include <boost/range.hpp>
+#include <boost/range/begin.hpp>
+#include <boost/range/end.hpp>
+#include <boost/range/size.hpp>
 
 #include <boost/geometry/core/point_type.hpp>
 #include <boost/geometry/core/tags.hpp>
@@ -113,19 +116,21 @@ template <typename MultiPoint, typename Areal, typename Strategy>
 class multipoint_to_areal
 {
 private:
+    template <typename CoveredByStrategy>
     struct not_covered_by_areal
     {
-        not_covered_by_areal(Areal const& areal)
-            : m_areal(areal)
+        not_covered_by_areal(Areal const& areal, CoveredByStrategy const& strategy)
+            : m_areal(areal), m_strategy(strategy)
         {}
 
         template <typename Point>
         inline bool apply(Point const& point) const
         {
-            return !geometry::covered_by(point, m_areal);
+            return !geometry::covered_by(point, m_areal, m_strategy);
         }
 
         Areal const& m_areal;
+        CoveredByStrategy const& m_strategy;
     };
 
 public:
@@ -140,11 +145,17 @@ public:
                                     Areal const& areal,
                                     Strategy const& strategy)
     {
-        not_covered_by_areal predicate(areal);
+        typedef typename Strategy::point_in_geometry_strategy_type pg_strategy_type;
+
+        typedef not_covered_by_areal<pg_strategy_type> predicate_type;
+        
+        // predicate holds references so the strategy has to be created here
+        pg_strategy_type pg_strategy = strategy.get_point_in_geometry_strategy();
+        predicate_type predicate(areal, pg_strategy);
 
         if (check_iterator_range
                 <
-                    not_covered_by_areal, false
+                    predicate_type, false
                 >::apply(boost::begin(multipoint),
                          boost::end(multipoint),
                          predicate))

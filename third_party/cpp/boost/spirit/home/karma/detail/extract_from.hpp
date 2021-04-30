@@ -10,7 +10,6 @@
 #pragma once
 #endif
 
-#include <boost/spirit/include/phoenix_core.hpp>
 #include <boost/spirit/home/support/unused.hpp>
 #include <boost/spirit/home/support/attributes_fwd.hpp>
 #include <boost/spirit/home/karma/detail/attributes.hpp>

@@ -136,13 +136,13 @@ template<typename T> using is_mutable_buffer =
         >;
 
 
-struct null_t  {constexpr null_t() {}};
+struct null_t  {constexpr null_t() = default;};
 struct close_t;
 
 template<class>
 struct std_in_
 {
-    constexpr std_in_() {}
+    constexpr std_in_() = default;
 
     api::close_in close() const {return api::close_in(); }
     api::close_in operator=(const close_t &) const {return api::close_in();}
@@ -199,7 +199,7 @@ struct std_in_
 template<int p1, int p2 = -1>
 struct std_out_
 {
-    constexpr std_out_() {}
+    constexpr std_out_() = default;
 
     api::close_out<p1,p2> close() const {return api::close_out<p1,p2>(); }
     api::close_out<p1,p2> operator=(const close_t &) const {return api::close_out<p1,p2>();}
@@ -260,7 +260,7 @@ struct std_out_
 
 struct close_t
 {
-    constexpr close_t() {}
+    constexpr close_t() = default;
     template<int T, int U>
     api::close_out<T,U> operator()(std_out_<T,U>) {return api::close_out<T,U>();}
 };

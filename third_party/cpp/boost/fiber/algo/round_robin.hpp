@@ -45,15 +45,15 @@ public:
     round_robin( round_robin const&) = delete;
     round_robin & operator=( round_robin const&) = delete;
 
-    virtual void awakened( context *) noexcept;
+    void awakened( context *) noexcept override;
 
-    virtual context * pick_next() noexcept;
+    context * pick_next() noexcept override;
 
-    virtual bool has_ready_fibers() const noexcept;
+    bool has_ready_fibers() const noexcept override;
 
-    virtual void suspend_until( std::chrono::steady_clock::time_point const&) noexcept;
+    void suspend_until( std::chrono::steady_clock::time_point const&) noexcept override;
 
-    virtual void notify() noexcept;
+    void notify() noexcept override;
 };
 
 }}}

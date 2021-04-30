@@ -60,14 +60,14 @@ struct export_impl
     static const basic_pointer_iserializer &
     enable_load(mpl::true_){
         return boost::serialization::singleton<
-            pointer_iserializer<Archive, Serializable> 
+            pointer_iserializer<Archive, Serializable>
         >::get_const_instance();
     }
 
     static const basic_pointer_oserializer &
     enable_save(mpl::true_){
         return boost::serialization::singleton<
-            pointer_oserializer<Archive, Serializable> 
+            pointer_oserializer<Archive, Serializable>
         >::get_const_instance();
     }
     inline static void enable_load(mpl::false_) {}
@@ -93,7 +93,7 @@ struct ptr_serialization_support
 };
 
 template <class Archive, class Serializable>
-BOOST_DLLEXPORT void 
+BOOST_DLLEXPORT void
 ptr_serialization_support<Archive,Serializable>::instantiate()
 {
     export_impl<Archive,Serializable>::enable_save(
@@ -199,7 +199,7 @@ namespace {                                                                    \
 
 # define BOOST_SERIALIZATION_MWERKS_BASE_AND_DERIVED(Base,Derived)
 
-#endif 
+#endif
 
 // check for unnecessary export.  T isn't polymorphic so there is no
 // need to export it.

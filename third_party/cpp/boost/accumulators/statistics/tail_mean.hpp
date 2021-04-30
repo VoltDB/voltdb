@@ -88,6 +88,10 @@ namespace impl
                      - numeric::fdiv(n, count(args))
                    );
         }
+        
+        // serialization is done by accumulators it depends on
+        template<class Archive>
+        void serialize(Archive & ar, const unsigned int file_version) {}
     };
 
     ///////////////////////////////////////////////////////////////////////////////
@@ -159,6 +163,10 @@ namespace impl
                 }
             }
         }
+        
+        // serialization is done by accumulators it depends on
+        template<class Archive>
+        void serialize(Archive & ar, const unsigned int file_version) {}
     };
 
 } // namespace impl

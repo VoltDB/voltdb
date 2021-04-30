@@ -4,6 +4,10 @@
 //
 // Copyright (c) 2011-2015 Adam Wulkiewicz, Lodz, Poland.
 //
+// This file was modified by Oracle on 2019.
+// Modifications copyright (c) 2019 Oracle and/or its affiliates.
+// Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
+//
 // Use, modification and distribution is subject to the Boost Software License,
 // Version 1.0. (See accompanying file LICENSE_1_0.txt or copy at
 // http://www.boost.org/LICENSE_1_0.txt)
@@ -15,16 +19,22 @@ namespace boost { namespace geometry { namespace index {
 
 namespace detail { namespace rtree { namespace visitors {
 
-template <typename Value, typename Options, typename Translator, typename Box, typename Allocators>
+template <typename MembersHolder>
 class children_box
-    : public rtree::visitor<Value, typename Options::parameters_type, Box, Allocators, typename Options::node_tag, true>::type
+    : public MembersHolder::visitor_const
 {
-    typedef typename rtree::internal_node<Value, typename Options::parameters_type, Box, Allocators, typename Options::node_tag>::type internal_node;
-    typedef typename rtree::leaf<Value, typename Options::parameters_type, Box, Allocators, typename Options::node_tag>::type leaf;
+    typedef typename MembersHolder::parameters_type parameters_type;
+    typedef typename MembersHolder::translator_type translator_type;
+    typedef typename MembersHolder::box_type box_type;
+
+    typedef typename MembersHolder::internal_node internal_node;
+    typedef typename MembersHolder::leaf leaf;
 
 public:
-    inline children_box(Box & result, Translator const& tr)
-        : m_result(result), m_tr(tr)
+    inline children_box(box_type & result,
+                        parameters_type const& parameters,
+                        translator_type const& tr)
+        : m_result(result), m_parameters(parameters), m_tr(tr)
     {}
 
     inline void operator()(internal_node const& n)
@@ -32,7 +42,8 @@ public:
         typedef typename rtree::elements_type<internal_node>::type elements_type;
         elements_type const& elements = rtree::elements(n);
 
-        m_result = rtree::elements_box<Box>(elements.begin(), elements.end(), m_tr);
+        m_result = rtree::elements_box<box_type>(elements.begin(), elements.end(), m_tr,
+                                                 index::detail::get_strategy(m_parameters));
     }
 
     inline void operator()(leaf const& n)
@@ -40,12 +51,14 @@ public:
         typedef typename rtree::elements_type<leaf>::type elements_type;
         elements_type const& elements = rtree::elements(n);
 
-        m_result = rtree::values_box<Box>(elements.begin(), elements.end(), m_tr);
+        m_result = rtree::values_box<box_type>(elements.begin(), elements.end(), m_tr,
+                                               index::detail::get_strategy(m_parameters));
     }
 
 private:
-    Box & m_result;
-    Translator const& m_tr;
+    box_type & m_result;
+    parameters_type const& m_parameters;
+    translator_type const& m_tr;
 };
 
 }}} // namespace detail::rtree::visitors

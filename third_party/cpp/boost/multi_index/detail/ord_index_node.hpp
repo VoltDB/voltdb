@@ -1,4 +1,4 @@
-/* Copyright 2003-2019 Joaquin M Lopez Munoz.
+/* Copyright 2003-2020 Joaquin M Lopez Munoz.
  * Distributed under the Boost Software License, Version 1.0.
  * (See accompanying file LICENSE_1_0.txt or copy at
  * http://www.boost.org/LICENSE_1_0.txt)
@@ -412,7 +412,7 @@ public:
     ordered_index_node_impl::rebalance(x,header->parent());
   }
 
-  static pointer rebalance_for_erase(
+  static pointer rebalance_for_extract(
     pointer z,parent_ref root,pointer& leftmost,pointer& rightmost)
   {
     pointer y=z;

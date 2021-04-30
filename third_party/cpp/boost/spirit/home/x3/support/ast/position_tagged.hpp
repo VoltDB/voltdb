@@ -7,7 +7,7 @@
 #if !defined(BOOST_SPIRIT_X3_POSITION_TAGGED_MAY_01_2014_0321PM)
 #define BOOST_SPIRIT_X3_POSITION_TAGGED_MAY_01_2014_0321PM
 
-#include <boost/range.hpp>
+#include <boost/range/iterator_range_core.hpp>
 #include <boost/type_traits/is_base_of.hpp>
 #include <boost/core/enable_if.hpp>
 

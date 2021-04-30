@@ -9,8 +9,8 @@
     LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 =============================================================================*/
 
-#if !defined(CPP_ITERATION_CONTEXT_HPP_00312288_9DDB_4668_AFE5_25D3994FD095_INCLUDED)
-#define CPP_ITERATION_CONTEXT_HPP_00312288_9DDB_4668_AFE5_25D3994FD095_INCLUDED
+#if !defined(BOOST_CPP_ITERATION_CONTEXT_HPP_00312288_9DDB_4668_AFE5_25D3994FD095_INCLUDED)
+#define BOOST_CPP_ITERATION_CONTEXT_HPP_00312288_9DDB_4668_AFE5_25D3994FD095_INCLUDED
 
 #include <iterator>
 #include <boost/filesystem/fstream.hpp>
@@ -118,7 +118,7 @@ struct base_iteration_context
         type(type_)
     {}
 
-// the actual input stream
+    // the actual input stream
     IteratorT first;            // actual input stream position
     IteratorT last;             // end of input stream
     BOOST_WAVE_STRINGTYPE real_filename;  // real name of the current file
@@ -168,4 +168,4 @@ struct iteration_context
 #include BOOST_ABI_SUFFIX
 #endif
 
-#endif // !defined(CPP_ITERATION_CONTEXT_HPP_00312288_9DDB_4668_AFE5_25D3994FD095_INCLUDED)
+#endif // !defined(BOOST_CPP_ITERATION_CONTEXT_HPP_00312288_9DDB_4668_AFE5_25D3994FD095_INCLUDED)

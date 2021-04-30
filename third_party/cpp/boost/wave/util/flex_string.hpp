@@ -35,8 +35,8 @@
 //      - Removed the getline implementation which was borrowed from the SGI
 //        STL as the license for this code is not compatible with Boost.
 
-#ifndef FLEX_STRING_INC_
-#define FLEX_STRING_INC_
+#ifndef BOOST_FLEX_STRING_INC_
+#define BOOST_FLEX_STRING_INC_
 
 /*
 ////////////////////////////////////////////////////////////////////////////////
@@ -87,6 +87,7 @@ class StoragePolicy
 #include <boost/assert.hpp>
 #include <boost/throw_exception.hpp>
 
+#include <boost/core/allocator_access.hpp>
 #include <boost/iterator/reverse_iterator.hpp>
 
 #include <boost/wave/wave_config.hpp>
@@ -287,30 +288,6 @@ inline bool operator!=(const mallocator<T>&,
   return false;
 }
 
-template <class Allocator>
-typename Allocator::pointer Reallocate(
-    Allocator& alloc,
-    typename Allocator::pointer p,
-    typename Allocator::size_type oldObjCount,
-    typename Allocator::size_type newObjCount,
-    void*)
-{
-    // @@@ not implemented
-    return NULL;
-}
-
-template <class Allocator>
-typename Allocator::pointer Reallocate(
-    Allocator& alloc,
-    typename Allocator::pointer p,
-    typename Allocator::size_type oldObjCount,
-    typename Allocator::size_type newObjCount,
-    mallocator<void>*)
-{
-    // @@@ not implemented
-    return NULL;
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 // class template SimpleStringStorage
 // Allocates memory with malloc
@@ -331,7 +308,7 @@ public:
     };
     static const Data emptyString_;
 
-    typedef typename A::size_type size_type;
+    typedef typename boost::allocator_size_type<A>::type size_type;
 
 private:
     Data* pData_;
@@ -544,12 +521,12 @@ SimpleStringStorage<E, A>::emptyString_ =
 template <typename E, class A = std::allocator<E> >
 class AllocatorStringStorage : public A
 {
-    typedef typename A::size_type size_type;
+    typedef typename boost::allocator_size_type<A>::type size_type;
     typedef typename SimpleStringStorage<E, A>::Data Data;
 
     void* Alloc(size_type sz, const void* p = 0)
     {
-        return A::allocate(1 + (sz - 1) / sizeof(E),
+        return boost::allocator_allocate(static_cast<A&>(*this), 1 + (sz - 1) / sizeof(E),
             static_cast<const char*>(p));
     }
 
@@ -563,7 +540,7 @@ class AllocatorStringStorage : public A
 
     void Free(void* p, size_type sz)
     {
-        A::deallocate(static_cast<E*>(p), sz);
+        boost::allocator_deallocate(static_cast<A&>(*this), static_cast<E*>(p), sz);
     }
 
     Data* pData_;
@@ -666,7 +643,7 @@ public:
     { return size_type(end() - begin()); }
 
     size_type max_size() const
-    { return A::max_size(); }
+    { return boost::allocator_max_size(static_cast<const A&>(*this)); }
 
     size_type capacity() const
     { return size_type(pData_->pEndOfMem_ - pData_->buffer_); }
@@ -757,7 +734,7 @@ public: // protected:
     typedef typename base::iterator iterator;
     typedef typename base::const_iterator const_iterator;
     typedef A allocator_type;
-    typedef typename A::size_type size_type;
+    typedef typename boost::allocator_size_type<A>::type size_type;
 
     VectorStringStorage(const VectorStringStorage& s) : base(s)
     { }
@@ -874,7 +851,7 @@ public:
     typedef value_type* iterator;
     typedef const value_type* const_iterator;
     typedef typename Storage::allocator_type allocator_type;
-    typedef typename allocator_type::size_type size_type;
+    typedef typename boost::allocator_size_type<allocator_type>::type size_type;
 
 private:
   enum { temp1 = threshold * sizeof(value_type) > sizeof(Storage)
@@ -1201,8 +1178,8 @@ public:
     typedef typename Storage::iterator iterator;
     typedef typename Storage::const_iterator const_iterator;
     typedef typename Storage::allocator_type allocator_type;
-    typedef typename allocator_type::size_type size_type;
-    typedef typename Storage::reference reference;
+    typedef typename boost::allocator_size_type<allocator_type>::type size_type;
+    typedef typename Storage::value_type& reference;
 
 private:
     union
@@ -1461,13 +1438,12 @@ public:
     typedef T traits_type;
     typedef typename traits_type::char_type value_type;
     typedef A allocator_type;
-    typedef typename A::size_type size_type;
-    typedef typename A::difference_type difference_type;
 
-    typedef typename A::reference reference;
-    typedef typename A::const_reference const_reference;
-    typedef typename A::pointer pointer;
-    typedef typename A::const_pointer const_pointer;
+    typedef typename boost::allocator_value_type<A>::type& reference;
+    typedef typename boost::allocator_value_type<A>::type const& const_reference;
+    typedef typename boost::allocator_pointer<A>::type pointer;
+    typedef typename boost::allocator_const_pointer<A>::type const_pointer;
+    typedef typename boost::allocator_size_type<A>::type size_type;
 
     typedef typename Storage::iterator iterator;
     typedef typename Storage::const_iterator const_iterator;
@@ -1802,13 +1778,13 @@ private:
         if(!empty() && beginIterator != endIterator)
         {
             typedef const typename std::iterator_traits<Iterator>::value_type *
-                pointer;
+                value_pointer;
 
-            pointer myBegin(&*begin());
-            pointer myEnd(&*begin() + size());
-            pointer rangeBegin(DereferenceValidIterator(beginIterator));
+            value_pointer myBegin(&*begin());
+            value_pointer myEnd(&*begin() + size());
+            value_pointer rangeBegin(DereferenceValidIterator(beginIterator));
 
-            const std::less_equal<pointer> less_equal = std::less_equal<pointer>();
+            const std::less_equal<value_pointer> less_equal = std::less_equal<value_pointer>();
             if(less_equal(myBegin, rangeBegin) && less_equal(rangeBegin, myEnd))
                 return true;
         }
@@ -2059,7 +2035,7 @@ private:
             i2 - i1;
         BOOST_ASSERT(n1 >= 0);
         const typename std::iterator_traits<FwdIterator>::difference_type n2 =
-        std::distance(s1, s2);
+            std::distance(s1, s2);
         BOOST_ASSERT(n2 >= 0);
 
         if (IsAliasedRange(s1, s2))
@@ -2601,4 +2577,4 @@ inline void serialize(Archive & ar, boost::wave::util::flex_string<E, T, A, S> &
 #include BOOST_ABI_SUFFIX
 #endif
 
-#endif // FLEX_STRING_INC_
+#endif // BOOST_FLEX_STRING_INC_

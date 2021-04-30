@@ -9,8 +9,8 @@
     Software License, Version 1.0. (See accompanying file
     LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 =============================================================================*/
-#if !defined(CONVERT_TRIGRAPHS_HK050403_INCLUDED)
-#define CONVERT_TRIGRAPHS_HK050403_INCLUDED
+#if !defined(BOOST_CONVERT_TRIGRAPHS_HK050403_INCLUDED)
+#define BOOST_CONVERT_TRIGRAPHS_HK050403_INCLUDED
 
 #include <boost/wave/wave_config.hpp>
 #include <boost/wave/cpplexer/cpplexer_exceptions.hpp>
@@ -134,6 +134,6 @@ convert_trigraphs(StringT const &value)
 #include BOOST_ABI_SUFFIX
 #endif
 
-#endif // !defined(CONVERT_TRIGRAPHS_HK050403_INCLUDED)
+#endif // !defined(BOOST_CONVERT_TRIGRAPHS_HK050403_INCLUDED)
 
 

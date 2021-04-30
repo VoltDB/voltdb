@@ -10,10 +10,8 @@
 #pragma once
 #endif
 
-#include <string>
 #include <boost/spirit/home/support/char_class.hpp>
 #include <boost/spirit/home/karma/detail/generate_to.hpp>
-#include <boost/range/const_iterator.hpp>
 
 namespace boost { namespace spirit { namespace karma { namespace detail
 {

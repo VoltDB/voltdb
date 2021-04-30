@@ -92,9 +92,8 @@ namespace boost { namespace spirit { namespace lex { namespace lexertl
             T& dst_;
             T const& src_;
 
-        private:
             // silence MSVC warning C4512: assignment operator could not be generated
-            assign_on_exit& operator= (assign_on_exit const&);
+            BOOST_DELETED_FUNCTION(assign_on_exit& operator= (assign_on_exit const&))
         };
 
     public:

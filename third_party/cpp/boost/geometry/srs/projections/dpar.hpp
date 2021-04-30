@@ -1,6 +1,6 @@
 // Boost.Geometry
 
-// Copyright (c) 2017-2018, Oracle and/or its affiliates.
+// Copyright (c) 2017-2020, Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
 // Use, modification and distribution is subject to the Boost Software License,
@@ -11,6 +11,10 @@
 #define BOOST_GEOMETRY_SRS_PROJECTIONS_DPAR_HPP
 
 
+#include <string>
+#include <type_traits>
+#include <vector>
+
 #include <boost/geometry/core/radius.hpp>
 #include <boost/geometry/core/tag.hpp>
 #include <boost/geometry/core/tags.hpp>
@@ -20,21 +24,15 @@
 #include <boost/geometry/srs/sphere.hpp>
 #include <boost/geometry/srs/spheroid.hpp>
 
-#include <boost/mpl/assert.hpp>
-#include <boost/mpl/if.hpp>
+#include <boost/geometry/util/range.hpp>
+
 #include <boost/range/begin.hpp>
 #include <boost/range/end.hpp>
 #include <boost/range/size.hpp>
 #include <boost/range/value_type.hpp>
 #include <boost/tuple/tuple.hpp>
-#include <boost/type_traits/integral_constant.hpp>
-#include <boost/type_traits/is_convertible.hpp>
-#include <boost/type_traits/is_same.hpp>
-#include <boost/type_traits/is_void.hpp>
 #include <boost/variant/variant.hpp>
 
-#include <string>
-#include <vector>
 
 namespace boost { namespace geometry { namespace srs
 {
@@ -42,51 +40,45 @@ namespace boost { namespace geometry { namespace srs
 namespace detail
 {
 
-template
-<
-    typename Types,
-    typename T,
-    typename Iter = typename boost::mpl::begin<Types>::type,
-    typename End = typename boost::mpl::end<Types>::type,
-    int I = 0
->
-struct find_type_index
-{
-    typedef typename boost::mpl::deref<Iter>::type type;
-    static const int value = boost::is_same<type, T>::value
-                           ? I
-                           : find_type_index
-                                <
-                                    Types,
-                                    T,
-                                    typename boost::mpl::next<Iter>::type,
-                                    End,
-                                    I + 1
-                                >::value;
-                            
-};
+template <typename T, int I, typename ...>
+struct find_type_index_impl
+    : std::integral_constant<int, I>
+{};
 
 template
 <
-    typename Types,
     typename T,
-    typename End,
-    int I
+    int I,
+    typename Type,
+    typename ...Types
 >
-struct find_type_index<Types, T, End, End, I>
-{
-    static const int value = I;
-};
+struct find_type_index_impl<T, I, Type, Types...>
+    : std::conditional_t
+        <
+            std::is_same<T, Type>::value,
+            std::integral_constant<int, I>,
+            typename find_type_index_impl<T, I + 1, Types...>::type
+        >
+{};
+
+template <typename Variant, typename T>
+struct find_type_index
+{};
+
+template <BOOST_VARIANT_ENUM_PARAMS(typename T), typename T>
+struct find_type_index<boost::variant<BOOST_VARIANT_ENUM_PARAMS(T)>, T>
+    : find_type_index_impl<T, 0, BOOST_VARIANT_ENUM_PARAMS(T)>
+{};
 
 
 template
 <
     typename Range,
     typename ToValue,
-    bool IsRange = boost::has_range_iterator<Range>::value
+    bool IsRange = range::detail::is_range<Range>::value
 >
 struct is_convertible_range
-    : boost::is_convertible
+    : std::is_convertible
         <
             typename boost::range_value<Range>::type,
             ToValue
@@ -99,7 +91,7 @@ template
     typename ToValue
 >
 struct is_convertible_range<Range, ToValue, false>
-    : boost::false_type
+    : std::false_type
 {};
 
 } // namespace detail
@@ -534,22 +526,30 @@ struct parameter
         : m_id(ellps), m_value(int(v))
     {}
 
-    template <typename Sphere>
-    parameter(name_ellps id, Sphere const& v,
-              typename boost::enable_if_c
-                <
-                    boost::is_same<typename geometry::tag<Sphere>::type, srs_sphere_tag>::value
-                >::type * = 0)
+    template
+    <
+        typename Sphere,
+        std::enable_if_t
+            <
+                std::is_same<typename geometry::tag<Sphere>::type, srs_sphere_tag>::value,
+                int
+            > = 0
+    >
+    parameter(name_ellps id, Sphere const& v)
         : m_id(id)
         , m_value(T(get_radius<0>(v)))
     {}
 
-    template <typename Spheroid>
-    parameter(name_ellps id, Spheroid const& v,
-              typename boost::enable_if_c
-                <
-                    boost::is_same<typename geometry::tag<Spheroid>::type, srs_spheroid_tag>::value
-                >::type * = 0)
+    template
+    <
+        typename Spheroid,
+        std::enable_if_t
+            <
+                std::is_same<typename geometry::tag<Spheroid>::type, srs_spheroid_tag>::value,
+                int
+            > = 0
+    >
+    parameter(name_ellps id, Spheroid const& v)
         : m_id(id)
         , m_value(srs::spheroid<T>(get_radius<0>(v), get_radius<2>(v)))
     {}
@@ -562,12 +562,16 @@ struct parameter
         : m_id(mode), m_value(int(v))
     {}
 
-    template <typename Range>
-    parameter(name_nadgrids id, Range const& v,
-              typename boost::enable_if_c
-                <
-                    detail::is_convertible_range<Range const, std::string>::value
-                >::type * = 0)
+    template
+    <
+        typename Range,
+        std::enable_if_t
+            <
+                detail::is_convertible_range<Range const, std::string>::value,
+                int
+            > = 0
+    >
+    parameter(name_nadgrids id, Range const& v)
         : m_id(id)
         , m_value(srs::detail::nadgrids(boost::begin(v), boost::end(v)))
     {}
@@ -617,12 +621,16 @@ struct parameter
         : m_id(sweep), m_value(int(v))
     {}
 
-    template <typename Range>
-    parameter(name_towgs84 id, Range const& v,
-              typename boost::enable_if_c
-                <
-                    detail::is_convertible_range<Range const, T>::value
-                >::type * = 0)
+    template
+    <
+        typename Range,
+        std::enable_if_t
+            <
+                detail::is_convertible_range<Range const, T>::value,
+                int
+            > = 0
+    >
+    parameter(name_towgs84 id, Range const& v)
         : m_id(id)
         , m_value(srs::detail::towgs84<T>(boost::begin(v), boost::end(v)))
     {
@@ -690,11 +698,7 @@ public:
     template <typename V>
     bool is_value_set() const
     {
-        return m_value.which() == srs::detail::find_type_index
-            <
-                typename variant_type::types,
-                V
-            >::value;
+        return m_value.which() == srs::detail::find_type_index<variant_type, V>::value;
     }
     
 private:

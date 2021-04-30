@@ -24,6 +24,8 @@
 
 #include <boost/fusion/include/vector.hpp>
 #include <boost/mpl/if.hpp>
+#include <boost/proto/extends.hpp>
+#include <boost/proto/traits.hpp>
 #include <boost/type_traits/is_same.hpp>
 #include <boost/variant.hpp>
 

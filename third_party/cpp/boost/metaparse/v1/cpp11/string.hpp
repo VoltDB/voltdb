@@ -206,8 +206,6 @@ namespace boost
   }
 }
 
-#include <boost/metaparse/v1/cpp11/impl/remove_trailing_no_chars.hpp>
-
 #if __clang__
 #  if __has_extension(cxx_string_literal_templates)
 #    define BOOST_METAPARSE_V1_STRING(...) ::boost::metaparse::string<__VA_ARGS__>

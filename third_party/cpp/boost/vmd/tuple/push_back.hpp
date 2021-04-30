@@ -29,7 +29,7 @@
 
     \brief appends an element to the end of a tuple. 
 
-    tuple = tuple to to append an element to.
+    tuple = tuple to to append an element to. <br/>
     elem  = element to append.
 
     If the tuple is an empty tuple the result is a tuple with the single element.

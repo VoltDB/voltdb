@@ -48,6 +48,10 @@ namespace impl
         {
             return p_square_quantile_for_median(args);
         }
+        
+        // serialization is done by accumulators it depends on
+        template<class Archive>
+        void serialize(Archive & ar, const unsigned int file_version) {}
     };
     ///////////////////////////////////////////////////////////////////////////////
     // with_density_median_impl
@@ -105,6 +109,16 @@ namespace impl
             return this->median;
         }
 
+        // make this accumulator serializeable
+        template<class Archive>
+        void serialize(Archive & ar, const unsigned int file_version)
+        { 
+            ar & sum;
+            ar & is_dirty;
+            ar & median;
+        }
+
+
     private:
         mutable float_type sum;
         mutable bool is_dirty;
@@ -160,6 +174,15 @@ namespace impl
 
             return this->median;
         }
+        
+        // make this accumulator serializeable
+        template<class Archive>
+        void serialize(Archive & ar, const unsigned int file_version)
+        { 
+            ar & is_dirty;
+            ar & median;
+        }
+
     private:
 
         mutable bool is_dirty;

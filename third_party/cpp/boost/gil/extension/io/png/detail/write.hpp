@@ -13,11 +13,7 @@
 #include <boost/gil/io/device.hpp>
 #include <boost/gil/io/dynamic_io_new.hpp>
 #include <boost/gil/io/row_buffer_helper.hpp>
-
-#include <boost/mpl/and.hpp>
-#include <boost/mpl/equal_to.hpp>
-#include <boost/mpl/less.hpp>
-#include <boost/mpl/not.hpp>
+#include <boost/gil/detail/mp11.hpp>
 
 #include <type_traits>
 
@@ -85,7 +81,7 @@ private:
 
     template<typename View>
     void write_view( const View& view
-                   ,  mpl::false_       // is bit aligned
+                   ,  std::false_type       // is bit aligned
                    )
     {
         using pixel_t = typename get_pixel_type<View>::type;
@@ -125,7 +121,7 @@ private:
 
     template<typename View>
     void write_view( const View& view
-                   , mpl::true_         // is bit aligned
+                   , std::true_type         // is bit aligned
                    )
     {
         using png_rw_info = detail::png_write_support
@@ -166,8 +162,21 @@ private:
                      );
     }
 
-    template< typename Info > struct is_less_than_eight : mpl::less< mpl::int_< Info::_bit_depth >, mpl::int_< 8 > > {};
-    template< typename Info > struct is_equal_to_sixteen : mpl::equal_to< mpl::int_< Info::_bit_depth >, mpl::int_< 16 > > {};
+    template<typename Info>
+    struct is_less_than_eight : mp11::mp_less
+        <
+            std::integral_constant<int, Info::_bit_depth>,
+            std::integral_constant<int, 8>
+        >
+    {};
+
+    template<typename Info>
+    struct is_equal_to_sixteen : mp11::mp_less
+        <
+            std::integral_constant<int, Info::_bit_depth>,
+            std::integral_constant<int, 16>
+        >
+    {};
 
     template <typename Info>
     void set_swap(typename std::enable_if<is_less_than_eight<Info>::value>::type* /*ptr*/ = 0)
@@ -185,10 +194,10 @@ private:
     void set_swap(
         typename std::enable_if
         <
-            mpl::and_
+            mp11::mp_and
             <
-                mpl::not_<is_less_than_eight<Info>>,
-                mpl::not_<is_equal_to_sixteen<Info>>
+                mp11::mp_not<is_less_than_eight<Info>>,
+                mp11::mp_not<is_equal_to_sixteen<Info>>
             >::value
         >::type* /*ptr*/ = nullptr)
     {
@@ -218,8 +227,8 @@ public:
               )
     {}
 
-    template< typename Views >
-    void apply( const any_image_view< Views >& views )
+    template< typename ...Views >
+    void apply( const any_image_view< Views... >& views )
     {
         detail::dynamic_io_fnobj< detail::png_write_is_supported
                                 , parent_t

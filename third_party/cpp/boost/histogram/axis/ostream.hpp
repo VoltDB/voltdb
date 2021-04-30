@@ -9,17 +9,30 @@
 #ifndef BOOST_HISTOGRAM_AXIS_OSTREAM_HPP
 #define BOOST_HISTOGRAM_AXIS_OSTREAM_HPP
 
-#include <boost/assert.hpp>
-#include <boost/core/typeinfo.hpp>
 #include <boost/histogram/axis/regular.hpp>
-#include <boost/histogram/detail/cat.hpp>
-#include <boost/histogram/detail/meta.hpp>
+#include <boost/histogram/detail/counting_streambuf.hpp>
+#include <boost/histogram/detail/priority.hpp>
+#include <boost/histogram/detail/type_name.hpp>
 #include <boost/histogram/fwd.hpp>
 #include <boost/throw_exception.hpp>
+#include <cassert>
 #include <iomanip>
 #include <iosfwd>
+#include <sstream>
 #include <stdexcept>
 #include <type_traits>
+
+/**
+  \file boost/histogram/axis/ostream.hpp
+  Simple streaming operators for the builtin axis types.
+
+  The text representation is not guaranteed to be stable between versions of
+  Boost.Histogram. This header is only included by
+  [boost/histogram/ostream.hpp](histogram/reference.html#header.boost.histogram.ostream_hpp).
+  To use your own, include your own implementation instead of this header and do not
+  include
+  [boost/histogram/ostream.hpp](histogram/reference.html#header.boost.histogram.ostream_hpp).
+ */
 
 #ifndef BOOST_HISTOGRAM_DOXYGEN_INVOKED
 
@@ -27,29 +40,49 @@ namespace boost {
 namespace histogram {
 
 namespace detail {
-inline const char* axis_suffix(const axis::transform::id&) { return ""; }
-inline const char* axis_suffix(const axis::transform::log&) { return "_log"; }
-inline const char* axis_suffix(const axis::transform::sqrt&) { return "_sqrt"; }
-inline const char* axis_suffix(const axis::transform::pow&) { return "_pow"; }
 
 template <class OStream, class T>
-void stream_metadata(OStream& os, const T& t) {
-  detail::static_if<detail::is_streamable<T>>(
-      [&os](const auto& t) {
-        std::ostringstream oss;
-        oss << t;
-        if (!oss.str().empty()) { os << ", metadata=" << std::quoted(oss.str()); }
-      },
-      [&os](const auto&) {
-        os << ", metadata=" << boost::core::demangled_name(BOOST_CORE_TYPEID(T));
-      },
-      t);
+auto ostream_any_impl(OStream& os, const T& t, priority<1>) -> decltype(os << t) {
+  return os << t;
+}
+
+template <class OStream, class T>
+OStream& ostream_any_impl(OStream& os, const T&, priority<0>) {
+  return os << type_name<T>();
+}
+
+template <class OStream, class T>
+OStream& ostream_any(OStream& os, const T& t) {
+  return ostream_any_impl(os, t, priority<1>{});
+}
+
+template <class OStream, class... Ts>
+OStream& ostream_any_quoted(OStream& os, const std::basic_string<Ts...>& s) {
+  return os << std::quoted(s);
+}
+
+template <class OStream, class T>
+OStream& ostream_any_quoted(OStream& os, const T& t) {
+  return ostream_any(os, t);
+}
+
+template <class... Ts, class T>
+std::basic_ostream<Ts...>& ostream_metadata(std::basic_ostream<Ts...>& os, const T& t,
+                                            const char* prefix = ", ") {
+  std::streamsize count = 0;
+  {
+    auto g = make_count_guard(os, count);
+    ostream_any(os, t);
+  }
+  if (!count) return os;
+  os << prefix << "metadata=";
+  return ostream_any_quoted(os, t);
 }
 
 template <class OStream>
-void stream_options(OStream& os, const unsigned bits) {
-  os << ", options=";
+void ostream_options(OStream& os, const unsigned bits) {
   bool first = true;
+  os << ", options=";
 
 #define BOOST_HISTOGRAM_AXIS_OPTION_OSTREAM(x) \
   if (bits & axis::option::x) {                \
@@ -71,24 +104,6 @@ void stream_options(OStream& os, const unsigned bits) {
   if (first) os << "none";
 }
 
-template <class OStream, class T>
-void stream_transform(OStream&, const T&) {}
-
-template <class OStream>
-void stream_transform(OStream& os, const axis::transform::pow& t) {
-  os << ", power=" << t.power;
-}
-
-template <class OStream, class T>
-void stream_value(OStream& os, const T& t) {
-  os << t;
-}
-
-template <class OStream, class... Ts>
-void stream_value(OStream& os, const std::basic_string<Ts...>& t) {
-  os << std::quoted(t);
-}
-
 } // namespace detail
 
 namespace axis {
@@ -104,40 +119,58 @@ std::basic_ostream<Ts...>& operator<<(std::basic_ostream<Ts...>& os, const null_
 template <class... Ts, class U>
 std::basic_ostream<Ts...>& operator<<(std::basic_ostream<Ts...>& os,
                                       const interval_view<U>& i) {
-  os << "[" << i.lower() << ", " << i.upper() << ")";
-  return os;
+  return os << "[" << i.lower() << ", " << i.upper() << ")";
 }
 
 template <class... Ts, class U>
 std::basic_ostream<Ts...>& operator<<(std::basic_ostream<Ts...>& os,
                                       const polymorphic_bin<U>& i) {
-  if (i.is_discrete())
-    os << static_cast<double>(i);
-  else
-    os << "[" << i.lower() << ", " << i.upper() << ")";
+  if (i.is_discrete()) return os << static_cast<double>(i);
+  return os << "[" << i.lower() << ", " << i.upper() << ")";
+}
+
+namespace transform {
+template <class... Ts>
+std::basic_ostream<Ts...>& operator<<(std::basic_ostream<Ts...>& os, const id&) {
   return os;
 }
+
+template <class... Ts>
+std::basic_ostream<Ts...>& operator<<(std::basic_ostream<Ts...>& os, const log&) {
+  return os << "transform::log{}";
+}
+
+template <class... Ts>
+std::basic_ostream<Ts...>& operator<<(std::basic_ostream<Ts...>& os, const sqrt&) {
+  return os << "transform::sqrt{}";
+}
+
+template <class... Ts>
+std::basic_ostream<Ts...>& operator<<(std::basic_ostream<Ts...>& os, const pow& p) {
+  return os << "transform::pow{" << p.power << "}";
+}
+} // namespace transform
 
 template <class... Ts, class... Us>
 std::basic_ostream<Ts...>& operator<<(std::basic_ostream<Ts...>& os,
                                       const regular<Us...>& a) {
-  os << "regular" << detail::axis_suffix(a.transform()) << "(" << a.size() << ", "
-     << a.value(0) << ", " << a.value(a.size());
-  detail::stream_metadata(os, a.metadata());
-  detail::stream_options(os, a.options());
-  detail::stream_transform(os, a.transform());
-  os << ")";
-  return os;
+  os << "regular(";
+  const auto pos = os.tellp();
+  os << a.transform();
+  if (os.tellp() > pos) os << ", ";
+  os << a.size() << ", " << a.value(0) << ", " << a.value(a.size());
+  detail::ostream_metadata(os, a.metadata());
+  detail::ostream_options(os, a.options());
+  return os << ")";
 }
 
 template <class... Ts, class... Us>
 std::basic_ostream<Ts...>& operator<<(std::basic_ostream<Ts...>& os,
                                       const integer<Us...>& a) {
   os << "integer(" << a.value(0) << ", " << a.value(a.size());
-  detail::stream_metadata(os, a.metadata());
-  detail::stream_options(os, a.options());
-  os << ")";
-  return os;
+  detail::ostream_metadata(os, a.metadata());
+  detail::ostream_options(os, a.options());
+  return os << ")";
 }
 
 template <class... Ts, class... Us>
@@ -145,10 +178,9 @@ std::basic_ostream<Ts...>& operator<<(std::basic_ostream<Ts...>& os,
                                       const variable<Us...>& a) {
   os << "variable(" << a.value(0);
   for (index_type i = 1, n = a.size(); i <= n; ++i) { os << ", " << a.value(i); }
-  detail::stream_metadata(os, a.metadata());
-  detail::stream_options(os, a.options());
-  os << ")";
-  return os;
+  detail::ostream_metadata(os, a.metadata());
+  detail::ostream_options(os, a.options());
+  return os << ")";
 }
 
 template <class... Ts, class... Us>
@@ -156,31 +188,26 @@ std::basic_ostream<Ts...>& operator<<(std::basic_ostream<Ts...>& os,
                                       const category<Us...>& a) {
   os << "category(";
   for (index_type i = 0, n = a.size(); i < n; ++i) {
-    detail::stream_value(os, a.value(i));
+    detail::ostream_any_quoted(os, a.value(i));
     os << (i == (a.size() - 1) ? "" : ", ");
   }
-  detail::stream_metadata(os, a.metadata());
-  detail::stream_options(os, a.options());
-  os << ")";
-  return os;
+  detail::ostream_metadata(os, a.metadata());
+  detail::ostream_options(os, a.options());
+  return os << ")";
+}
+
+template <class... Ts, class M>
+std::basic_ostream<Ts...>& operator<<(std::basic_ostream<Ts...>& os,
+                                      const boolean<M>& a) {
+  os << "boolean(";
+  detail::ostream_metadata(os, a.metadata(), "");
+  return os << ")";
 }
 
 template <class... Ts, class... Us>
 std::basic_ostream<Ts...>& operator<<(std::basic_ostream<Ts...>& os,
                                       const variant<Us...>& v) {
-  visit(
-      [&os](const auto& x) {
-        using A = detail::remove_cvref_t<decltype(x)>;
-        detail::static_if<detail::is_streamable<A>>(
-            [&os](const auto& x) { os << x; },
-            [](const auto&) {
-              BOOST_THROW_EXCEPTION(std::runtime_error(
-                  detail::cat(boost::core::demangled_name(BOOST_CORE_TYPEID(A)),
-                              " is not streamable")));
-            },
-            x);
-      },
-      v);
+  visit([&os](const auto& x) { detail::ostream_any(os, x); }, v);
   return os;
 }
 

@@ -4,6 +4,10 @@
 // Copyright (c) 2007-2012 Barend Gehrels, Amsterdam, the Netherlands.
 // Copyright (c) 2009-2012 Mateusz Loskot, London, UK.
 
+// This file was modified by Oracle on 2020.
+// Modifications copyright (c) 2020 Oracle and/or its affiliates.
+// Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
+
 // Parts of Boost.Geometry are redesigned from Geodan's Geographic Library
 // (geolib/GGL), copyright (c) 1995-2010 Geodan, Amsterdam, the Netherlands.
 
@@ -15,8 +19,7 @@
 #define BOOST_GEOMETRY_GEOMETRIES_ADAPTED_C_ARRAY_HPP
 
 #include <cstddef>
-
-#include <boost/type_traits/is_arithmetic.hpp>
+#include <type_traits>
 
 #include <boost/geometry/core/access.hpp>
 #include <boost/geometry/core/cs.hpp>
@@ -61,7 +64,7 @@ struct c_array_tag<true>
 // Assign the point-tag, preventing arrays of points getting a point-tag
 template <typename CoordinateType, std::size_t DimensionCount>
 struct tag<CoordinateType[DimensionCount]>
-    : detail::c_array_tag<boost::is_arithmetic<CoordinateType>::value> {};
+    : detail::c_array_tag<std::is_arithmetic<CoordinateType>::value> {};
 
 
 template <typename CoordinateType, std::size_t DimensionCount>
@@ -72,7 +75,9 @@ struct coordinate_type<CoordinateType[DimensionCount]>
 
 
 template <typename CoordinateType, std::size_t DimensionCount>
-struct dimension<CoordinateType[DimensionCount]>: boost::mpl::int_<DimensionCount> {};
+struct dimension<CoordinateType[DimensionCount]>
+    : std::integral_constant<std::size_t, DimensionCount>
+{};
 
 
 template <typename CoordinateType, std::size_t DimensionCount, std::size_t Dimension>

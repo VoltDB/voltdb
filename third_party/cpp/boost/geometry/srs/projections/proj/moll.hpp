@@ -2,8 +2,8 @@
 
 // Copyright (c) 2008-2015 Barend Gehrels, Amsterdam, the Netherlands.
 
-// This file was modified by Oracle on 2017, 2018.
-// Modifications copyright (c) 2017-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2017, 2018, 2019.
+// Modifications copyright (c) 2017-2019, Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle.
 
 // Use, modification and distribution is subject to the Boost Software License,
@@ -66,20 +66,14 @@ namespace projections
                 T    C_x, C_y, C_p;
             };
 
-            // template class, using CRTP to implement forward/inverse
             template <typename T, typename Parameters>
             struct base_moll_spheroid
-                : public base_t_fi<base_moll_spheroid<T, Parameters>, T, Parameters>
             {
                 par_moll<T> m_proj_parm;
 
-                inline base_moll_spheroid(const Parameters& par)
-                    : base_t_fi<base_moll_spheroid<T, Parameters>, T, Parameters>(*this, par)
-                {}
-
                 // FORWARD(s_forward)  spheroid
                 // Project coordinates from geographic (lon, lat) to cartesian (x, y)
-                inline void fwd(T const& lp_lon, T lp_lat, T& xy_x, T& xy_y) const
+                inline void fwd(Parameters const& , T const& lp_lon, T lp_lat, T& xy_x, T& xy_y) const
                 {
                     static const T half_pi = detail::half_pi<T>();
 
@@ -103,7 +97,7 @@ namespace projections
 
                 // INVERSE(s_inverse)  spheroid
                 // Project coordinates from cartesian (x, y) to geographic (lon, lat)
-                inline void inv(T const& xy_x, T const& xy_y, T& lp_lon, T& lp_lat) const
+                inline void inv(Parameters const& , T const& xy_x, T const& xy_y, T& lp_lon, T& lp_lat) const
                 {
                     static const T pi = detail::pi<T>();
 
@@ -182,10 +176,9 @@ namespace projections
     struct moll_spheroid : public detail::moll::base_moll_spheroid<T, Parameters>
     {
         template <typename Params>
-        inline moll_spheroid(Params const& , Parameters const& par)
-            : detail::moll::base_moll_spheroid<T, Parameters>(par)
+        inline moll_spheroid(Params const& , Parameters & par)
         {
-            detail::moll::setup_moll(this->m_par, this->m_proj_parm);
+            detail::moll::setup_moll(par, this->m_proj_parm);
         }
     };
 
@@ -205,10 +198,9 @@ namespace projections
     struct wag4_spheroid : public detail::moll::base_moll_spheroid<T, Parameters>
     {
         template <typename Params>
-        inline wag4_spheroid(Params const& , Parameters const& par)
-            : detail::moll::base_moll_spheroid<T, Parameters>(par)
+        inline wag4_spheroid(Params const& , Parameters & par)
         {
-            detail::moll::setup_wag4(this->m_par, this->m_proj_parm);
+            detail::moll::setup_wag4(par, this->m_proj_parm);
         }
     };
 
@@ -228,10 +220,9 @@ namespace projections
     struct wag5_spheroid : public detail::moll::base_moll_spheroid<T, Parameters>
     {
         template <typename Params>
-        inline wag5_spheroid(Params const& , Parameters const& par)
-            : detail::moll::base_moll_spheroid<T, Parameters>(par)
+        inline wag5_spheroid(Params const& , Parameters & par)
         {
-            detail::moll::setup_wag5(this->m_par, this->m_proj_parm);
+            detail::moll::setup_wag5(par, this->m_proj_parm);
         }
     };
 
@@ -240,9 +231,9 @@ namespace projections
     {
 
         // Static projection
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_moll, moll_spheroid, moll_spheroid)
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_wag4, wag4_spheroid, wag4_spheroid)
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_wag5, wag5_spheroid, wag5_spheroid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI(srs::spar::proj_moll, moll_spheroid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI(srs::spar::proj_wag4, wag4_spheroid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI(srs::spar::proj_wag5, wag5_spheroid)
 
         // Factory entry(s)
         BOOST_GEOMETRY_PROJECTIONS_DETAIL_FACTORY_ENTRY_FI(moll_entry, moll_spheroid)

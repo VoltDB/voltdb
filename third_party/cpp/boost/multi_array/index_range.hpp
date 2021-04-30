@@ -10,8 +10,8 @@
 //           Andrew Lumsdaine
 //  See http://www.boost.org/libs/multi_array for documentation.
 
-#ifndef BOOST_INDEX_RANGE_RG071801_HPP
-#define BOOST_INDEX_RANGE_RG071801_HPP
+#ifndef BOOST_MULTI_ARRAY_INDEX_RANGE_HPP
+#define BOOST_MULTI_ARRAY_INDEX_RANGE_HPP
 
 #include <boost/config.hpp>
 #include <utility>
@@ -191,4 +191,4 @@ namespace multi_array {
 } // namespace detail  
 } // namespace boost
 
-#endif // BOOST_INDEX_RANGE_RG071801_HPP
+#endif

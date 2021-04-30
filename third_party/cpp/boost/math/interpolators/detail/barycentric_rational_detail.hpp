@@ -177,7 +177,7 @@ Real barycentric_rational_imp<Real>::operator()(Real x) const
  * http://www.ams.org/journals/mcom/1986-47-175/S0025-5718-1986-0842136-8/S0025-5718-1986-0842136-8.pdf
  * and reviewed in
  * Recent developments in barycentric rational interpolation
- * Jean–Paul Berrut, Richard Baltensperger and Hans D. Mittelmann
+ * Jean-Paul Berrut, Richard Baltensperger and Hans D. Mittelmann
  *
  * Is it possible to complete this in one pass through the data?
  */

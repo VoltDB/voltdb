@@ -36,7 +36,9 @@ initialize other base classes):
                 public b
         : BASES
     {
-        ...
+        friend class boost::contract::access;
+
+        typedef BOOST_CONTRACT_BASE_TYPES(BASES) base_types;
         #undef BASES
 
     public:
@@ -60,10 +62,11 @@ In addition, this class should never be declared as a virtual base (because
 virtual bases are initialized only once across the entire inheritance hierarchy
 preventing preconditions of other base classes from being checked).
 
-Unions cannot have base classes in C++ so this class can be used to declare a
-local object within the constructor definition just before
-@RefFunc{boost::contract::constructor} is used (see
-@RefSect{extras.unions, Unions}).
+This class cannot be used this way in a @c union because unions cannot have base
+classes in C++.
+Instead, this class is used in a @c union to declare a local object within the
+constructor definition just before @RefFunc{boost::contract::constructor} is
+used (see @RefSect{extras.unions, Unions}).
 
 @see @RefSect{tutorial.constructors, Constructors}
 
@@ -79,9 +82,10 @@ public:
     This is implicitly called for those constructors of the contracted class
     that do not specify preconditions.
     
-    @note   Calling this default constructor should amount to negligible
-            compile-time and run-time overheads (likely to be optimized away
-            completely by most compilers).
+    @note   The implementation of this library is optimized so that calling this
+            default constructor should amount to negligible compile-time and
+            run-time overheads (likely to be optimized away completely by most
+            compilers).
     */
     constructor_precondition() {}
 

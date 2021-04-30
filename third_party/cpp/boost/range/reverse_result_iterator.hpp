@@ -15,6 +15,10 @@
 # pragma once
 #endif
 
+#include <boost/config/header_deprecated.hpp>
+
+BOOST_HEADER_DEPRECATED("<boost/range/reverse_iterator.hpp>")
+
 #include <boost/range/reverse_iterator.hpp>
 
 namespace boost

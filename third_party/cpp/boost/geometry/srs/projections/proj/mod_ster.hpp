@@ -2,8 +2,8 @@
 
 // Copyright (c) 2008-2015 Barend Gehrels, Amsterdam, the Netherlands.
 
-// This file was modified by Oracle on 2017, 2018.
-// Modifications copyright (c) 2017-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2017, 2018, 2019.
+// Modifications copyright (c) 2017-2019, Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle.
 
 // Use, modification and distribution is subject to the Boost Software License,
@@ -64,27 +64,21 @@ namespace projections
             template <typename T>
             struct par_mod_ster
             {
-                pj_complex<T> *zcoeff;
-                T          cchio, schio;
-                int        n;
+                T              cchio, schio;
+                pj_complex<T>* zcoeff;
+                int            n;
             };
 
             /* based upon Snyder and Linck, USGS-NMD */
 
-            // template class, using CRTP to implement forward/inverse
             template <typename T, typename Parameters>
             struct base_mod_ster_ellipsoid
-                : public base_t_fi<base_mod_ster_ellipsoid<T, Parameters>, T, Parameters>
             {
                 par_mod_ster<T> m_proj_parm;
 
-                inline base_mod_ster_ellipsoid(const Parameters& par)
-                    : base_t_fi<base_mod_ster_ellipsoid<T, Parameters>, T, Parameters>(*this, par)
-                {}
-
                 // FORWARD(e_forward)  ellipsoid
                 // Project coordinates from geographic (lon, lat) to cartesian (x, y)
-                inline void fwd(T const& lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
+                inline void fwd(Parameters const& par, T const& lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
                 {
                     static const T half_pi = detail::half_pi<T>();
 
@@ -93,9 +87,9 @@ namespace projections
 
                     sinlon = sin(lp_lon);
                     coslon = cos(lp_lon);
-                    esphi = this->m_par.e * sin(lp_lat);
+                    esphi = par.e * sin(lp_lat);
                     chi = 2. * atan(tan((half_pi + lp_lat) * .5) *
-                        math::pow((T(1) - esphi) / (T(1) + esphi), this->m_par.e * T(0.5))) - half_pi;
+                        math::pow((T(1) - esphi) / (T(1) + esphi), par.e * T(0.5))) - half_pi;
                     schi = sin(chi);
                     cchi = cos(chi);
                     s = 2. / (1. + this->m_proj_parm.schio * schi + this->m_proj_parm.cchio * cchi * coslon);
@@ -108,7 +102,7 @@ namespace projections
 
                 // INVERSE(e_inverse)  ellipsoid
                 // Project coordinates from cartesian (x, y) to geographic (lon, lat)
-                inline void inv(T const& xy_x, T const& xy_y, T& lp_lon, T& lp_lat) const
+                inline void inv(Parameters const& par, T const& xy_x, T const& xy_y, T& lp_lon, T& lp_lat) const
                 {
                     static const T half_pi = detail::half_pi<T>();
 
@@ -135,21 +129,21 @@ namespace projections
                         z = 2. * atan(.5 * rh);
                         sinz = sin(z);
                         cosz = cos(z);
-                        lp_lon = this->m_par.lam0;
+                        lp_lon = par.lam0;
                         if (fabs(rh) <= epsilon) {
                             /* if we end up here input coordinates were (0,0).
                              * pj_inv() adds P->lam0 to lp.lam, this way we are
                              * sure to get the correct offset */
                             lp_lon = 0.0;
-                            lp_lat = this->m_par.phi0;
+                            lp_lat = par.phi0;
                             return;
                         }
                         chi = aasin(cosz * this->m_proj_parm.schio + p.i * sinz * this->m_proj_parm.cchio / rh);
                         phi = chi;
                         for (nn = 20; nn ;--nn) {
-                            esphi = this->m_par.e * sin(phi);
+                            esphi = par.e * sin(phi);
                             dphi = 2. * atan(tan((half_pi + chi) * .5) *
-                                math::pow((T(1) + esphi) / (T(1) - esphi), this->m_par.e * T(0.5))) - half_pi - phi;
+                                math::pow((T(1) + esphi) / (T(1) - esphi), par.e * T(0.5))) - half_pi - phi;
                             phi += dphi;
                             if (fabs(dphi) <= epsilon)
                                 break;
@@ -357,10 +351,9 @@ namespace projections
     struct mil_os_ellipsoid : public detail::mod_ster::base_mod_ster_ellipsoid<T, Parameters>
     {
         template <typename Params>
-        inline mil_os_ellipsoid(Params const& , Parameters const& par)
-            : detail::mod_ster::base_mod_ster_ellipsoid<T, Parameters>(par)
+        inline mil_os_ellipsoid(Params const& , Parameters & par)
         {
-            detail::mod_ster::setup_mil_os(this->m_par, this->m_proj_parm);
+            detail::mod_ster::setup_mil_os(par, this->m_proj_parm);
         }
     };
 
@@ -379,10 +372,9 @@ namespace projections
     struct lee_os_ellipsoid : public detail::mod_ster::base_mod_ster_ellipsoid<T, Parameters>
     {
         template <typename Params>
-        inline lee_os_ellipsoid(Params const& , Parameters const& par)
-            : detail::mod_ster::base_mod_ster_ellipsoid<T, Parameters>(par)
+        inline lee_os_ellipsoid(Params const& , Parameters & par)
         {
-            detail::mod_ster::setup_lee_os(this->m_par, this->m_proj_parm);
+            detail::mod_ster::setup_lee_os(par, this->m_proj_parm);
         }
     };
 
@@ -401,10 +393,9 @@ namespace projections
     struct gs48_ellipsoid : public detail::mod_ster::base_mod_ster_ellipsoid<T, Parameters>
     {
         template <typename Params>
-        inline gs48_ellipsoid(Params const& , Parameters const& par)
-            : detail::mod_ster::base_mod_ster_ellipsoid<T, Parameters>(par)
+        inline gs48_ellipsoid(Params const& , Parameters & par)
         {
-            detail::mod_ster::setup_gs48(this->m_par, this->m_proj_parm);
+            detail::mod_ster::setup_gs48(par, this->m_proj_parm);
         }
     };
 
@@ -423,10 +414,9 @@ namespace projections
     struct alsk_ellipsoid : public detail::mod_ster::base_mod_ster_ellipsoid<T, Parameters>
     {
         template <typename Params>
-        inline alsk_ellipsoid(Params const& , Parameters const& par)
-            : detail::mod_ster::base_mod_ster_ellipsoid<T, Parameters>(par)
+        inline alsk_ellipsoid(Params const& , Parameters & par)
         {
-            detail::mod_ster::setup_alsk(this->m_par, this->m_proj_parm);
+            detail::mod_ster::setup_alsk(par, this->m_proj_parm);
         }
     };
 
@@ -445,10 +435,9 @@ namespace projections
     struct gs50_ellipsoid : public detail::mod_ster::base_mod_ster_ellipsoid<T, Parameters>
     {
         template <typename Params>
-        inline gs50_ellipsoid(Params const& , Parameters const& par)
-            : detail::mod_ster::base_mod_ster_ellipsoid<T, Parameters>(par)
+        inline gs50_ellipsoid(Params const& , Parameters & par)
         {
-            detail::mod_ster::setup_gs50(this->m_par, this->m_proj_parm);
+            detail::mod_ster::setup_gs50(par, this->m_proj_parm);
         }
     };
 
@@ -457,11 +446,11 @@ namespace projections
     {
 
         // Static projection
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_mil_os, mil_os_ellipsoid, mil_os_ellipsoid)
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_lee_os, lee_os_ellipsoid, lee_os_ellipsoid)
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_gs48, gs48_ellipsoid, gs48_ellipsoid)
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_alsk, alsk_ellipsoid, alsk_ellipsoid)
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_gs50, gs50_ellipsoid, gs50_ellipsoid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI(srs::spar::proj_mil_os, mil_os_ellipsoid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI(srs::spar::proj_lee_os, lee_os_ellipsoid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI(srs::spar::proj_gs48, gs48_ellipsoid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI(srs::spar::proj_alsk, alsk_ellipsoid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI(srs::spar::proj_gs50, gs50_ellipsoid)
 
         // Factory entry(s)
         BOOST_GEOMETRY_PROJECTIONS_DETAIL_FACTORY_ENTRY_FI(mil_os_entry, mil_os_ellipsoid)

@@ -427,7 +427,7 @@ inline bool experimental_elliptic_intersection(Point3d const& a1, Point3d const&
     Point3d b1v, b2v, o2, n2;
     experimental_elliptic_plane(b1, b2, b1v, b2v, o2, n2, spheroid);
 
-    if (! detail::vec_normalize(n1) || ! detail::vec_normalize(n2))
+    if (! geometry::detail::vec_normalize(n1) || ! geometry::detail::vec_normalize(n2))
     {
         return false;
     }

@@ -10,5 +10,9 @@
 //! @deprecated Use boost/test/tools/floating_point_comparison.hpp instead
 // ***************************************************************************
 
+#include <boost/config/header_deprecated.hpp>
+BOOST_HEADER_DEPRECATED( "<boost/test/tools/floating_point_comparison.hpp>" )
+
+
 // Boost.Test
 #include <boost/test/tools/floating_point_comparison.hpp>

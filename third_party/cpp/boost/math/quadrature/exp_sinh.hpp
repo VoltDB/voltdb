@@ -18,6 +18,7 @@
 #include <cmath>
 #include <limits>
 #include <memory>
+#include <string>
 #include <boost/math/quadrature/detail/exp_sinh_detail.hpp>
 
 namespace boost{ namespace math{ namespace quadrature {
@@ -62,13 +63,13 @@ auto exp_sinh<Real, Policy>::integrate(const F& f, Real a, Real b, Real toleranc
         {
             return m_imp->integrate(f, error, L1, function, tolerance, levels);
         }
-        const auto u = [&](Real t)->Real { return f(t + a); };
+        const auto u = [&](Real t)->K { return f(t + a); };
         return m_imp->integrate(u, error, L1, function, tolerance, levels);
     }
 
     if ((boost::math::isfinite)(b) && a <= -boost::math::tools::max_value<Real>())
     {
-        const auto u = [&](Real t)->Real { return f(b-t);};
+        const auto u = [&](Real t)->K { return f(b-t);};
         return m_imp->integrate(u, error, L1, function, tolerance, levels);
     }
 
@@ -86,6 +87,11 @@ template<class F>
 auto exp_sinh<Real, Policy>::integrate(const F& f, Real tolerance, Real* error, Real* L1, std::size_t* levels)->decltype(std::declval<F>()(std::declval<Real>())) const
 {
     static const char* function = "boost::math::quadrature::exp_sinh<%1%>::integrate";
+    using std::abs;
+    if (abs(tolerance) > 1) {
+        std::string msg = std::string(__FILE__) + ":" + std::to_string(__LINE__) + ":" + std::string(function) + ": The tolerance provided is unusually large; did you confuse it with a domain bound?";
+        throw std::domain_error(msg);
+    }
     return m_imp->integrate(f, error, L1, function, tolerance, levels);
 }
 

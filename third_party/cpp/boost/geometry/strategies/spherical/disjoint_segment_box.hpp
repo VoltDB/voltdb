@@ -1,6 +1,6 @@
 // Boost.Geometry
 
-// Copyright (c) 2017-2018 Oracle and/or its affiliates.
+// Copyright (c) 2017-2019 Oracle and/or its affiliates.
 
 // Contributed and/or modified by Vissarion Fysikopoulos, on behalf of Oracle
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
@@ -46,22 +46,11 @@ namespace boost { namespace geometry { namespace strategy { namespace disjoint
 // other strategies that are used are intersection and covered_by strategies.
 struct segment_box_spherical
 {
-    template <typename Segment, typename Box>
-    struct point_in_geometry_strategy
-        : services::default_strategy
-            <
-                typename point_type<Segment>::type,
-                Box
-            >
-    {};
+    typedef covered_by::spherical_point_box disjoint_point_box_strategy_type;
 
-    template <typename Segment, typename Box>
-    static inline typename point_in_geometry_strategy<Segment, Box>::type
-        get_point_in_geometry_strategy()
+    static inline disjoint_point_box_strategy_type get_disjoint_point_box_strategy()
     {
-        typedef typename point_in_geometry_strategy<Segment, Box>::type strategy_type;
-
-        return strategy_type();
+        return disjoint_point_box_strategy_type();
     }
 
     template <typename Segment, typename Box>

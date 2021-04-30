@@ -155,8 +155,8 @@ public:
 
         constexpr static const r_interval_type r_interval = t_interval * u_interval;
 
-        constexpr static auto rl = r_interval.l;
-        constexpr static auto ru = r_interval.u;
+        constexpr static const auto rl = r_interval.l;
+        constexpr static const auto ru = r_interval.u;
 
         using type = typename result_type<
             temp_base_type,
@@ -195,7 +195,7 @@ public:
             checked::cast<temp_base_type>(base_value(std::numeric_limits<U>::max()))
         };
 
-        constexpr static const r_interval_type rx(){
+        constexpr static r_interval_type rx(){
             if(u_interval.u < r_type(0)
             || u_interval.l > r_type(0))
                 return t_interval / u_interval;
@@ -255,7 +255,7 @@ public:
             checked::cast<temp_base_type>(base_value(std::numeric_limits<U>::max()))
         };
 
-        constexpr static const r_interval_type rx(){
+        constexpr static r_interval_type rx(){
             if(u_interval.u < r_type(0)
             || u_interval.l > r_type(0))
                 return t_interval / u_interval;

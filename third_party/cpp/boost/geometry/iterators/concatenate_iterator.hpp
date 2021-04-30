@@ -1,8 +1,8 @@
 // Boost.Geometry (aka GGL, Generic Geometry Library)
 
-// Copyright (c) 2014, Oracle and/or its affiliates.
-
+// Copyright (c) 2014-2020, Oracle and/or its affiliates.
 // Contributed and/or modified by Menelaos Karavelas, on behalf of Oracle
+// Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
 // Licensed under the Boost Software License version 1.0.
 // http://www.boost.org/users/license.html
@@ -10,10 +10,13 @@
 #ifndef BOOST_GEOMETRY_ITERATORS_CONCATENATE_ITERATOR_HPP
 #define BOOST_GEOMETRY_ITERATORS_CONCATENATE_ITERATOR_HPP
 
-#include <boost/mpl/assert.hpp>
-#include <boost/type_traits/is_convertible.hpp>
+
+#include <type_traits>
+
 #include <boost/iterator/iterator_facade.hpp>
 #include <boost/iterator/iterator_categories.hpp>
+
+#include <boost/geometry/core/static_assert.hpp>
 
 
 namespace boost { namespace geometry
@@ -79,12 +82,12 @@ public:
         , m_it2(other.m_it2)
     {
         static const bool are_conv
-            = boost::is_convertible<OtherIt1, Iterator1>::value
-           && boost::is_convertible<OtherIt2, Iterator2>::value;
+            = std::is_convertible<OtherIt1, Iterator1>::value
+           && std::is_convertible<OtherIt2, Iterator2>::value;
 
-        BOOST_MPL_ASSERT_MSG((are_conv),
-                             NOT_CONVERTIBLE,
-                             (types<OtherIt1, OtherIt2>));
+        BOOST_GEOMETRY_STATIC_ASSERT((are_conv),
+            "Other iterators have to be convertible to member iterators.",
+            OtherIt1, OtherIt2);
     }
 
 private:

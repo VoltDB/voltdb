@@ -14,13 +14,17 @@
 #include <boost/winapi/handles.hpp>
 #include <boost/winapi/handle_info.hpp>
 #include <boost/process/detail/handler_base.hpp>
+#include <boost/process/detail/used_handles.hpp>
 #include <boost/process/detail/windows/file_descriptor.hpp>
 
 namespace boost { namespace process { namespace detail { namespace windows {
 
-struct null_in : public ::boost::process::detail::handler_base
+struct null_in : public ::boost::process::detail::handler_base, ::boost::process::detail::uses_handles
 {
     file_descriptor source{"NUL", file_descriptor::read};
+
+    ::boost::winapi::HANDLE_ get_used_handles() const { return source.handle(); }
+
 
 public:
     template <class WindowsExecutor>

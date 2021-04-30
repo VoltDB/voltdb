@@ -4,6 +4,10 @@
 // Copyright (c) 2008-2012 Bruno Lalande, Paris, France.
 // Copyright (c) 2009-2012 Mateusz Loskot, London, UK.
 
+// This file was modified by Oracle on 2020.
+// Modifications copyright (c) 2020 Oracle and/or its affiliates.
+// Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
+
 // Parts of Boost.Geometry are redesigned from Geodan's Geographic Library
 // (geolib/GGL), copyright (c) 1995-2010 Geodan, Amsterdam, the Netherlands.
 
@@ -16,9 +20,9 @@
 
 
 #include <cstddef>
+#include <type_traits>
 
 #include <boost/range/value_type.hpp>
-#include <boost/type_traits/remove_reference.hpp>
 
 
 namespace boost { namespace geometry
@@ -36,7 +40,7 @@ namespace traits
 template <typename Range>
 struct rvalue_type
 {
-    typedef typename boost::remove_reference<Range>::type& type;
+    typedef typename std::remove_reference<Range>::type& type;
 };
 
 
@@ -63,7 +67,7 @@ struct push_back
 {
     typedef typename boost::range_value
         <
-            typename boost::remove_reference<Range>::type
+            typename std::remove_reference<Range>::type
         >::type item_type;
 
     static inline void apply(typename rvalue_type<Range>::type range,

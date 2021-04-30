@@ -69,7 +69,7 @@ class xsi_shared_memory
    public:
    //!Default constructor.
    //!Represents an empty xsi_shared_memory.
-   xsi_shared_memory();
+   xsi_shared_memory() BOOST_NOEXCEPT;
 
    //!Initializes *this with a shmid previously obtained (possibly from another process)
    //!This lower-level initializer allows shared memory mapping without having a key.
@@ -95,14 +95,14 @@ class xsi_shared_memory
    //!Moves the ownership of "moved"'s shared memory object to *this.
    //!After the call, "moved" does not represent any shared memory object.
    //!Does not throw
-   xsi_shared_memory(BOOST_RV_REF(xsi_shared_memory) moved)
+   xsi_shared_memory(BOOST_RV_REF(xsi_shared_memory) moved) BOOST_NOEXCEPT
       : m_shmid(-1)
    {  this->swap(moved);   }
 
    //!Moves the ownership of "moved"'s shared memory to *this.
    //!After the call, "moved" does not represent any shared memory.
    //!Does not throw
-   xsi_shared_memory &operator=(BOOST_RV_REF(xsi_shared_memory) moved)
+   xsi_shared_memory &operator=(BOOST_RV_REF(xsi_shared_memory) moved) BOOST_NOEXCEPT
    {
       xsi_shared_memory tmp(boost::move(moved));
       this->swap(tmp);
@@ -110,7 +110,7 @@ class xsi_shared_memory
    }
 
    //!Swaps two xsi_shared_memorys. Does not throw
-   void swap(xsi_shared_memory &other);
+   void swap(xsi_shared_memory &other) BOOST_NOEXCEPT;
 
    //!Destroys *this. The shared memory won't be destroyed, just
    //!this connection to it. Use remove() to destroy the shared memory.
@@ -118,11 +118,11 @@ class xsi_shared_memory
 
    //!Returns the shared memory ID that
    //!identifies the shared memory
-   int get_shmid() const;
+   int get_shmid() const BOOST_NOEXCEPT;
 
    //!Returns the mapping handle.
    //!Never throws
-   mapping_handle_t get_mapping_handle() const;
+   mapping_handle_t get_mapping_handle() const BOOST_NOEXCEPT;
 
    //!Erases the XSI shared memory object identified by shmid
    //!from the system.
@@ -143,22 +143,22 @@ class xsi_shared_memory
 
 #if !defined(BOOST_INTERPROCESS_DOXYGEN_INVOKED)
 
-inline xsi_shared_memory::xsi_shared_memory()
+inline xsi_shared_memory::xsi_shared_memory() BOOST_NOEXCEPT
    :  m_shmid(-1)
 {}
 
 inline xsi_shared_memory::~xsi_shared_memory()
 {}
 
-inline int xsi_shared_memory::get_shmid() const
+inline int xsi_shared_memory::get_shmid() const BOOST_NOEXCEPT
 {  return m_shmid; }
 
-inline void xsi_shared_memory::swap(xsi_shared_memory &other)
+inline void xsi_shared_memory::swap(xsi_shared_memory &other) BOOST_NOEXCEPT
 {
    (simple_swap)(m_shmid, other.m_shmid);
 }
 
-inline mapping_handle_t xsi_shared_memory::get_mapping_handle() const
+inline mapping_handle_t xsi_shared_memory::get_mapping_handle() const BOOST_NOEXCEPT
 {  mapping_handle_t mhnd = { m_shmid, true};   return mhnd;   }
 
 inline bool xsi_shared_memory::priv_open_or_create

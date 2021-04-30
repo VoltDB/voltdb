@@ -13,15 +13,19 @@
 #include <boost/winapi/process.hpp>
 #include <boost/winapi/handles.hpp>
 #include <boost/process/detail/handler_base.hpp>
+#include <boost/process/detail/used_handles.hpp>
 #include <boost/process/detail/windows/file_descriptor.hpp>
 #include <io.h>
 
 namespace boost { namespace process { namespace detail { namespace windows {
 
-struct file_in : public ::boost::process::detail::handler_base
+struct file_in : public ::boost::process::detail::handler_base,
+                        ::boost::process::detail::uses_handles
 {
     file_descriptor file;
     ::boost::winapi::HANDLE_ handle = file.handle();
+
+    ::boost::winapi::HANDLE_ get_used_handles() const { return handle; }
 
     template<typename T>
     file_in(T&& t) : file(std::forward<T>(t), file_descriptor::read) {}

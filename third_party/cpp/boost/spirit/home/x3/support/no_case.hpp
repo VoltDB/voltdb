@@ -18,21 +18,17 @@ namespace boost { namespace spirit { namespace x3
     template <typename Encoding>
     struct case_compare
     {
-        template < template <typename> class basic_charset>
-        typename Encoding::char_type
-        in_set( typename Encoding::char_type const ch
-              , basic_charset<typename Encoding::char_type> const &set)
+        template <typename Char, typename CharSet>
+        bool in_set(Char ch, CharSet const& set)
         {
             return set.test(ch);
         }
 
-        int32_t operator()(
-              typename Encoding::char_type const lc
-            , typename Encoding::char_type const rc) const
+        template <typename Char>
+        int32_t operator()(Char lc, Char rc) const
         {
             return lc - rc;
         }
-
 
         template <typename CharClassTag>
         CharClassTag get_char_class_tag(CharClassTag tag) const
@@ -44,20 +40,24 @@ namespace boost { namespace spirit { namespace x3
     template <typename Encoding>
     struct no_case_compare
     {
-        template < template <typename> class basic_charset>
-        typename Encoding::char_type
-        in_set( typename Encoding::char_type const ch
-              , basic_charset<typename Encoding::char_type> const &set)
+        template <typename Char, typename CharSet>
+        bool in_set(Char ch_, CharSet const& set)
         {
+            using char_type = typename Encoding::classify_type;
+            auto ch = char_type(ch_);
             return set.test(ch)
-                || set.test(Encoding::islower(ch) ? Encoding::toupper(ch) : Encoding::tolower(ch));
+                || set.test(Encoding::islower(ch)
+                    ? Encoding::toupper(ch) : Encoding::tolower(ch));
         }
 
-        int32_t operator()(
-              typename Encoding::char_type const lc
-            , typename Encoding::char_type const rc) const
+        template <typename Char>
+        int32_t operator()(Char lc_, Char const rc_) const
         {
-            return Encoding::islower(rc) ? Encoding::tolower(lc) - rc : Encoding::toupper(lc) - rc;
+            using char_type = typename Encoding::classify_type;
+            auto lc = char_type(lc_);
+            auto rc = char_type(rc_);
+            return Encoding::islower(rc)
+                ? Encoding::tolower(lc) - rc : Encoding::toupper(lc) - rc;
         }
 
         template <typename CharClassTag>
@@ -95,6 +95,7 @@ namespace boost { namespace spirit { namespace x3
     {
         return get_case_compare_impl<Encoding>(x3::get<no_case_tag>(context));
     }
+
     auto const no_case_compare_ = no_case_tag{};
 
 }}}

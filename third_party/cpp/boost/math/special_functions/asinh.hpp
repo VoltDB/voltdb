@@ -23,6 +23,7 @@
 #include <boost/math/special_functions/sqrt1pm1.hpp>
 #include <boost/math/special_functions/log1p.hpp>
 #include <boost/math/constants/constants.hpp>
+#include <boost/math/special_functions/fpclassify.hpp>
 
 // This is the inverse of the hyperbolic sine function.
 

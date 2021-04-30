@@ -2,8 +2,8 @@
 
 // Copyright (c) 2008-2015 Barend Gehrels, Amsterdam, the Netherlands.
 
-// This file was modified by Oracle on 2017, 2018.
-// Modifications copyright (c) 2017-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2017, 2018, 2019.
+// Modifications copyright (c) 2017-2019, Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle.
 
 // Use, modification and distribution is subject to the Boost Software License,
@@ -85,23 +85,17 @@ namespace projections
                 T   sw;
                 T   cw;
                 mode_type mode;
-                int tilt;
+                bool tilt;
             };
 
-            // template class, using CRTP to implement forward/inverse
             template <typename T, typename Parameters>
             struct base_nsper_spheroid
-                : public base_t_fi<base_nsper_spheroid<T, Parameters>, T, Parameters>
             {
                 par_nsper<T> m_proj_parm;
 
-                inline base_nsper_spheroid(const Parameters& par)
-                    : base_t_fi<base_nsper_spheroid<T, Parameters>, T, Parameters>(*this, par)
-                {}
-
                 // FORWARD(s_forward)  spheroid
                 // Project coordinates from geographic (lon, lat) to cartesian (x, y)
-                inline void fwd(T const& lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
+                inline void fwd(Parameters const& , T const& lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
                 {
                     T  coslam, cosphi, sinphi;
 
@@ -154,7 +148,7 @@ namespace projections
 
                 // INVERSE(s_inverse)  spheroid
                 // Project coordinates from cartesian (x, y) to geographic (lon, lat)
-                inline void inv(T xy_x, T xy_y, T& lp_lon, T& lp_lat) const
+                inline void inv(Parameters const& par, T xy_x, T xy_y, T& lp_lon, T& lp_lat) const
                 {
                     T  rh, cosz, sinz;
 
@@ -175,7 +169,7 @@ namespace projections
                     cosz = sqrt(1. - sinz * sinz);
                     if (fabs(rh) <= epsilon10) {
                         lp_lon = 0.;
-                        lp_lat = this->m_par.phi0;
+                        lp_lat = par.phi0;
                     } else {
                         switch (this->m_proj_parm.mode) {
                         case obliq:
@@ -236,7 +230,7 @@ namespace projections
             template <typename Params, typename Parameters, typename T>
             inline void setup_nsper(Params const& params, Parameters& par, par_nsper<T>& proj_parm)
             {
-                proj_parm.tilt = 0;
+                proj_parm.tilt = false;
 
                 setup(params, par, proj_parm);
             }
@@ -247,7 +241,7 @@ namespace projections
             {
                 T const omega = pj_get_param_r<T, srs::spar::tilt>(params, "tilt", srs::dpar::tilt);
                 T const gamma = pj_get_param_r<T, srs::spar::azi>(params, "azi", srs::dpar::azi);
-                proj_parm.tilt = 1;
+                proj_parm.tilt = true;
                 proj_parm.cg = cos(gamma); proj_parm.sg = sin(gamma);
                 proj_parm.cw = cos(omega); proj_parm.sw = sin(omega);
 
@@ -275,10 +269,9 @@ namespace projections
     struct nsper_spheroid : public detail::nsper::base_nsper_spheroid<T, Parameters>
     {
         template <typename Params>
-        inline nsper_spheroid(Params const& params, Parameters const& par)
-            : detail::nsper::base_nsper_spheroid<T, Parameters>(par)
+        inline nsper_spheroid(Params const& params, Parameters & par)
         {
-            detail::nsper::setup_nsper(params, this->m_par, this->m_proj_parm);
+            detail::nsper::setup_nsper(params, par, this->m_proj_parm);
         }
     };
 
@@ -302,10 +295,9 @@ namespace projections
     struct tpers_spheroid : public detail::nsper::base_nsper_spheroid<T, Parameters>
     {
         template <typename Params>
-        inline tpers_spheroid(Params const& params, Parameters const& par)
-            : detail::nsper::base_nsper_spheroid<T, Parameters>(par)
+        inline tpers_spheroid(Params const& params, Parameters & par)
         {
-            detail::nsper::setup_tpers(params, this->m_par, this->m_proj_parm);
+            detail::nsper::setup_tpers(params, par, this->m_proj_parm);
         }
     };
 
@@ -314,8 +306,8 @@ namespace projections
     {
 
         // Static projection
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_nsper, nsper_spheroid, nsper_spheroid)
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_tpers, tpers_spheroid, tpers_spheroid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_F(srs::spar::proj_nsper, nsper_spheroid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_F(srs::spar::proj_tpers, tpers_spheroid)
 
         // Factory entry(s)
         BOOST_GEOMETRY_PROJECTIONS_DETAIL_FACTORY_ENTRY_FI(nsper_entry, nsper_spheroid)

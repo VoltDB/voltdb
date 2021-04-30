@@ -7,30 +7,28 @@
 #ifndef BOOST_HISTOGRAM_AXIS_POLYMORPHIC_BIN_HPP
 #define BOOST_HISTOGRAM_AXIS_POLYMORPHIC_BIN_HPP
 
-#include <boost/histogram/detail/meta.hpp>
-#include <type_traits>
-
 namespace boost {
 namespace histogram {
 namespace axis {
 
 /**
-  Holds the bin data of a axis::variant.
+  Holds the bin data of an axis::variant.
 
-  The interface is a superset of the `value_bin_view` and `interval_bin_view`
-  classes. The methods value() and lower() return the same number. For a value bin,
-  upper() and lower() and center() return the same number, width() returns zero.
+  The interface is a superset of the axis::interval_view
+  class. In addition, the object is implicitly convertible to the value type,
+  returning the equivalent of a call to lower(). For discrete axes, lower() ==
+  upper(), and width() returns zero.
 
-  This is not a view like interval_bin_view or value_bin_view for two reasons.
+  This is not a view like axis::interval_view for two reasons.
   - Sequential calls to lower() and upper() would have to each loop through
     the variant types. This is likely to be slower than filling all the data in
     one loop.
   - polymorphic_bin may be created from a temporary instance of axis::variant,
     like in the call histogram::axis(0). Storing a reference to the axis would
     result in a dangling reference. Rather than specialing the code to handle
-    this, it seems easier to just use a value instead of a view here.
+    this, it seems easier to just use a value instead of a view.
 */
-template <typename RealType>
+template <class RealType>
 class polymorphic_bin {
   using value_type = RealType;
 
@@ -50,12 +48,12 @@ public:
   /// Return width of bin.
   value_type width() const noexcept { return upper() - lower(); }
 
-  template <typename BinType>
+  template <class BinType>
   bool operator==(const BinType& rhs) const noexcept {
-    return equal_impl(detail::has_method_lower<BinType>(), rhs);
+    return equal_impl(rhs, 0);
   }
 
-  template <typename BinType>
+  template <class BinType>
   bool operator!=(const BinType& rhs) const noexcept {
     return !operator==(rhs);
   }
@@ -64,17 +62,17 @@ public:
   bool is_discrete() const noexcept { return lower_or_value_ == upper_; }
 
 private:
-  bool equal_impl(std::true_type, const polymorphic_bin& rhs) const noexcept {
+  bool equal_impl(const polymorphic_bin& rhs, int) const noexcept {
     return lower_or_value_ == rhs.lower_or_value_ && upper_ == rhs.upper_;
   }
 
-  template <typename BinType>
-  bool equal_impl(std::true_type, const BinType& rhs) const noexcept {
+  template <class BinType>
+  auto equal_impl(const BinType& rhs, decltype(rhs.lower(), 0)) const noexcept {
     return lower() == rhs.lower() && upper() == rhs.upper();
   }
 
-  template <typename BinType>
-  bool equal_impl(std::false_type, const BinType& rhs) const noexcept {
+  template <class BinType>
+  bool equal_impl(const BinType& rhs, float) const noexcept {
     return is_discrete() && static_cast<value_type>(*this) == rhs;
   }
 

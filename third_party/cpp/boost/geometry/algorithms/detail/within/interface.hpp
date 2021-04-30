@@ -4,9 +4,8 @@
 // Copyright (c) 2008-2012 Bruno Lalande, Paris, France.
 // Copyright (c) 2009-2012 Mateusz Loskot, London, UK.
 
-// This file was modified by Oracle on 2013, 2014, 2017, 2018.
-// Modifications copyright (c) 2013-2018 Oracle and/or its affiliates.
-
+// This file was modified by Oracle on 2013-2021.
+// Modifications copyright (c) 2013-2021 Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
 // Parts of Boost.Geometry are redesigned from Geodan's Geographic Library
@@ -34,7 +33,8 @@
 #include <boost/geometry/geometries/concepts/check.hpp>
 #include <boost/geometry/strategies/concepts/within_concept.hpp>
 #include <boost/geometry/strategies/default_strategy.hpp>
-#include <boost/geometry/strategies/within.hpp>
+#include <boost/geometry/strategies/detail.hpp>
+#include <boost/geometry/strategies/relate/services.hpp>
 
 
 namespace boost { namespace geometry
@@ -63,30 +63,63 @@ struct within
 namespace resolve_strategy
 {
 
+template
+<
+    typename Strategy,
+    bool IsUmbrella = strategies::detail::is_umbrella_strategy<Strategy>::value
+>
 struct within
 {
-    template <typename Geometry1, typename Geometry2, typename Strategy>
+    template <typename Geometry1, typename Geometry2>
     static inline bool apply(Geometry1 const& geometry1,
                              Geometry2 const& geometry2,
                              Strategy const& strategy)
     {
         concepts::within::check<Geometry1, Geometry2, Strategy>();
 
-        return dispatch::within<Geometry1, Geometry2>::apply(geometry1, geometry2, strategy);
+        return dispatch::within
+            <
+                Geometry1, Geometry2
+            >::apply(geometry1, geometry2, strategy);
     }
+};
 
+template <typename Strategy>
+struct within<Strategy, false>
+{
+    template <typename Geometry1, typename Geometry2>
+    static inline bool apply(Geometry1 const& geometry1,
+                             Geometry2 const& geometry2,
+                             Strategy const& strategy)
+    {
+        using strategies::relate::services::strategy_converter;
+
+        return within
+            <
+                decltype(strategy_converter<Strategy>::get(strategy))
+            >::apply(geometry1, geometry2,
+                     strategy_converter<Strategy>::get(strategy));
+    }
+};
+
+template <>
+struct within<default_strategy, false>
+{
     template <typename Geometry1, typename Geometry2>
     static inline bool apply(Geometry1 const& geometry1,
                              Geometry2 const& geometry2,
                              default_strategy)
     {
-        typedef typename strategy::within::services::default_strategy
+        typedef typename strategies::relate::services::default_strategy
             <
                 Geometry1,
                 Geometry2
             >::type strategy_type;
 
-        return apply(geometry1, geometry2, strategy_type());
+        return within
+            <
+                strategy_type
+            >::apply(geometry1, geometry2, strategy_type());
     }
 };
 
@@ -108,9 +141,10 @@ struct within
         concepts::check<Geometry2 const>();
         assert_dimension_equal<Geometry1, Geometry2>();
 
-        return resolve_strategy::within::apply(geometry1,
-                                               geometry2,
-                                               strategy);
+        return resolve_strategy::within
+            <
+                Strategy
+            >::apply(geometry1, geometry2, strategy);
     }
 };
 

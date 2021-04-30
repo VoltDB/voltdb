@@ -15,6 +15,7 @@
 #include <functional>     // for std::plus
 #include <iterator>       // for std::iterator_traits
 
+#include <boost/config.hpp>
 #include <boost/range/begin.hpp>
 #include <boost/range/end.hpp>
 #include <boost/range/value_type.hpp>

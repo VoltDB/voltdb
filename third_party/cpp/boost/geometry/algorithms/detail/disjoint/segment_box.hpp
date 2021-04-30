@@ -5,8 +5,8 @@
 // Copyright (c) 2009-2014 Mateusz Loskot, London, UK.
 // Copyright (c) 2013-2014 Adam Wulkiewicz, Lodz, Poland.
 
-// This file was modified by Oracle on 2013-2019.
-// Modifications copyright (c) 2013-2019, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2013-2020.
+// Modifications copyright (c) 2013-2020, Oracle and/or its affiliates.
 
 // Contributed and/or modified by Vissarion Fysikopoulos, on behalf of Oracle
 // Contributed and/or modified by Menelaos Karavelas, on behalf of Oracle
@@ -40,7 +40,7 @@
 #include <boost/geometry/geometries/box.hpp>
 
 // Temporary, for envelope_segment_impl
-#include <boost/geometry/strategies/spherical/envelope_segment.hpp>
+#include <boost/geometry/strategy/spherical/envelope_segment.hpp>
 
 namespace boost { namespace geometry
 {
@@ -247,7 +247,7 @@ struct disjoint_segment_box
                              Box const& box,
                              Strategy const& strategy)
     {
-        return strategy.apply(segment, box);
+        return strategy.disjoint(segment, box).apply(segment, box);
     }
 };
 

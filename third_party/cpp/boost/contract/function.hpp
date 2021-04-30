@@ -66,9 +66,10 @@ postconditions, and exception guarantees.
         @RefSect{advanced.lambdas__loops__code_blocks__and__constexpr__,
         Lambdas\, Loops\, Code Blocks}
 
-@return The result of this function must be explicitly assigned to a variable of
-        type @RefClass{boost::contract::check} declared locally just before the
-        function body code (otherwise this library will generate a run-time
+@return The result of this function must be assigned to a variable of type
+        @RefClass{boost::contract::check} declared explicitly (i.e., without
+        using C++11 @c auto declarations) and locally just before the code of
+        the function body (otherwise this library will generate a run-time
         error, see @RefMacro{BOOST_CONTRACT_ON_MISSING_CHECK_DECL}).
 */
 inline specify_precondition_old_postcondition_except<> function() {

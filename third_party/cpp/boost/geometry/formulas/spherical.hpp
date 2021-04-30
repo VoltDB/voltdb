@@ -1,6 +1,6 @@
 // Boost.Geometry
 
-// Copyright (c) 2016-2018, Oracle and/or its affiliates.
+// Copyright (c) 2016-2020, Oracle and/or its affiliates.
 // Contributed and/or modified by Vissarion Fysikopoulos, on behalf of Oracle
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
@@ -99,7 +99,7 @@ static inline PointSph cart3d_to_sph(Point3d const& point_3d)
 
     math::normalize_spheroidal_coordinates
         <
-            typename detail::cs_angular_units<PointSph>::type,
+            typename geometry::detail::cs_angular_units<PointSph>::type,
             coord_t
         >(lon, lat);
 
@@ -186,17 +186,13 @@ inline int azimuth_side_value(T const& azi_a1_p, T const& azi_a1_a2)
 {
     T const c0 = 0;
     T const pi = math::pi<T>();
-    T const two_pi = math::two_pi<T>();
 
     // instead of the formula from XTD
     //calc_t a_diff = asin(sin(azi_a1_p - azi_a1_a2));
 
     T a_diff = azi_a1_p - azi_a1_a2;
-    // normalize, angle in [-pi, pi]
-    while (a_diff > pi)
-        a_diff -= two_pi;
-    while (a_diff < -pi)
-        a_diff += two_pi;
+    // normalize, angle in (-pi, pi]
+    math::detail::normalize_angle_loop<radian>(a_diff);
 
     // NOTE: in general it shouldn't be required to support the pi/-pi case
     // because in non-cartesian systems it makes sense to check the side
@@ -205,7 +201,7 @@ inline int azimuth_side_value(T const& azi_a1_p, T const& azi_a1_a2)
     // for vertical segments to check if the point is "between the endpoints.
     // This could be avoided since the side strategy is not required for that
     // because meridian is the shortest path. So a difference of
-    // longitudes would be sufficient (of course normalized to [-pi, pi]).
+    // longitudes would be sufficient (of course normalized to (-pi, pi]).
 
     // NOTE: with the above said, the pi/-pi check is temporary
     // however in case if this was required
@@ -267,6 +263,10 @@ inline result_direct<CT> spherical_direct(CT const& lon1,
 
         result.lon2 = lon1 + lon2 - omg1;
         result.lat2 = lat2;
+
+        // For longitudes close to the antimeridian the result can be out
+        // of range. Therefore normalize.
+        math::detail::normalize_angle_cond<radian>(result.lon2);
     }
 
     if (ReverseAzimuth)

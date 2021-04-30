@@ -20,7 +20,7 @@
 
 /// Generates the macro metafunction name for BOOST_TTI_HAS_FUNCTION.
 /**
-    name  = the name of the static member function.
+    name  = the name of the function.
 
     returns = the generated macro metafunction name.
 */

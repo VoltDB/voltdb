@@ -2,8 +2,8 @@
 
 // Copyright (c) 2008-2015 Barend Gehrels, Amsterdam, the Netherlands.
 
-// This file was modified by Oracle on 2017, 2018.
-// Modifications copyright (c) 2017-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2017, 2018, 2019.
+// Modifications copyright (c) 2017-2019, Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle.
 
 // Use, modification and distribution is subject to the Boost Software License,
@@ -62,36 +62,30 @@ namespace projections
 
             static const double epsilon10 = 1.e-10;
 
-            // template class, using CRTP to implement forward/inverse
             template <typename T, typename Parameters>
             struct base_merc_ellipsoid
-                : public base_t_fi<base_merc_ellipsoid<T, Parameters>, T, Parameters>
             {
-                inline base_merc_ellipsoid(const Parameters& par)
-                    : base_t_fi<base_merc_ellipsoid<T, Parameters>, T, Parameters>(*this, par)
-                {}
-
                 // FORWARD(e_forward)  ellipsoid
                 // Project coordinates from geographic (lon, lat) to cartesian (x, y)
-                inline void fwd(T const& lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
+                inline void fwd(Parameters const& par, T const& lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
                 {
                     static const T half_pi = detail::half_pi<T>();
 
                     if (fabs(fabs(lp_lat) - half_pi) <= epsilon10) {
                         BOOST_THROW_EXCEPTION( projection_exception(error_tolerance_condition) );
                     }
-                    xy_x = this->m_par.k0 * lp_lon;
-                    xy_y = - this->m_par.k0 * log(pj_tsfn(lp_lat, sin(lp_lat), this->m_par.e));
+                    xy_x = par.k0 * lp_lon;
+                    xy_y = - par.k0 * log(pj_tsfn(lp_lat, sin(lp_lat), par.e));
                 }
 
                 // INVERSE(e_inverse)  ellipsoid
                 // Project coordinates from cartesian (x, y) to geographic (lon, lat)
-                inline void inv(T const& xy_x, T const& xy_y, T& lp_lon, T& lp_lat) const
+                inline void inv(Parameters const& par, T const& xy_x, T const& xy_y, T& lp_lon, T& lp_lat) const
                 {
-                    if ((lp_lat = pj_phi2(exp(- xy_y / this->m_par.k0), this->m_par.e)) == HUGE_VAL) {
+                    if ((lp_lat = pj_phi2(exp(- xy_y / par.k0), par.e)) == HUGE_VAL) {
                         BOOST_THROW_EXCEPTION( projection_exception(error_tolerance_condition) );
                     }
-                    lp_lon = xy_x / this->m_par.k0;
+                    lp_lon = xy_x / par.k0;
                 }
 
                 static inline std::string get_name()
@@ -101,18 +95,12 @@ namespace projections
 
             };
 
-            // template class, using CRTP to implement forward/inverse
             template <typename T, typename Parameters>
             struct base_merc_spheroid
-                : public base_t_fi<base_merc_spheroid<T, Parameters>, T, Parameters>
             {
-                inline base_merc_spheroid(const Parameters& par)
-                    : base_t_fi<base_merc_spheroid<T, Parameters>, T, Parameters>(*this, par)
-                {}
-
                 // FORWARD(s_forward)  spheroid
                 // Project coordinates from geographic (lon, lat) to cartesian (x, y)
-                inline void fwd(T const& lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
+                inline void fwd(Parameters const& par, T const& lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
                 {
                     static const T half_pi = detail::half_pi<T>();
                     static const T fourth_pi = detail::fourth_pi<T>();
@@ -120,18 +108,18 @@ namespace projections
                     if (fabs(fabs(lp_lat) - half_pi) <= epsilon10) {
                         BOOST_THROW_EXCEPTION( projection_exception(error_tolerance_condition) );
                     }
-                    xy_x = this->m_par.k0 * lp_lon;
-                    xy_y = this->m_par.k0 * log(tan(fourth_pi + .5 * lp_lat));
+                    xy_x = par.k0 * lp_lon;
+                    xy_y = par.k0 * log(tan(fourth_pi + .5 * lp_lat));
                 }
 
                 // INVERSE(s_inverse)  spheroid
                 // Project coordinates from cartesian (x, y) to geographic (lon, lat)
-                inline void inv(T const& xy_x, T const& xy_y, T& lp_lon, T& lp_lat) const
+                inline void inv(Parameters const& par, T const& xy_x, T const& xy_y, T& lp_lon, T& lp_lat) const
                 {
                     static const T half_pi = detail::half_pi<T>();
 
-                    lp_lat = half_pi - 2. * atan(exp(-xy_y / this->m_par.k0));
-                    lp_lon = xy_x / this->m_par.k0;
+                    lp_lat = half_pi - 2. * atan(exp(-xy_y / par.k0));
+                    lp_lon = xy_x / par.k0;
                 }
 
                 static inline std::string get_name()
@@ -187,10 +175,9 @@ namespace projections
     struct merc_ellipsoid : public detail::merc::base_merc_ellipsoid<T, Parameters>
     {
         template <typename Params>
-        inline merc_ellipsoid(Params const& params, Parameters const& par)
-            : detail::merc::base_merc_ellipsoid<T, Parameters>(par)
+        inline merc_ellipsoid(Params const& params, Parameters & par)
         {
-            detail::merc::setup_merc(params, this->m_par);
+            detail::merc::setup_merc(params, par);
         }
     };
 
@@ -213,10 +200,9 @@ namespace projections
     struct merc_spheroid : public detail::merc::base_merc_spheroid<T, Parameters>
     {
         template <typename Params>
-        inline merc_spheroid(Params const& params, Parameters const& par)
-            : detail::merc::base_merc_spheroid<T, Parameters>(par)
+        inline merc_spheroid(Params const& params, Parameters & par)
         {
-            detail::merc::setup_merc(params, this->m_par);
+            detail::merc::setup_merc(params, par);
         }
     };
 
@@ -225,7 +211,7 @@ namespace projections
     {
 
         // Static projection
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_merc, merc_spheroid, merc_ellipsoid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI2(srs::spar::proj_merc, merc_spheroid, merc_ellipsoid)
 
         // Factory entry(s)
         BOOST_GEOMETRY_PROJECTIONS_DETAIL_FACTORY_ENTRY_FI2(merc_entry, merc_spheroid, merc_ellipsoid)

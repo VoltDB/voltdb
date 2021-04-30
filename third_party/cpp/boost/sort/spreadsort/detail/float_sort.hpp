@@ -21,7 +21,6 @@ Scott McMurray
 #include <limits>
 #include <functional>
 #include <boost/static_assert.hpp>
-#include <boost/serialization/static_warning.hpp>
 #include <boost/utility/enable_if.hpp>
 #include <boost/sort/spreadsort/detail/constants.hpp>
 #include <boost/sort/spreadsort/detail/integer_sort.hpp>
@@ -735,7 +734,7 @@ namespace spreadsort {
       void >::type
     float_sort(RandomAccessIter first, RandomAccessIter last)
     {
-      BOOST_STATIC_WARNING(!(sizeof(boost::uint64_t) ==
+      BOOST_STATIC_ASSERT(!(sizeof(boost::uint64_t) ==
       sizeof(typename std::iterator_traits<RandomAccessIter>::value_type)
       || sizeof(boost::uint32_t) ==
       sizeof(typename std::iterator_traits<RandomAccessIter>::value_type))
@@ -778,7 +777,7 @@ namespace spreadsort {
     float_sort(RandomAccessIter first, RandomAccessIter last, Div_type,
                Right_shift rshift)
     {
-      BOOST_STATIC_WARNING(sizeof(boost::uintmax_t) >= sizeof(Div_type));
+      BOOST_STATIC_ASSERT(sizeof(boost::uintmax_t) >= sizeof(Div_type));
       boost::sort::pdqsort(first, last);
     }
 
@@ -820,7 +819,7 @@ namespace spreadsort {
     float_sort(RandomAccessIter first, RandomAccessIter last, Div_type,
                Right_shift rshift, Compare comp)
     {
-      BOOST_STATIC_WARNING(sizeof(boost::uintmax_t) >= sizeof(Div_type));
+      BOOST_STATIC_ASSERT(sizeof(boost::uintmax_t) >= sizeof(Div_type));
       boost::sort::pdqsort(first, last, comp);
     }
   }

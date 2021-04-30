@@ -21,6 +21,7 @@
 #include <boost/math/constants/constants.hpp>
 #include <boost/math/special_functions/fpclassify.hpp>
 #include <boost/math/policies/error_handling.hpp>
+#include <boost/math/tools/cxx03_warn.hpp>
 
 namespace boost{ namespace math{ namespace quadrature {
 
@@ -33,17 +34,22 @@ auto trapezoidal(F f, Real a, Real b, Real tol, std::size_t max_refinements, Rea
     // In many math texts, K represents the field of real or complex numbers.
     // Too bad we can't put blackboard bold into C++ source!
     typedef decltype(f(a)) K;
-    if(a >= b)
-    {
-       return static_cast<K>(boost::math::policies::raise_domain_error(function, "a < b for integration over the region [a, b] is required, but got a = %1%.\n", a, pol));
-    }
     if (!(boost::math::isfinite)(a))
     {
        return static_cast<K>(boost::math::policies::raise_domain_error(function, "Left endpoint of integration must be finite for adaptive trapezoidal integration but got a = %1%.\n", a, pol));
     }
     if (!(boost::math::isfinite)(b))
     {
-       return static_cast<K>(boost::math::policies::raise_domain_error(function, "Right endpoint of integration must be finite for adaptive trapedzoidal integration but got b = %1%.\n", b, pol));
+       return static_cast<K>(boost::math::policies::raise_domain_error(function, "Right endpoint of integration must be finite for adaptive trapezoidal integration but got b = %1%.\n", b, pol));
+    }
+
+    if (a == b)
+    {
+        return static_cast<K>(0);
+    }
+    if(a > b)
+    {
+        return -trapezoidal(f, b, a, tol, max_refinements, error_estimate, L1, pol);
     }
 
 
@@ -61,11 +67,14 @@ auto trapezoidal(F f, Real a, Real b, Real tol, std::size_t max_refinements, Rea
     // The recursion is:
     // I_k = 1/2 I_{k-1} + 1/2^k \sum_{j=1; j odd, j < 2^k} f(a + j(b-a)/2^k)
     std::size_t k = 2;
-    // We want to go through at least 4 levels so we have sampled the function at least 10 times.
+    // We want to go through at least 5 levels so we have sampled the function at least 20 times.
     // Otherwise, we could terminate prematurely and miss essential features.
-    // This is of course possible anyway, but 10 samples seems to be a reasonable compromise.
+    // This is of course possible anyway, but 20 samples seems to be a reasonable compromise.
     Real error = abs(I0 - I1);
-    while (k < 4 || (k < max_refinements && error > tol*IL1) )
+    // I take k < 5, rather than k < 4, or some other smaller minimum number,
+    // because I hit a truly exceptional bug where the k = 2 and k =3 refinement were bitwise equal,
+    // but the quadrature had not yet converged.
+    while (k < 5 || (k < max_refinements && error > tol*IL1) )
     {
         I0 = I1;
         IL0 = IL1;
@@ -103,7 +112,7 @@ auto trapezoidal(F f, Real a, Real b, Real tol, std::size_t max_refinements, Rea
     return static_cast<K>(I1);
 }
 #if BOOST_WORKAROUND(BOOST_MSVC, < 1800)
-// Template argument dedcution failure otherwise:
+// Template argument deduction failure otherwise:
 template<class F, class Real>
 auto trapezoidal(F f, Real a, Real b, Real tol = 0, std::size_t max_refinements = 12, Real* error_estimate = 0, Real* L1 = 0)->decltype(std::declval<F>()(std::declval<Real>()))
 #elif !defined(BOOST_NO_CXX11_NULLPTR)

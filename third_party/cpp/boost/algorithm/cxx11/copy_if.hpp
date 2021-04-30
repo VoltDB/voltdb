@@ -13,6 +13,8 @@
 #define BOOST_ALGORITHM_COPY_IF_HPP
 
 #include <utility>    // for std::pair, std::make_pair
+
+#include <boost/config.hpp>
 #include <boost/range/begin.hpp>
 #include <boost/range/end.hpp>
 

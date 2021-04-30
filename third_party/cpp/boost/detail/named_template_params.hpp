@@ -11,9 +11,10 @@
 #ifndef BOOST_DETAIL_NAMED_TEMPLATE_PARAMS_HPP
 #define BOOST_DETAIL_NAMED_TEMPLATE_PARAMS_HPP
 
+#include <boost/config.hpp>
 #include <boost/type_traits/conversion_traits.hpp>
 #include <boost/type_traits/composite_traits.hpp> // for is_reference
-#if defined(__BORLANDC__)
+#if defined(BOOST_BORLANDC)
 #include <boost/type_traits/ice.hpp>
 #endif
 
@@ -57,7 +58,7 @@ namespace boost {
       };
     };
 
-#if defined(__BORLANDC__)
+#if defined(BOOST_BORLANDC)
     template <class UseDefault>
     struct choose_arg_or_default { typedef choose_arg type; };
     template <>
@@ -75,7 +76,7 @@ namespace boost {
     
     template <class Arg, class DefaultGen, class Base, class Traits>
     class resolve_default {
-#if defined(__BORLANDC__)
+#if defined(BOOST_BORLANDC)
       typedef typename choose_arg_or_default<typename is_default<Arg>::type>::type Selector;
 #else
       // This usually works for Borland, but I'm seeing weird errors in

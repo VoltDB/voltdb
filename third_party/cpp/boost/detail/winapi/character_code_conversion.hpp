@@ -10,6 +10,10 @@
 #ifndef BOOST_DETAIL_WINAPI_CHARACTER_CODE_CONVERSION_HPP
 #define BOOST_DETAIL_WINAPI_CHARACTER_CODE_CONVERSION_HPP
 
+#include <boost/config/header_deprecated.hpp>
+
+BOOST_HEADER_DEPRECATED("<boost/winapi/character_code_conversion.hpp>")
+
 #include <boost/winapi/character_code_conversion.hpp>
 #include <boost/detail/winapi/detail/deprecated_namespace.hpp>
 

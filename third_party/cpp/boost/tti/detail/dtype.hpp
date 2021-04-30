@@ -7,7 +7,6 @@
 #if !defined(BOOST_TTI_DETAIL_TYPE_HPP)
 #define BOOST_TTI_DETAIL_TYPE_HPP
 
-#include <boost/config.hpp>
 #include <boost/mpl/apply.hpp>
 #include <boost/mpl/bool.hpp>
 #include <boost/mpl/eval_if.hpp>
@@ -15,8 +14,8 @@
 #include <boost/preprocessor/cat.hpp>
 #include <boost/tti/detail/ddeftype.hpp>
 #include <boost/tti/detail/dlambda.hpp>
+#include <boost/tti/detail/denclosing_type.hpp>
 #include <boost/tti/gen/namespace_gen.hpp>
-#include <boost/type_traits/is_class.hpp>
 
 #define BOOST_TTI_DETAIL_TRAIT_INVOKE_HAS_TYPE(trait,name) \
 template<class BOOST_TTI_DETAIL_TP_T,class BOOST_TTI_DETAIL_TP_MFC> \
@@ -67,12 +66,12 @@ struct BOOST_PP_CAT(trait,_detail_type_op) : \
 BOOST_TTI_DETAIL_TRAIT_HAS_TYPE_OP(trait,name) \
 template<class BOOST_TTI_DETAIL_TP_T,class BOOST_TTI_DETAIL_TP_U> \
 struct BOOST_PP_CAT(trait,_detail_type) : \
-	boost::mpl::eval_if \
-		< \
- 		boost::is_class<BOOST_TTI_DETAIL_TP_T>, \
- 		BOOST_PP_CAT(trait,_detail_type_op)<BOOST_TTI_DETAIL_TP_T,BOOST_TTI_DETAIL_TP_U>, \
- 		boost::mpl::false_ \
-		> \
+    boost::mpl::eval_if \
+        < \
+        BOOST_TTI_NAMESPACE::detail::enclosing_type<BOOST_TTI_DETAIL_TP_T>, \
+        BOOST_PP_CAT(trait,_detail_type_op)<BOOST_TTI_DETAIL_TP_T,BOOST_TTI_DETAIL_TP_U>, \
+        boost::mpl::false_ \
+        > \
   { \
   }; \
 /**/

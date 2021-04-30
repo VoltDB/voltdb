@@ -4,6 +4,9 @@
 // Copyright (c) 2008-2012 Bruno Lalande, Paris, France.
 // Copyright (c) 2009-2012 Mateusz Loskot, London, UK.
 
+// Copyright (c) 2020, Oracle and/or its affiliates.
+// Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
+
 // Parts of Boost.Geometry are redesigned from Geodan's Geographic Library
 // (geolib/GGL), copyright (c) 1995-2010 Geodan, Amsterdam, the Netherlands.
 
@@ -14,10 +17,15 @@
 #ifndef BOOST_GEOMETRY_ITERATORS_CLOSING_ITERATOR_HPP
 #define BOOST_GEOMETRY_ITERATORS_CLOSING_ITERATOR_HPP
 
-#include <boost/range.hpp>
+
 #include <boost/iterator/iterator_facade.hpp>
 #include <boost/iterator/iterator_categories.hpp>
-
+#include <boost/range/begin.hpp>
+#include <boost/range/end.hpp>
+#include <boost/range/difference_type.hpp>
+#include <boost/range/reference.hpp>
+#include <boost/range/size.hpp>
+#include <boost/range/value_type.hpp>
 
 
 namespace boost { namespace geometry

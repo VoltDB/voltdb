@@ -8,10 +8,9 @@
 #ifndef BOOST_GIL_IO_GET_READ_DEVICE_HPP
 #define BOOST_GIL_IO_GET_READ_DEVICE_HPP
 
+#include <boost/gil/detail/mp11.hpp>
 #include <boost/gil/io/device.hpp>
 #include <boost/gil/io/path_spec.hpp>
-
-#include <boost/mpl/and.hpp>
 
 #include <type_traits>
 
@@ -31,7 +30,7 @@ struct get_read_device
     FormatTag,
     typename std::enable_if
     <
-        mpl::and_
+        mp11::mp_and
         <
             detail::is_adaptable_input_device<FormatTag, Device>,
             is_format_tag<FormatTag>
@@ -53,7 +52,7 @@ struct get_read_device
     FormatTag,
     typename std::enable_if
     <
-        mpl::and_
+        mp11::mp_and
         <
             detail::is_supported_path_spec<String>,
             is_format_tag<FormatTag>

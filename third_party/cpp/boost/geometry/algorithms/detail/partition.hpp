@@ -3,8 +3,8 @@
 // Copyright (c) 2011-2015 Barend Gehrels, Amsterdam, the Netherlands.
 // Copyright (c) 2017 Adam Wulkiewicz, Lodz, Poland.
 
-// This file was modified by Oracle on 2015, 2017.
-// Modifications copyright (c) 2015-2017 Oracle and/or its affiliates.
+// This file was modified by Oracle on 2015-2020.
+// Modifications copyright (c) 2015-2020 Oracle and/or its affiliates.
 
 // Contributed and/or modified by Menelaos Karavelas, on behalf of Oracle
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
@@ -16,12 +16,19 @@
 #ifndef BOOST_GEOMETRY_ALGORITHMS_DETAIL_PARTITION_HPP
 #define BOOST_GEOMETRY_ALGORITHMS_DETAIL_PARTITION_HPP
 
+
 #include <cstddef>
+#include <type_traits>
 #include <vector>
-#include <boost/range.hpp>
+
+#include <boost/range/begin.hpp>
+#include <boost/range/empty.hpp>
+#include <boost/range/end.hpp>
+#include <boost/range/size.hpp>
+
+#include <boost/geometry/algorithms/assign.hpp>
 #include <boost/geometry/core/access.hpp>
 #include <boost/geometry/core/coordinate_type.hpp>
-#include <boost/geometry/algorithms/assign.hpp>
 
 
 namespace boost { namespace geometry
@@ -30,15 +37,35 @@ namespace boost { namespace geometry
 namespace detail { namespace partition
 {
 
+template <typename T, bool IsIntegral = std::is_integral<T>::value>
+struct divide_interval
+{
+    static inline T apply(T const& mi, T const& ma)
+    {
+        static T const two = 2;
+        return (mi + ma) / two;
+    }
+};
+
+template <typename T>
+struct divide_interval<T, true>
+{
+    static inline T apply(T const& mi, T const& ma)
+    {
+        // avoid overflow
+        return mi / 2 + ma / 2 + (mi % 2 + ma % 2) / 2;
+    }
+};
+
 template <int Dimension, typename Box>
 inline void divide_box(Box const& box, Box& lower_box, Box& upper_box)
 {
     typedef typename coordinate_type<Box>::type ctype;
 
     // Divide input box into two parts, e.g. left/right
-    ctype two = 2;
-    ctype mid = (geometry::get<min_corner, Dimension>(box)
-            + geometry::get<max_corner, Dimension>(box)) / two;
+    ctype mid = divide_interval<ctype>::apply(
+                    geometry::get<min_corner, Dimension>(box),
+                    geometry::get<max_corner, Dimension>(box));
 
     lower_box = box;
     upper_box = box;

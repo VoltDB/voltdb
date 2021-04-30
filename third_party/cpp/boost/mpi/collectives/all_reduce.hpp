@@ -77,7 +77,7 @@ namespace detail {
       // implementation in this case.
       // it's not clear how/if we can avoid the copy.
       std::vector<T> tmp_in( out_values, out_values + n);
-      reduce(comm, &(tmp_in[0]), n, out_values, op, 0);
+      reduce(comm, detail::c_data(tmp_in), n, out_values, op, 0);
     } else {
       reduce(comm, in_values, n, out_values, op, 0);
     }

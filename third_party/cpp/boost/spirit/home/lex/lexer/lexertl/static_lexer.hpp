@@ -151,9 +151,8 @@ namespace boost { namespace spirit { namespace lex { namespace lexertl
             std::size_t num_states_;
             bool bol_;
 
-        private:
             // silence MSVC warning C4512: assignment operator could not be generated
-            iterator_data_type& operator= (iterator_data_type const&);
+            BOOST_DELETED_FUNCTION(iterator_data_type& operator= (iterator_data_type const&))
         };
 
         typedef LexerTables tables_type;
@@ -230,7 +229,7 @@ namespace boost { namespace spirit { namespace lex { namespace lexertl
             actions_.add_action(unique_id, state, wrapper_type::call(act));
         }
 
-        bool init_dfa(bool minimize = false) const { return true; }
+        bool init_dfa(bool /*minimize*/ = false) const { return true; }
 
     private:
         typename Functor::semantic_actions_type actions_;

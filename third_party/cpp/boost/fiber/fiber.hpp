@@ -41,14 +41,14 @@ class BOOST_FIBERS_DECL fiber {
 private:
     friend class context;
 
-    typedef intrusive_ptr< context >  ptr_t;
+    using ptr_t = intrusive_ptr<context>;
 
     ptr_t       impl_{};
 
     void start_() noexcept;
 
 public:
-    typedef context::id    id;
+    using id = context::id;
 
     fiber() = default;
 
@@ -59,7 +59,7 @@ public:
               typename = detail::disable_overload< std::allocator_arg_t, Fn >
     >
 #if BOOST_COMP_GNUC < 50000000
-    fiber( Fn && fn, Arg && ... arg) :
+    explicit fiber( Fn && fn, Arg && ... arg) :
 #else
     fiber( Fn && fn, Arg ... arg) :
 #endif

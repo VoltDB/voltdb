@@ -2,8 +2,8 @@
 
 // Copyright (c) 2008-2015 Barend Gehrels, Amsterdam, the Netherlands.
 
-// This file was modified by Oracle on 2017, 2018.
-// Modifications copyright (c) 2017-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2017, 2018, 2019.
+// Modifications copyright (c) 2017-2019, Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle.
 
 // Use, modification and distribution is subject to the Boost Software License,
@@ -63,20 +63,14 @@ namespace projections
                 T C_x, C_y, A, B;
             };
 
-            // template class, using CRTP to implement forward/inverse
             template <typename T, typename Parameters>
             struct base_eck3_spheroid
-                : public base_t_fi<base_eck3_spheroid<T, Parameters>, T, Parameters>
             {
                 par_eck3<T> m_proj_parm;
 
-                inline base_eck3_spheroid(const Parameters& par)
-                    : base_t_fi<base_eck3_spheroid<T, Parameters>, T, Parameters>(*this, par)
-                {}
-
                 // FORWARD(s_forward)  spheroid
                 // Project coordinates from geographic (lon, lat) to cartesian (x, y)
-                inline void fwd(T const& lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
+                inline void fwd(Parameters const& , T const& lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
                 {
                     xy_y = this->m_proj_parm.C_y * lp_lat;
                     xy_x = this->m_proj_parm.C_x * lp_lon * (this->m_proj_parm.A + asqrt(1. - this->m_proj_parm.B * lp_lat * lp_lat));
@@ -84,7 +78,7 @@ namespace projections
 
                 // INVERSE(s_inverse)  spheroid
                 // Project coordinates from cartesian (x, y) to geographic (lon, lat)
-                inline void inv(T const& xy_x, T const& xy_y, T& lp_lon, T& lp_lat) const
+                inline void inv(Parameters const& , T const& xy_x, T const& xy_y, T& lp_lon, T& lp_lat) const
                 {
                     T denominator;
                     lp_lat = xy_y / this->m_proj_parm.C_y;
@@ -179,10 +173,9 @@ namespace projections
     struct eck3_spheroid : public detail::eck3::base_eck3_spheroid<T, Parameters>
     {
         template <typename Params>
-        inline eck3_spheroid(Params const& , Parameters const& par)
-            : detail::eck3::base_eck3_spheroid<T, Parameters>(par)
+        inline eck3_spheroid(Params const& , Parameters & par)
         {
-            detail::eck3::setup_eck3(this->m_par, this->m_proj_parm);
+            detail::eck3::setup_eck3(par, this->m_proj_parm);
         }
     };
 
@@ -202,10 +195,9 @@ namespace projections
     struct putp1_spheroid : public detail::eck3::base_eck3_spheroid<T, Parameters>
     {
         template <typename Params>
-        inline putp1_spheroid(Params const& , Parameters const& par)
-            : detail::eck3::base_eck3_spheroid<T, Parameters>(par)
+        inline putp1_spheroid(Params const& , Parameters & par)
         {
-            detail::eck3::setup_putp1(this->m_par, this->m_proj_parm);
+            detail::eck3::setup_putp1(par, this->m_proj_parm);
         }
     };
 
@@ -225,10 +217,9 @@ namespace projections
     struct wag6_spheroid : public detail::eck3::base_eck3_spheroid<T, Parameters>
     {
         template <typename Params>
-        inline wag6_spheroid(Params const& , Parameters const& par)
-            : detail::eck3::base_eck3_spheroid<T, Parameters>(par)
+        inline wag6_spheroid(Params const& , Parameters & par)
         {
-            detail::eck3::setup_wag6(this->m_par, this->m_proj_parm);
+            detail::eck3::setup_wag6(par, this->m_proj_parm);
         }
     };
 
@@ -248,10 +239,9 @@ namespace projections
     struct kav7_spheroid : public detail::eck3::base_eck3_spheroid<T, Parameters>
     {
         template <typename Params>
-        inline kav7_spheroid(Params const& , Parameters const& par)
-            : detail::eck3::base_eck3_spheroid<T, Parameters>(par)
+        inline kav7_spheroid(Params const& , Parameters & par)
         {
-            detail::eck3::setup_kav7(this->m_par, this->m_proj_parm);
+            detail::eck3::setup_kav7(par, this->m_proj_parm);
         }
     };
 
@@ -260,10 +250,10 @@ namespace projections
     {
 
         // Static projection
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_eck3, eck3_spheroid, eck3_spheroid)
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_putp1, putp1_spheroid, putp1_spheroid)
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_wag6, wag6_spheroid, wag6_spheroid)
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_kav7, kav7_spheroid, kav7_spheroid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI(srs::spar::proj_eck3, eck3_spheroid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI(srs::spar::proj_putp1, putp1_spheroid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI(srs::spar::proj_wag6, wag6_spheroid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI(srs::spar::proj_kav7, kav7_spheroid)
 
         // Factory entry(s)
         BOOST_GEOMETRY_PROJECTIONS_DETAIL_FACTORY_ENTRY_FI(eck3_entry, eck3_spheroid)

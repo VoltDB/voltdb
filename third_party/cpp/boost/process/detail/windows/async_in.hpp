@@ -17,19 +17,20 @@
 
 #include <boost/asio/write.hpp>
 #include <boost/process/detail/handler_base.hpp>
+#include <boost/process/detail/used_handles.hpp>
 #include <boost/process/detail/windows/async_handler.hpp>
 #include <boost/process/detail/windows/asio_fwd.hpp>
 #include <boost/process/async_pipe.hpp>
 #include <memory>
 #include <future>
 
-
 namespace boost { namespace process { namespace detail { namespace windows {
 
 
 template<typename Buffer>
 struct async_in_buffer : ::boost::process::detail::windows::handler_base_ext,
-                         ::boost::process::detail::windows::require_io_context
+                         ::boost::process::detail::windows::require_io_context,
+                         ::boost::process::detail::uses_handles
 {
     Buffer & buf;
 
@@ -41,6 +42,11 @@ struct async_in_buffer : ::boost::process::detail::windows::handler_base_ext,
     }
 
     std::shared_ptr<boost::process::async_pipe> pipe;
+
+    ::boost::winapi::HANDLE_ get_used_handles() const
+    {
+        return std::move(*pipe).source().native_handle();
+    }
 
     async_in_buffer(Buffer & buf) : buf(buf)
     {

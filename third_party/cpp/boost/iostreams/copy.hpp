@@ -23,7 +23,7 @@
 #include <algorithm>                        // copy, min.
 #include <cstddef>                          // ptrdiff_t.
 #include <utility>                          // pair.
-#include <boost/bind.hpp>
+
 #include <boost/detail/workaround.hpp>
 #include <boost/iostreams/chain.hpp>
 #include <boost/iostreams/constants.hpp>

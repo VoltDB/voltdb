@@ -188,26 +188,17 @@ int utf8_codecvt_facet::do_length(
 #if BOOST_WORKAROUND(__IBMCPP__, BOOST_TESTED_AT(600))
         throw()
 #endif
-{ 
-    // RG - this code is confusing!  I need a better way to express it.
-    // and test cases.
-
-    // Invariants:
-    // 1) last_octet_count has the size of the last measured character
-    // 2) char_count holds the number of characters shown to fit
-    // within the bounds so far (no greater than max_limit)
-    // 3) from_next points to the octet 'last_octet_count' before the
-    // last measured character.  
-    int last_octet_count=0;
-    std::size_t char_count = 0;
-    const char* from_next = from;
-    // Use "<" because the buffer may represent incomplete characters
-    while (from_next+last_octet_count <= from_end && char_count <= max_limit) {
-        from_next += last_octet_count;
-        last_octet_count = (get_octet_count(*from_next));
-        ++char_count;
+{
+    const char * from_next = from;
+    for (std::size_t char_count = 0u; char_count < max_limit && from_next < from_end; ++char_count) {
+        unsigned int octet_count = get_octet_count(*from_next);
+        // The buffer may represent incomplete characters, so terminate early if one is found
+        if (octet_count > static_cast<std::size_t>(from_end - from_next))
+            break;
+        from_next += octet_count;
     }
-    return static_cast<int>(from_next-from);
+
+    return static_cast<int>(from_next - from);
 }
 
 unsigned int utf8_codecvt_facet::get_octet_count(

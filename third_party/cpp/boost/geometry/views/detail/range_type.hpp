@@ -15,10 +15,10 @@
 #define BOOST_GEOMETRY_VIEWS_DETAIL_RANGE_TYPE_HPP
 
 
-#include <boost/mpl/assert.hpp>
 #include <boost/range/value_type.hpp>
 
 #include <boost/geometry/core/ring_type.hpp>
+#include <boost/geometry/core/static_assert.hpp>
 #include <boost/geometry/core/tag.hpp>
 #include <boost/geometry/core/tags.hpp>
 
@@ -37,11 +37,9 @@ template <typename Geometry,
           typename Tag = typename tag<Geometry>::type>
 struct range_type
 {
-    BOOST_MPL_ASSERT_MSG
-        (
-            false, NOT_OR_NOT_YET_IMPLEMENTED_FOR_THIS_GEOMETRY_TYPE
-            , (types<Geometry>)
-        );
+    BOOST_GEOMETRY_STATIC_ASSERT_FALSE(
+        "Not or not yet implemented for this Geometry type.",
+        Geometry, Tag);
 };
 
 

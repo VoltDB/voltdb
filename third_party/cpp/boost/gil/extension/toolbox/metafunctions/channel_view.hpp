@@ -13,28 +13,28 @@
 namespace boost {
 namespace gil {
 
-template < typename Channel
-         , typename View
-         >
+template <typename Channel, typename View>
 struct channel_type_to_index
 {
-    static const int value = detail::type_to_index< typename color_space_type< View >::type // color (mpl::vector)
-                                                  , Channel                                 // channel type
-                                                  >::value;                           //< index of the channel in the color (mpl::vector)
+    static constexpr int value = detail::type_to_index
+        <
+            typename color_space_type<View>::type, // color (Boost.MP11-compatible list)
+            Channel                                // channel type
+        >::value;                                  // index of the channel in the color (Boost.MP11-compatible list)
 };
 
-template< typename Channel
-        , typename View
-        >
-struct channel_view_type : public kth_channel_view_type< channel_type_to_index< Channel
-                                                                              , View
-                                                                              >::value
-                                                       , View
-                                                       >
+template<typename Channel, typename View>
+struct channel_view_type : kth_channel_view_type
+    <
+        channel_type_to_index<Channel, View>::value,
+        View
+    >
 {
-    static const int index = channel_type_to_index< Channel
-                                                  , View
-                                                  >::value;
+    static constexpr int index = channel_type_to_index
+        <
+            Channel,
+            View
+        >::value;
 
     using parent_t = kth_channel_view_type<index, View>;
     using type = typename parent_t::type;
@@ -46,19 +46,13 @@ struct channel_view_type : public kth_channel_view_type< channel_type_to_index< 
 };
 
 /// \ingroup ImageViewTransformationsKthChannel
-template< typename Channel
-        , typename View
-        >
-typename channel_view_type< Channel
-                          , View
-                          >::type channel_view( const View& src )
+template<typename Channel, typename View>
+auto channel_view(View const& src)
+    -> typename channel_view_type<Channel, View>::type
 {
-   return channel_view_type< Channel
-                           , View
-                           >::make( src );
+   return channel_view_type<Channel, View>::make(src);
 }
 
-} // namespace gil
-} // namespace boost
+}} // namespace boost::gil
 
 #endif

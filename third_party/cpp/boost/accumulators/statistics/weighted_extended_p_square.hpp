@@ -28,6 +28,7 @@
 #include <boost/accumulators/statistics/sum.hpp>
 #include <boost/accumulators/statistics/times2_iterator.hpp>
 #include <boost/accumulators/statistics/extended_p_square.hpp>
+#include <boost/serialization/vector.hpp>
 
 namespace boost { namespace accumulators
 {
@@ -249,6 +250,17 @@ namespace impl
                 make_permutation_iterator(this->heights.begin(), idx_begin)
               , make_permutation_iterator(this->heights.begin(), idx_end)
             );
+        }
+
+        // make this accumulator serializeable
+        // TODO: do we need to split to load/save and verify that the parameters did not change?
+        template<class Archive>
+        void serialize(Archive & ar, const unsigned int file_version)
+        { 
+            ar & probabilities;
+            ar & heights;
+            ar & actual_positions;
+            ar & desired_positions;
         }
 
     private:

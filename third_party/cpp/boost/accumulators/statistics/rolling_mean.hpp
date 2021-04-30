@@ -43,6 +43,10 @@ namespace boost { namespace accumulators
          {
             return numeric::fdiv(rolling_sum(args), rolling_count(args));
          }
+        
+         // serialization is done by accumulators it depends on
+         template<class Archive>
+         void serialize(Archive & ar, const unsigned int file_version) {}
       };
 
       ///////////////////////////////////////////////////////////////////////////////
@@ -67,12 +71,18 @@ namespace boost { namespace accumulators
          {
             if(is_rolling_window_plus1_full(args))
             {
-               mean_ += numeric::fdiv(args[sample]-rolling_window_plus1(args).front(),rolling_count(args));
+               if (rolling_window_plus1(args).front() > args[sample])
+                  mean_ -= numeric::fdiv(rolling_window_plus1(args).front()-args[sample],rolling_count(args));
+               else if (rolling_window_plus1(args).front() < args[sample])
+                  mean_ += numeric::fdiv(args[sample]-rolling_window_plus1(args).front(),rolling_count(args));
             }
             else
             {
                result_type prev_mean = mean_;
-               mean_ += numeric::fdiv(args[sample]-prev_mean,rolling_count(args));
+               if (prev_mean > args[sample])
+                   mean_ -= numeric::fdiv(prev_mean-args[sample],rolling_count(args));
+               else if (prev_mean < args[sample])
+                   mean_ += numeric::fdiv(args[sample]-prev_mean,rolling_count(args));
             }
          }
 
@@ -80,6 +90,13 @@ namespace boost { namespace accumulators
          result_type result(Args const &) const
          {
             return mean_;
+         }
+        
+         // make this accumulator serializeable
+         template<class Archive>
+         void serialize(Archive & ar, const unsigned int file_version)
+         { 
+            ar & mean_;
          }
 
       private:

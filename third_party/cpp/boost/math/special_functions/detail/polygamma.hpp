@@ -22,8 +22,6 @@
   #include <boost/math/special_functions/sin_pi.hpp>
   #include <boost/math/special_functions/cos_pi.hpp>
   #include <boost/math/special_functions/pow.hpp>
-  #include <boost/mpl/if.hpp>
-  #include <boost/mpl/int.hpp>
   #include <boost/static_assert.hpp>
   #include <boost/type_traits/is_convertible.hpp>
 
@@ -51,7 +49,7 @@ namespace boost { namespace math { namespace detail{
         if(n == 1) return 1 / x;
         T nlx = n * log(x);
         if((nlx < tools::log_max_value<T>()) && (n < (int)max_factorial<T>::value))
-           return ((n & 1) ? 1 : -1) * boost::math::factorial<T>(n - 1) * pow(x, -n);
+           return ((n & 1) ? 1 : -1) * boost::math::factorial<T>(n - 1, pol) * pow(x, -n);
         else
          return ((n & 1) ? 1 : -1) * exp(boost::math::lgamma(T(n), pol) - n * log(x));
      }
@@ -161,7 +159,7 @@ namespace boost { namespace math { namespace detail{
           sum0 += z_plus_k_pow_minus_m_minus_one;
           z += 1;
        }
-       sum0 *= boost::math::factorial<T>(n);
+       sum0 *= boost::math::factorial<T>(n, pol);
     }
     else
     {
@@ -240,7 +238,7 @@ namespace boost { namespace math { namespace detail{
            return policies::raise_evaluation_error<T>(function, "Series did not converge, best value is %1%", sum, pol);
      }
      //
-     // We need to multiply by the scale, at each stage checking for oveflow:
+     // We need to multiply by the scale, at each stage checking for overflow:
      //
      if(boost::math::tools::max_value<T>() / scale < sum)
         return boost::math::policies::raise_overflow_error<T>(function, 0, pol);
@@ -278,13 +276,13 @@ namespace boost { namespace math { namespace detail{
      // C[k+1, n+1]  += (k-n-1) * C[k, n];
      //
      // Note that there are many different ways of representing this derivative thanks to
-     // the many trigomonetric identies available.  In particular, the sum of powers of
+     // the many trigonometric identies available.  In particular, the sum of powers of
      // cosines could be replaced by a sum of cosine multiple angles, and indeed if you
      // plug the derivative into Mathematica this is the form it will give.  The two
      // forms are related via the Chebeshev polynomials of the first kind and
      // T_n(cos(x)) = cos(n x).  The polynomial form has the great advantage that
      // all the cosine terms are zero at half integer arguments - right where this
-     // function has it's minumum - thus avoiding cancellation error in this region.
+     // function has it's minimum - thus avoiding cancellation error in this region.
      //
      // And finally, since every other term in the polynomials is zero, we can save
      // space by only storing the non-zero terms.  This greatly complexifies
@@ -448,7 +446,7 @@ namespace boost { namespace math { namespace detail{
      }
      T sum = boost::math::tools::evaluate_even_polynomial(&table[index][0], c, table[index].size());
      if(index & 1)
-        sum *= c;  // First coeffient is order 1, and really an odd polynomial.
+        sum *= c;  // First coefficient is order 1, and really an odd polynomial.
      if(sum == 0)
         return sum;
      //
@@ -459,7 +457,7 @@ namespace boost { namespace math { namespace detail{
      if(s == 0)
         return sum * boost::math::policies::raise_overflow_error<T>(function, 0, pol);
      power_terms -= log(fabs(s)) * (n + 1);
-     power_terms += boost::math::lgamma(T(n));
+     power_terms += boost::math::lgamma(T(n), pol);
      power_terms += log(fabs(sum));
 
      if(power_terms > boost::math::tools::log_max_value<T>())

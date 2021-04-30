@@ -1,8 +1,9 @@
 // Boost.Geometry
 
-// Copyright (c) 2015 Oracle and/or its affiliates.
+// Copyright (c) 2015-2020 Oracle and/or its affiliates.
 
 // Contributed and/or modified by Menelaos Karavelas, on behalf of Oracle
+// Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
 // Use, modification and distribution is subject to the Boost Software License,
 // Version 1.0. (See accompanying file LICENSE_1_0.txt or copy at
@@ -11,7 +12,7 @@
 #ifndef BOOST_GEOMETRY_UTIL_HAS_INFINITE_COORDINATE_HPP
 #define BOOST_GEOMETRY_UTIL_HAS_INFINITE_COORDINATE_HPP
 
-#include <boost/type_traits/is_floating_point.hpp>
+#include <type_traits>
 
 #include <boost/geometry/core/coordinate_type.hpp>
 #include <boost/geometry/util/has_nan_coordinate.hpp>
@@ -43,7 +44,7 @@ bool has_infinite_coordinate(Point const& point)
         <
             Point,
             detail::isinf,
-            boost::is_floating_point
+            std::is_floating_point
                 <
                     typename coordinate_type<Point>::type
                 >::value

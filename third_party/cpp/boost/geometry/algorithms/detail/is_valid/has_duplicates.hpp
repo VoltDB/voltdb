@@ -1,8 +1,9 @@
 // Boost.Geometry (aka GGL, Generic Geometry Library)
 
-// Copyright (c) 2014-2015, Oracle and/or its affiliates.
+// Copyright (c) 2014-2020, Oracle and/or its affiliates.
 
 // Contributed and/or modified by Menelaos Karavelas, on behalf of Oracle
+// Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
 // Licensed under the Boost Software License version 1.0.
 // http://www.boost.org/users/license.html
@@ -11,7 +12,9 @@
 #define BOOST_GEOMETRY_ALGORITHMS_DETAIL_IS_VALID_HAS_DUPLICATES_HPP
 
 #include <boost/core/ignore_unused.hpp>
-#include <boost/range.hpp>
+#include <boost/range/begin.hpp>
+#include <boost/range/end.hpp>
+#include <boost/range/size.hpp>
 
 #include <boost/geometry/core/closure.hpp>
 
@@ -33,8 +36,9 @@ namespace detail { namespace is_valid
 template <typename Range, closure_selector Closure>
 struct has_duplicates
 {
-    template <typename VisitPolicy>
-    static inline bool apply(Range const& range, VisitPolicy& visitor)
+    template <typename VisitPolicy, typename Strategy>
+    static inline bool apply(Range const& range, VisitPolicy& visitor,
+                             Strategy const& )
     {
         boost::ignore_unused(visitor);
 
@@ -51,7 +55,12 @@ struct has_duplicates
             return ! visitor.template apply<no_failure>();
         }
 
-        geometry::equal_to<typename boost::range_value<Range>::type> equal;
+        geometry::equal_to
+            <
+                typename boost::range_value<Range>::type,
+                -1,
+                typename Strategy::cs_tag
+            > equal;
 
         const_iterator it = boost::const_begin(view);
         const_iterator next = it;

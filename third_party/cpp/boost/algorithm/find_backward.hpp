@@ -2,17 +2,16 @@
    Copyright (c) T. Zachary Laine 2018.
 
    Distributed under the Boost Software License, Version 1.0. (See accompanying
-   file LICENSE10.txt or copy at http://www.boost.org/LICENSE10.txt)
+   file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 */
 #ifndef BOOST_ALGORITHM_FIND_BACKWARD_HPP
 #define BOOST_ALGORITHM_FIND_BACKWARD_HPP
 
+#include <utility>
+
 #include <boost/config.hpp>
 #include <boost/range/begin.hpp>
 #include <boost/range/end.hpp>
-
-#include <utility>
-
 
 namespace boost { namespace algorithm {
 

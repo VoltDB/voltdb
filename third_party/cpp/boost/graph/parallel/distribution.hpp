@@ -22,6 +22,7 @@
 #include <boost/iterator/counting_iterator.hpp>
 #include <boost/random/uniform_int.hpp>
 #include <boost/shared_ptr.hpp>
+#include <boost/config.hpp>
 #include <typeinfo>
 
 namespace boost { namespace parallel {
@@ -461,8 +462,12 @@ class twod_random
               make_counting_iterator(global_to_local.size()),
               global_to_local.begin());
 
+#if defined(BOOST_NO_CXX98_RANDOM_SHUFFLE)
+    std::shuffle(global_to_local.begin(), global_to_local.end(), gen);
+#else
     random_int<RandomNumberGen> rand(gen);
     std::random_shuffle(global_to_local.begin(), global_to_local.end(), rand);
+#endif
   }
       
   template<typename SizeType>
@@ -563,9 +568,12 @@ class random_distribution
               make_counting_iterator(n),
               local_to_global.begin());
 
+#if defined(BOOST_NO_CXX98_RANDOM_SHUFFLE)
+    std::shuffle(local_to_global.begin(), local_to_global.end(), gen);
+#else
     random_int<RandomNumberGen> rand(gen);
     std::random_shuffle(local_to_global.begin(), local_to_global.end(), rand);
-                        
+#endif
 
     for (std::vector<std::size_t>::size_type i = 0; i < n; ++i)
       global_to_local[local_to_global[i]] = i;

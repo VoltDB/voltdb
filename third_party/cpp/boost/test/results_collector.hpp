@@ -97,7 +97,7 @@ public:
     /// @returns
     ///   - @c boost::exit_success on success,
     ///   - @c boost::exit_exception_failure in case test unit
-    ///     was aborted for any reason (incuding uncaught exception)
+    ///     was aborted for any reason (including uncaught exception)
     ///   - and @c boost::exit_test_failure otherwise
     int             result_code() const;
 
@@ -121,18 +121,18 @@ public:
 class BOOST_TEST_DECL results_collector_t : public test_observer {
 public:
 
-    virtual void        test_start( counter_t );
+    void        test_start( counter_t, test_unit_id ) BOOST_OVERRIDE;
 
-    virtual void        test_unit_start( test_unit const& );
-    virtual void        test_unit_finish( test_unit const&, unsigned long );
-    virtual void        test_unit_skipped( test_unit const&, const_string );
-    virtual void        test_unit_aborted( test_unit const& );
-    virtual void        test_unit_timed_out( test_unit const& );
+    void        test_unit_start( test_unit const& ) BOOST_OVERRIDE;
+    void        test_unit_finish( test_unit const&, unsigned long ) BOOST_OVERRIDE;
+    void        test_unit_skipped( test_unit const&, const_string ) BOOST_OVERRIDE;
+    void        test_unit_aborted( test_unit const& ) BOOST_OVERRIDE;
+    void        test_unit_timed_out( test_unit const& ) BOOST_OVERRIDE;
 
-    virtual void        assertion_result( unit_test::assertion_result );
-    virtual void        exception_caught( execution_exception const& );
+    void        assertion_result( unit_test::assertion_result ) BOOST_OVERRIDE;
+    void        exception_caught( execution_exception const& ) BOOST_OVERRIDE;
 
-    virtual int         priority() { return 3; }
+    int         priority() BOOST_OVERRIDE { return 3; }
 
     /// Results access per test unit
     ///

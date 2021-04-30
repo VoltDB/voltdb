@@ -45,40 +45,23 @@ namespace boost { namespace spirit { namespace x3
         static bool const is_pass_through_unary = false;
         static bool const has_action = false;
 
-        Derived const& derived() const
+        constexpr Derived const& derived() const
         {
             return *static_cast<Derived const*>(this);
         }
 
         template <typename Action>
-        action<Derived, Action> operator[](Action f) const
+        constexpr action<Derived, Action> operator[](Action f) const
         {
             return { this->derived(), f };
         }
 
         template <typename Handler>
-        guard<Derived, Handler> on_error(Handler f) const
+        constexpr guard<Derived, Handler> on_error(Handler f) const
         {
             return { this->derived(), f };
         }
     };
-
-    namespace detail {
-        template <typename Parser>
-        static void assert_initialized_rule(Parser const& p) {
-            boost::ignore_unused(p);
-
-            // Assert that we are not copying an unitialized static rule. If
-            // the static is in another TU, it may be initialized after we copy
-            // it. If so, its name member will be nullptr.
-            //
-            // Rather than hardcoding behaviour for rule-type subject parsers,
-            // we simply allow get_info<> to do the check in debug builds.
-#ifndef NDEBUG
-            what(p); // note: allows get_info<> to diagnose the issue
-#endif
-        }
-    }
 
     struct unary_category;
     struct binary_category;
@@ -90,8 +73,8 @@ namespace boost { namespace spirit { namespace x3
         typedef Subject subject_type;
         static bool const has_action = Subject::has_action;
 
-        unary_parser(Subject const& subject)
-            : subject(subject) { detail::assert_initialized_rule(subject); }
+        constexpr unary_parser(Subject const& subject)
+            : subject(subject) {}
 
         unary_parser const& get_unary() const { return *this; }
 
@@ -107,12 +90,8 @@ namespace boost { namespace spirit { namespace x3
         static bool const has_action =
             left_type::has_action || right_type::has_action;
 
-        binary_parser(Left const& left, Right const& right)
-            : left(left), right(right)
-        {
-            detail::assert_initialized_rule(left);
-            detail::assert_initialized_rule(right);
-        }
+        constexpr binary_parser(Left const& left, Right const& right)
+            : left(left), right(right) {}
 
         binary_parser const& get_binary() const { return *this; }
 
@@ -162,7 +141,7 @@ namespace boost { namespace spirit { namespace x3
         {
             typedef unused_type type;
             typedef unused_type value_type;
-            static type call(unused_type)
+            static constexpr type call(unused_type)
             {
                 return unused;
             }
@@ -174,7 +153,7 @@ namespace boost { namespace spirit { namespace x3
         {
             typedef Derived const& type;
             typedef Derived value_type;
-            static type call(Derived const& p)
+            static constexpr type call(Derived const& p)
             {
                 return p;
             }
@@ -185,7 +164,7 @@ namespace boost { namespace spirit { namespace x3
         {
             typedef Derived const& type;
             typedef Derived value_type;
-            static type call(parser<Derived> const& p)
+            static constexpr type call(parser<Derived> const& p)
             {
                 return p.derived();
             }
@@ -193,14 +172,14 @@ namespace boost { namespace spirit { namespace x3
     }
 
     template <typename T>
-    inline typename extension::as_parser<T>::type
+    constexpr typename extension::as_parser<T>::type
     as_parser(T const& x)
     {
         return extension::as_parser<T>::call(x);
     }
 
     template <typename Derived>
-    inline Derived const&
+    constexpr Derived const&
     as_parser(parser<Derived> const& p)
     {
         return p.derived();

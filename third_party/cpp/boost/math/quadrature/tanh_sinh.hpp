@@ -113,6 +113,10 @@ auto tanh_sinh<Real, Policy>::integrate(const F f, Real a, Real b, Real toleranc
           {
              *L1 *= 2;
           }
+          if (error)
+          {
+             *error *= 2;
+          }
 
           return Q;
        }
@@ -140,14 +144,22 @@ auto tanh_sinh<Real, Policy>::integrate(const F f, Real a, Real b, Real toleranc
           {
              *L1 *= 2;
           }
+          if (error)
+          {
+             *error *= 2;
+          }
           return Q;
        }
 
        if ((boost::math::isfinite)(a) && (boost::math::isfinite)(b))
        {
-          if (b <= a)
+          if (a == b)
           {
-             return policies::raise_domain_error(function, "Arguments to integrate are in wrong order; integration over [a,b] must have b > a.", a, Policy());
+             return result_type(0);
+          }
+          if (b < a)
+          {
+             return -this->integrate(f, b, a, tolerance, error, L1, levels);
           }
           Real avg = (a + b)*half<Real>();
           Real diff = (b - a)*half<Real>();
@@ -181,7 +193,7 @@ auto tanh_sinh<Real, Policy>::integrate(const F f, Real a, Real b, Real toleranc
                   return f(diff * (avg_over_diff_m1 - zc));
                 position = a - diff * zc;
              }
-             if (z > 0.5)
+             else if (z > 0.5)
              {
                 if(have_small_right)
                   return f(diff * (avg_over_diff_p1 - zc));
@@ -198,6 +210,10 @@ auto tanh_sinh<Real, Policy>::integrate(const F f, Real a, Real b, Real toleranc
           if (L1)
           {
              *L1 *= diff;
+          }
+          if (error)
+          {
+             *error *= diff;
           }
           return Q;
        }
@@ -236,6 +252,10 @@ auto tanh_sinh<Real, Policy>::integrate(const F f, Real a, Real b, Real toleranc
       if (L1)
       {
          *L1 *= diff;
+      }
+      if (error)
+      {
+         *error *= diff;
       }
       return Q;
    }

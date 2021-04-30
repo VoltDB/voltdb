@@ -10,6 +10,10 @@
 #ifndef BOOST_DETAIL_WINAPI_CRITICAL_SECTION_HPP
 #define BOOST_DETAIL_WINAPI_CRITICAL_SECTION_HPP
 
+#include <boost/config/header_deprecated.hpp>
+
+BOOST_HEADER_DEPRECATED("<boost/winapi/critical_section.hpp>")
+
 #include <boost/winapi/critical_section.hpp>
 #include <boost/detail/winapi/detail/deprecated_namespace.hpp>
 

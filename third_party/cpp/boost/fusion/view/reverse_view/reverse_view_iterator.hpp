@@ -48,9 +48,8 @@ namespace boost { namespace fusion
 
         first_type first;
 
-    private:
         // silence MSVC warning C4512: assignment operator could not be generated
-        reverse_view_iterator& operator= (reverse_view_iterator const&);
+        BOOST_DELETED_FUNCTION(reverse_view_iterator& operator= (reverse_view_iterator const&))
     };
 }}
 

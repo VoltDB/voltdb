@@ -2,8 +2,8 @@
 
 // Copyright (c) 2008-2015 Barend Gehrels, Amsterdam, the Netherlands.
 
-// This file was modified by Oracle on 2017, 2018.
-// Modifications copyright (c) 2017-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2017, 2018, 2019.
+// Modifications copyright (c) 2017-2019, Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle.
 
 // Use, modification and distribution is subject to the Boost Software License,
@@ -62,18 +62,12 @@ namespace projections
             static const double FXC2 = 1.11072;
             static const double FYC = 0.49931;
 
-            // template class, using CRTP to implement forward/inverse
             template <typename T, typename Parameters>
             struct base_boggs_spheroid
-                : public base_t_f<base_boggs_spheroid<T, Parameters>, T, Parameters>
             {
-                inline base_boggs_spheroid(const Parameters& par)
-                    : base_t_f<base_boggs_spheroid<T, Parameters>, T, Parameters>(*this, par)
-                {}
-
                 // FORWARD(s_forward)  spheroid
                 // Project coordinates from geographic (lon, lat) to cartesian (x, y)
-                inline void fwd(T const& lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
+                inline void fwd(Parameters const& , T const& lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
                 {
                     static const T half_pi = detail::half_pi<T>();
                     static const T pi = detail::pi<T>();
@@ -132,10 +126,9 @@ namespace projections
     struct boggs_spheroid : public detail::boggs::base_boggs_spheroid<T, Parameters>
     {
         template <typename Params>
-        inline boggs_spheroid(Params const& , Parameters const& par)
-            : detail::boggs::base_boggs_spheroid<T, Parameters>(par)
+        inline boggs_spheroid(Params const& , Parameters & par)
         {
-            detail::boggs::setup_boggs(this->m_par);
+            detail::boggs::setup_boggs(par);
         }
     };
 
@@ -144,7 +137,7 @@ namespace projections
     {
 
         // Static projection
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_boggs, boggs_spheroid, boggs_spheroid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_F(srs::spar::proj_boggs, boggs_spheroid)
 
         // Factory entry(s)
         BOOST_GEOMETRY_PROJECTIONS_DETAIL_FACTORY_ENTRY_F(boggs_entry, boggs_spheroid)

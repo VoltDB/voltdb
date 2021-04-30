@@ -208,6 +208,26 @@ struct dispatch_table
         {
             self->entries[0] = &convert_event_and_forward<Transition>::execute;
         }
+        template <class Transition>
+        typename ::boost::disable_if<
+            typename ::boost::is_same<typename Transition::current_state_type,Fsm>::type
+        ,void>::type
+        init_event_base_case(Transition const&, ::boost::mpl::true_ const &, ::boost::mpl::true_ const &) const
+        {
+            typedef typename create_stt<Fsm>::type stt;
+            BOOST_STATIC_CONSTANT(int, state_id =
+                (get_state_id<stt,typename Transition::current_state_type>::value));
+            self->entries[state_id+1] = &convert_event_and_forward<Transition>::execute;
+        }
+        template <class Transition>
+        typename ::boost::enable_if<
+            typename ::boost::is_same<typename Transition::current_state_type,Fsm>::type
+        ,void>::type
+        init_event_base_case(Transition const&, ::boost::mpl::true_ const &, ::boost::mpl::true_ const &) const
+        {
+            self->entries[0] = &convert_event_and_forward<Transition>::execute;
+        }
+        // end version for kleene
 
         // version for transition event base of our event
         // first for all transitions, then for internal ones of a fsm

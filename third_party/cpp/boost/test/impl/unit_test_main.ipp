@@ -30,6 +30,7 @@
 #include <boost/test/utils/basic_cstring/io.hpp>
 
 // Boost
+#include <boost/core/ignore_unused.hpp>
 #include <boost/cstdlib.hpp>
 
 // STL
@@ -67,15 +68,15 @@ private:
 
         m_os << "\n";
     }
-    virtual void    visit( test_case const& tc ) { report_test_unit( tc ); }
-    virtual bool    test_suite_start( test_suite const& ts )
+    void    visit( test_case const& tc ) BOOST_OVERRIDE { report_test_unit( tc ); }
+    bool    test_suite_start( test_suite const& ts ) BOOST_OVERRIDE
     {
         if( m_indent >= 0 )
             report_test_unit( ts );
         m_indent += 4;
         return true;
     }
-    virtual void    test_suite_finish( test_suite const& )
+    void    test_suite_finish( test_suite const& ) BOOST_OVERRIDE
     {
         m_indent -= 4;
     }
@@ -132,11 +133,11 @@ private:
         }
 
     }
-    virtual void    visit( test_case const& tc )
+    void    visit( test_case const& tc ) BOOST_OVERRIDE
     { 
         report_test_unit( tc );
     }
-    virtual bool    test_suite_start( test_suite const& ts )
+    bool    test_suite_start( test_suite const& ts ) BOOST_OVERRIDE
     {
         if( ts.p_parent_id == INV_TEST_UNIT_ID )
             m_os << "digraph G {rankdir=LR;\n";
@@ -147,7 +148,7 @@ private:
 
         return true;
     }
-    virtual void    test_suite_finish( test_suite const& ts )
+    void    test_suite_finish( test_suite const& ts ) BOOST_OVERRIDE
     {
         m_os << "}\n";
         if( ts.p_parent_id == INV_TEST_UNIT_ID )
@@ -165,7 +166,7 @@ struct labels_collector : test_tree_visitor {
     std::set<std::string> const& labels() const { return m_labels; }
 
 private:
-    virtual bool            visit( test_unit const& tu ) 
+    bool            visit( test_unit const& tu ) BOOST_OVERRIDE
     {
         m_labels.insert( tu.p_labels->begin(), tu.p_labels->end() );
         return true;
@@ -200,6 +201,7 @@ unit_test_main( init_unit_test_func init_func, int argc, char* argv[] )
     int result_code = 0;
 
     ut_detail::framework_shutdown_helper shutdown_helper;
+    boost::ignore_unused(shutdown_helper);
 
     BOOST_TEST_I_TRY {
         

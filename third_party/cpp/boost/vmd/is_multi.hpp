@@ -46,7 +46,7 @@
 
     \brief Determines if the sequence has more than one element, referred to as a multi-element sequence.
     
-    d        = The next available BOOST_PP_WHILE iteration. 
+    d        = The next available BOOST_PP_WHILE iteration. <br/>
     sequence = a sequence
 
     returns = 1 if the sequence is a multi-element sequence, else returns 0.

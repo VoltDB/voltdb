@@ -2,8 +2,8 @@
 
 // Copyright (c) 2007-2012 Barend Gehrels, Amsterdam, the Netherlands.
 
-// This file was modified by Oracle on 2013, 2014, 2015, 2017, 2018.
-// Modifications copyright (c) 2013-2018 Oracle and/or its affiliates.
+// This file was modified by Oracle on 2013-2020.
+// Modifications copyright (c) 2013-2020 Oracle and/or its affiliates.
 
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
@@ -60,11 +60,8 @@ struct point_geometry
         if ( BOOST_GEOMETRY_CONDITION(result.interrupt) )
             return;
 
-        typedef detail::relate::topology_check
-            <
-                Geometry,
-                typename Strategy::equals_point_point_strategy_type
-            > tc_t;
+        typedef detail::relate::topology_check<Geometry, Strategy> tc_t;
+
         if ( relate::may_update<exterior, interior, tc_t::interior, Transpose>(result)
           || relate::may_update<exterior, boundary, tc_t::boundary, Transpose>(result) )
         {
@@ -79,7 +76,7 @@ struct point_geometry
             else
             {
                 // check if there is a boundary in Geometry
-                tc_t tc(geometry);
+                tc_t tc(geometry, strategy);
                 if ( tc.has_interior() )
                     relate::set<exterior, interior, tc_t::interior, Transpose>(result);
                 if ( tc.has_boundary() )

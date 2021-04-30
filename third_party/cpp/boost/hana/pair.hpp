@@ -37,7 +37,11 @@ BOOST_HANA_NAMESPACE_BEGIN
     //////////////////////////////////////////////////////////////////////////
     //! @cond
     template <typename First, typename Second>
+#ifdef BOOST_HANA_WORKAROUND_MSVC_EMPTYBASE
+    struct __declspec(empty_bases) pair : detail::operators::adl<pair<First, Second>>
+#else
     struct pair : detail::operators::adl<pair<First, Second>>
+#endif
                 , private detail::ebo<detail::pix<0>, First>
                 , private detail::ebo<detail::pix<1>, Second>
     {

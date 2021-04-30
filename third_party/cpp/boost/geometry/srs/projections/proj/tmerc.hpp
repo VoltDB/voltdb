@@ -2,8 +2,8 @@
 
 // Copyright (c) 2008-2015 Barend Gehrels, Amsterdam, the Netherlands.
 
-// This file was modified by Oracle on 2017, 2018.
-// Modifications copyright (c) 2017-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2017, 2018, 2019.
+// Modifications copyright (c) 2017-2019, Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle.
 
 // Use, modification and distribution is subject to the Boost Software License,
@@ -86,20 +86,14 @@ namespace projections
                 detail::en<T> en;
             };
 
-            // template class, using CRTP to implement forward/inverse
             template <typename T, typename Parameters>
             struct base_tmerc_ellipsoid
-                : public base_t_fi<base_tmerc_ellipsoid<T, Parameters>, T, Parameters>
             {
                 par_tmerc<T> m_proj_parm;
 
-                inline base_tmerc_ellipsoid(const Parameters& par)
-                    : base_t_fi<base_tmerc_ellipsoid<T, Parameters>, T, Parameters>(*this, par)
-                {}
-
                 // FORWARD(e_forward)  ellipse
                 // Project coordinates from geographic (lon, lat) to cartesian (x, y)
-                inline void fwd(T const& lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
+                inline void fwd(Parameters const& par, T const& lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
                 {
                     static const T half_pi = detail::half_pi<T>();
                     static const T FC1 = tmerc::FC1<T>();
@@ -134,14 +128,14 @@ namespace projections
                     t *= t;
                     al = cosphi * lp_lon;
                     als = al * al;
-                    al /= sqrt(1. - this->m_par.es * sinphi * sinphi);
+                    al /= sqrt(1. - par.es * sinphi * sinphi);
                     n = this->m_proj_parm.esp * cosphi * cosphi;
-                    xy_x = this->m_par.k0 * al * (FC1 +
+                    xy_x = par.k0 * al * (FC1 +
                         FC3 * als * (1. - t + n +
                         FC5 * als * (5. + t * (t - 18.) + n * (14. - 58. * t)
                         + FC7 * als * (61. + t * ( t * (179. - t) - 479. ) )
                         )));
-                    xy_y = this->m_par.k0 * (pj_mlfn(lp_lat, sinphi, cosphi, this->m_proj_parm.en) - this->m_proj_parm.ml0 +
+                    xy_y = par.k0 * (pj_mlfn(lp_lat, sinphi, cosphi, this->m_proj_parm.en) - this->m_proj_parm.ml0 +
                         sinphi * al * lp_lon * FC2 * ( 1. +
                         FC4 * als * (5. - t + n * (9. + 4. * n) +
                         FC6 * als * (61. + t * (t - 58.) + n * (270. - 330 * t)
@@ -151,7 +145,7 @@ namespace projections
 
                 // INVERSE(e_inverse)  ellipsoid
                 // Project coordinates from cartesian (x, y) to geographic (lon, lat)
-                inline void inv(T const& xy_x, T const& xy_y, T& lp_lon, T& lp_lat) const
+                inline void inv(Parameters const& par, T const& xy_x, T const& xy_y, T& lp_lon, T& lp_lat) const
                 {
                     static const T half_pi = detail::half_pi<T>();
                     static const T FC1 = tmerc::FC1<T>();
@@ -165,7 +159,7 @@ namespace projections
 
                     T n, con, cosphi, d, ds, sinphi, t;
 
-                    lp_lat = pj_inv_mlfn(this->m_proj_parm.ml0 + xy_y / this->m_par.k0, this->m_par.es, this->m_proj_parm.en);
+                    lp_lat = pj_inv_mlfn(this->m_proj_parm.ml0 + xy_y / par.k0, par.es, this->m_proj_parm.en);
                     if (fabs(lp_lat) >= half_pi) {
                         lp_lat = xy_y < 0. ? -half_pi : half_pi;
                         lp_lon = 0.;
@@ -174,11 +168,11 @@ namespace projections
                         cosphi = cos(lp_lat);
                         t = fabs(cosphi) > 1e-10 ? sinphi/cosphi : 0.;
                         n = this->m_proj_parm.esp * cosphi * cosphi;
-                        d = xy_x * sqrt(con = 1. - this->m_par.es * sinphi * sinphi) / this->m_par.k0;
+                        d = xy_x * sqrt(con = 1. - par.es * sinphi * sinphi) / par.k0;
                         con *= t;
                         t *= t;
                         ds = d * d;
-                        lp_lat -= (con * ds / (1.-this->m_par.es)) * FC2 * (1. -
+                        lp_lat -= (con * ds / (1.-par.es)) * FC2 * (1. -
                             ds * FC4 * (5. + t * (3. - 9. *  n) + n * (1. - 4 * n) -
                             ds * FC6 * (61. + t * (90. - 252. * n +
                                 45. * t) + 46. * n
@@ -199,20 +193,14 @@ namespace projections
 
             };
 
-            // template class, using CRTP to implement forward/inverse
             template <typename T, typename Parameters>
             struct base_tmerc_spheroid
-                : public base_t_fi<base_tmerc_spheroid<T, Parameters>, T, Parameters>
             {
                 par_tmerc<T> m_proj_parm;
 
-                inline base_tmerc_spheroid(const Parameters& par)
-                    : base_t_fi<base_tmerc_spheroid<T, Parameters>, T, Parameters>(*this, par)
-                {}
-
                 // FORWARD(s_forward)  sphere
                 // Project coordinates from geographic (lon, lat) to cartesian (x, y)
-                inline void fwd(T const& lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
+                inline void fwd(Parameters const& par, T const& lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
                 {
                     static const T half_pi = detail::half_pi<T>();
 
@@ -251,22 +239,22 @@ namespace projections
 
                     if (lp_lat < 0.)
                         xy_y = -xy_y;
-                    xy_y = this->m_proj_parm.esp * (xy_y - this->m_par.phi0);
+                    xy_y = this->m_proj_parm.esp * (xy_y - par.phi0);
                 }
 
                 // INVERSE(s_inverse)  sphere
                 // Project coordinates from cartesian (x, y) to geographic (lon, lat)
-                inline void inv(T const& xy_x, T const& xy_y, T& lp_lon, T& lp_lat) const
+                inline void inv(Parameters const& par, T const& xy_x, T const& xy_y, T& lp_lon, T& lp_lat) const
                 {
                     T h, g;
 
                     h = exp(xy_x / this->m_proj_parm.esp);
                     g = .5 * (h - 1. / h);
-                    h = cos(this->m_par.phi0 + xy_y / this->m_proj_parm.esp);
+                    h = cos(par.phi0 + xy_y / this->m_proj_parm.esp);
                     lp_lat = asin(sqrt((1. - h * h) / (1. + g * g)));
 
                     /* Make sure that phi is on the correct hemisphere when false northing is used */
-                    if (xy_y < 0. && -lp_lat+this->m_par.phi0 < 0.0) lp_lat = -lp_lat;
+                    if (xy_y < 0. && -lp_lat+par.phi0 < 0.0) lp_lat = -lp_lat;
 
                     lp_lon = (g != 0.0 || h != 0.0) ? atan2(g, h) : 0.;
                 }
@@ -279,7 +267,7 @@ namespace projections
             };
 
             template <typename Parameters, typename T>
-            inline void setup(Parameters& par, par_tmerc<T>& proj_parm)
+            inline void setup(Parameters const& par, par_tmerc<T>& proj_parm)
             {
                 if (par.es != 0.0) {
                     proj_parm.en = pj_enfn<T>(par.es);
@@ -312,9 +300,8 @@ namespace projections
     {
         template <typename Params>
         inline tmerc_ellipsoid(Params const&, Parameters const& par)
-            : detail::tmerc::base_tmerc_ellipsoid<T, Parameters>(par)
         {
-            detail::tmerc::setup(this->m_par, this->m_proj_parm);
+            detail::tmerc::setup(par, this->m_proj_parm);
         }
     };
 
@@ -336,9 +323,8 @@ namespace projections
     {
         template <typename Params>
         inline tmerc_spheroid(Params const&, Parameters const& par)
-            : detail::tmerc::base_tmerc_spheroid<T, Parameters>(par)
         {
-            detail::tmerc::setup(this->m_par, this->m_proj_parm);
+            detail::tmerc::setup(par, this->m_proj_parm);
         }
     };
 
@@ -347,7 +333,7 @@ namespace projections
     {
 
         // Static projection
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_tmerc, tmerc_spheroid, tmerc_ellipsoid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI2(srs::spar::proj_tmerc, tmerc_spheroid, tmerc_ellipsoid)
         
         // Factory entry(s) - dynamic projection
         BOOST_GEOMETRY_PROJECTIONS_DETAIL_FACTORY_ENTRY_FI2(tmerc_entry, tmerc_spheroid, tmerc_ellipsoid)

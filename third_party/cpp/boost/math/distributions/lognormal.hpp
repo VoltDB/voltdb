@@ -328,6 +328,15 @@ inline RealType kurtosis_excess(const lognormal_distribution<RealType, Policy>& 
    return exp(4 * ss) + 2 * exp(3 * ss) + 3 * exp(2 * ss) - 6;
 }
 
+template <class RealType, class Policy>
+inline RealType entropy(const lognormal_distribution<RealType, Policy>& dist)
+{
+   using std::log;
+   RealType mu = dist.location();
+   RealType sigma = dist.scale();
+   return mu + log(constants::two_pi<RealType>()*constants::e<RealType>()*sigma*sigma)/2;
+}
+
 } // namespace math
 } // namespace boost
 

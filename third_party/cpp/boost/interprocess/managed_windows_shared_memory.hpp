@@ -38,12 +38,31 @@ namespace interprocess {
 
 namespace ipcdetail {
 
-template<class AllocationAlgorithm>
+template
+      <
+         class CharType,
+         class AllocationAlgorithm,
+         template<class IndexConfig> class IndexType
+      >
 struct wshmem_open_or_create
 {
+   static const std::size_t segment_manager_alignment = boost::move_detail::alignment_of
+         < segment_manager
+               < CharType
+               , AllocationAlgorithm
+               , IndexType>
+         >::value;
+   static const std::size_t final_segment_manager_alignment
+      = segment_manager_alignment > AllocationAlgorithm::Alignment
+      ? segment_manager_alignment : AllocationAlgorithm::Alignment;
+
    typedef  ipcdetail::managed_open_or_create_impl
-      < windows_shared_memory, AllocationAlgorithm::Alignment, false, false> type;
+      < windows_shared_memory
+      , final_segment_manager_alignment
+      , false
+      , false> type;
 };
+
 
 }  //namespace ipcdetail {
 
@@ -67,13 +86,15 @@ template
 class basic_managed_windows_shared_memory
    : public ipcdetail::basic_managed_memory_impl
       < CharType, AllocationAlgorithm, IndexType
-      , ipcdetail::wshmem_open_or_create<AllocationAlgorithm>::type::ManagedOpenOrCreateUserOffset>
+      , ipcdetail::wshmem_open_or_create
+         <CharType, AllocationAlgorithm, IndexType>::type::ManagedOpenOrCreateUserOffset>
 {
    #if !defined(BOOST_INTERPROCESS_DOXYGEN_INVOKED)
    private:
    typedef ipcdetail::basic_managed_memory_impl
-      <CharType, AllocationAlgorithm, IndexType,
-      ipcdetail::wshmem_open_or_create<AllocationAlgorithm>::type::ManagedOpenOrCreateUserOffset>   base_t;
+      < CharType, AllocationAlgorithm, IndexType
+      , ipcdetail::wshmem_open_or_create
+         <CharType, AllocationAlgorithm, IndexType>::type::ManagedOpenOrCreateUserOffset>   base_t;
    typedef ipcdetail::create_open_func<base_t>        create_open_func_t;
 
    basic_managed_windows_shared_memory *get_this_pointer()
@@ -89,7 +110,7 @@ class basic_managed_windows_shared_memory
 
    //!Default constructor. Does nothing.
    //!Useful in combination with move semantics
-   basic_managed_windows_shared_memory()
+   basic_managed_windows_shared_memory() BOOST_NOEXCEPT
    {}
 
    //!Creates shared memory and creates and places the segment manager.
@@ -143,15 +164,57 @@ class basic_managed_windows_shared_memory
                 create_open_func_t(get_this_pointer(), ipcdetail::DoOpen))
    {}
 
+   //!Creates shared memory and creates and places the segment manager if
+   //!segment was not created. If segment was created it connects to the
+   //!segment.
+   //!This can throw.
+   basic_managed_windows_shared_memory
+      (open_or_create_t,
+      const wchar_t *name, size_type size,
+      const void *addr = 0,
+      const permissions &perm = permissions())
+      : m_wshm(open_or_create, name, size, read_write, addr,
+                create_open_func_t(get_this_pointer(),
+                ipcdetail::DoOpenOrCreate), perm)
+   {}
+
+   //!Connects to a created shared memory and its segment manager.
+   //!This can throw.
+   basic_managed_windows_shared_memory
+      (open_only_t, const wchar_t* name, const void *addr = 0)
+      : m_wshm(open_only, name, read_write, addr,
+                create_open_func_t(get_this_pointer(),
+                ipcdetail::DoOpen))
+   {}
+
+   //!Connects to a created shared memory and its segment manager
+   //!in copy_on_write mode.
+   //!This can throw.
+   basic_managed_windows_shared_memory
+      (open_copy_on_write_t, const wchar_t* name, const void *addr = 0)
+      : m_wshm(open_only, name, copy_on_write, addr,
+                create_open_func_t(get_this_pointer(), ipcdetail::DoOpen))
+   {}
+
+   //!Connects to a created shared memory and its segment manager
+   //!in read-only mode.
+   //!This can throw.
+   basic_managed_windows_shared_memory
+      (open_read_only_t, const wchar_t* name, const void *addr = 0)
+      : base_t()
+      , m_wshm(open_only, name, read_only, addr,
+                create_open_func_t(get_this_pointer(), ipcdetail::DoOpen))
+   {}
+
    //!Moves the ownership of "moved"'s managed memory to *this.
    //!Does not throw
    basic_managed_windows_shared_memory
-      (BOOST_RV_REF(basic_managed_windows_shared_memory) moved)
+      (BOOST_RV_REF(basic_managed_windows_shared_memory) moved) BOOST_NOEXCEPT
    {  this->swap(moved);   }
 
    //!Moves the ownership of "moved"'s managed memory to *this.
    //!Does not throw
-   basic_managed_windows_shared_memory &operator=(BOOST_RV_REF(basic_managed_windows_shared_memory) moved)
+   basic_managed_windows_shared_memory &operator=(BOOST_RV_REF(basic_managed_windows_shared_memory) moved) BOOST_NOEXCEPT
    {
       basic_managed_windows_shared_memory tmp(boost::move(moved));
       this->swap(tmp);
@@ -168,7 +231,7 @@ class basic_managed_windows_shared_memory
 
    //!Swaps the ownership of the managed mapped memories managed by *this and other.
    //!Never throws.
-   void swap(basic_managed_windows_shared_memory &other)
+   void swap(basic_managed_windows_shared_memory &other) BOOST_NOEXCEPT
    {
       base_t::swap(other);
       m_wshm.swap(other.m_wshm);
@@ -191,7 +254,8 @@ class basic_managed_windows_shared_memory
    }
 
    private:
-   typename ipcdetail::wshmem_open_or_create<AllocationAlgorithm>::type m_wshm;
+   typename ipcdetail::wshmem_open_or_create
+      <CharType, AllocationAlgorithm, IndexType>::type m_wshm;
    #endif   //#ifndef BOOST_INTERPROCESS_DOXYGEN_INVOKED
 };
 

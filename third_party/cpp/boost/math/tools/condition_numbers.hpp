@@ -79,7 +79,7 @@ private:
 };
 
 template<class F, class Real>
-auto evaluation_condition_number(F const & f, Real const & x)
+Real evaluation_condition_number(F const & f, Real const & x)
 {
     using std::abs;
     using std::isnan;

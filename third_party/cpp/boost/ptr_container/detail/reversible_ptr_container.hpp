@@ -410,7 +410,7 @@ namespace ptr_container_detail
           : c_( a )
         { 
             constructor_impl( first, last, 
-#if BOOST_WORKAROUND(__BORLANDC__, BOOST_TESTED_AT(0x564))
+#if BOOST_WORKAROUND(BOOST_BORLANDC, BOOST_TESTED_AT(0x564))
 #else
                               BOOST_DEDUCED_TYPENAME
 #endif                              
@@ -440,7 +440,7 @@ namespace ptr_container_detail
           : c_( n )
         {
             constructor_impl( first, last, 
-#if BOOST_WORKAROUND(__BORLANDC__, BOOST_TESTED_AT(0x564))
+#if BOOST_WORKAROUND(BOOST_BORLANDC, BOOST_TESTED_AT(0x564))
 #else
                               BOOST_DEDUCED_TYPENAME
 #endif                              
@@ -730,7 +730,7 @@ namespace ptr_container_detail
     }; // 'reversible_ptr_container'
 
 
-#if BOOST_WORKAROUND(__BORLANDC__, BOOST_TESTED_AT(0x564))    
+#if BOOST_WORKAROUND(BOOST_BORLANDC, BOOST_TESTED_AT(0x564))    
 #define BOOST_PTR_CONTAINER_DEFINE_RELEASE( base_type ) \
     typename base_type::auto_type                   \
     release( typename base_type::iterator i )       \

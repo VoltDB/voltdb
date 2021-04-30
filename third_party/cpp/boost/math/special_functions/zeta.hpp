@@ -24,7 +24,7 @@
 // This is the only way we can avoid
 // warning: non-standard suffix on floating constant [-Wpedantic]
 // when building with -Wall -pedantic.  Neither __extension__
-// nor #pragma dianostic ignored work :(
+// nor #pragma diagnostic ignored work :(
 //
 #pragma GCC system_header
 #endif
@@ -50,15 +50,15 @@ struct zeta_series_cache_size
    //
    typedef typename boost::math::policies::precision<T,Policy>::type precision_type;
    typedef typename mpl::if_<
-      mpl::less_equal<precision_type, mpl::int_<0> >,
-      mpl::int_<5000>,
+      mpl::less_equal<precision_type, std::integral_constant<int, 0> >,
+      std::integral_constant<int, 5000>,
       typename mpl::if_<
-         mpl::less_equal<precision_type, mpl::int_<64> >,
-         mpl::int_<70>,
+         mpl::less_equal<precision_type, std::integral_constant<int, 64> >,
+         std::integral_constant<int, 70>,
          typename mpl::if_<
-            mpl::less_equal<precision_type, mpl::int_<113> >,
-            mpl::int_<100>,
-            mpl::int_<5000>
+            mpl::less_equal<precision_type, std::integral_constant<int, 113> >,
+            std::integral_constant<int, 100>,
+            std::integral_constant<int, 5000>
          >::type
       >::type
    >::type type;
@@ -174,7 +174,7 @@ T zeta_polynomial_series(T s, T sc, Policy const &)
 }
 
 template <class T, class Policy>
-T zeta_imp_prec(T s, T sc, const Policy& pol, const mpl::int_<0>&)
+T zeta_imp_prec(T s, T sc, const Policy& pol, const std::integral_constant<int, 0>&)
 {
    BOOST_MATH_STD_USING
    T result;
@@ -199,7 +199,7 @@ T zeta_imp_prec(T s, T sc, const Policy& pol, const mpl::int_<0>&)
 }
 
 template <class T, class Policy>
-inline T zeta_imp_prec(T s, T sc, const Policy&, const mpl::int_<53>&)
+inline T zeta_imp_prec(T s, T sc, const Policy&, const std::integral_constant<int, 53>&)
 {
    BOOST_MATH_STD_USING
    T result;
@@ -373,7 +373,7 @@ inline T zeta_imp_prec(T s, T sc, const Policy&, const mpl::int_<53>&)
 }
 
 template <class T, class Policy>
-T zeta_imp_prec(T s, T sc, const Policy&, const mpl::int_<64>&)
+T zeta_imp_prec(T s, T sc, const Policy&, const std::integral_constant<int, 64>&)
 {
    BOOST_MATH_STD_USING
    T result;
@@ -556,7 +556,7 @@ T zeta_imp_prec(T s, T sc, const Policy&, const mpl::int_<64>&)
 }
 
 template <class T, class Policy>
-T zeta_imp_prec(T s, T sc, const Policy&, const mpl::int_<113>&)
+T zeta_imp_prec(T s, T sc, const Policy&, const std::integral_constant<int, 113>&)
 {
    BOOST_MATH_STD_USING
    T result;
@@ -877,7 +877,7 @@ T zeta_imp_prec(T s, T sc, const Policy&, const mpl::int_<113>&)
 }
 
 template <class T, class Policy>
-T zeta_imp_odd_integer(int s, const T&, const Policy&, const mpl::true_&)
+T zeta_imp_odd_integer(int s, const T&, const Policy&, const std::true_type&)
 {
    static const T results[] = {
       BOOST_MATH_BIG_CONSTANT(T, 113, 1.2020569031595942853997381615114500), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0369277551433699263313654864570342), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0083492773819228268397975498497968), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0020083928260822144178527692324121), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0004941886041194645587022825264699), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0001227133475784891467518365263574), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0000305882363070204935517285106451), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0000076371976378997622736002935630), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0000019082127165539389256569577951), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0000004769329867878064631167196044), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0000001192199259653110730677887189), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0000000298035035146522801860637051), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0000000074507117898354294919810042), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0000000018626597235130490064039099), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0000000004656629065033784072989233), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0000000001164155017270051977592974), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0000000000291038504449709968692943), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0000000000072759598350574810145209), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0000000000018189896503070659475848), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0000000000004547473783042154026799), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0000000000001136868407680227849349), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0000000000000284217097688930185546), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0000000000000071054273952108527129), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0000000000000017763568435791203275), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0000000000000004440892103143813364), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0000000000000001110223025141066134), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0000000000000000277555756213612417), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0000000000000000069388939045441537), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0000000000000000017347234760475766), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0000000000000000004336808690020650), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0000000000000000001084202172494241), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0000000000000000000271050543122347), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0000000000000000000067762635780452), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0000000000000000000016940658945098), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0000000000000000000004235164736273), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0000000000000000000001058791184068), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0000000000000000000000264697796017), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0000000000000000000000066174449004), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0000000000000000000000016543612251), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0000000000000000000000004135903063), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0000000000000000000000001033975766), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0000000000000000000000000258493941), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0000000000000000000000000064623485), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0000000000000000000000000016155871), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0000000000000000000000000004038968), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0000000000000000000000000001009742), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0000000000000000000000000000252435), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0000000000000000000000000000063109), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0000000000000000000000000000015777), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0000000000000000000000000000003944), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0000000000000000000000000000000986), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0000000000000000000000000000000247), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0000000000000000000000000000000062), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0000000000000000000000000000000015), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0000000000000000000000000000000004), BOOST_MATH_BIG_CONSTANT(T, 113, 1.0000000000000000000000000000000001),
@@ -886,8 +886,11 @@ T zeta_imp_odd_integer(int s, const T&, const Policy&, const mpl::true_&)
 }
 
 template <class T, class Policy>
-T zeta_imp_odd_integer(int s, const T& sc, const Policy& pol, const mpl::false_&)
+T zeta_imp_odd_integer(int s, const T& sc, const Policy& pol, const std::false_type&)
 {
+#ifdef BOOST_MATH_NO_THREAD_LOCAL_WITH_NON_TRIVIAL_TYPES
+   static_assert(std::is_trivially_destructible<T>::value, "Your platform does not support thread_local with non-trivial types, last checked with Mingw-x64-8.1, Jan 2021.  Please try a Mingw build with the POSIX threading model, see https://sourceforge.net/p/mingw-w64/bugs/527/");
+#endif
    static BOOST_MATH_THREAD_LOCAL bool is_init = false;
    static BOOST_MATH_THREAD_LOCAL T results[50] = {};
    static BOOST_MATH_THREAD_LOCAL int digits = tools::digits<T>();
@@ -956,10 +959,10 @@ T zeta_imp(T s, T sc, const Policy& pol, const Tag& tag)
                   return T(((v / 2 - 1) & 1) ? -1 : 1) * ldexp(T(1), v - 1) * pow(constants::pi<T, Policy>(), v) *
                      boost::math::unchecked_bernoulli_b2n<T>(v / 2) / boost::math::unchecked_factorial<T>(v);
                return T(((v / 2 - 1) & 1) ? -1 : 1) * ldexp(T(1), v - 1) * pow(constants::pi<T, Policy>(), v) *
-                  boost::math::bernoulli_b2n<T>(v / 2) / boost::math::factorial<T>(v);
+                  boost::math::bernoulli_b2n<T>(v / 2) / boost::math::factorial<T>(v, pol);
             }
             else
-               return zeta_imp_odd_integer(v, sc, pol, mpl::bool_<(Tag::value <= 113) && Tag::value>());
+               return zeta_imp_odd_integer(v, sc, pol, std::integral_constant<bool, (Tag::value <= 113) && Tag::value>());
          }
 #ifndef BOOST_NO_EXCEPTIONS
       }
@@ -1016,9 +1019,9 @@ struct zeta_initializer
       {
          do_init(tag());
       }
-      static void do_init(const mpl::int_<0>&){ boost::math::zeta(static_cast<T>(5), Policy()); }
-      static void do_init(const mpl::int_<53>&){ boost::math::zeta(static_cast<T>(5), Policy()); }
-      static void do_init(const mpl::int_<64>&)
+      static void do_init(const std::integral_constant<int, 0>&){ boost::math::zeta(static_cast<T>(5), Policy()); }
+      static void do_init(const std::integral_constant<int, 53>&){ boost::math::zeta(static_cast<T>(5), Policy()); }
+      static void do_init(const std::integral_constant<int, 64>&)
       {
          boost::math::zeta(static_cast<T>(0.5), Policy());
          boost::math::zeta(static_cast<T>(1.5), Policy());
@@ -1029,7 +1032,7 @@ struct zeta_initializer
 
          boost::math::zeta(static_cast<T>(5), Policy());
       }
-      static void do_init(const mpl::int_<113>&)
+      static void do_init(const std::integral_constant<int, 113>&)
       {
          boost::math::zeta(static_cast<T>(0.5), Policy());
          boost::math::zeta(static_cast<T>(1.5), Policy());
@@ -1068,24 +1071,12 @@ inline typename tools::promote_args<T>::type zeta(T s, const Policy&)
       policies::promote_double<false>, 
       policies::discrete_quantile<>,
       policies::assert_undefined<> >::type forwarding_policy;
-   typedef typename mpl::if_<
-      mpl::less_equal<precision_type, mpl::int_<0> >,
-      mpl::int_<0>,
-      typename mpl::if_<
-         mpl::less_equal<precision_type, mpl::int_<53> >,
-         mpl::int_<53>,  // double
-         typename mpl::if_<
-            mpl::less_equal<precision_type, mpl::int_<64> >,
-            mpl::int_<64>, // 80-bit long double
-            typename mpl::if_<
-               mpl::less_equal<precision_type, mpl::int_<113> >,
-               mpl::int_<113>, // 128-bit long double
-               mpl::int_<0> // too many bits, use generic version.
-            >::type
-         >::type
-      >::type
-   >::type tag_type;
-   //typedef mpl::int_<0> tag_type;
+   typedef std::integral_constant<int,
+      precision_type::value <= 0 ? 0 :
+      precision_type::value <= 53 ? 53 :
+      precision_type::value <= 64 ? 64 :
+      precision_type::value <= 113 ? 113 : 0
+   > tag_type;
 
    detail::zeta_initializer<value_type, forwarding_policy, tag_type>::force_instantiate();
 

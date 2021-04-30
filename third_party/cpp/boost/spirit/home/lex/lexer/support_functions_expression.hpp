@@ -4,14 +4,16 @@
 //  Distributed under the Boost Software License, Version 1.0. (See accompanying 
 //  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
-#if !defined(SPIRIT_LEX_SUPPORT_FUNCTIONS_EXPRESSION_MAR_22_2011_0711PM)
-#define SPIRIT_LEX_SUPPORT_FUNCTIONS_EXPRESSION_MAR_22_2011_0711PM
+#ifndef BOOST_SPIRIT_LEX_LEXER_SUPPORT_FUNCTIONS_EXPRESSION_HPP
+#define BOOST_SPIRIT_LEX_LEXER_SUPPORT_FUNCTIONS_EXPRESSION_HPP
 
 #if defined(_MSC_VER)
 #pragma once
 #endif
 
-#include <boost/spirit/include/phoenix_core.hpp>
+#include <boost/phoenix/core/expression.hpp>
+#include <boost/phoenix/core/v2_eval.hpp>
+#include <boost/proto/proto_fwd.hpp> // for transform placeholders
 
 namespace boost { namespace spirit { namespace lex
 {

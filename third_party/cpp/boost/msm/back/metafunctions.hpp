@@ -11,6 +11,8 @@
 #ifndef BOOST_MSM_BACK_METAFUNCTIONS_H
 #define BOOST_MSM_BACK_METAFUNCTIONS_H
 
+#include <algorithm>
+
 #include <boost/mpl/set.hpp>
 #include <boost/mpl/at.hpp>
 #include <boost/mpl/pair.hpp>

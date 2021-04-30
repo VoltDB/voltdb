@@ -6,8 +6,8 @@
 // Copyright (c) 2013-2014 Adam Wulkiewicz, Lodz, Poland.
 // Copyright (c) 2014 Samuel Debionne, Grenoble, France.
 
-// This file was modified by Oracle on 2014, 2018.
-// Modifications copyright (c) 2014-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2014-2020.
+// Modifications copyright (c) 2014-2020, Oracle and/or its affiliates.
 
 // Contributed and/or modified by Menelaos Karavelas, on behalf of Oracle
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
@@ -23,10 +23,6 @@
 #define BOOST_GEOMETRY_ALGORITHMS_DETAIL_DISTANCE_INTERFACE_HPP
 
 #include <boost/concept_check.hpp>
-
-#include <boost/mpl/always.hpp>
-#include <boost/mpl/bool.hpp>
-#include <boost/mpl/vector.hpp>
 
 #include <boost/geometry/core/point_type.hpp>
 

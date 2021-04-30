@@ -27,7 +27,7 @@ namespace fibers {
 
 class fiber_error : public std::system_error {
 public:
-    fiber_error( std::error_code ec) :
+    explicit fiber_error( std::error_code ec) :
         std::system_error{ ec } {
     }
 
@@ -39,12 +39,12 @@ public:
         std::system_error{ ec, what_arg } {
     }
 
-    virtual ~fiber_error() = default;
+    ~fiber_error() override = default;
 };
 
 class lock_error : public fiber_error {
 public:
-    lock_error( std::error_code ec) :
+    explicit lock_error( std::error_code ec) :
         fiber_error{ ec } {
     }
 
@@ -92,7 +92,7 @@ namespace fibers {
 
 class future_error : public fiber_error {
 public:
-    future_error( std::error_code ec) :
+    explicit future_error( std::error_code ec) :
         fiber_error{ ec } {
     }
 };

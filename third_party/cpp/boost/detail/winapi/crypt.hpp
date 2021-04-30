@@ -10,6 +10,10 @@
 #ifndef BOOST_DETAIL_WINAPI_CRYPT_HPP
 #define BOOST_DETAIL_WINAPI_CRYPT_HPP
 
+#include <boost/config/header_deprecated.hpp>
+
+BOOST_HEADER_DEPRECATED("<boost/winapi/crypt.hpp>")
+
 #include <boost/winapi/crypt.hpp>
 #include <boost/detail/winapi/detail/deprecated_namespace.hpp>
 

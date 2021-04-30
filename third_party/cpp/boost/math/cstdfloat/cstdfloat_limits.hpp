@@ -9,8 +9,8 @@
 
 // Implement quadruple-precision std::numeric_limits<> support.
 
-#ifndef _BOOST_CSTDFLOAT_LIMITS_2014_01_09_HPP_
-  #define _BOOST_CSTDFLOAT_LIMITS_2014_01_09_HPP_
+#ifndef BOOST_MATH_CSTDFLOAT_LIMITS_2014_01_09_HPP_
+  #define BOOST_MATH_CSTDFLOAT_LIMITS_2014_01_09_HPP_
 
   #include <boost/math/cstdfloat/cstdfloat_types.hpp>
 
@@ -19,7 +19,7 @@
 // This is the only way we can avoid
 // warning: non-standard suffix on floating constant [-Wpedantic]
 // when building with -Wall -pedantic.  Neither __extension__
-// nor #pragma dianostic ignored work :(
+// nor #pragma diagnostic ignored work :(
 //
 #pragma GCC system_header
 #endif
@@ -82,5 +82,5 @@
 
   #endif // Not BOOST_CSTDFLOAT_NO_LIBQUADMATH_SUPPORT (i.e., the user would like to have libquadmath support)
 
-#endif // _BOOST_CSTDFLOAT_LIMITS_2014_01_09_HPP_
+#endif // BOOST_MATH_CSTDFLOAT_LIMITS_2014_01_09_HPP_
 

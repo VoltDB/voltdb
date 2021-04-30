@@ -1,5 +1,5 @@
 /* Proposed SG14 status_code
-(C) 2018-2019 Niall Douglas <http://www.nedproductions.biz/> (5 commits)
+(C) 2018-2021 Niall Douglas <http://www.nedproductions.biz/> (5 commits)
 File Created: Feb 2018
 
 
@@ -51,13 +51,13 @@ the program is terminated as this is a logic error)
 - Is immutable.
 
 As with `system_code`, it remains guaranteed to be two CPU registers in size,
-and move relocating.
+and move bitcopying.
 */
 using error = errored_status_code<erased<system_code::value_type>>;
 
 #ifndef NDEBUG
 static_assert(sizeof(error) == 2 * sizeof(void *), "error is not exactly two pointers in size!");
-static_assert(traits::is_move_relocating<error>::value, "error is not move relocating!");
+static_assert(traits::is_move_bitcopying<error>::value, "error is not move bitcopying!");
 #endif
 
 BOOST_OUTCOME_SYSTEM_ERROR2_NAMESPACE_END

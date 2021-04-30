@@ -2,8 +2,8 @@
 
 // Copyright (c) 2008-2015 Barend Gehrels, Amsterdam, the Netherlands.
 
-// This file was modified by Oracle on 2017, 2018.
-// Modifications copyright (c) 2017-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2017, 2018, 2019.
+// Modifications copyright (c) 2017-2019, Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle.
 
 // Use, modification and distribution is subject to the Boost Software License,
@@ -67,20 +67,14 @@ namespace projections
                 T    hrw;
             };
 
-            // template class, using CRTP to implement forward/inverse
             template <typename T, typename Parameters>
             struct base_lagrng_spheroid
-                : public base_t_f<base_lagrng_spheroid<T, Parameters>, T, Parameters>
             {
                 par_lagrng<T> m_proj_parm;
 
-                inline base_lagrng_spheroid(const Parameters& par)
-                    : base_t_f<base_lagrng_spheroid<T, Parameters>, T, Parameters>(*this, par)
-                {}
-
                 // FORWARD(s_forward)  spheroid
                 // Project coordinates from geographic (lon, lat) to cartesian (x, y)
-                inline void fwd(T lp_lon, T lp_lat, T& xy_x, T& xy_y) const
+                inline void fwd(Parameters const& , T lp_lon, T lp_lat, T& xy_x, T& xy_y) const
                 {
                     static const T half_pi = detail::half_pi<T>();
 
@@ -161,10 +155,9 @@ namespace projections
     struct lagrng_spheroid : public detail::lagrng::base_lagrng_spheroid<T, Parameters>
     {
         template <typename Params>
-        inline lagrng_spheroid(Params const& params, Parameters const& par)
-            : detail::lagrng::base_lagrng_spheroid<T, Parameters>(par)
+        inline lagrng_spheroid(Params const& params, Parameters & par)
         {
-            detail::lagrng::setup_lagrng(params, this->m_par, this->m_proj_parm);
+            detail::lagrng::setup_lagrng(params, par, this->m_proj_parm);
         }
     };
 
@@ -173,7 +166,7 @@ namespace projections
     {
 
         // Static projection
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_lagrng, lagrng_spheroid, lagrng_spheroid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_F(srs::spar::proj_lagrng, lagrng_spheroid)
 
         // Factory entry(s)
         BOOST_GEOMETRY_PROJECTIONS_DETAIL_FACTORY_ENTRY_F(lagrng_entry, lagrng_spheroid)

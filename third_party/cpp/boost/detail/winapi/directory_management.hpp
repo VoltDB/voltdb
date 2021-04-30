@@ -10,6 +10,10 @@
 #ifndef BOOST_DETAIL_WINAPI_DIRECTORY_MANAGEMENT_HPP
 #define BOOST_DETAIL_WINAPI_DIRECTORY_MANAGEMENT_HPP
 
+#include <boost/config/header_deprecated.hpp>
+
+BOOST_HEADER_DEPRECATED("<boost/winapi/directory_management.hpp>")
+
 #include <boost/winapi/directory_management.hpp>
 #include <boost/detail/winapi/detail/deprecated_namespace.hpp>
 

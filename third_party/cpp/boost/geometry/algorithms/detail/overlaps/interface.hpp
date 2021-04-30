@@ -4,8 +4,8 @@
 // Copyright (c) 2008-2015 Bruno Lalande, Paris, France.
 // Copyright (c) 2009-2015 Mateusz Loskot, London, UK.
 
-// This file was modified by Oracle on 2014, 2015, 2017.
-// Modifications copyright (c) 2014-2017 Oracle and/or its affiliates.
+// This file was modified by Oracle on 2014-2021.
+// Modifications copyright (c) 2014-2021 Oracle and/or its affiliates.
 
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
@@ -28,7 +28,9 @@
 
 #include <boost/geometry/algorithms/detail/relate/relate_impl.hpp>
 
-#include <boost/geometry/strategies/relate.hpp>
+#include <boost/geometry/strategies/default_strategy.hpp>
+#include <boost/geometry/strategies/detail.hpp>
+#include <boost/geometry/strategies/relate/services.hpp>
 
 
 namespace boost { namespace geometry
@@ -60,6 +62,68 @@ struct overlaps
 #endif // DOXYGEN_NO_DISPATCH
 
 
+namespace resolve_strategy
+{
+
+template
+<
+    typename Strategy,
+    bool IsUmbrella = strategies::detail::is_umbrella_strategy<Strategy>::value
+>
+struct overlaps
+{
+    template <typename Geometry1, typename Geometry2>
+    static inline bool apply(Geometry1 const& geometry1,
+                             Geometry2 const& geometry2,
+                             Strategy const& strategy)
+    {
+        return dispatch::overlaps
+            <
+                Geometry1, Geometry2
+            >::apply(geometry1, geometry2, strategy);
+    }
+};
+
+template <typename Strategy>
+struct overlaps<Strategy, false>
+{
+    template <typename Geometry1, typename Geometry2>
+    static inline bool apply(Geometry1 const& geometry1,
+                             Geometry2 const& geometry2,
+                             Strategy const& strategy)
+    {
+        using strategies::relate::services::strategy_converter;
+        return dispatch::overlaps
+            <
+                Geometry1, Geometry2
+            >::apply(geometry1, geometry2,
+                     strategy_converter<Strategy>::get(strategy));
+    }
+};
+
+template <>
+struct overlaps<default_strategy, false>
+{
+    template <typename Geometry1, typename Geometry2>
+    static inline bool apply(Geometry1 const& geometry1,
+                             Geometry2 const& geometry2,
+                             default_strategy)
+    {
+        typedef typename strategies::relate::services::default_strategy
+            <
+                Geometry1, Geometry2
+            >::type strategy_type;
+
+        return dispatch::overlaps
+            <
+                Geometry1, Geometry2
+            >::apply(geometry1, geometry2, strategy_type());
+    }
+};
+
+} // namespace resolve_strategy
+
+
 /*!
 \brief \brief_check2{overlap}
 \ingroup overlaps
@@ -82,10 +146,9 @@ inline bool overlaps(Geometry1 const& geometry1,
     concepts::check<Geometry1 const>();
     concepts::check<Geometry2 const>();
 
-    return dispatch::overlaps
+    return resolve_strategy::overlaps
         <
-            Geometry1,
-            Geometry2
+            Strategy
         >::apply(geometry1, geometry2, strategy);
 }
 
@@ -99,6 +162,11 @@ inline bool overlaps(Geometry1 const& geometry1,
 \return \return_check2{overlap}
 
 \qbk{[include reference/algorithms/overlaps.qbk]}
+\qbk{
+[heading Examples]
+[overlaps]
+[overlaps_output]
+}
 */
 template <typename Geometry1, typename Geometry2>
 inline bool overlaps(Geometry1 const& geometry1, Geometry2 const& geometry2)
@@ -106,17 +174,10 @@ inline bool overlaps(Geometry1 const& geometry1, Geometry2 const& geometry2)
     concepts::check<Geometry1 const>();
     concepts::check<Geometry2 const>();
 
-    typedef typename strategy::relate::services::default_strategy
-            <
-                Geometry1,
-                Geometry2
-            >::type strategy_type;
-
-    return dispatch::overlaps
+    return resolve_strategy::overlaps
         <
-            Geometry1,
-            Geometry2
-        >::apply(geometry1, geometry2, strategy_type());
+            default_strategy
+        >::apply(geometry1, geometry2, default_strategy());
 }
 
 }} // namespace boost::geometry

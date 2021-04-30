@@ -112,7 +112,7 @@ std::pair<RealType, RealType> support(const distribution_archetype<RealType>& di
 
 //
 // Next comes the concept checks for verifying that a class
-// fullfils the requirements of a Distribution:
+// fulfils the requirements of a Distribution:
 //
 template <class Distribution>
 struct DistributionConcept

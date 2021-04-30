@@ -180,7 +180,7 @@ void forward_iterator_test(Iterator i, T v1, T v2)
   trivial_iterator_test(i, i2, v2);
 
  // borland doesn't allow non-type template parameters
-# if !defined(__BORLANDC__) || (__BORLANDC__ > 0x551)
+# if !defined(BOOST_BORLANDC) || (BOOST_BORLANDC > 0x551)
   lvalue_test<(boost::is_pointer<Iterator>::value)>::check(i);
 #endif
 }

@@ -333,6 +333,13 @@ inline RealType kurtosis_excess(const laplace_distribution<RealType, Policy>& /*
    return 3;
 }
 
+template <class RealType, class Policy>
+inline RealType entropy(const laplace_distribution<RealType, Policy> & dist)
+{
+   using std::log;
+   return log(2*dist.scale()*constants::e<RealType>());
+}
+
 #ifdef BOOST_MSVC
 #  pragma warning(pop)
 #endif

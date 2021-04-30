@@ -2,7 +2,7 @@
 // basic_socket.hpp
 // ~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2019 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2021 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -15,6 +15,7 @@
 # pragma once
 #endif // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
+#include <boost/asio/any_io_executor.hpp>
 #include <boost/asio/detail/config.hpp>
 #include <boost/asio/async_result.hpp>
 #include <boost/asio/detail/handler_type_requirements.hpp>
@@ -24,7 +25,6 @@
 #include <boost/asio/detail/type_traits.hpp>
 #include <boost/asio/error.hpp>
 #include <boost/asio/execution_context.hpp>
-#include <boost/asio/executor.hpp>
 #include <boost/asio/post.hpp>
 #include <boost/asio/socket_base.hpp>
 
@@ -49,7 +49,7 @@ namespace asio {
 #define BOOST_ASIO_BASIC_SOCKET_FWD_DECL
 
 // Forward declaration with defaulted arguments.
-template <typename Protocol, typename Executor = executor>
+template <typename Protocol, typename Executor = any_io_executor>
 class basic_socket;
 
 #endif // !defined(BOOST_ASIO_BASIC_SOCKET_FWD_DECL)
@@ -112,7 +112,7 @@ public:
    * dispatch handlers for any asynchronous operations performed on the socket.
    */
   explicit basic_socket(const executor_type& ex)
-    : impl_(ex)
+    : impl_(0, ex)
   {
   }
 
@@ -126,10 +126,10 @@ public:
    */
   template <typename ExecutionContext>
   explicit basic_socket(ExecutionContext& context,
-      typename enable_if<
+      typename constraint<
         is_convertible<ExecutionContext&, execution_context&>::value
-      >::type* = 0)
-    : impl_(context)
+      >::type = 0)
+    : impl_(0, 0, context)
   {
   }
 
@@ -145,7 +145,7 @@ public:
    * @throws boost::system::system_error Thrown on failure.
    */
   basic_socket(const executor_type& ex, const protocol_type& protocol)
-    : impl_(ex)
+    : impl_(0, ex)
   {
     boost::system::error_code ec;
     impl_.get_service().open(impl_.get_implementation(), protocol, ec);
@@ -166,10 +166,11 @@ public:
    */
   template <typename ExecutionContext>
   basic_socket(ExecutionContext& context, const protocol_type& protocol,
-      typename enable_if<
-        is_convertible<ExecutionContext&, execution_context&>::value
-      >::type* = 0)
-    : impl_(context)
+      typename constraint<
+        is_convertible<ExecutionContext&, execution_context&>::value,
+        defaulted_constraint
+      >::type = defaulted_constraint())
+    : impl_(0, 0, context)
   {
     boost::system::error_code ec;
     impl_.get_service().open(impl_.get_implementation(), protocol, ec);
@@ -192,7 +193,7 @@ public:
    * @throws boost::system::system_error Thrown on failure.
    */
   basic_socket(const executor_type& ex, const endpoint_type& endpoint)
-    : impl_(ex)
+    : impl_(0, ex)
   {
     boost::system::error_code ec;
     const protocol_type protocol = endpoint.protocol();
@@ -220,10 +221,10 @@ public:
    */
   template <typename ExecutionContext>
   basic_socket(ExecutionContext& context, const endpoint_type& endpoint,
-      typename enable_if<
+      typename constraint<
         is_convertible<ExecutionContext&, execution_context&>::value
-      >::type* = 0)
-    : impl_(context)
+      >::type = 0)
+    : impl_(0, 0, context)
   {
     boost::system::error_code ec;
     const protocol_type protocol = endpoint.protocol();
@@ -248,7 +249,7 @@ public:
    */
   basic_socket(const executor_type& ex, const protocol_type& protocol,
       const native_handle_type& native_socket)
-    : impl_(ex)
+    : impl_(0, ex)
   {
     boost::system::error_code ec;
     impl_.get_service().assign(impl_.get_implementation(),
@@ -273,10 +274,10 @@ public:
   template <typename ExecutionContext>
   basic_socket(ExecutionContext& context, const protocol_type& protocol,
       const native_handle_type& native_socket,
-      typename enable_if<
+      typename constraint<
         is_convertible<ExecutionContext&, execution_context&>::value
-      >::type* = 0)
-    : impl_(context)
+      >::type = 0)
+    : impl_(0, 0, context)
   {
     boost::system::error_code ec;
     impl_.get_service().assign(impl_.get_implementation(),
@@ -295,7 +296,7 @@ public:
    * @note Following the move, the moved-from object is in the same state as if
    * constructed using the @c basic_socket(const executor_type&) constructor.
    */
-  basic_socket(basic_socket&& other)
+  basic_socket(basic_socket&& other) BOOST_ASIO_NOEXCEPT
     : impl_(std::move(other.impl_))
   {
   }
@@ -332,10 +333,10 @@ public:
    */
   template <typename Protocol1, typename Executor1>
   basic_socket(basic_socket<Protocol1, Executor1>&& other,
-      typename enable_if<
+      typename constraint<
         is_convertible<Protocol1, Protocol>::value
           && is_convertible<Executor1, Executor>::value
-      >::type* = 0)
+      >::type = 0)
     : impl_(std::move(other.impl_))
   {
   }
@@ -351,7 +352,7 @@ public:
    * constructed using the @c basic_socket(const executor_type&) constructor.
    */
   template <typename Protocol1, typename Executor1>
-  typename enable_if<
+  typename constraint<
     is_convertible<Protocol1, Protocol>::value
       && is_convertible<Executor1, Executor>::value,
     basic_socket&
@@ -940,11 +941,14 @@ public:
    * socket.async_connect(endpoint, connect_handler);
    * @endcode
    */
-  template <typename ConnectHandler>
-  BOOST_ASIO_INITFN_RESULT_TYPE(ConnectHandler,
+  template <
+      BOOST_ASIO_COMPLETION_TOKEN_FOR(void (boost::system::error_code))
+        ConnectHandler BOOST_ASIO_DEFAULT_COMPLETION_TOKEN_TYPE(executor_type)>
+  BOOST_ASIO_INITFN_AUTO_RESULT_TYPE(ConnectHandler,
       void (boost::system::error_code))
   async_connect(const endpoint_type& peer_endpoint,
-      BOOST_ASIO_MOVE_ARG(ConnectHandler) handler)
+      BOOST_ASIO_MOVE_ARG(ConnectHandler) handler
+        BOOST_ASIO_DEFAULT_COMPLETION_TOKEN(executor_type))
   {
     boost::system::error_code open_ec;
     if (!is_open())
@@ -954,7 +958,7 @@ public:
     }
 
     return async_initiate<ConnectHandler, void (boost::system::error_code)>(
-        initiate_async_connect(), handler, this, peer_endpoint, open_ec);
+        initiate_async_connect(this), handler, peer_endpoint, open_ec);
   }
 
   /// Set an option on the socket.
@@ -1770,13 +1774,17 @@ public:
    * socket.async_wait(boost::asio::ip::tcp::socket::wait_read, wait_handler);
    * @endcode
    */
-  template <typename WaitHandler>
-  BOOST_ASIO_INITFN_RESULT_TYPE(WaitHandler,
+  template <
+      BOOST_ASIO_COMPLETION_TOKEN_FOR(void (boost::system::error_code))
+        WaitHandler BOOST_ASIO_DEFAULT_COMPLETION_TOKEN_TYPE(executor_type)>
+  BOOST_ASIO_INITFN_AUTO_RESULT_TYPE(WaitHandler,
       void (boost::system::error_code))
-  async_wait(wait_type w, BOOST_ASIO_MOVE_ARG(WaitHandler) handler)
+  async_wait(wait_type w,
+      BOOST_ASIO_MOVE_ARG(WaitHandler) handler
+        BOOST_ASIO_DEFAULT_COMPLETION_TOKEN(executor_type))
   {
     return async_initiate<WaitHandler, void (boost::system::error_code)>(
-        initiate_async_wait(), handler, this, w);
+        initiate_async_wait(this), handler, w);
   }
 
 protected:
@@ -1805,11 +1813,24 @@ private:
   basic_socket(const basic_socket&) BOOST_ASIO_DELETED;
   basic_socket& operator=(const basic_socket&) BOOST_ASIO_DELETED;
 
-  struct initiate_async_connect
+  class initiate_async_connect
   {
+  public:
+    typedef Executor executor_type;
+
+    explicit initiate_async_connect(basic_socket* self)
+      : self_(self)
+    {
+    }
+
+    executor_type get_executor() const BOOST_ASIO_NOEXCEPT
+    {
+      return self_->get_executor();
+    }
+
     template <typename ConnectHandler>
     void operator()(BOOST_ASIO_MOVE_ARG(ConnectHandler) handler,
-        basic_socket* self, const endpoint_type& peer_endpoint,
+        const endpoint_type& peer_endpoint,
         const boost::system::error_code& open_ec) const
     {
       // If you get an error on the following line it means that your handler
@@ -1818,35 +1839,53 @@ private:
 
       if (open_ec)
       {
-          boost::asio::post(self->impl_.get_executor(),
+          boost::asio::post(self_->impl_.get_executor(),
               boost::asio::detail::bind_handler(
                 BOOST_ASIO_MOVE_CAST(ConnectHandler)(handler), open_ec));
       }
       else
       {
         detail::non_const_lvalue<ConnectHandler> handler2(handler);
-        self->impl_.get_service().async_connect(
-            self->impl_.get_implementation(), peer_endpoint,
-            handler2.value, self->impl_.get_implementation_executor());
+        self_->impl_.get_service().async_connect(
+            self_->impl_.get_implementation(), peer_endpoint,
+            handler2.value, self_->impl_.get_executor());
       }
     }
+
+  private:
+    basic_socket* self_;
   };
 
-  struct initiate_async_wait
+  class initiate_async_wait
   {
+  public:
+    typedef Executor executor_type;
+
+    explicit initiate_async_wait(basic_socket* self)
+      : self_(self)
+    {
+    }
+
+    executor_type get_executor() const BOOST_ASIO_NOEXCEPT
+    {
+      return self_->get_executor();
+    }
+
     template <typename WaitHandler>
-    void operator()(BOOST_ASIO_MOVE_ARG(WaitHandler) handler,
-        basic_socket* self, wait_type w) const
+    void operator()(BOOST_ASIO_MOVE_ARG(WaitHandler) handler, wait_type w) const
     {
       // If you get an error on the following line it means that your handler
       // does not meet the documented type requirements for a WaitHandler.
       BOOST_ASIO_WAIT_HANDLER_CHECK(WaitHandler, handler) type_check;
 
       detail::non_const_lvalue<WaitHandler> handler2(handler);
-      self->impl_.get_service().async_wait(
-          self->impl_.get_implementation(), w, handler2.value,
-          self->impl_.get_implementation_executor());
+      self_->impl_.get_service().async_wait(
+          self_->impl_.get_implementation(), w,
+          handler2.value, self_->impl_.get_executor());
     }
+
+  private:
+    basic_socket* self_;
   };
 };
 

@@ -36,7 +36,7 @@ namespace fibers {
 namespace numa {
 namespace algo {
 
-class work_stealing : public boost::fibers::algo::algorithm {
+class BOOST_FIBERS_DECL work_stealing : public boost::fibers::algo::algorithm {
 private:
     static std::vector< intrusive_ptr< work_stealing > >    schedulers_;
 

@@ -32,6 +32,8 @@ public:
 
     Real prime(Real x) const;
 
+    Real double_prime(Real x) const;
+
 private:
     std::vector<Real> m_beta;
     Real m_h_inv;
@@ -75,6 +77,25 @@ Real b3_spline_prime(Real x)
     if (x < 2)
     {
         return -boost::math::constants::half<Real>()*(2 - x)*(2 - x);
+    }
+    return (Real) 0;
+}
+
+template<class Real>
+Real b3_spline_double_prime(Real x)
+{
+    if (x < 0)
+    {
+        return b3_spline_double_prime(-x);
+    }
+
+    if (x < 1)
+    {
+        return 3*x - 2;
+    }
+    if (x < 2)
+    {
+        return (2 - x);
     }
     return (Real) 0;
 }
@@ -282,6 +303,28 @@ Real cubic_b_spline_imp<Real>::prime(Real x) const
     }
     return z*m_h_inv;
 }
+
+template<class Real>
+Real cubic_b_spline_imp<Real>::double_prime(Real x) const
+{
+    Real z = 0;
+    Real t = m_h_inv*(x - m_a) + 1;
+
+    using std::max;
+    using std::min;
+    using std::ceil;
+    using std::floor;
+
+    size_t k_min = (size_t) (max)(static_cast<long>(0), boost::math::ltrunc(ceil(t - 2)));
+    size_t k_max = (size_t) (min)(static_cast<long>(m_beta.size() - 1), boost::math::ltrunc(floor(t + 2)));
+
+    for (size_t k = k_min; k <= k_max; ++k)
+    {
+        z += m_beta[k]*b3_spline_double_prime(t - k);
+    }
+    return z*m_h_inv*m_h_inv;
+}
+
 
 }}}
 #endif

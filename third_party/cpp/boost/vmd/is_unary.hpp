@@ -46,7 +46,7 @@
 
     \brief Determines if the sequence has only a single element, referred to as a single-element sequence. Re-entrant version.
     
-    d        = The next available BOOST_PP_WHILE iteration.
+    d        = The next available BOOST_PP_WHILE iteration. <br/>
     sequence = a sequence
 
     returns = 1 if the sequence is a single-element sequence, else returns 0.

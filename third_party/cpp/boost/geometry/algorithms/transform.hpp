@@ -5,6 +5,10 @@
 // Copyright (c) 2009-2012 Mateusz Loskot, London, UK.
 // Copyright (c) 2014 Adam Wulkiewicz, Lodz, Poland.
 
+// This file was modified by Oracle on 2020.
+// Modifications copyright (c) 2020 Oracle and/or its affiliates.
+// Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
+
 // Parts of Boost.Geometry are redesigned from Geodan's Geographic Library
 // (geolib/GGL), copyright (c) 1995-2010 Geodan, Amsterdam, the Netherlands.
 
@@ -17,9 +21,12 @@
 
 #include <cmath>
 #include <iterator>
+#include <type_traits>
 
-#include <boost/range.hpp>
-#include <boost/type_traits/remove_reference.hpp>
+#include <boost/range/begin.hpp>
+#include <boost/range/end.hpp>
+#include <boost/range/size.hpp>
+#include <boost/range/value_type.hpp>
 
 #include <boost/variant/apply_visitor.hpp>
 #include <boost/variant/static_visitor.hpp>
@@ -170,7 +177,7 @@ struct transform_polygon
         // Note: here a resizeable container is assumed.
         traits::resize
             <
-                typename boost::remove_reference
+                typename std::remove_reference
                 <
                     typename traits::interior_mutable_type<Polygon2>::type
                 >::type

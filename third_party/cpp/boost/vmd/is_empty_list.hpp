@@ -31,7 +31,7 @@
     
     sequence = a preprocessor parameter
 
-    returns = 1 if the sequence is an empty Boost PP list
+    returns = 1 if the sequence is an empty Boost PP list,
               0 if it is not.
               
     The macro will generate a preprocessing error if the input
@@ -52,10 +52,10 @@
     An empty Boost PP list consists of the single identifier 'BOOST_PP_NIL'.
     This identifier also serves as a list terminator for a non-empty list.
     
-    d        = The next available BOOST_PP_WHILE iteration
+    d        = The next available BOOST_PP_WHILE iteration <br/>
     sequence = a preprocessor parameter
 
-    returns = 1 if the sequence is an empty Boost PP list
+    returns = 1 if the sequence is an empty Boost PP list,
               0 if it is not.
               
     The macro will generate a preprocessing error if the input

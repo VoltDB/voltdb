@@ -5,8 +5,8 @@
 // Copyright (c) 2009-2015 Mateusz Loskot, London, UK.
 // Copyright (c) 2013-2015 Adam Wulkiewicz, Lodz, Poland
 
-// This file was modified by Oracle on 2013, 2014, 2015, 2017, 2018.
-// Modifications copyright (c) 2013-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2013-2020.
+// Modifications copyright (c) 2013-2020, Oracle and/or its affiliates.
 
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 // Contributed and/or modified by Menelaos Karavelas, on behalf of Oracle
@@ -18,11 +18,12 @@
 // Version 1.0. (See accompanying file LICENSE_1_0.txt or copy at
 // http://www.boost.org/LICENSE_1_0.txt)
 
-
 #ifndef BOOST_GEOMETRY_STRATEGY_SPHERICAL_POINT_IN_POINT_HPP
 #define BOOST_GEOMETRY_STRATEGY_SPHERICAL_POINT_IN_POINT_HPP
 
+
 #include <cstddef>
+#include <type_traits>
 
 #include <boost/geometry/core/access.hpp>
 #include <boost/geometry/core/radian_access.hpp>
@@ -56,6 +57,9 @@ namespace detail { namespace within
 
 class point_point_on_spheroid
 {
+public:
+    typedef spherical_tag cs_tag;
+
 private:
     template <typename Point1, typename Point2, bool SameUnits>
     struct are_same_points
@@ -93,8 +97,10 @@ private:
                     Point1, calculation_type, radian
                 >::type helper_point1, helper_point2;
 
-            Point1 point1_normalized = return_normalized<Point1>(point1);
-            Point2 point2_normalized = return_normalized<Point2>(point2);
+            Point1 point1_normalized;
+            strategy::normalize::spherical_point::apply(point1, point1_normalized);
+            Point2 point2_normalized;
+            strategy::normalize::spherical_point::apply(point2, point2_normalized);
 
             geometry::transform(point1_normalized, helper_point1);
             geometry::transform(point2_normalized, helper_point2);
@@ -114,7 +120,7 @@ public:
             <
                 Point1,
                 Point2,
-                boost::is_same
+                std::is_same
                     <
                         typename detail::cs_angular_units<Point1>::type,
                         typename detail::cs_angular_units<Point2>::type

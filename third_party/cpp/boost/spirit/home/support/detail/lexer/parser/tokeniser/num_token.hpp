@@ -3,8 +3,8 @@
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file licence_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
-#ifndef BOOST_LEXER_NUM_TOKEN_HPP
-#define BOOST_LEXER_NUM_TOKEN_HPP
+#ifndef BOOST_SPIRIT_SUPPORT_DETAIL_LEXER_PARSER_TOKENISER_NUM_TOKEN_HPP
+#define BOOST_SPIRIT_SUPPORT_DETAIL_LEXER_PARSER_TOKENISER_NUM_TOKEN_HPP
 
 #include <boost/config.hpp>
 #include "../../consts.hpp" // null_token
@@ -43,30 +43,6 @@ struct basic_num_token
         _max (0)
     {
         *_macro = 0;
-    }
-
-    basic_num_token &operator = (const basic_num_token &rhs_)
-    {
-        _type = rhs_._type;
-        _id = rhs_._id;
-        _min = rhs_._min;
-        _comma = rhs_._comma;
-        _max = rhs_._max;
-
-        if (_type == MACRO)
-        {
-            const CharT *read_ = rhs_._macro;
-            CharT *write_ = _macro;
-
-            while (*read_)
-            {
-                *write_++ = *read_++;
-            }
-
-            *write_ = 0;
-        }
-
-        return *this;
     }
 
     void set (const type type_)

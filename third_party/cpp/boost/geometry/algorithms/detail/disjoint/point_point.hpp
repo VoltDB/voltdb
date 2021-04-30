@@ -5,8 +5,8 @@
 // Copyright (c) 2009-2015 Mateusz Loskot, London, UK.
 // Copyright (c) 2013-2015 Adam Wulkiewicz, Lodz, Poland
 
-// This file was modified by Oracle on 2013, 2014, 2015, 2017, 2018.
-// Modifications copyright (c) 2013-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2013-2020.
+// Modifications copyright (c) 2013-2020, Oracle and/or its affiliates.
 
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 // Contributed and/or modified by Menelaos Karavelas, on behalf of Oracle
@@ -22,10 +22,13 @@
 #define BOOST_GEOMETRY_ALGORITHMS_DETAIL_DISJOINT_POINT_POINT_HPP
 
 #include <cstddef>
+#include <type_traits>
 
 #include <boost/geometry/core/tags.hpp>
 
 #include <boost/geometry/algorithms/dispatch/disjoint.hpp>
+
+#include <boost/geometry/strategies/detail.hpp>
 
 // For backward compatibility
 #include <boost/geometry/strategies/disjoint.hpp>
@@ -46,10 +49,28 @@ namespace detail { namespace disjoint
     \brief Internal utility function to detect of points are disjoint
     \note To avoid circular references
  */
-template <typename Point1, typename Point2, typename Strategy>
+template
+<
+    typename Point1, typename Point2, typename Strategy,
+    std::enable_if_t<strategies::detail::is_umbrella_strategy<Strategy>::value, int> = 0
+>
+inline bool disjoint_point_point(Point1 const& point1, Point2 const& point2,
+                                 Strategy const& strategy)
+{
+    typedef decltype(strategy.relate(point1, point2)) strategy_type;
+    // ! within(point1, point2)
+    return ! strategy_type::apply(point1, point2);
+}
+
+template
+<
+    typename Point1, typename Point2, typename Strategy,
+    std::enable_if_t<! strategies::detail::is_umbrella_strategy<Strategy>::value, int> = 0
+>
 inline bool disjoint_point_point(Point1 const& point1, Point2 const& point2,
                                  Strategy const& )
 {
+    // ! within(point1, point2)
     return ! Strategy::apply(point1, point2);
 }
 
@@ -68,9 +89,11 @@ struct disjoint<Point1, Point2, DimensionCount, point_tag, point_tag, false>
 {
     template <typename Strategy>
     static inline bool apply(Point1 const& point1, Point2 const& point2,
-                             Strategy const& )
+                             Strategy const& strategy)
     {
-        return ! Strategy::apply(point1, point2);
+        typedef decltype(strategy.relate(point1, point2)) strategy_type;
+        // ! within(point1, point2)
+        return ! strategy_type::apply(point1, point2);
     }
 };
 

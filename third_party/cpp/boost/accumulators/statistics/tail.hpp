@@ -268,6 +268,17 @@ namespace impl
             std::vector<Sample> const &samples;
         };
 
+    public:
+        // make this accumulator serializeable
+        template<class Archive>
+        void serialize(Archive & ar, const unsigned int file_version)
+        { 
+            ar & is_sorted;
+            ar & indices;
+            ar & samples;
+        }
+
+    private:
         mutable bool is_sorted;
         mutable std::vector<std::size_t> indices;
         std::vector<Sample> samples;

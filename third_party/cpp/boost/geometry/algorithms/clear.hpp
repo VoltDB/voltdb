@@ -4,6 +4,10 @@
 // Copyright (c) 2008-2012 Bruno Lalande, Paris, France.
 // Copyright (c) 2009-2012 Mateusz Loskot, London, UK.
 
+// This file was modified by Oracle on 2020.
+// Modifications copyright (c) 2020, Oracle and/or its affiliates.
+// Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
+
 // Parts of Boost.Geometry are redesigned from Geodan's Geographic Library
 // (geolib/GGL), copyright (c) 1995-2010 Geodan, Amsterdam, the Netherlands.
 
@@ -15,7 +19,7 @@
 #define BOOST_GEOMETRY_ALGORITHMS_CLEAR_HPP
 
 
-#include <boost/type_traits/remove_const.hpp>
+#include <type_traits>
 
 #include <boost/variant/apply_visitor.hpp>
 #include <boost/variant/static_visitor.hpp>
@@ -54,14 +58,14 @@ struct polygon_clear
     {
         traits::clear
             <
-                typename boost::remove_reference
+                typename std::remove_reference
                     <
                         typename traits::interior_mutable_type<Polygon>::type
                     >::type
             >::apply(interior_rings(polygon));
         traits::clear
             <
-                typename boost::remove_reference
+                typename std::remove_reference
                     <
                         typename traits::ring_mutable_type<Polygon>::type
                     >::type

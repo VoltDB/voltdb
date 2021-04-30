@@ -2,8 +2,8 @@
 
 // Copyright (c) 2007-2014 Barend Gehrels, Amsterdam, the Netherlands.
 
-// This file was modified by Oracle on 2014, 2017, 2018.
-// Modifications copyright (c) 2014-2018 Oracle and/or its affiliates.
+// This file was modified by Oracle on 2014-2020.
+// Modifications copyright (c) 2014-2020 Oracle and/or its affiliates.
 
 // Contributed and/or modified by Menelaos Karavelas, on behalf of Oracle
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
@@ -16,18 +16,21 @@
 #define BOOST_GEOMETRY_ALGORITHMS_UNION_HPP
 
 
-#include <boost/range/metafunctions.hpp>
+#include <boost/range/value_type.hpp>
 
-#include <boost/geometry/core/is_areal.hpp>
+#include <boost/geometry/algorithms/not_implemented.hpp>
+#include <boost/geometry/algorithms/detail/overlay/overlay.hpp>
 #include <boost/geometry/core/point_order.hpp>
 #include <boost/geometry/core/reverse_dispatch.hpp>
 #include <boost/geometry/geometries/concepts/check.hpp>
-#include <boost/geometry/algorithms/not_implemented.hpp>
-#include <boost/geometry/algorithms/detail/overlay/overlay.hpp>
 #include <boost/geometry/policies/robustness/get_rescale_policy.hpp>
 #include <boost/geometry/strategies/default_strategy.hpp>
+#include <boost/geometry/strategies/detail.hpp>
+#include <boost/geometry/strategies/relate/services.hpp>
 #include <boost/geometry/util/range.hpp>
 
+#include <boost/geometry/algorithms/detail/intersection/multi.hpp>
+#include <boost/geometry/algorithms/detail/overlay/intersection_insert.hpp>
 #include <boost/geometry/algorithms/detail/overlay/linear_linear.hpp>
 #include <boost/geometry/algorithms/detail/overlay/pointlike_pointlike.hpp>
 
@@ -44,13 +47,10 @@ template
     typename Geometry1, typename Geometry2, typename GeometryOut,
     typename TagIn1 = typename tag<Geometry1>::type,
     typename TagIn2 = typename tag<Geometry2>::type,
-    typename TagOut = typename tag<GeometryOut>::type,
-    bool Areal1 = geometry::is_areal<Geometry1>::value,
-    bool Areal2 = geometry::is_areal<Geometry2>::value,
-    bool ArealOut = geometry::is_areal<GeometryOut>::value,
-    bool Reverse1 = detail::overlay::do_reverse<geometry::point_order<Geometry1>::value>::value,
-    bool Reverse2 = detail::overlay::do_reverse<geometry::point_order<Geometry2>::value>::value,
-    bool ReverseOut = detail::overlay::do_reverse<geometry::point_order<GeometryOut>::value>::value,
+    typename TagOut = typename detail::setop_insert_output_tag<GeometryOut>::type,
+    typename CastedTagIn1 = typename geometry::tag_cast<TagIn1, areal_tag, linear_tag, pointlike_tag>::type,
+    typename CastedTagIn2 = typename geometry::tag_cast<TagIn2, areal_tag, linear_tag, pointlike_tag>::type,
+    typename CastedTagOut = typename geometry::tag_cast<TagOut, areal_tag, linear_tag, pointlike_tag>::type,
     bool Reverse = geometry::reverse_dispatch<Geometry1, Geometry2>::type::value
 >
 struct union_insert: not_implemented<TagIn1, TagIn2, TagOut>
@@ -63,24 +63,22 @@ template
 <
     typename Geometry1, typename Geometry2, typename GeometryOut,
     typename TagIn1, typename TagIn2, typename TagOut,
-    bool Areal1, bool Areal2, bool ArealOut,
-    bool Reverse1, bool Reverse2, bool ReverseOut
+    typename CastedTagIn1, typename CastedTagIn2, typename CastedTagOut
 >
 struct union_insert
     <
         Geometry1, Geometry2, GeometryOut,
         TagIn1, TagIn2, TagOut,
-        Areal1, Areal2, ArealOut,
-        Reverse1, Reverse2, ReverseOut,
+        CastedTagIn1, CastedTagIn2, CastedTagOut,
         true
-    >: union_insert<Geometry2, Geometry1, GeometryOut>
+    >
 {
     template <typename RobustPolicy, typename OutputIterator, typename Strategy>
     static inline OutputIterator apply(Geometry1 const& g1,
-            Geometry2 const& g2,
-            RobustPolicy const& robust_policy,
-            OutputIterator out,
-            Strategy const& strategy)
+                                       Geometry2 const& g2,
+                                       RobustPolicy const& robust_policy,
+                                       OutputIterator out,
+                                       Strategy const& strategy)
     {
         return union_insert
             <
@@ -93,44 +91,22 @@ struct union_insert
 template
 <
     typename Geometry1, typename Geometry2, typename GeometryOut,
-    typename TagIn1, typename TagIn2, typename TagOut,
-    bool Reverse1, bool Reverse2, bool ReverseOut
+    typename TagIn1, typename TagIn2, typename TagOut
 >
 struct union_insert
     <
         Geometry1, Geometry2, GeometryOut,
         TagIn1, TagIn2, TagOut,
-        true, true, true,
-        Reverse1, Reverse2, ReverseOut,
+        areal_tag, areal_tag, areal_tag,
         false
     > : detail::overlay::overlay
-        <Geometry1, Geometry2, Reverse1, Reverse2, ReverseOut, GeometryOut, overlay_union>
-{};
-
-
-// dispatch for union of non-areal geometries
-template
-<
-    typename Geometry1, typename Geometry2, typename GeometryOut,
-    typename TagIn1, typename TagIn2, typename TagOut,
-    bool Reverse1, bool Reverse2, bool ReverseOut
->
-struct union_insert
-    <
-        Geometry1, Geometry2, GeometryOut,
-        TagIn1, TagIn2, TagOut,
-        false, false, false,
-        Reverse1, Reverse2, ReverseOut,
-        false
-    > : union_insert
         <
-            Geometry1, Geometry2, GeometryOut,
-            typename tag_cast<TagIn1, pointlike_tag, linear_tag>::type,
-            typename tag_cast<TagIn2, pointlike_tag, linear_tag>::type,
-            TagOut,
-            false, false, false,
-            Reverse1, Reverse2, ReverseOut,
-            false
+            Geometry1, Geometry2,
+            detail::overlay::do_reverse<geometry::point_order<Geometry1>::value>::value,
+            detail::overlay::do_reverse<geometry::point_order<Geometry2>::value>::value,
+            detail::overlay::do_reverse<geometry::point_order<GeometryOut>::value>::value,
+            GeometryOut,
+            overlay_union
         >
 {};
 
@@ -139,14 +115,13 @@ struct union_insert
 template
 <
     typename Linear1, typename Linear2, typename LineStringOut,
-    bool Reverse1, bool Reverse2, bool ReverseOut
+    typename TagIn1, typename TagIn2
 >
 struct union_insert
     <
         Linear1, Linear2, LineStringOut,
-        linear_tag, linear_tag, linestring_tag,
-        false, false, false,
-        Reverse1, Reverse2, ReverseOut,
+        TagIn1, TagIn2, linestring_tag,
+        linear_tag, linear_tag, linear_tag,
         false
     > : detail::overlay::linear_linear_linestring
         <
@@ -159,20 +134,185 @@ struct union_insert
 template
 <
     typename PointLike1, typename PointLike2, typename PointOut,
-    bool Reverse1, bool Reverse2, bool ReverseOut
+    typename TagIn1, typename TagIn2
 >
 struct union_insert
     <
         PointLike1, PointLike2, PointOut,
-        pointlike_tag, pointlike_tag, point_tag,
-        false, false, false,
-        Reverse1, Reverse2, ReverseOut,
+        TagIn1, TagIn2, point_tag,
+        pointlike_tag, pointlike_tag, pointlike_tag,
         false
     > : detail::overlay::union_pointlike_pointlike_point
         <
             PointLike1, PointLike2, PointOut
         >
 {};
+
+
+template
+<
+    typename Geometry1, typename Geometry2, typename SingleTupledOut,
+    typename TagIn1, typename TagIn2,
+    typename CastedTagIn
+>
+struct union_insert
+    <
+        Geometry1, Geometry2, SingleTupledOut,
+        TagIn1, TagIn2, detail::tupled_output_tag,
+        CastedTagIn, CastedTagIn, detail::tupled_output_tag,
+        false
+    >
+{
+    typedef typename geometry::detail::single_tag_from_base_tag
+        <
+            CastedTagIn
+        >::type single_tag;
+
+    typedef detail::expect_output
+        <
+            Geometry1, Geometry2, SingleTupledOut, single_tag
+        > expect_check;
+
+    typedef typename geometry::detail::output_geometry_access
+        <
+            SingleTupledOut, single_tag, single_tag
+        > access;
+
+    template <typename RobustPolicy, typename OutputIterator, typename Strategy>
+    static inline OutputIterator apply(Geometry1 const& g1,
+                                       Geometry2 const& g2,
+                                       RobustPolicy const& robust_policy,
+                                       OutputIterator out,
+                                       Strategy const& strategy)
+    {
+        access::get(out) = union_insert
+            <
+                Geometry2, Geometry1, typename access::type
+            >::apply(g2, g1, robust_policy, access::get(out), strategy);
+
+        return out;
+    }
+};
+
+
+template
+<
+    typename Geometry1, typename Geometry2, typename SingleTupledOut,
+    typename SingleTag1, typename SingleTag2,
+    bool Geometry1LesserTopoDim = (topological_dimension<Geometry1>::value
+                                    < topological_dimension<Geometry2>::value)
+>
+struct union_insert_tupled_different
+{
+    typedef typename geometry::detail::output_geometry_access
+        <
+            SingleTupledOut, SingleTag1, SingleTag1
+        > access1;
+
+    typedef typename geometry::detail::output_geometry_access
+        <
+            SingleTupledOut, SingleTag2, SingleTag2
+        > access2;
+
+    template <typename RobustPolicy, typename OutputIterator, typename Strategy>
+    static inline OutputIterator apply(Geometry1 const& g1,
+                                       Geometry2 const& g2,
+                                       RobustPolicy const& robust_policy,
+                                       OutputIterator out,
+                                       Strategy const& strategy)
+    {
+        access1::get(out) = geometry::dispatch::intersection_insert
+            <
+                Geometry1, Geometry2,
+                typename access1::type,
+                overlay_difference,
+                geometry::detail::overlay::do_reverse<geometry::point_order<Geometry1>::value>::value,
+                geometry::detail::overlay::do_reverse<geometry::point_order<Geometry2>::value, true>::value
+            >::apply(g1, g2, robust_policy, access1::get(out), strategy);
+
+        access2::get(out) = geometry::detail::convert_to_output
+            <
+                Geometry2,
+                typename access2::type
+            >::apply(g2, access2::get(out));
+
+        return out;
+    }
+};
+
+
+template
+<
+    typename Geometry1, typename Geometry2, typename SingleTupledOut,
+    typename SingleTag1, typename SingleTag2
+>
+struct union_insert_tupled_different
+    <
+        Geometry1, Geometry2, SingleTupledOut, SingleTag1, SingleTag2, false
+    >
+{
+    template <typename RobustPolicy, typename OutputIterator, typename Strategy>
+    static inline OutputIterator apply(Geometry1 const& g1,
+                                       Geometry2 const& g2,
+                                       RobustPolicy const& robust_policy,
+                                       OutputIterator out,
+                                       Strategy const& strategy)
+    {
+        return union_insert_tupled_different
+            <
+                Geometry2, Geometry1, SingleTupledOut, SingleTag2, SingleTag1, true
+            >::apply(g2, g1, robust_policy, out, strategy);
+    }
+};
+
+
+template
+<
+    typename Geometry1, typename Geometry2, typename SingleTupledOut,
+    typename TagIn1, typename TagIn2,
+    typename CastedTagIn1, typename CastedTagIn2
+>
+struct union_insert
+    <
+        Geometry1, Geometry2, SingleTupledOut,
+        TagIn1, TagIn2, detail::tupled_output_tag,
+        CastedTagIn1, CastedTagIn2, detail::tupled_output_tag,
+        false
+    >
+{
+    typedef typename geometry::detail::single_tag_from_base_tag
+        <
+            CastedTagIn1
+        >::type single_tag1;
+
+    typedef detail::expect_output
+        <
+            Geometry1, Geometry2, SingleTupledOut, single_tag1
+        > expect_check1;
+
+    typedef typename geometry::detail::single_tag_from_base_tag
+        <
+            CastedTagIn2
+        >::type single_tag2;
+
+    typedef detail::expect_output
+        <
+            Geometry1, Geometry2, SingleTupledOut, single_tag2
+        > expect_check2;
+
+    template <typename RobustPolicy, typename OutputIterator, typename Strategy>
+    static inline OutputIterator apply(Geometry1 const& g1,
+                                       Geometry2 const& g2,
+                                       RobustPolicy const& robust_policy,
+                                       OutputIterator out,
+                                       Strategy const& strategy)
+    {
+        return union_insert_tupled_different
+            <
+                Geometry1, Geometry2, SingleTupledOut, single_tag1, single_tag2
+            >::apply(g1, g2, robust_policy, out, strategy);
+    }
+};
 
 
 } // namespace dispatch
@@ -209,7 +349,12 @@ inline OutputIterator union_insert(Geometry1 const& geometry1,
 {
     concepts::check<Geometry1 const>();
     concepts::check<Geometry2 const>();
-    concepts::check<GeometryOut>();
+    geometry::detail::output_geometry_concept_check<GeometryOut>::apply();
+
+    typename strategies::relate::services::default_strategy
+        <
+            Geometry1, Geometry2
+        >::type strategy;
 
     typedef typename geometry::rescale_overlay_policy_type
         <
@@ -217,13 +362,9 @@ inline OutputIterator union_insert(Geometry1 const& geometry1,
             Geometry2
         >::type rescale_policy_type;
 
-    typename strategy::intersection::services::default_strategy
-        <
-            typename cs_tag<GeometryOut>::type
-        >::type strategy;
-
     rescale_policy_type robust_policy
-            = geometry::get_rescale_policy<rescale_policy_type>(geometry1, geometry2);
+            = geometry::get_rescale_policy<rescale_policy_type>(
+                geometry1, geometry2, strategy);
 
     return dispatch::union_insert
            <
@@ -238,59 +379,82 @@ inline OutputIterator union_insert(Geometry1 const& geometry1,
 
 namespace resolve_strategy {
 
+template
+<
+    typename Strategy,
+    bool IsUmbrella = strategies::detail::is_umbrella_strategy<Strategy>::value
+>
 struct union_
 {
-    template
-    <
-        typename Geometry1,
-        typename Geometry2,
-        typename RobustPolicy,
-        typename Collection,
-        typename Strategy
-    >
+    template <typename Geometry1, typename Geometry2, typename Collection>
     static inline void apply(Geometry1 const& geometry1,
                              Geometry2 const& geometry2,
-                             RobustPolicy const& robust_policy,
                              Collection & output_collection,
                              Strategy const& strategy)
     {
-        typedef typename boost::range_value<Collection>::type geometry_out;
+        typedef typename geometry::detail::output_geometry_value
+            <
+                Collection
+            >::type single_out;
+
+        typedef typename geometry::rescale_overlay_policy_type
+            <
+                Geometry1,
+                Geometry2,
+                typename Strategy::cs_tag
+            >::type rescale_policy_type;
+
+        rescale_policy_type robust_policy
+                = geometry::get_rescale_policy<rescale_policy_type>(
+                    geometry1, geometry2, strategy);
 
         dispatch::union_insert
            <
-               Geometry1, Geometry2, geometry_out
+               Geometry1, Geometry2, single_out
            >::apply(geometry1, geometry2, robust_policy,
-                    range::back_inserter(output_collection),
+                    geometry::detail::output_geometry_back_inserter(output_collection),
                     strategy);
     }
+};
 
-    template
-    <
-        typename Geometry1,
-        typename Geometry2,
-        typename RobustPolicy,
-        typename Collection
-    >
+template <typename Strategy>
+struct union_<Strategy, false>
+{
+    template <typename Geometry1, typename Geometry2, typename Collection>
     static inline void apply(Geometry1 const& geometry1,
                              Geometry2 const& geometry2,
-                             RobustPolicy const& robust_policy,
+                             Collection & output_collection,
+                             Strategy const& strategy)
+    {
+        using strategies::relate::services::strategy_converter;
+
+        union_
+            <
+                decltype(strategy_converter<Strategy>::get(strategy))
+            >::apply(geometry1, geometry2, output_collection,
+                     strategy_converter<Strategy>::get(strategy));
+    }
+};
+
+template <>
+struct union_<default_strategy, false>
+{
+    template <typename Geometry1, typename Geometry2, typename Collection>
+    static inline void apply(Geometry1 const& geometry1,
+                             Geometry2 const& geometry2,
                              Collection & output_collection,
                              default_strategy)
     {
-        typedef typename boost::range_value<Collection>::type geometry_out;
-
-        typedef typename strategy::relate::services::default_strategy
+        typedef typename strategies::relate::services::default_strategy
             <
                 Geometry1,
                 Geometry2
             >::type strategy_type;
 
-        dispatch::union_insert
-           <
-               Geometry1, Geometry2, geometry_out
-           >::apply(geometry1, geometry2, robust_policy,
-                    range::back_inserter(output_collection),
-                    strategy_type());
+        union_
+            <
+                strategy_type
+            >::apply(geometry1, geometry2, output_collection, strategy_type());
     }
 };
 
@@ -311,22 +475,19 @@ struct union_
     {
         concepts::check<Geometry1 const>();
         concepts::check<Geometry2 const>();
-        concepts::check<typename boost::range_value<Collection>::type>();
-
-        typedef typename geometry::rescale_overlay_policy_type
+        //concepts::check<typename boost::range_value<Collection>::type>();
+        geometry::detail::output_geometry_concept_check
             <
-                Geometry1,
-                Geometry2
-            >::type rescale_policy_type;
+                typename geometry::detail::output_geometry_value
+                    <
+                        Collection
+                    >::type
+            >::apply();
 
-        rescale_policy_type robust_policy
-                = geometry::get_rescale_policy<rescale_policy_type>(geometry1,
-                                                                    geometry2);
-        
-        resolve_strategy::union_::apply(geometry1, geometry2,
-                                        robust_policy,
-                                        output_collection,
-                                        strategy);
+        resolve_strategy::union_
+            <
+                Strategy
+            >::apply(geometry1, geometry2, output_collection, strategy);
     }
 };
 

@@ -12,10 +12,10 @@
 #include <boost/lockfree/policies.hpp>
 #include <boost/parameter/parameters.hpp>
 #include <boost/parameter/binding.hpp>
+#include <boost/core/allocator_access.hpp>
 
 #include <boost/mpl/void.hpp>
 
-#include <boost/lockfree/detail/allocator_rebind_helper.hpp>
 
 
 namespace boost {
@@ -56,7 +56,7 @@ struct extract_allocator
                                std::allocator<T>
                               >::type allocator_arg;
 
-    typedef typename detail::allocator_rebind_helper<allocator_arg, T>::type type;
+    typedef typename boost::allocator_rebind<allocator_arg, T>::type type;
 };
 
 template <typename bound_args, bool default_ = false>

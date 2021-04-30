@@ -11,7 +11,13 @@
 #pragma once
 #endif
 
-#include <boost/spirit/include/phoenix_core.hpp>
+#include <boost/phoenix/core/actor.hpp>
+#include <boost/phoenix/core/as_actor.hpp>
+#include <boost/phoenix/core/expression.hpp>
+#include <boost/phoenix/core/v2_eval.hpp>
+#include <boost/phoenix/core/value.hpp> // includes as_actor specialization
+#include <boost/proto/traits.hpp>
+#include <boost/proto/proto_fwd.hpp> // for transform placeholders
 
 namespace boost { namespace spirit { namespace lex
 {
@@ -37,7 +43,7 @@ namespace boost { namespace spirit { namespace lex
 
         template <typename Env>
         unused_type
-        eval(Env const& env) const
+        eval(Env const&) const
         {
             return unused;
         }
@@ -69,7 +75,7 @@ namespace boost { namespace spirit { namespace lex
 
         template <typename Env>
         unused_type
-        eval(Env const& env) const
+        eval(Env const&) const
         {
             return unused;
         }

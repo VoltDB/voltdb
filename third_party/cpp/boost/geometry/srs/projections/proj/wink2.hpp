@@ -2,8 +2,8 @@
 
 // Copyright (c) 2008-2015 Barend Gehrels, Amsterdam, the Netherlands.
 
-// This file was modified by Oracle on 2017, 2018.
-// Modifications copyright (c) 2017-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2017, 2018, 2019.
+// Modifications copyright (c) 2017-2019, Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle.
 
 // Use, modification and distribution is subject to the Boost Software License,
@@ -66,20 +66,14 @@ namespace projections
                 T    cosphi1;
             };
 
-            // template class, using CRTP to implement forward/inverse
             template <typename T, typename Parameters>
             struct base_wink2_spheroid
-                : public base_t_f<base_wink2_spheroid<T, Parameters>, T, Parameters>
             {
-
                 par_wink2<T> m_proj_parm;
-
-                inline base_wink2_spheroid(const Parameters& par)
-                    : base_t_f<base_wink2_spheroid<T, Parameters>, T, Parameters>(*this, par) {}
 
                 // FORWARD(s_forward)  spheroid
                 // Project coordinates from geographic (lon, lat) to cartesian (x, y)
-                inline void fwd(T const& lp_lon, T lp_lat, T& xy_x, T& xy_y) const
+                inline void fwd(Parameters const& , T const& lp_lon, T lp_lat, T& xy_x, T& xy_y) const
                 {
                     static const T pi = detail::pi<T>();
                     static const T half_pi = detail::half_pi<T>();
@@ -143,10 +137,9 @@ namespace projections
     struct wink2_spheroid : public detail::wink2::base_wink2_spheroid<T, Parameters>
     {
         template <typename Params>
-        inline wink2_spheroid(Params const& params, Parameters const& par)
-            : detail::wink2::base_wink2_spheroid<T, Parameters>(par)
+        inline wink2_spheroid(Params const& params, Parameters & par)
         {
-            detail::wink2::setup_wink2(params, this->m_par, this->m_proj_parm);
+            detail::wink2::setup_wink2(params, par, this->m_proj_parm);
         }
     };
 
@@ -155,7 +148,7 @@ namespace projections
     {
 
         // Static projection
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_wink2, wink2_spheroid, wink2_spheroid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_F(srs::spar::proj_wink2, wink2_spheroid)
 
         // Factory entry(s)
         BOOST_GEOMETRY_PROJECTIONS_DETAIL_FACTORY_ENTRY_F(wink2_entry, wink2_spheroid)

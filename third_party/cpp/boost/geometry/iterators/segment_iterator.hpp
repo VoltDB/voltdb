@@ -1,8 +1,8 @@
 // Boost.Geometry (aka GGL, Generic Geometry Library)
 
-// Copyright (c) 2014, Oracle and/or its affiliates.
-
+// Copyright (c) 2014-2020, Oracle and/or its affiliates.
 // Contributed and/or modified by Menelaos Karavelas, on behalf of Oracle
+// Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
 // Licensed under the Boost Software License version 1.0.
 // http://www.boost.org/users/license.html
@@ -10,12 +10,15 @@
 #ifndef BOOST_GEOMETRY_ITERATORS_SEGMENT_ITERATOR_HPP
 #define BOOST_GEOMETRY_ITERATORS_SEGMENT_ITERATOR_HPP
 
-#include <boost/mpl/assert.hpp>
-#include <boost/type_traits/is_convertible.hpp>
-#include <boost/range.hpp>
+
+#include <type_traits>
+
+#include <boost/range/begin.hpp>
+#include <boost/range/end.hpp>
 
 #include <boost/geometry/core/exterior_ring.hpp>
 #include <boost/geometry/core/interior_rings.hpp>
+#include <boost/geometry/core/static_assert.hpp>
 #include <boost/geometry/core/tags.hpp>
 
 #include <boost/geometry/iterators/detail/point_iterator/inner_range_type.hpp>
@@ -289,7 +292,7 @@ public:
         : base(*other.base_ptr())
     {
         static const bool is_conv
-            = boost::is_convertible<
+            = std::is_convertible<
                 typename detail::segment_iterator::iterator_type
                     <
                         OtherGeometry
@@ -297,9 +300,9 @@ public:
                 typename detail::segment_iterator::iterator_type<Geometry>::type
             >::value;
 
-        BOOST_MPL_ASSERT_MSG((is_conv),
-                             NOT_CONVERTIBLE,
-                             (segment_iterator<OtherGeometry>));
+        BOOST_GEOMETRY_STATIC_ASSERT((is_conv),
+            "Other iterator has to be convertible to member iterator.",
+            segment_iterator<OtherGeometry>);
     }
 
     inline segment_iterator& operator++() // prefix

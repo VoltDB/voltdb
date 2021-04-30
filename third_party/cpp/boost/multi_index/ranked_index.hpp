@@ -1,4 +1,4 @@
-/* Copyright 2003-2018 Joaquin M Lopez Munoz.
+/* Copyright 2003-2020 Joaquin M Lopez Munoz.
  * Distributed under the Boost Software License, Version 1.0.
  * (See accompanying file LICENSE_1_0.txt or copy at
  * http://www.boost.org/LICENSE_1_0.txt)
@@ -40,7 +40,7 @@ class ranked_index:public OrderedIndexImpl
   typedef          OrderedIndexImpl         super;
 
 protected:
-  typedef typename super::node_type         node_type;
+  typedef typename super::index_node_type   index_node_type;
   typedef typename super::node_impl_pointer node_impl_pointer;
 
 public:
@@ -53,7 +53,7 @@ public:
 
   iterator nth(size_type n)const
   {
-    return this->make_iterator(node_type::from_impl(
+    return this->make_iterator(index_node_type::from_impl(
       ranked_index_nth(n,this->header()->impl())));
   }
 
@@ -163,8 +163,8 @@ private:
   std::pair<size_type,size_type>
   range_rank(LowerBounder lower,UpperBounder upper,none_unbounded_tag)const
   {
-    node_type* y=this->header();
-    node_type* z=this->root();
+    index_node_type* y=this->header();
+    index_node_type* z=this->root();
 
     if(!z)return std::pair<size_type,size_type>(0,0);
 
@@ -172,19 +172,19 @@ private:
 
     do{
       if(!lower(this->key(z->value()))){
-        z=node_type::from_impl(z->right());
+        z=index_node_type::from_impl(z->right());
       }
       else if(!upper(this->key(z->value()))){
         y=z;
         s-=ranked_node_size(y->right())+1;
-        z=node_type::from_impl(z->left());
+        z=index_node_type::from_impl(z->left());
       }
       else{
         return std::pair<size_type,size_type>(
           s-z->impl()->size+
-            lower_range_rank(node_type::from_impl(z->left()),z,lower),
+            lower_range_rank(index_node_type::from_impl(z->left()),z,lower),
           s-ranked_node_size(z->right())+
-            upper_range_rank(node_type::from_impl(z->right()),y,upper));
+            upper_range_rank(index_node_type::from_impl(z->right()),y,upper));
       }
     }while(z);
 
@@ -218,7 +218,8 @@ private:
 
   template<typename LowerBounder>
   size_type
-  lower_range_rank(node_type* top,node_type* y,LowerBounder lower)const
+  lower_range_rank(
+    index_node_type* top,index_node_type* y,LowerBounder lower)const
   {
     if(!top)return 0;
 
@@ -228,9 +229,9 @@ private:
       if(lower(this->key(top->value()))){
         y=top;
         s-=ranked_node_size(y->right())+1;
-        top=node_type::from_impl(top->left());
+        top=index_node_type::from_impl(top->left());
       }
-      else top=node_type::from_impl(top->right());
+      else top=index_node_type::from_impl(top->right());
     }while(top);
 
     return s;
@@ -238,7 +239,8 @@ private:
 
   template<typename UpperBounder>
   size_type
-  upper_range_rank(node_type* top,node_type* y,UpperBounder upper)const
+  upper_range_rank(
+    index_node_type* top,index_node_type* y,UpperBounder upper)const
   {
     if(!top)return 0;
 
@@ -248,9 +250,9 @@ private:
       if(!upper(this->key(top->value()))){
         y=top;
         s-=ranked_node_size(y->right())+1;
-        top=node_type::from_impl(top->left());
+        top=index_node_type::from_impl(top->left());
       }
-      else top=node_type::from_impl(top->right());
+      else top=index_node_type::from_impl(top->right());
     }while(top);
 
     return s;

@@ -14,16 +14,19 @@
 #endif
 
 #include <boost/config.hpp>
-#include <boost/spirit/include/phoenix_core.hpp>
-#include <boost/spirit/include/phoenix_function.hpp>
-#include <boost/proto/proto.hpp>
 #include <boost/spirit/home/support/meta_compiler.hpp>
 #include <boost/spirit/home/support/detail/make_vector.hpp>
 #include <boost/spirit/home/support/unused.hpp>
 #include <boost/spirit/home/support/detail/is_spirit_tag.hpp>
-#include <boost/preprocessor/tuple/elem.hpp>
-
 #include <boost/spirit/home/support/terminal_expression.hpp>
+#include <boost/phoenix/core/as_actor.hpp>
+#include <boost/phoenix/core/is_actor.hpp>
+#include <boost/phoenix/core/terminal_fwd.hpp>
+#include <boost/phoenix/core/value.hpp> // includes as_actor specialization
+#include <boost/phoenix/function/function.hpp>
+#include <boost/preprocessor/tuple/elem.hpp>
+#include <boost/proto/extends.hpp>
+#include <boost/proto/traits.hpp>
 
 namespace boost { namespace spirit
 {
@@ -485,9 +488,8 @@ namespace boost { namespace spirit
               , phoenix::as_actor<A2>::convert(_2_));
         }
 
-    private:
         // silence MSVC warning C4512: assignment operator could not be generated
-        terminal& operator= (terminal const&);
+        BOOST_DELETED_FUNCTION(terminal& operator= (terminal const&))
     };
 
     ///////////////////////////////////////////////////////////////////////////
@@ -543,9 +545,8 @@ namespace boost { namespace spirit
 
             data_type data_;
 
-        private:
             // silence MSVC warning C4512: assignment operator could not be generated
-            stateful_tag& operator= (stateful_tag const&);
+            BOOST_DELETED_FUNCTION(stateful_tag& operator= (stateful_tag const&))
         };
     }
 
@@ -562,9 +563,8 @@ namespace boost { namespace spirit
           : spirit::terminal<tag_type>(data) 
         {}
 
-    private:
         // silence MSVC warning C4512: assignment operator could not be generated
-        stateful_tag_type& operator= (stateful_tag_type const&);
+        BOOST_DELETED_FUNCTION(stateful_tag_type& operator= (stateful_tag_type const&))
     };
 
     namespace detail

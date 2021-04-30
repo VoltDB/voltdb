@@ -12,6 +12,7 @@
 #include <boost/typeof/vector.hpp>
 #include <boost/type_traits/enable_if.hpp>
 #include <boost/type_traits/is_function.hpp>
+#include <cstddef> // for std::size_t
 
 #define BOOST_TYPEOF_VECTOR(n) BOOST_PP_CAT(boost::type_of::vector, n)
 
@@ -106,7 +107,7 @@ namespace boost { namespace type_of {
     typedef _typeof_encode_fraction<self_t::iteration> fraction_type;
 #endif
 
-#ifdef __BORLANDC__
+#ifdef BOOST_BORLANDC
 namespace boost { namespace type_of {
     template<typename Pos,typename Iter>
     struct generic_typeof_fraction_iter {

@@ -14,6 +14,7 @@
 
 #include <boost/math/distributions/fwd.hpp>
 #include <boost/math/special_functions/beta.hpp> // for ibeta(a, b, x).
+#include <boost/math/special_functions/digamma.hpp>
 #include <boost/math/distributions/complement.hpp>
 #include <boost/math/distributions/detail/common_error_handling.hpp>
 #include <boost/math/distributions/normal.hpp> 
@@ -476,6 +477,18 @@ inline RealType kurtosis_excess(const students_t_distribution<RealType, Policy>&
    {
      return 6 / (df - 4);
    }
+}
+
+template <class RealType, class Policy>
+inline RealType entropy(const students_t_distribution<RealType, Policy>& dist)
+{
+   using std::log;
+   using std::sqrt;
+   RealType v = dist.degrees_of_freedom();
+   RealType vp1 = (v+1)/2;
+   RealType vd2 = v/2;
+
+   return vp1*(digamma(vp1) - digamma(vd2)) + log(sqrt(v)*beta(vd2, RealType(1)/RealType(2)));
 }
 
 } // namespace math

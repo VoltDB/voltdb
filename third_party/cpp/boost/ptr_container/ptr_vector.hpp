@@ -19,6 +19,8 @@
 #include <vector>
 #include <boost/ptr_container/ptr_sequence_adapter.hpp>
 #include <boost/ptr_container/detail/ptr_container_disable_deprecated.hpp>
+#include <boost/type_traits/is_same.hpp>
+#include <boost/mpl/if.hpp>
 
 #if defined(BOOST_PTR_CONTAINER_DISABLE_DEPRECATED)
 #pragma GCC diagnostic push
@@ -32,16 +34,27 @@ namespace boost
     < 
         class T, 
         class CloneAllocator = heap_clone_allocator,
-        class Allocator      = std::allocator<typename ptr_container_detail::void_ptr<T>::type>
+        class Allocator      = void
     >
     class ptr_vector : public 
-        ptr_sequence_adapter< T, std::vector<
-            typename ptr_container_detail::void_ptr<T>::type,Allocator>, 
-                              CloneAllocator >
+        ptr_sequence_adapter< T,
+            std::vector<
+                typename ptr_container_detail::void_ptr<T>::type,
+                typename boost::mpl::if_<boost::is_same<Allocator, void>,
+                    std::allocator<typename ptr_container_detail::void_ptr<T>::type>, Allocator>::type
+            >,
+            CloneAllocator >
     {  
-        typedef ptr_sequence_adapter< T, std::vector<
-            typename ptr_container_detail::void_ptr<T>::type,Allocator>, 
-                                      CloneAllocator > 
+        typedef
+
+            ptr_sequence_adapter< T,
+                std::vector<
+                    typename ptr_container_detail::void_ptr<T>::type,
+                    typename boost::mpl::if_<boost::is_same<Allocator, void>,
+                        std::allocator<typename ptr_container_detail::void_ptr<T>::type>, Allocator>::type
+                >,
+                CloneAllocator >
+
             base_class;
 
         typedef ptr_vector<T,CloneAllocator,Allocator> this_type;

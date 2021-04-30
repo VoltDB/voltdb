@@ -45,8 +45,9 @@ namespace impl{
 
 template <class T>
 struct extract_version
-   : T::version
-{};
+{
+   typedef typename T::version type;
+};
 
 template <class T>
 struct has_version
@@ -69,7 +70,7 @@ struct version
 template <class T>
 struct version<T, true>
 {
-   static const unsigned value = extract_version<T>::value;
+   static const unsigned value = extract_version<T>::type::value;
 };
 
 }  //namespace impl

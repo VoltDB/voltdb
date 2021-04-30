@@ -95,7 +95,7 @@ public:
    // See https://svn.boost.org/trac/boost/ticket/3632.
    //
    match_results(const match_results& m)
-      : m_subs(m.m_subs), m_named_subs(m.m_named_subs), m_last_closed_paren(m.m_last_closed_paren), m_is_singular(m.m_is_singular) 
+      : m_subs(m.m_subs), m_base(), m_null(), m_named_subs(m.m_named_subs), m_last_closed_paren(m.m_last_closed_paren), m_is_singular(m.m_is_singular)
    {
       if(!m_is_singular)
       {
@@ -474,7 +474,7 @@ public:
    // private access functions:
    void BOOST_REGEX_CALL set_second(BidiIterator i)
    {
-      BOOST_ASSERT(m_subs.size() > 2);
+      BOOST_REGEX_ASSERT(m_subs.size() > 2);
       m_subs[2].second = i;
       m_subs[2].matched = true;
       m_subs[0].first = i;
@@ -490,7 +490,7 @@ public:
       if(pos)
          m_last_closed_paren = static_cast<int>(pos);
       pos += 2;
-      BOOST_ASSERT(m_subs.size() > pos);
+      BOOST_REGEX_ASSERT(m_subs.size() > pos);
       m_subs[pos].second = i;
       m_subs[pos].matched = m;
       if((pos == 2) && !escape_k)
@@ -531,7 +531,7 @@ public:
    }
    void BOOST_REGEX_CALL set_first(BidiIterator i)
    {
-      BOOST_ASSERT(m_subs.size() > 2);
+      BOOST_REGEX_ASSERT(m_subs.size() > 2);
       // set up prefix:
       m_subs[1].second = i;
       m_subs[1].matched = (m_subs[1].first != i);
@@ -546,7 +546,7 @@ public:
    }
    void BOOST_REGEX_CALL set_first(BidiIterator i, size_type pos, bool escape_k = false)
    {
-      BOOST_ASSERT(pos+2 < m_subs.size());
+      BOOST_REGEX_ASSERT(pos+2 < m_subs.size());
       if(pos || escape_k)
       {
          m_subs[pos+2].first = i;
@@ -650,15 +650,15 @@ void BOOST_REGEX_CALL match_results<BidiIterator, Allocator>::maybe_assign(const
       }
       base1 = ::boost::BOOST_REGEX_DETAIL_NS::distance(l_base, p1->first);
       base2 = ::boost::BOOST_REGEX_DETAIL_NS::distance(l_base, p2->first);
-      BOOST_ASSERT(base1 >= 0);
-      BOOST_ASSERT(base2 >= 0);
+      BOOST_REGEX_ASSERT(base1 >= 0);
+      BOOST_REGEX_ASSERT(base2 >= 0);
       if(base1 < base2) return;
       if(base2 < base1) break;
 
       len1 = ::boost::BOOST_REGEX_DETAIL_NS::distance((BidiIterator)p1->first, (BidiIterator)p1->second);
       len2 = ::boost::BOOST_REGEX_DETAIL_NS::distance((BidiIterator)p2->first, (BidiIterator)p2->second);
-      BOOST_ASSERT(len1 >= 0);
-      BOOST_ASSERT(len2 >= 0);
+      BOOST_REGEX_ASSERT(len1 >= 0);
+      BOOST_REGEX_ASSERT(len2 >= 0);
       if((len1 != len2) || ((p1->matched == false) && (p2->matched == true)))
          break;
       if((p1->matched == true) && (p2->matched == false))

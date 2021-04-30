@@ -4,6 +4,10 @@
 //
 // Copyright (c) 2011-2018 Adam Wulkiewicz, Lodz, Poland.
 //
+// This file was modified by Oracle on 2019-2020.
+// Modifications copyright (c) 2019-2020 Oracle and/or its affiliates.
+// Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
+//
 // Use, modification and distribution is subject to the Boost Software License,
 // Version 1.0. (See accompanying file LICENSE_1_0.txt or copy at
 // http://www.boost.org/LICENSE_1_0.txt)
@@ -18,18 +22,31 @@
 
 namespace boost { namespace geometry { namespace index { namespace detail {
 
-/**
- * \brief Compute the area of the intersection of b1 and b2
- */
-template <typename Box>
-inline typename default_content_result<Box>::type intersection_content(Box const& box1, Box const& box2)
+// Util to distinguish between default and non-default index strategy
+template <typename Box, typename Strategy>
+inline bool disjoint_box_box(Box const& box1, Box const& box2, Strategy const& s)
 {
-    typedef typename strategy::disjoint::services::default_strategy
-        <
-            Box, Box
-        >::type strategy_type;
+    return geometry::detail::disjoint::disjoint_box_box(box1, box2, s);
+}
 
-    bool const intersects = ! geometry::detail::disjoint::disjoint_box_box(box1, box2, strategy_type());
+template <typename Box>
+inline bool disjoint_box_box(Box const& box1, Box const& box2, default_strategy const& )
+{
+    typedef typename strategy::disjoint::services::default_strategy<Box, Box>::type strategy_type;
+    return geometry::detail::disjoint::disjoint_box_box(box1, box2, strategy_type());
+}
+
+/**
+ * \brief Compute the area, volume, ... of the intersection of b1 and b2
+ */
+template <typename Box, typename Strategy>
+inline typename default_content_result<Box>::type intersection_content(Box const& box1, Box const& box2, Strategy const& strategy)
+{
+    bool const intersects = ! index::detail::disjoint_box_box(box1, box2, strategy);
+
+    // NOTE: the code below may be inconsistent with the disjoint_box_box()
+    // however intersection_box_box checks if the boxes intersect on the fly so it should be ok
+    // but this also means that disjoint_box_box() is probably not needed
 
     if ( intersects )
     {
@@ -44,6 +61,12 @@ inline typename default_content_result<Box>::type intersection_content(Box const
         }
     }
     return 0;
+}
+
+template <typename Box>
+inline typename default_content_result<Box>::type intersection_content(Box const& box1, Box const& box2)
+{
+    return intersection_content(box1, box2, default_strategy());
 }
 
 }}}} // namespace boost::geometry::index::detail

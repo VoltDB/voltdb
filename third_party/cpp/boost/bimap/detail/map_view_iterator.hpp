@@ -22,6 +22,7 @@
 
 #ifndef BOOST_BIMAP_DISABLE_SERIALIZATION
   #include <boost/serialization/nvp.hpp>
+  #include <boost/serialization/split_member.hpp>
 #endif // BOOST_BIMAP_DISABLE_SERIALIZATION
 
 #include <boost/iterator/detail/enable_if.hpp>
@@ -123,8 +124,6 @@ struct map_view_iterator :
     map_view_iterator() {}
     map_view_iterator(BOOST_DEDUCED_TYPENAME base_::base_type const& iter)
       : base_(iter) {}
-    map_view_iterator(map_view_iterator const & iter)
-      : base_(iter.base()) {}
 
     BOOST_DEDUCED_TYPENAME base_::reference dereference() const
     {
@@ -161,8 +160,6 @@ struct const_map_view_iterator :
     const_map_view_iterator(
             BOOST_DEDUCED_TYPENAME base_::base_type const& iter)
       : base_(iter) {}
-    const_map_view_iterator(const_map_view_iterator const & iter)
-      : base_(iter.base()) {}
 	const_map_view_iterator(map_view_iterator<Tag,BimapCore> i)
       : base_(i.base()) {}
 
@@ -200,8 +197,6 @@ struct reverse_map_view_iterator :
     reverse_map_view_iterator(
             BOOST_DEDUCED_TYPENAME base_::base_type const& iter)
       : base_(iter) {}
-    reverse_map_view_iterator(reverse_map_view_iterator const & iter)
-      : base_(iter.base()) {}
 
     BOOST_DEDUCED_TYPENAME base_::reference dereference() const
     {
@@ -239,8 +234,6 @@ struct const_reverse_map_view_iterator :
     const_reverse_map_view_iterator(
             BOOST_DEDUCED_TYPENAME base_::base_type const& iter)
       : base_(iter) {}
-    const_reverse_map_view_iterator(const_reverse_map_view_iterator const & iter)
-      : base_(iter.base()) {}
 	const_reverse_map_view_iterator(reverse_map_view_iterator<Tag,BimapCore> i)
       : base_(i.base()) {}
 
@@ -278,8 +271,6 @@ struct local_map_view_iterator :
     local_map_view_iterator(
             BOOST_DEDUCED_TYPENAME base_::base_type const& iter)
       : base_(iter) {}
-    local_map_view_iterator(local_map_view_iterator const & iter)
-      : base_(iter.base()) {}
 
     BOOST_DEDUCED_TYPENAME base_::reference dereference() const
     {
@@ -316,8 +307,6 @@ struct const_local_map_view_iterator :
     const_local_map_view_iterator(
             BOOST_DEDUCED_TYPENAME base_::base_type const& iter)
       : base_(iter) {}
-    const_local_map_view_iterator(const_local_map_view_iterator const & iter)
-      : base_(iter.base()) {}
 	const_local_map_view_iterator(local_map_view_iterator<Tag,BimapCore> i)
       : base_(i.base()) {}
 

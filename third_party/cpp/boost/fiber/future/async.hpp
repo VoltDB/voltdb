@@ -21,9 +21,19 @@
 namespace boost {
 namespace fibers {
 
+#if defined(BOOST_MSVC) && (_MSC_VER >= 1911 && _MSVC_LANG >= 201703)
+template <typename>
+struct result_of;
+template <typename F, typename... Args>
+struct result_of<F(Args...)> : std::invoke_result<F, Args...> {};
+#else
+using std::result_of;
+#endif
+
+
 template< typename Fn, typename ... Args >
 future<
-    typename std::result_of<
+    typename result_of<
         typename std::enable_if<
             ! detail::is_launch_policy< typename std::decay< Fn >::type >::value,
             typename std::decay< Fn >::type
@@ -31,7 +41,7 @@ future<
     >::type
 >
 async( Fn && fn, Args ... args) {
-    typedef typename std::result_of<
+    typedef typename result_of<
         typename std::decay< Fn >::type( typename std::decay< Args >::type ... )
     >::type     result_type;
 
@@ -44,7 +54,7 @@ async( Fn && fn, Args ... args) {
 
 template< typename Policy, typename Fn, typename ... Args >
 future<
-    typename std::result_of<
+    typename result_of<
         typename std::enable_if<
             detail::is_launch_policy< Policy >::value,
             typename std::decay< Fn >::type
@@ -52,7 +62,7 @@ future<
     >::type
 >
 async( Policy policy, Fn && fn, Args ... args) {
-    typedef typename std::result_of<
+    typedef typename result_of<
         typename std::decay< Fn >::type( typename std::decay< Args >::type ... )
     >::type     result_type;
 
@@ -65,7 +75,7 @@ async( Policy policy, Fn && fn, Args ... args) {
 
 template< typename Policy, typename StackAllocator, typename Fn, typename ... Args >
 future<
-    typename std::result_of<
+    typename result_of<
         typename std::enable_if<
             detail::is_launch_policy< Policy >::value,
             typename std::decay< Fn >::type
@@ -73,7 +83,7 @@ future<
     >::type
 >
 async( Policy policy, std::allocator_arg_t, StackAllocator salloc, Fn && fn, Args ... args) {
-    typedef typename std::result_of<
+    typedef typename result_of<
         typename std::decay< Fn >::type( typename std::decay< Args >::type ... )
     >::type     result_type;
 
@@ -87,7 +97,7 @@ async( Policy policy, std::allocator_arg_t, StackAllocator salloc, Fn && fn, Arg
 
 template< typename Policy, typename StackAllocator, typename Allocator, typename Fn, typename ... Args >
 future<
-    typename std::result_of<
+    typename result_of<
         typename std::enable_if<
             detail::is_launch_policy< Policy >::value,
             typename std::decay< Fn >::type
@@ -95,7 +105,7 @@ future<
     >::type
 >
 async( Policy policy, std::allocator_arg_t, StackAllocator salloc, Allocator alloc, Fn && fn, Args ... args) {
-    typedef typename std::result_of<
+    typedef typename result_of<
         typename std::decay< Fn >::type( typename std::decay< Args >::type ... )
     >::type     result_type;
 

@@ -325,28 +325,10 @@ inline std::basic_ostream<charT, traits>& operator<<(std::basic_ostream<charT, t
 template <class charT, class traits>
 inline std::basic_istream<charT, traits>& operator>>(std::basic_istream<charT, traits>& is, real_concept& a)
 {
-#if defined(BOOST_MSVC) && defined(__SGI_STL_PORT)
-   //
-   // STLPort 5.1.4 has a problem reading long doubles from strings,
-   // see http://sourceforge.net/tracker/index.php?func=detail&aid=1811043&group_id=146814&atid=766244
-   //
-   double v;
-   is >> v;
-   a = v;
-   return is;
-#elif defined(__SGI_STL_PORT) || defined(_RWSTD_VER) || defined(__LIBCOMO__) || defined(_LIBCPP_VERSION)
-   std::string s;
-   real_concept_base_type d;
-   is >> s;
-   std::sscanf(s.c_str(), "%Lf", &d);
-   a = d;
-   return is;
-#else
    real_concept_base_type v;
    is >> v;
    a = v;
    return is;
-#endif
 }
 
 } // namespace concepts
@@ -355,7 +337,7 @@ namespace tools
 {
 
 template <>
-inline concepts::real_concept make_big_value<concepts::real_concept>(boost::math::tools::largest_float val, const char* , mpl::false_ const&, mpl::false_ const&)
+inline concepts::real_concept make_big_value<concepts::real_concept>(boost::math::tools::largest_float val, const char* , std::false_type const&, std::false_type const&)
 {
    return val;  // Can't use lexical_cast here, sometimes it fails....
 }
@@ -408,88 +390,6 @@ inline BOOST_MATH_CONSTEXPR int digits<concepts::real_concept>(BOOST_MATH_EXPLIC
 }
 
 } // namespace tools
-/*
-namespace policies {
-   namespace detail {
-
-      template <class T>
-      inline concepts::real_concept raise_rounding_error(
-         const char*,
-         const char*,
-         const T& val,
-         const concepts::real_concept&,
-         const  ::boost::math::policies::rounding_error< ::boost::math::policies::errno_on_error>&) BOOST_MATH_NOEXCEPT(T)
-      {
-         errno = ERANGE;
-         // This may or may not do the right thing, but the user asked for the error
-         // to be silent so here we go anyway:
-         return  val > 0 ? boost::math::tools::max_value<concepts::real_concept>() : -boost::math::tools::max_value<concepts::real_concept>();
-      }
-
-   }
-}*/
-
-#if defined(__SGI_STL_PORT) || defined(BOOST_NO_LIMITS_COMPILE_TIME_CONSTANTS)
-//
-// We shouldn't really need these type casts any more, but there are some
-// STLport iostream bugs we work around by using them....
-//
-namespace tools
-{
-// real_cast converts from T to integer and narrower floating-point types.
-
-// Convert from T to integer types.
-
-template <>
-inline unsigned int real_cast<unsigned int, concepts::real_concept>(concepts::real_concept r)
-{
-   return static_cast<unsigned int>(r.value());
-}
-
-template <>
-inline int real_cast<int, concepts::real_concept>(concepts::real_concept r)
-{
-   return static_cast<int>(r.value());
-}
-
-template <>
-inline long real_cast<long, concepts::real_concept>(concepts::real_concept r)
-{
-   return static_cast<long>(r.value());
-}
-
-// Converts from T to narrower floating-point types, float, double & long double.
-
-template <>
-inline float real_cast<float, concepts::real_concept>(concepts::real_concept r)
-{
-   return static_cast<float>(r.value());
-}
-template <>
-inline double real_cast<double, concepts::real_concept>(concepts::real_concept r)
-{
-   return static_cast<double>(r.value());
-}
-template <>
-inline long double real_cast<long double, concepts::real_concept>(concepts::real_concept r)
-{
-   return r.value();
-}
-
-} // STLPort
-
-#endif
-
-#if BOOST_WORKAROUND(BOOST_MSVC, <= 1310)
-//
-// For some strange reason ADL sometimes fails to find the
-// correct overloads, unless we bring these declarations into scope:
-//
-using concepts::itrunc;
-using concepts::iround;
-
-#endif
-
 } // namespace math
 } // namespace boost
 

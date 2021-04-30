@@ -18,10 +18,10 @@
   template<class BOOST_TTI_DETAIL_TP_ET,class BOOST_TTI_DETAIL_TP_DT> \
   struct BOOST_PP_CAT(trait,_detail_hd) : \
     boost::mpl::or_ \
-    	< \
-    	BOOST_PP_CAT(trait,_detail_hmd_with_enclosing_class)<BOOST_TTI_DETAIL_TP_ET,BOOST_TTI_DETAIL_TP_DT>, \
-    	BOOST_PP_CAT(trait,_detail_hsd)<BOOST_TTI_DETAIL_TP_ET,BOOST_TTI_DETAIL_TP_DT> \
-    	> \
+        < \
+        BOOST_PP_CAT(trait,_detail_hmd_with_enclosing_class)<BOOST_TTI_DETAIL_TP_ET,BOOST_TTI_DETAIL_TP_DT>, \
+        BOOST_PP_CAT(trait,_detail_hsd)<BOOST_TTI_DETAIL_TP_ET,BOOST_TTI_DETAIL_TP_DT> \
+        > \
     { \
     }; \
 /**/

@@ -23,7 +23,7 @@ namespace boost { namespace spirit { namespace x3
         static bool const is_pass_through_unary = true;
         static bool const handles_container = Subject::handles_container;
 
-        lexeme_directive(Subject const& subject)
+        constexpr lexeme_directive(Subject const& subject)
           : base_type(subject) {}
 
         template <typename Iterator, typename Context
@@ -65,14 +65,14 @@ namespace boost { namespace spirit { namespace x3
     struct lexeme_gen
     {
         template <typename Subject>
-        lexeme_directive<typename extension::as_parser<Subject>::value_type>
+        constexpr lexeme_directive<typename extension::as_parser<Subject>::value_type>
         operator[](Subject const& subject) const
         {
             return { as_parser(subject) };
         }
     };
 
-    auto const lexeme = lexeme_gen{};
+    constexpr auto lexeme = lexeme_gen{};
 }}}
 
 #endif

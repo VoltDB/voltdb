@@ -1,5 +1,5 @@
 /* A less simple result type
-(C) 2017-2019 Niall Douglas <http://www.nedproductions.biz/> (59 commits)
+(C) 2017-2021 Niall Douglas <http://www.nedproductions.biz/> (6 commits)
 File Created: June 2017
 
 
@@ -34,10 +34,13 @@ DEALINGS IN THE SOFTWARE.
 #include "basic_outcome.hpp"
 #include "std_result.hpp"
 
+#ifndef STD_BASIC_OUTCOME_FAILURE_EXCEPTION_FROM_ERROR
+#define STD_BASIC_OUTCOME_FAILURE_EXCEPTION_FROM_ERROR
 namespace std  // NOLINT
 {
   inline exception_ptr basic_outcome_failure_exception_from_error(const error_code &ec) { return make_exception_ptr(system_error(ec)); }
 }  // namespace std
+#endif
 
 BOOST_OUTCOME_V2_NAMESPACE_EXPORT_BEGIN
 

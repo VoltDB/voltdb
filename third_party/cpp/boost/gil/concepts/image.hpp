@@ -13,15 +13,17 @@
 #include <boost/gil/concepts/fwd.hpp>
 #include <boost/gil/concepts/image_view.hpp>
 #include <boost/gil/concepts/point.hpp>
+#include <boost/gil/detail/mp11.hpp>
 
-#include <boost/mpl/size.hpp>
+#include <type_traits>
 
 #if defined(BOOST_CLANG)
 #pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunknown-pragmas"
 #pragma clang diagnostic ignored "-Wunused-local-typedefs"
 #endif
 
-#if defined(BOOST_GCC) && (BOOST_GCC >= 40600)
+#if defined(BOOST_GCC) && (BOOST_GCC >= 40900)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-local-typedefs"
 #endif
@@ -146,10 +148,10 @@ struct ImageConcept
         gil_function_requires<RandomAccess2DImageConcept<Image>>();
         gil_function_requires<MutableImageViewConcept<typename Image::view_t>>();
         using coord_t = typename Image::coord_t;
-        static_assert(num_channels<Image>::value == mpl::size<typename color_space_type<Image>::type>::value, "");
+        static_assert(num_channels<Image>::value == mp11::mp_size<typename color_space_type<Image>::type>::value, "");
 
-        static_assert(is_same<coord_t, typename Image::x_coord_t>::value, "");
-        static_assert(is_same<coord_t, typename Image::y_coord_t>::value, "");
+        static_assert(std::is_same<coord_t, typename Image::x_coord_t>::value, "");
+        static_assert(std::is_same<coord_t, typename Image::y_coord_t>::value, "");
     }
     Image image;
 };
@@ -160,7 +162,7 @@ struct ImageConcept
 #pragma clang diagnostic pop
 #endif
 
-#if defined(BOOST_GCC) && (BOOST_GCC >= 40600)
+#if defined(BOOST_GCC) && (BOOST_GCC >= 40900)
 #pragma GCC diagnostic pop
 #endif
 

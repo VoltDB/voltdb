@@ -1,6 +1,6 @@
 // Boost.Geometry (aka GGL, Generic Geometry Library)
 
-// Copyright (c) 2014-2017, Oracle and/or its affiliates.
+// Copyright (c) 2014-2020, Oracle and/or its affiliates.
 
 // Contributed and/or modified by Menelaos Karavelas, on behalf of Oracle
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
@@ -20,7 +20,8 @@
 #include <boost/geometry/algorithms/dispatch/is_simple.hpp>
 #include <boost/geometry/core/cs.hpp>
 #include <boost/geometry/strategies/default_strategy.hpp>
-#include <boost/geometry/strategies/intersection.hpp>
+#include <boost/geometry/strategies/detail.hpp>
+#include <boost/geometry/strategies/relate/services.hpp>
 
 
 namespace boost { namespace geometry
@@ -29,23 +30,47 @@ namespace boost { namespace geometry
 namespace resolve_strategy
 {
 
+template
+<
+    typename Strategy,
+    bool IsUmbrella = strategies::detail::is_umbrella_strategy<Strategy>::value
+>
 struct is_simple
 {
-    template <typename Geometry, typename Strategy>
+    template <typename Geometry>
     static inline bool apply(Geometry const& geometry,
                              Strategy const& strategy)
     {
         return dispatch::is_simple<Geometry>::apply(geometry, strategy);
     }
+};
 
+template <typename Strategy>
+struct is_simple<Strategy, false>
+{
+    template <typename Geometry>
+    static inline bool apply(Geometry const& geometry,
+                             Strategy const& strategy)
+    {
+        using strategies::relate::services::strategy_converter;
+        return dispatch::is_simple
+            <
+                Geometry
+            >::apply(geometry, strategy_converter<Strategy>::get(strategy));
+    }
+};
+
+template <>
+struct is_simple<default_strategy, false>
+{
     template <typename Geometry>
     static inline bool apply(Geometry const& geometry,
                              default_strategy)
     {
         // NOTE: Currently the strategy is only used for Linear geometries
-        typedef typename strategy::intersection::services::default_strategy
+        typedef typename strategies::relate::services::default_strategy
             <
-                typename cs_tag<Geometry>::type
+                Geometry, Geometry
             >::type strategy_type;
 
         return dispatch::is_simple<Geometry>::apply(geometry, strategy_type());
@@ -65,7 +90,7 @@ struct is_simple
     {
         concepts::check<Geometry const>();
 
-        return resolve_strategy::is_simple::apply(geometry, strategy);
+        return resolve_strategy::is_simple<Strategy>::apply(geometry, strategy);
     }
 };
 

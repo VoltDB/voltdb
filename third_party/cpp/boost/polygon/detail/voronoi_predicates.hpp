@@ -77,7 +77,7 @@ class voronoi_predicates {
     }
   }
 
-  typedef struct orientation_test {
+  struct orientation_test {
    public:
     // Represents orientation test result.
     enum Orientation {
@@ -115,7 +115,8 @@ class voronoi_predicates {
                         static_cast<int_x2_type>(point3.y());
       return eval(robust_cross_product(dx1, dy1, dx2, dy2));
     }
-  } ot;
+  };
+  typedef orientation_test ot;
 
   template <typename Point>
   class point_comparison_predicate {

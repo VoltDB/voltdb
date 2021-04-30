@@ -61,17 +61,16 @@ This object enforces the following (see
 @li Constructor entry never checks class invariants.
 @li Destructor exit checks class invariants only if the body throws an
 exception (even if destructors should usually not be programmed to throw
-exceptions in C++).
+exceptions in C++ and they are implicitly declared @c noexcept since C++11).
 @li Static invariants are always checked at entry and exit (and regardless of
 the body throwing exceptions or not).
 
-When used this way, this object is usually constructed and initialized to the
-return value of one of the contract functions
-@RefFunc{boost::contract::function}, @RefFunc{boost::contract::constructor},
-@RefFunc{boost::contract::destructor}, or
-@RefFunc{boost::contract::public_function}.
-In addition, this object can be constructed from a nullary functor that is used
-to program implementation checks.
+When used this way, this object is constructed and initialized to the return
+value of one of the contract functions @RefFunc{boost::contract::function},
+@RefFunc{boost::contract::constructor}, @RefFunc{boost::contract::destructor},
+or @RefFunc{boost::contract::public_function}.
+In addition to that, this object can be constructed from a nullary functor when
+it is used to program implementation checks.
 
 @see    @RefSect{tutorial, Tutorial},
         @RefSect{advanced.implementation_checks, Implementation Checks}
@@ -132,7 +131,7 @@ public:
     /**
     Construct this object to check the specified contract.
 
-    This checks class invariants at entry (if those apply to the specified
+    This checks class invariants at entry (if those were specified for the given
     contract).
     This constructor is not declared @c explicit so initializations can use
     assignment syntax @c =.
@@ -149,8 +148,11 @@ public:
 
     @tparam VirtualResult   Return type of the enclosing function declaring the
                             contract if that is either a virtual or an
-                            overriding public function.
-                            Otherwise, this is always @c void.
+                            overriding public function, otherwise this is always
+                            @c void.
+                            (Usually this template parameter is automatically
+                            deduced by C++ and it does not need to be explicitly
+                            specified by programmers.)
     */
     template<typename VirtualResult>
     /* implicit */ check
@@ -169,7 +171,7 @@ public:
     Construct this object to check the specified contract.
 
     This checks class invariants at entry and preconditions (if any of those
-    apply to the specified contract).
+    were specified for the given contract).
     This constructor is not declared @c explicit so initializations can use
     assignment syntax @c =.
     
@@ -187,8 +189,11 @@ public:
 
     @tparam VirtualResult   Return type of the enclosing function declaring the
                             contract if that is either a virtual or an
-                            overriding public function.
-                            Otherwise, this is always @c void.
+                            overriding public function, otherwise this is always
+                            @c void.
+                            (Usually this template parameter is automatically
+                            deduced by C++ and it does not need to be explicitly
+                            specified by programmers.)
     */
     template<typename VirtualResult>
     /* implicit */ check
@@ -205,7 +210,8 @@ public:
     Construct this object to check the specified contract.
 
     This checks class invariants at entry and preconditions then it makes old
-    value copies at body (if any of those apply to the specified contract).
+    value copies at body (if any of those were specified for the given
+    contract).
     This constructor is not declared @c explicit so initializations can use
     assignment syntax @c =.
     
@@ -223,8 +229,11 @@ public:
 
     @tparam VirtualResult   Return type of the enclosing function declaring the
                             contract if that is either a virtual or an
-                            overriding public function.
-                            Otherwise, this is always @c void.
+                            overriding public function, otherwise this is always
+                            @c void.
+                            (Usually this template parameter is automatically
+                            deduced by C++ and it does not need to be explicitly
+                            specified by programmers.)
     */
     template<typename VirtualResult>
     /* implicit */ check
@@ -241,8 +250,8 @@ public:
     Construct this object to check the specified contract.
 
     This checks class invariants at entry and preconditions then it makes old
-    value copies at body, plus the destructor of this object will check
-    postconditions in this case (if any of those apply to the specified
+    value copies at body, plus the destructor of this object will also check
+    postconditions in this case (if any of those were specified for the given
     contract).
     This constructor is not declared @c explicit so initializations can use
     assignment syntax @c =.
@@ -261,8 +270,11 @@ public:
 
     @tparam VirtualResult   Return type of the enclosing function declaring the
                             contract if that is either a virtual or an
-                            overriding public function.
-                            Otherwise, this is always @c void.
+                            overriding public function, otherwise this is always
+                            @c void.
+                            (Usually this template parameter is automatically
+                            deduced by C++ and it does not need to be explicitly
+                            specified by programmers.)
     */
     /* implicit */ check
     /** @cond */ BOOST_PREVENT_MACRO_SUBSTITUTION /** @endcond */ (
@@ -277,9 +289,9 @@ public:
     Construct this object to check the specified contract.
 
     This checks class invariants at entry and preconditions then it makes old
-    value copies at body, plus the destructor of this object will check
-    postconditions and exception guarantees in this case (if any of those apply
-    to the specified contract).
+    value copies at body, plus the destructor of this object will also check
+    postconditions and exception guarantees in this case (if any of those were
+    specified for the given contract).
     This constructor is not declared @c explicit so initializations can use
     assignment syntax @c =.
     
@@ -297,8 +309,11 @@ public:
 
     @tparam VirtualResult   Return type of the enclosing function declaring the
                             contract if that is either a virtual or an
-                            overriding public function.
-                            Otherwise, this is always @c void.
+                            overriding public function, otherwise this is always
+                            @c void.
+                            (Usually this template parameter is automatically
+                            deduced by C++ and it does not need to be explicitly
+                            specified by programmers.)
     */
     /* implicit */ check
     /** @cond */ BOOST_PREVENT_MACRO_SUBSTITUTION /** @endcond */ (
@@ -314,9 +329,10 @@ public:
 
     This checks class invariants at exit and either postconditions when the
     enclosing function body did not throw an exception, or exception guarantees
-    when the function body threw an exception (that is if class invariants,
-    postconditions, and exception guarantees respectively apply to the contract
-    parameter specified when constructing this object).
+    when the function body threw an exception (if class invariants,
+    postconditions, and exception guarantees respectively were specified for the
+    enclosing class and the contract parameter given when constructing this
+    object).
 
     @b Throws:  This can throw in case programmers specify contract failure
                 handlers that throw exceptions instead of terminating the

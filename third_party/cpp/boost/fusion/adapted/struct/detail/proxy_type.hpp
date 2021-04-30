@@ -28,8 +28,7 @@
                                                                                 \
         WRAPPED_TYPE& obj;                                                      \
                                                                                 \
-    private:                                                                    \
-        NAME& operator= (NAME const&);                                          \
+        BOOST_DELETED_FUNCTION(NAME& operator= (NAME const&))                   \
     };                                                                          \
                                                                                 \
     BOOST_FUSION_ADAPT_STRUCT_NAMESPACE_DEFINITION_END(NAMESPACE_SEQ)

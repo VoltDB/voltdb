@@ -87,7 +87,7 @@ struct ast_tree_policy :
         typedef typename tree_match<iterator_t, NodeFactoryT, T>::container_t
             container_t;
 
-        // test for size() is nessecary, because no_tree_gen_node leaves a.trees
+        // test for size() is necessary, because no_tree_gen_node leaves a.trees
         // and/or b.trees empty
         if (0 != b.trees.size() && b.trees.begin()->value.is_root())
         {

@@ -3,8 +3,8 @@
 //Distributed under the Boost Software License, Version 1.0. (See accompanying
 //file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 
-#ifndef UUID_45CC9A82B77511DEB330FC4956D89593
-#define UUID_45CC9A82B77511DEB330FC4956D89593
+#ifndef BOOST_EXCEPTION_45CC9A82B77511DEB330FC4956D89593
+#define BOOST_EXCEPTION_45CC9A82B77511DEB330FC4956D89593
 
 namespace
 boost

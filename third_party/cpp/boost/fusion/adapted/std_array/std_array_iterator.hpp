@@ -100,9 +100,7 @@ namespace boost { namespace fusion
             }
         };
 
-    private:
-
-        std_array_iterator<Array, Pos>& operator=(std_array_iterator<Array, Pos> const&);
+        BOOST_DELETED_FUNCTION(std_array_iterator& operator=(std_array_iterator const&))
     };
 }}
 

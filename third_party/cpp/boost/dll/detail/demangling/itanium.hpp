@@ -88,6 +88,102 @@ public:
 
 namespace parser
 {
+    //! declare
+    template <typename... T>
+    struct dummy;
+
+    template <typename T>
+    std::string parse_type_helper(const mangled_storage_impl & ms, dummy<T>*);
+
+    template <typename... T, template <typename...> class Tn>
+    std::string parse_type_helper(const mangled_storage_impl & ms, dummy<Tn<T...>>*);
+
+    template <typename... T, template <typename...> class Tn>
+    std::string parse_type(const mangled_storage_impl & ms, dummy<Tn<T...>>*);
+
+    template <typename T>
+    std::string parse_type(const mangled_storage_impl & ms, dummy<T>*);
+
+    template <typename T1, typename T2, typename... T3>
+    std::string parse_type(const mangled_storage_impl & ms, dummy<T1, T2, T3...>*);
+
+    template <typename R, typename... Args>
+    std::string parse_type(const mangled_storage_impl & ms, dummy<R(Args...)>*);
+
+    std::string parse_type(const mangled_storage_impl & ms, dummy<>*);
+
+    template<typename T>
+    std::string
+    type_name(const mangled_storage_impl &);
+
+
+    //The purpose of this class template is to separate the pure type from the rule name from the target type
+    template<typename T>
+    struct pure_type
+    {
+        typedef T type;
+        inline static std::string type_rule() { return ""; }
+    };
+
+    template<typename T>
+    struct pure_type<T*>
+    {
+        typedef typename pure_type<T>::type type;
+        inline static std::string type_rule()
+        {
+            return pure_type<T>::type_rule() + "*";
+        }
+    };
+
+    template<typename T>
+    struct pure_type<T const>
+    {
+        typedef typename pure_type<T>::type type;
+        inline static std::string type_rule()
+        {
+            return pure_type<T>::type_rule() + " const";
+        }
+    };
+
+    template<typename T>
+    struct pure_type<T volatile>
+    {
+        typedef typename pure_type<T>::type type;
+        inline static std::string type_rule()
+        {
+            return pure_type<T>::type_rule() + " volatile";
+        }
+    };
+
+    template<typename T>
+    struct pure_type<T const volatile>
+    {
+        typedef typename pure_type<T>::type type;
+        inline static std::string type_rule()
+        {
+            return pure_type<T>::type_rule() + " const volatile";
+        }
+    };
+
+    template<typename T>
+    struct pure_type<T&>
+    {
+        typedef typename pure_type<T>::type type;
+        inline static std::string type_rule()
+        {
+            return pure_type<T>::type_rule() + "&";
+        }
+    };
+
+    template<typename T>
+    struct pure_type<T&&>
+    {
+        typedef typename pure_type<T>::type type;
+        inline static std::string type_rule()
+        {
+            return pure_type<T>::type_rule() + "&&";
+        }
+    };
 
     inline std::string const_rule_impl(true_type )  {return " const";}
     inline std::string const_rule_impl(false_type)  {return "";}
@@ -103,44 +199,92 @@ namespace parser
     inline std::string reference_rule_impl(true_type,  false_type) {return "&" ;}
     inline std::string reference_rule_impl(false_type, true_type ) {return "&&";}
 
-
     template<typename T>
     std::string reference_rule() {using t_l = is_lvalue_reference<T>; using t_r = is_rvalue_reference<T>; return reference_rule_impl(t_l(), t_r());}
 
     //it takes a string, because it may be overloaded.
-    template<typename T>
-    std::string type_rule(const std::string & type_name)
-    {
-        using namespace std;
-
-        return  type_name +
-                const_rule<T>() +
-                volatile_rule<T>() +
-                reference_rule<T>();
-    }
-
-
     template<typename Return, typename Arg>
     std::string arg_list(const mangled_storage_impl & ms, Return (*)(Arg))
     {
         using namespace std;
-        auto str = ms.get_name<Arg>();
-        return type_rule<Arg>(str);
+        return type_name<Arg>(ms);
     }
 
     template<typename Return, typename First, typename Second, typename ...Args>
     std::string arg_list(const mangled_storage_impl & ms, Return (*)(First, Second, Args...))
     {
-        auto st = ms.get_name<First>();
-
         using next_type = Return (*)(Second, Args...);
-        return type_rule<First>(st) + ", " + arg_list(ms, next_type());
+        return type_name<First>(ms) + ", " + arg_list(ms, next_type());
     }
 
     template<typename Return>
     std::string arg_list(const mangled_storage_impl &, Return (*)())
     {
         return "";
+    }
+
+    //! implement
+    template <typename T>
+    inline std::string parse_type_helper(const mangled_storage_impl & ms, dummy<T>*) {
+        return  ms.get_name<T>();
+    }
+
+    template <typename... T, template <typename...> class Tn>
+    inline std::string parse_type_helper(const mangled_storage_impl & ms, dummy<Tn<T...>>*) {
+        using type = dummy<Tn<T...>>*;
+        return parse_type(ms, type());
+    }
+
+    template <typename R, typename... Args>
+    inline std::string parse_type(const mangled_storage_impl & ms, dummy<R(*)(Args...)>*) {
+        using args_type = dummy<Args...>*;
+        using return_type = dummy<R>*;
+        return parse_type(ms, return_type()) + " (*)(" + parse_type(ms, args_type()) + ")";
+    }
+
+    template <typename R, typename... Args>
+    inline std::string parse_type(const mangled_storage_impl & ms, dummy<R(Args...)>*) {
+        using args_type = dummy<Args...>*;
+        using return_type = dummy<R>*;
+        return parse_type(ms, return_type()) + " (" + parse_type(ms, args_type()) + ")";
+    }
+
+    template <typename T>
+    inline std::string parse_type(const mangled_storage_impl & ms, dummy<T>*) {
+        using type = dummy<typename pure_type<T>::type>*;
+        auto str = parse_type_helper(ms, type());
+        return str + pure_type<T>::type_rule();
+    }
+
+    template <typename T1, typename T2, typename... T3>
+    inline std::string parse_type(const mangled_storage_impl & ms, dummy<T1, T2, T3...>*) {
+        using first_type = dummy<T1>*;
+        using next_type = dummy<T2, T3...>*;
+        return parse_type(ms, first_type()) + ", " + parse_type(ms, next_type());
+    }
+
+    template <typename... T, template <typename...> class Tn>
+    inline std::string parse_type(const mangled_storage_impl & ms, dummy<Tn<T...>>*) {
+        using next_type = dummy<T...>*;
+        std::string str = ms.get_name<Tn<T...>>();
+        auto frist = str.find_first_of("<");
+        std::string template_name = str.substr(0, frist);
+        std::string args_name = parse_type(ms, next_type());
+        char last_ch = args_name[args_name.size() - 1];
+        return template_name + "<" + args_name + (last_ch == '>' ? " >" : ">");
+    }
+
+    inline std::string parse_type(const mangled_storage_impl &, dummy<>*) {
+        return "";
+    }
+
+    template<typename T>
+    inline  std::string
+    type_name(const mangled_storage_impl &ms)
+    {
+        using namespace parser;
+        using type = dummy<T>*;
+        return  parse_type(ms, type());
     }
 }
 
@@ -180,11 +324,30 @@ std::string mangled_storage_impl::get_mem_fn(const std::string &name) const
 
     std::string cname = get_name<Class>();
 
-    auto matcher = cname + "::" + name +
+    const auto matcher = cname + "::" + name +
              '(' + parser::arg_list(*this, func_type()) + ')'
              + const_rule<Class>() + volatile_rule<Class>();
 
-    auto found = std::find_if(storage_.begin(), storage_.end(), [&](const entry& e) {return e.demangled == matcher;});
+    // Linux export table contains int MyClass::Func<float>(), but expected in import_mangled MyClass::Func<float>() without returned type.
+    auto found = std::find_if(storage_.begin(), storage_.end(), [&matcher](const entry& e) {
+        if (e.demangled == matcher) {
+          return true;
+        }
+
+        const auto pos = e.demangled.rfind(matcher);
+        if (pos == std::string::npos) {
+          // Not found.
+          return false;
+        }
+
+        if (pos + matcher.size() != e.demangled.size()) {
+          // There are some characters after the `matcher` string.
+          return false;
+        }
+
+        // Double checking that we matched a full function name
+        return e.demangled[pos - 1] == ' '; // `if (e.demangled == matcher)` makes sure that `pos > 0`
+    });
 
     if (found != storage_.end())
         return found->mangled;

@@ -44,7 +44,8 @@ public:
     //!
     //! @param[in] number_of_test_cases indicates the number of test cases. Only active
     //! test cases are taken into account.
-    virtual void    test_start( counter_t /* number_of_test_cases */ ) {}
+    //! @param[in] root_test_unit_id the ID root of the test tree currently being tested
+    virtual void    test_start( counter_t /* number_of_test_cases */, test_unit_id /* root_test_unit_id */ ) {}
 
     //! Called after the framework ends executing the test cases
     //!

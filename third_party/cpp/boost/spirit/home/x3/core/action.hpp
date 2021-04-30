@@ -1,5 +1,5 @@
 /*=============================================================================
-    Copyright (arg) 2001-2014 Joel de Guzman
+    Copyright (c) 2001-2014 Joel de Guzman
 
     Distributed under the Boost Software License, Version 1.0. (See accompanying
     file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -11,7 +11,7 @@
 #include <boost/spirit/home/x3/support/traits/attribute_of.hpp>
 #include <boost/spirit/home/x3/core/call.hpp>
 #include <boost/spirit/home/x3/nonterminal/detail/transform_attribute.hpp>
-#include <boost/range/iterator_range.hpp>
+#include <boost/range/iterator_range_core.hpp>
 
 namespace boost { namespace spirit { namespace x3
 {
@@ -31,7 +31,7 @@ namespace boost { namespace spirit { namespace x3
         static bool const is_pass_through_unary = true;
         static bool const has_action = true;
 
-        action(Subject const& subject, Action f)
+        constexpr action(Subject const& subject, Action f)
           : base_type(subject), f(f) {}
 
         template <typename Iterator, typename Context, typename RuleContext, typename Attribute>
@@ -83,8 +83,8 @@ namespace boost { namespace spirit { namespace x3
             attribute_type;
 
             // synthesize the attribute since one is not supplied
-            attribute_type attr{};
-            return parse_main(first, last, context, rcontext, attr);
+            attribute_type attribute{};
+            return parse_main(first, last, context, rcontext, attribute);
         }
         
         // main parse function
@@ -100,7 +100,7 @@ namespace boost { namespace spirit { namespace x3
     };
 
     template <typename P, typename Action>
-    inline action<typename extension::as_parser<P>::value_type, Action>
+    constexpr action<typename extension::as_parser<P>::value_type, Action>
     operator/(P const& p, Action f)
     {
         return { as_parser(p), f };

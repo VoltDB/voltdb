@@ -26,15 +26,23 @@ BOOST_HANA_NAMESPACE_BEGIN namespace detail {
 
     namespace operators {
         template <typename X, typename Y, typename = typename std::enable_if<
-            detail::comparable_operators<typename hana::tag_of<X>::type>::value ||
-            detail::comparable_operators<typename hana::tag_of<Y>::type>::value
+            !detail::has_idempotent_tag<X>::value &&
+            !detail::has_idempotent_tag<Y>::value &&
+            (detail::comparable_operators<
+                typename hana::tag_of<X>::type>::value ||
+             detail::comparable_operators<
+                typename hana::tag_of<Y>::type>::value)
         >::type>
         constexpr auto operator==(X&& x, Y&& y)
         { return hana::equal(static_cast<X&&>(x), static_cast<Y&&>(y)); }
 
         template <typename X, typename Y, typename = typename std::enable_if<
-            detail::comparable_operators<typename hana::tag_of<X>::type>::value ||
-            detail::comparable_operators<typename hana::tag_of<Y>::type>::value
+            !detail::has_idempotent_tag<X>::value &&
+            !detail::has_idempotent_tag<Y>::value &&
+            (detail::comparable_operators<
+                typename hana::tag_of<X>::type>::value ||
+             detail::comparable_operators<
+                typename hana::tag_of<Y>::type>::value)
         >::type>
         constexpr auto operator!=(X&& x, Y&& y)
         { return hana::not_equal(static_cast<X&&>(x), static_cast<Y&&>(y)); }

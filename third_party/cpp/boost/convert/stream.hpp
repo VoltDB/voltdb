@@ -1,4 +1,4 @@
-// Copyright (c) 2009-2016 Vladimir Batov.
+// Copyright (c) 2009-2020 Vladimir Batov.
 // Use, modification and distribution are subject to the Boost Software License,
 // Version 1.0. See http://www.boost.org/LICENSE_1_0.txt.
 
@@ -8,18 +8,27 @@
 #include <boost/convert/parameters.hpp>
 #include <boost/convert/detail/is_string.hpp>
 #include <boost/make_default.hpp>
-#include <boost/noncopyable.hpp>
 #include <sstream>
 #include <iomanip>
 
-#define BOOST_CNV_STRING_ENABLE                                         \
-    template<typename string_type, typename type>                       \
-    typename boost::enable_if<cnv::is_string<string_type>, void>::type  \
+#define BOOST_CNV_STRING_ENABLE                                             \
+    template<typename string_type, typename type>                           \
+    typename std::enable_if<cnv::is_string<string_type>::value, void>::type \
     operator()
 
-#define BOOST_CNV_PARAM(PARAM_NAME, PARAM_TYPE) \
-    this_type&                                  \
-    operator()(boost::parameter::aux::tag<boost::cnv::parameter::type::PARAM_NAME, PARAM_TYPE>::type const& arg)
+#define BOOST_CNV_PARAM_SET(param_name)   \
+    template <typename argument_pack>     \
+    void set_(                            \
+        argument_pack const& arg,         \
+        cnv::parameter::type::param_name, \
+        mpl::true_)
+
+#define BOOST_CNV_PARAM_TRY(param_name)     \
+    this->set_(                             \
+        arg,                                \
+        cnv::parameter::type::param_name(), \
+        typename mpl::has_key<              \
+            argument_pack, cnv::parameter::type::param_name>::type());
 
 namespace boost { namespace cnv
 {
@@ -30,7 +39,7 @@ namespace boost { namespace cnv
 }}
 
 template<class Char>
-struct boost::cnv::basic_stream : boost::noncopyable
+struct boost::cnv::basic_stream
 {
     // C01. In string-to-type conversions the "string" must be a CONTIGUOUS ARRAY of
     //      characters because "ibuffer_type" uses/relies on that (it deals with char_type*).
@@ -70,51 +79,71 @@ struct boost::cnv::basic_stream : boost::noncopyable
         using buffer_type::epptr;
     };
 
-    basic_stream() : stream_(std::ios_base::in | std::ios_base::out) {}
-#if !defined( BOOST_NO_CXX11_RVALUE_REFERENCES )
-    basic_stream(this_type&& other) : stream_(std::move(other.stream_)) {}
-#endif
+    basic_stream () : stream_(std::ios_base::in | std::ios_base::out) {}
+    basic_stream (this_type&& other) : stream_(std::move(other.stream_)) {}
+
+    basic_stream(this_type const&) = delete;
+    this_type& operator=(this_type const&) = delete;
 
     BOOST_CNV_STRING_ENABLE(type const& v, optional<string_type>& s) const { to_str(v, s); }
     BOOST_CNV_STRING_ENABLE(string_type const& s, optional<type>& r) const { str_to(cnv::range<string_type const>(s), r); }
+
     // Resolve ambiguity of string-to-string
     template<typename type> void operator()(  char_type const* s, optional<type>& r) const { str_to(cnv::range< char_type const*>(s), r); }
     template<typename type> void operator()(stdstr_type const& s, optional<type>& r) const { str_to(cnv::range<stdstr_type const>(s), r); }
 
     // Formatters
     template<typename manipulator>
-    this_type& operator() (manipulator m) { return (stream_ << m, *this); }
+    typename boost::disable_if<boost::parameter::is_argument_pack<manipulator>, this_type&>::type
+    operator()(manipulator m) { return (this->stream_ << m, *this); }
+
     this_type& operator() (manipulator_type m) { return (m(stream_), *this); }
     this_type& operator() (std::locale const& l) { return (stream_.imbue(l), *this); }
 
-    BOOST_CNV_PARAM(locale, std::locale const) { return (stream_.imbue(arg[cnv::parameter::locale]), *this); }
-    BOOST_CNV_PARAM(precision,      int const) { return (stream_.precision(arg[cnv::parameter::precision]), *this); }
-    BOOST_CNV_PARAM(precision,            int) { return (stream_.precision(arg[cnv::parameter::precision]), *this); }
-    BOOST_CNV_PARAM(width,          int const) { return (stream_.width(arg[cnv::parameter::width]), *this); }
-    BOOST_CNV_PARAM(fill,          char const) { return (stream_.fill(arg[cnv::parameter::fill]), *this); }
-    BOOST_CNV_PARAM(uppercase,     bool const)
+    template<typename argument_pack>
+    typename std::enable_if<boost::parameter::is_argument_pack<argument_pack>::value, this_type&>::type
+    operator()(argument_pack const& arg)
+    {
+        BOOST_CNV_PARAM_TRY(precision);
+        BOOST_CNV_PARAM_TRY(width);
+        BOOST_CNV_PARAM_TRY(fill);
+        BOOST_CNV_PARAM_TRY(uppercase);
+        BOOST_CNV_PARAM_TRY(skipws);
+        BOOST_CNV_PARAM_TRY(adjust);
+        BOOST_CNV_PARAM_TRY(base);
+        BOOST_CNV_PARAM_TRY(notation);
+
+        return *this;
+    }
+
+    private:
+
+    template<typename argument_pack, typename keyword_tag>
+    void set_(argument_pack const&, keyword_tag, mpl::false_) {}
+
+    BOOST_CNV_PARAM_SET (locale)    { stream_.imbue(arg[cnv::parameter::locale]); }
+    BOOST_CNV_PARAM_SET (precision) { stream_.precision(arg[cnv::parameter::precision]); }
+    BOOST_CNV_PARAM_SET (width)     { stream_.width(arg[cnv::parameter::width]); }
+    BOOST_CNV_PARAM_SET (fill)      { stream_.fill(arg[cnv::parameter::fill]); }
+    BOOST_CNV_PARAM_SET (uppercase)
     {
         bool uppercase = arg[cnv::parameter::uppercase];
         uppercase ? (void) stream_.setf(std::ios::uppercase) : stream_.unsetf(std::ios::uppercase);
-        return *this;
     }
-    BOOST_CNV_PARAM(skipws, bool const)
+    BOOST_CNV_PARAM_SET (skipws)
     {
         bool skipws = arg[cnv::parameter::skipws];
         skipws ? (void) stream_.setf(std::ios::skipws) : stream_.unsetf(std::ios::skipws);
-        return *this;
     }
-    BOOST_CNV_PARAM(adjust, boost::cnv::adjust const)
+    BOOST_CNV_PARAM_SET (adjust)
     {
         cnv::adjust adjust = arg[cnv::parameter::adjust];
 
         /**/ if (adjust == cnv::adjust:: left) stream_.setf(std::ios::adjustfield, std::ios:: left);
         else if (adjust == cnv::adjust::right) stream_.setf(std::ios::adjustfield, std::ios::right);
         else BOOST_ASSERT(!"Not implemented");
-
-        return *this;
     }
-    BOOST_CNV_PARAM(base, boost::cnv::base const)
+    BOOST_CNV_PARAM_SET (base)
     {
         cnv::base base = arg[cnv::parameter::base];
 
@@ -122,21 +151,15 @@ struct boost::cnv::basic_stream : boost::noncopyable
         else if (base == cnv::base::hex) std::hex(stream_);
         else if (base == cnv::base::oct) std::oct(stream_);
         else BOOST_ASSERT(!"Not implemented");
-
-        return *this;
     }
-    BOOST_CNV_PARAM(notation, boost::cnv::notation const)
+    BOOST_CNV_PARAM_SET (notation)
     {
         cnv::notation notation = arg[cnv::parameter::notation];
 
         /**/ if (notation == cnv::notation::     fixed)      std::fixed(stream_);
         else if (notation == cnv::notation::scientific) std::scientific(stream_);
         else BOOST_ASSERT(!"Not implemented");
-
-        return *this;
     }
-
-    private:
 
     template<typename string_type, typename out_type> void str_to(cnv::range<string_type>, optional<out_type>&) const;
     template<typename string_type, typename  in_type> void to_str(in_type const&, optional<string_type>&) const;
@@ -158,7 +181,7 @@ boost::cnv::basic_stream<char_type>::to_str(
     if (!(stream_ << value_in).fail())
     {
         buffer_type*     buf = stream_.rdbuf();
-        obuffer_type*   obuf = static_cast<obuffer_type*>(buf);
+        obuffer_type*   obuf = reinterpret_cast<obuffer_type*>(buf);
         char_type const* beg = obuf->pbase();
         char_type const* end = obuf->pptr();
 
@@ -194,6 +217,7 @@ boost::cnv::basic_stream<char_type>::str_to(
 }
 
 #undef BOOST_CNV_STRING_ENABLE
-#undef BOOST_CNV_PARAM
+#undef BOOST_CNV_PARAM_SET
+#undef BOOST_CNV_PARAM_TRY
 
 #endif // BOOST_CONVERT_STRINGSTREAM_BASED_CONVERTER_HPP

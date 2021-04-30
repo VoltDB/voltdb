@@ -5,8 +5,8 @@
     Distributed under the Boost Software License, Version 1.0. (See accompanying
     file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 =============================================================================*/
-#if !defined(SPIRIT_KEYWORDS_OR_MARCH_13_2007_1145PM)
-#define SPIRIT_KEYWORDS_OR_MARCH_13_2007_1145PM
+#ifndef BOOST_SPIRIT_REPOSITORY_QI_OPERATOR_KEYWORDS_HPP
+#define BOOST_SPIRIT_REPOSITORY_QI_OPERATOR_KEYWORDS_HPP
 
 #if defined(_MSC_VER)
 #pragma once
@@ -41,6 +41,8 @@
 #include <boost/fusion/include/zip_view.hpp>
 #include <boost/fusion/include/as_vector.hpp>
 #include <boost/variant/static_visitor.hpp>
+#include <boost/proto/operators.hpp>
+#include <boost/proto/tags.hpp>
 #include <boost/type_traits/remove_const.hpp>
 #include <boost/type_traits/is_same.hpp>
 #include <boost/spirit/repository/home/qi/operator/detail/keywords.hpp>
@@ -263,7 +265,7 @@ namespace boost { namespace spirit { namespace repository { namespace qi
             // 1) parse a keyword and fetch the parser index associated with that keyword
             // 2) call the associated parser and store the parsed value in the matching attribute.
 
-            while(true)
+            for(;;)
             {
 
                 spirit::qi::skip_over(first, last, skipper);
@@ -278,7 +280,7 @@ namespace boost { namespace spirit { namespace repository { namespace qi
                   if(!complex_keywords_inst.parse(complex_function))
                   {
                     first = save;
-                    // Check that we are leaving the keywords parser in a successfull state
+                    // Check that we are leaving the keywords parser in a successful state
                     BOOST_FOREACH(bool &valid,flags)
                     {
                       if(!valid)
@@ -292,7 +294,7 @@ namespace boost { namespace spirit { namespace repository { namespace qi
                     save = first;
                 }
             }
-            return false;
+            BOOST_UNREACHABLE_RETURN(false)
           }
 
         // Handle the mixed kwd and ikwd case
@@ -344,7 +346,7 @@ namespace boost { namespace spirit { namespace repository { namespace qi
             // 1) parse a keyword and fetch the parser index associated with that keyword
             // 2) call the associated parser and store the parsed value in the matching attribute.
 
-            while(true)
+            for(;;)
             {
                 spirit::qi::skip_over(first, last, skipper);
                 Iterator save = first;
@@ -359,7 +361,7 @@ namespace boost { namespace spirit { namespace repository { namespace qi
                   if(!complex_keywords_inst.parse(complex_function))
                   {
                     first = save;
-                    // Check that we are leaving the keywords parser in a successfull state
+                    // Check that we are leaving the keywords parser in a successful state
                     BOOST_FOREACH(bool &valid,flags)
                     {
                       if(!valid)
@@ -375,7 +377,7 @@ namespace boost { namespace spirit { namespace repository { namespace qi
                   }
                 }
             }
-            return false;
+            BOOST_UNREACHABLE_RETURN(false)
           }
 
         template <typename Context>

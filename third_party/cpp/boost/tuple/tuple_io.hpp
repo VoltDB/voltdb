@@ -102,7 +102,7 @@ class tuple_manipulator {
   CharType f_c;
 public:
   explicit tuple_manipulator(detail::format_info::manipulator_type m,
-                             const char c = 0)
+                             CharType c = CharType())
      : mt(m), f_c(c) {}
 
    template<class CharTrait>
@@ -259,7 +259,7 @@ extract_and_check_delimiter(
 
 #if defined (BOOST_NO_STD_LOCALE)
   const bool is_delimiter = !isspace(d);
-#elif defined ( __BORLANDC__ )
+#elif defined ( BOOST_BORLANDC )
   const bool is_delimiter = !std::use_facet< std::ctype< CharType > >
     (is.getloc() ).is( std::ctype_base::space, d);
 #else

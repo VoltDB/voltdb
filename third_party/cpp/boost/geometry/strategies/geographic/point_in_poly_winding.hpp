@@ -1,6 +1,6 @@
 // Boost.Geometry
 
-// Copyright (c) 2017 Oracle and/or its affiliates.
+// Copyright (c) 2017, 2019 Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
 // Use, modification and distribution is subject to the Boost Software License,
@@ -38,8 +38,8 @@ namespace strategy { namespace within
  */
 template
 <
-    typename Point,
-    typename PointOfSegment = Point,
+    typename Point = void, // for backward compatibility
+    typename PointOfSegment = Point, // for backward compatibility
     typename FormulaPolicy = strategy::andoyer,
     typename Spheroid = srs::spheroid<double>,
     typename CalculationType = void
@@ -47,16 +47,12 @@ template
 class geographic_winding
     : public within::detail::spherical_winding_base
         <
-            Point,
-            PointOfSegment,
             side::geographic<FormulaPolicy, Spheroid, CalculationType>,
             CalculationType
         >
 {
     typedef within::detail::spherical_winding_base
         <
-            Point,
-            PointOfSegment,
             side::geographic<FormulaPolicy, Spheroid, CalculationType>,
             CalculationType
         > base_t;
@@ -68,6 +64,11 @@ public:
     explicit geographic_winding(Spheroid const& model)
         : base_t(model)
     {}
+
+    Spheroid const& model() const
+    {
+        return base_t::m_side_strategy.model();
+    }
 };
 
 

@@ -12,7 +12,7 @@
 #define BOOST_DYNAMIC_BITSET_SERIALIZATION_HPP
 
 #include "boost/dynamic_bitset/dynamic_bitset.hpp"
-#include <boost/serialization/vector.hpp>
+#include <boost/core/nvp.hpp>
 
 namespace boost {
 
@@ -23,8 +23,8 @@ namespace boost {
             public:
                 template <typename Ar> 
                 static void serialize(Ar& ar, dynamic_bitset<Block, Allocator>& bs, unsigned) {
-                    ar & serialization::make_nvp("m_num_bits", bs.m_num_bits)
-                       & serialization::make_nvp("m_bits", bs.m_bits);
+                    ar & boost::make_nvp("m_num_bits", bs.m_num_bits)
+                       & boost::make_nvp("m_bits", bs.m_bits);
                 }
         };
 

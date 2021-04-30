@@ -1,6 +1,6 @@
 /////////1/////////2/////////3/////////4/////////5/////////6/////////7/////////8
 
-// (C) Copyright 2002-4 Pavel Vozenilek . 
+// (C) Copyright 2002-4 Pavel Vozenilek .
 // Use, modification and distribution is subject to the Boost Software
 // License, Version 1.0. (See accompanying file LICENSE_1_0.txt or copy at
 // http://www.boost.org/LICENSE_1_0.txt)
@@ -16,30 +16,25 @@
 
 #include <boost/config.hpp>
 
-#include <boost/archive/detail/basic_iarchive.hpp>
-
 #include <boost/optional.hpp>
-#include <boost/move/utility_core.hpp>
 
 #include <boost/serialization/item_version_type.hpp>
-#include <boost/serialization/split_free.hpp>
-#include <boost/serialization/level.hpp>
-#include <boost/serialization/nvp.hpp>
+#include <boost/serialization/library_version_type.hpp>
 #include <boost/serialization/version.hpp>
+#include <boost/serialization/split_free.hpp>
+#include <boost/serialization/nvp.hpp>
 #include <boost/type_traits/is_pointer.hpp>
-#include <boost/serialization/detail/stack_constructor.hpp>
 #include <boost/serialization/detail/is_default_constructible.hpp>
-#include <boost/serialization/force_include.hpp>
 
 // function specializations must be defined in the appropriate
 // namespace - boost::serialization
-namespace boost { 
+namespace boost {
 namespace serialization {
 
 template<class Archive, class T>
 void save(
-    Archive & ar, 
-    const boost::optional< T > & t, 
+    Archive & ar,
+    const boost::optional< T > & t,
     const unsigned int /*version*/
 ){
     // It is an inherent limitation to the serialization of optional.hpp
@@ -62,8 +57,8 @@ void save(
 
 template<class Archive, class T>
 void load(
-    Archive & ar, 
-    boost::optional< T > & t, 
+    Archive & ar,
+    boost::optional< T > & t,
     const unsigned int version
 ){
     bool tflag;
@@ -75,10 +70,10 @@ void load(
 
     if(0 == version){
         boost::serialization::item_version_type item_version(0);
-        boost::archive::library_version_type library_version(
+        boost::serialization::library_version_type library_version(
             ar.get_library_version()
         );
-        if(boost::archive::library_version_type(3) < library_version){
+        if(boost::serialization::library_version_type(3) < library_version){
             ar >> BOOST_SERIALIZATION_NVP(item_version);
         }
     }
@@ -89,8 +84,8 @@ void load(
 
 template<class Archive, class T>
 void serialize(
-    Archive & ar, 
-    boost::optional< T > & t, 
+    Archive & ar,
+    boost::optional< T > & t,
     const unsigned int version
 ){
     boost::serialization::split_free(ar, t, version);

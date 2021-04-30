@@ -76,7 +76,7 @@
       !(defined(__UCLIBC__) || defined(__nios2__) || defined(__microblaze__))
   //! Indicates that floating point exception handling is supported for the
   //! non SEH version of it, for the GLIBC extensions only
-  // see dicussions on the related topic: https://svn.boost.org/trac/boost/ticket/11756
+  // see discussions on the related topic: https://svn.boost.org/trac/boost/ticket/11756
   #define BOOST_TEST_FPE_SUPPORT_WITH_GLIBC_EXTENSIONS__
   #endif
 #endif
@@ -310,7 +310,7 @@ private:
 /// This class is used to uniformly detect and report an occurrence of several types of signals and exceptions, reducing various
 /// errors to a uniform execution_exception that is returned to a caller.
 ///
-/// The executiom_monitor behavior can be customized through a set of public parameters (properties) associated with the execution_monitor instance.
+/// The execution_monitor behavior can be customized through a set of public parameters (properties) associated with the execution_monitor instance.
 /// All parameters are implemented as public unit_test::readwrite_property data members of the class execution_monitor.
 // ************************************************************************** //
 
@@ -372,7 +372,7 @@ public:
 
     /// @brief Execution monitor entry point for functions returning void
     ///
-    /// This method is semantically identical to execution_monitor::execute, but des't produce any result code.
+    /// This method is semantically identical to execution_monitor::execute, but doesn't produce any result code.
     /// @param[in] F  Function to monitor
     /// @see execute
     void         vexecute( boost::function<void ()> const& F );
@@ -442,7 +442,7 @@ public:
     : translator_holder_base( next, tag ), m_translator( tr ) {}
 
     // translator holder interface
-    virtual int operator()( boost::function<int ()> const& F )
+    int operator()( boost::function<int ()> const& F ) BOOST_OVERRIDE
     {
         BOOST_TEST_I_TRY {
             return m_next ? (*m_next)( F ) : F();
@@ -453,7 +453,7 @@ public:
         }
     }
 #ifndef BOOST_NO_RTTI
-    virtual translator_holder_base_ptr erase( translator_holder_base_ptr this_, std::type_info const& ti )
+    translator_holder_base_ptr erase( translator_holder_base_ptr this_, std::type_info const& ti ) BOOST_OVERRIDE
     {
         return ti == typeid(ExceptionType) ? m_next : this_;
     }

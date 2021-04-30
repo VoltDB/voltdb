@@ -428,7 +428,7 @@ namespace boost
       // is less accurate, so use acos instead of asin for complement.
       result = static_cast<RealType>(2) * acos(sqrt((x - x_min) / (x_max - x_min))) / pi<RealType>();
       return result;
-    } // arcine ccdf
+    } // arcsine ccdf
 
     template <class RealType, class Policy>
     inline RealType quantile(const arcsine_distribution<RealType, Policy>& dist, const RealType& p)

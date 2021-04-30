@@ -4,9 +4,8 @@
 // Copyright (c) 2007-2012 Barend Gehrels, Amsterdam, the Netherlands.
 // Copyright (c) 2009-2012 Mateusz Loskot, London, UK.
 
-// This file was modified by Oracle on 2018.
-// Modifications copyright (c) 2018, Oracle and/or its affiliates.
-
+// This file was modified by Oracle on 2018-2020.
+// Modifications copyright (c) 2018-2020, Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
 // Parts of Boost.Geometry are redesigned from Geodan's Geographic Library
@@ -20,27 +19,42 @@
 #define BOOST_GEOMETRY_GEOMETRIES_VARIANT_GEOMETRY_HPP
 
 
-#include <boost/mpl/front.hpp>
 #include <boost/variant/variant_fwd.hpp>
 
 #include <boost/geometry/core/point_type.hpp>
 
 
-namespace boost { namespace geometry {
+namespace boost { namespace geometry
+{
+
+namespace detail
+{
+
+template <typename ...>
+struct parameter_pack_first_type {};
+
+template <typename T, typename ... Ts>
+struct parameter_pack_first_type<T, Ts...>
+{
+    typedef T type;
+};
+
+} // namespace detail
 
 
 template <BOOST_VARIANT_ENUM_PARAMS(typename T)>
 struct point_type<boost::variant<BOOST_VARIANT_ENUM_PARAMS(T)> >
-    : point_type<
-        typename boost::mpl::front<
-            typename boost::variant<BOOST_VARIANT_ENUM_PARAMS(T)>::types
-        >::type
-    >
+    : point_type
+        <
+            typename detail::parameter_pack_first_type
+                <
+                    BOOST_VARIANT_ENUM_PARAMS(T)
+                >::type
+        >
 {};
 
 
-} // namespace geometry
-} // namespace boost
+}} // namespace boost::geometry
 
 
 #endif // BOOST_GEOMETRY_GEOMETRIES_VARIANT_GEOMETRY_HPP

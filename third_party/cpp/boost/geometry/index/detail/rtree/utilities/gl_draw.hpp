@@ -4,6 +4,10 @@
 //
 // Copyright (c) 2011-2013 Adam Wulkiewicz, Lodz, Poland.
 //
+// This file was modified by Oracle on 2019-2020.
+// Modifications copyright (c) 2019-2020 Oracle and/or its affiliates.
+// Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
+//
 // Use, modification and distribution is subject to the Boost Software License,
 // Version 1.0. (See accompanying file LICENSE_1_0.txt or copy at
 // http://www.boost.org/LICENSE_1_0.txt)
@@ -11,7 +15,7 @@
 #ifndef BOOST_GEOMETRY_INDEX_DETAIL_RTREE_UTILITIES_GL_DRAW_HPP
 #define BOOST_GEOMETRY_INDEX_DETAIL_RTREE_UTILITIES_GL_DRAW_HPP
 
-#include <boost/mpl/assert.hpp>
+#include <boost/geometry/core/static_assert.hpp>
 
 namespace boost { namespace geometry { namespace index { namespace detail {
 
@@ -79,7 +83,9 @@ struct gl_draw_segment<Segment, 2>
 template <typename Indexable, typename Tag>
 struct gl_draw_indexable
 {
-    BOOST_MPL_ASSERT_MSG((false), NOT_IMPLEMENTED_FOR_THIS_TAG, (Tag));
+    BOOST_GEOMETRY_STATIC_ASSERT_FALSE(
+        "Not implemented for this Indexable type.",
+        Indexable, Tag);
 };
 
 template <typename Box>
@@ -114,16 +120,20 @@ namespace rtree { namespace utilities {
 
 namespace visitors {
 
-template <typename Value, typename Options, typename Translator, typename Box, typename Allocators>
-struct gl_draw : public rtree::visitor<Value, typename Options::parameters_type, Box, Allocators, typename Options::node_tag, true>::type
+template <typename MembersHolder>
+struct gl_draw
+    : public MembersHolder::visitor_const
 {
-    typedef typename rtree::internal_node<Value, typename Options::parameters_type, Box, Allocators, typename Options::node_tag>::type internal_node;
-    typedef typename rtree::leaf<Value, typename Options::parameters_type, Box, Allocators, typename Options::node_tag>::type leaf;
+    typedef typename MembersHolder::box_type box_type;
+    typedef typename MembersHolder::translator_type translator_type;
 
-    inline gl_draw(Translator const& t,
+    typedef typename MembersHolder::internal_node internal_node;
+    typedef typename MembersHolder::leaf leaf;
+
+    inline gl_draw(translator_type const& t,
                    size_t level_first = 0,
                    size_t level_last = (std::numeric_limits<size_t>::max)(),
-                   typename coordinate_type<Box>::type z_coord_level_multiplier = 1
+                   typename coordinate_type<box_type>::type z_coord_level_multiplier = 1
     )
         : tr(t)
         , level_f(level_first)
@@ -197,10 +207,10 @@ struct gl_draw : public rtree::visitor<Value, typename Options::parameters_type,
         }
     }
 
-    Translator const& tr;
+    translator_type const& tr;
     size_t level_f;
     size_t level_l;
-    typename coordinate_type<Box>::type z_mul;
+    typename coordinate_type<box_type>::type z_mul;
 
     size_t level;
 };
@@ -226,11 +236,7 @@ void gl_draw(Rtree const& tree,
     }
 
     visitors::gl_draw<
-        typename RTV::value_type,
-        typename RTV::options_type,
-        typename RTV::translator_type,
-        typename RTV::box_type,
-        typename RTV::allocators_type
+        typename RTV::members_holder
     > gl_draw_v(rtv.translator(), level_first, level_last, z_coord_level_multiplier);
 
     rtv.apply_visitor(gl_draw_v);

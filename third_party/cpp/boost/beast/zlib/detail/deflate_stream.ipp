@@ -39,7 +39,6 @@
 
 #include <boost/beast/zlib/detail/deflate_stream.hpp>
 #include <boost/beast/zlib/detail/ranges.hpp>
-#include <boost/beast/core/detail/type_traits.hpp>
 #include <boost/assert.hpp>
 #include <boost/config.hpp>
 #include <boost/make_unique.hpp>
@@ -361,7 +360,10 @@ doWrite(z_params& zs, boost::optional<Flush> flush, error_code& ec)
 {
     maybe_init();
 
-    if(zs.next_out == 0 || (zs.next_in == 0 && zs.avail_in != 0) ||
+    if(zs.next_in == nullptr && zs.avail_in != 0)
+        BOOST_THROW_EXCEPTION(std::invalid_argument{"invalid input"});
+
+    if(zs.next_out == nullptr ||
         (status_ == FINISH_STATE && flush != Flush::finish))
     {
         ec = error::stream_error;
@@ -397,7 +399,7 @@ doWrite(z_params& zs, boost::optional<Flush> flush, error_code& ec)
         }
     }
     else if(zs.avail_in == 0 && (
-            old_flush && flush <= *old_flush
+            old_flush && flush <= *old_flush // Caution: depends on enum order
         ) && flush != Flush::finish)
     {
         /* Make sure there is something to do and avoid duplicate consecutive
@@ -465,7 +467,7 @@ doWrite(z_params& zs, boost::optional<Flush> flush, error_code& ec)
             else if(flush != Flush::block)
             {
                 /* FULL_FLUSH or SYNC_FLUSH */
-                tr_stored_block((char*)0, 0L, 0);
+                tr_stored_block(nullptr, 0L, 0);
                 /* For a full flush, this empty block will be recognized
                  * as a special marker by inflate_sync().
                  */
@@ -623,6 +625,7 @@ init()
 
     window_ = reinterpret_cast<Byte*>(buf_.get());
     prev_   = reinterpret_cast<std::uint16_t*>(buf_.get() + nwindow);
+    std::memset(prev_, 0, nprev);
     head_   = reinterpret_cast<std::uint16_t*>(buf_.get() + nwindow + nprev);
 
     /*  We overlay pending_buf_ and d_buf_ + l_buf_. This works
@@ -1295,9 +1298,9 @@ copy_block(
         put_short((std::uint16_t)len);
         put_short((std::uint16_t)~len);
     }
-    // VFALCO Use memcpy?
-    while (len--)
-        put_byte(*buf++);
+    if(buf)
+        std::memcpy(&pending_buf_[pending_], buf, len);
+    pending_ += len;
 }
 
 //------------------------------------------------------------------------------

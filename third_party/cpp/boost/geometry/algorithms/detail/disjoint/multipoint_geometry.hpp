@@ -2,7 +2,7 @@
 
 // Copyright (c) 2017 Adam Wulkiewicz, Lodz, Poland.
 
-// Copyright (c) 2014-2018, Oracle and/or its affiliates.
+// Copyright (c) 2014-2020, Oracle and/or its affiliates.
 // Contributed and/or modified by Menelaos Karavelas, on behalf of Oracle
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
@@ -15,8 +15,10 @@
 #include <algorithm>
 #include <vector>
 
-#include <boost/range.hpp>
-#include <boost/mpl/assert.hpp>
+#include <boost/range/begin.hpp>
+#include <boost/range/end.hpp>
+#include <boost/range/size.hpp>
+#include <boost/range/value_type.hpp>
 
 #include <boost/geometry/core/assert.hpp>
 #include <boost/geometry/core/tag.hpp>
@@ -42,6 +44,12 @@
 #include <boost/geometry/policies/compare.hpp>
 
 
+// TEMP
+#include <boost/geometry/strategies/envelope/cartesian.hpp>
+#include <boost/geometry/strategies/envelope/geographic.hpp>
+#include <boost/geometry/strategies/envelope/spherical.hpp>
+
+
 namespace boost { namespace geometry
 {
 
@@ -51,16 +59,15 @@ namespace detail { namespace disjoint
 {
 
 
-template <typename MultiPoint1, typename MultiPoint2>
 class multipoint_multipoint
 {
 private:
-    template <typename Iterator>
+    template <typename Iterator, typename CSTag>
     class unary_disjoint_predicate
-        : geometry::less<>
+        : geometry::less<void, -1, CSTag>
     {
     private:
-        typedef geometry::less<> base_type;
+        typedef geometry::less<void, -1, CSTag> base_type;
 
     public:
         unary_disjoint_predicate(Iterator first, Iterator last)
@@ -81,9 +88,14 @@ private:
     };
 
 public:
+    template <typename MultiPoint1, typename MultiPoint2, typename Strategy>
     static inline bool apply(MultiPoint1 const& multipoint1,
-                             MultiPoint2 const& multipoint2)
+                             MultiPoint2 const& multipoint2,
+                             Strategy const&)
     {
+        typedef typename Strategy::cs_tag cs_tag;
+        typedef geometry::less<void, -1, cs_tag> less_type;
+
         BOOST_GEOMETRY_ASSERT( boost::size(multipoint1) <= boost::size(multipoint2) );
 
         typedef typename boost::range_value<MultiPoint1>::type point1_type;
@@ -91,11 +103,12 @@ public:
         std::vector<point1_type> points1(boost::begin(multipoint1),
                                          boost::end(multipoint1));
 
-        std::sort(points1.begin(), points1.end(), geometry::less<>());
+        std::sort(points1.begin(), points1.end(), less_type());
 
         typedef unary_disjoint_predicate
             <
-                typename std::vector<point1_type>::const_iterator
+                typename std::vector<point1_type>::const_iterator,
+                cs_tag
             > predicate_type;
 
         return check_iterator_range
@@ -112,65 +125,78 @@ template <typename MultiPoint, typename Linear>
 class multipoint_linear
 {
 private:
+    template <typename Strategy>
     struct expand_box_point
     {
+        explicit expand_box_point(Strategy const& strategy)
+            : m_strategy(strategy)
+        {}
+
         template <typename Box, typename Point>
-        static inline void apply(Box& total, Point const& point)
+        void apply(Box& total, Point const& point) const
         {
-            geometry::expand(total, point);
+            geometry::expand(total, point, m_strategy);
         }
+
+        Strategy const& m_strategy;
     };
 
-    template <typename EnvelopeStrategy>
+    template <typename Strategy>
     struct expand_box_segment
     {
-        explicit expand_box_segment(EnvelopeStrategy const& strategy)
+        explicit expand_box_segment(Strategy const& strategy)
             : m_strategy(strategy)
         {}
 
         template <typename Box, typename Segment>
-        inline void apply(Box& total, Segment const& segment) const
+        void apply(Box& total, Segment const& segment) const
         {
             geometry::expand(total,
-                             geometry::return_envelope<Box>(segment, m_strategy));
+                             geometry::return_envelope<Box>(segment, m_strategy),
+                             m_strategy);
         }
 
-        EnvelopeStrategy const& m_strategy;
+        Strategy const& m_strategy;
     };
 
-    template <typename DisjointPointBoxStrategy>
+    template <typename Strategy>
     struct overlaps_box_point
     {
+        explicit overlaps_box_point(Strategy const& strategy)
+            : m_strategy(strategy)
+        {}
+
         template <typename Box, typename Point>
-        static inline bool apply(Box const& box, Point const& point)
+        bool apply(Box const& box, Point const& point) const
         {
-            // The default strategy is enough in this case
             return ! detail::disjoint::disjoint_point_box(point, box,
-                DisjointPointBoxStrategy());
+                                                          m_strategy);
         }
+
+        Strategy const& m_strategy;
     };
 
-    template <typename DisjointStrategy>
+    template <typename Strategy>
     struct overlaps_box_segment
     {
-        explicit overlaps_box_segment(DisjointStrategy const& strategy)
+        explicit overlaps_box_segment(Strategy const& strategy)
             : m_strategy(strategy)
         {}
 
         template <typename Box, typename Segment>
-        inline bool apply(Box const& box, Segment const& segment) const
+        bool apply(Box const& box, Segment const& segment) const
         {
             return ! dispatch::disjoint<Segment, Box>::apply(segment, box, m_strategy);
         }
 
-        DisjointStrategy const& m_strategy;
+        Strategy const& m_strategy;
     };
 
-    template <typename PtSegStrategy>
+    template <typename Strategy>
     class item_visitor_type
     {
     public:
-        item_visitor_type(PtSegStrategy const& strategy)
+        item_visitor_type(Strategy const& strategy)
             : m_intersection_found(false)
             , m_strategy(strategy)
         {}
@@ -191,7 +217,7 @@ private:
 
     private:
         bool m_intersection_found;
-        PtSegStrategy const& m_strategy;
+        Strategy const& m_strategy;
     };
     // structs for partition -- end
 
@@ -225,10 +251,6 @@ public:
     {
         item_visitor_type<Strategy> visitor(strategy);
 
-        typedef typename Strategy::envelope_strategy_type envelope_strategy_type;
-        typedef typename Strategy::disjoint_strategy_type disjoint_strategy_type;
-        typedef typename Strategy::disjoint_point_box_strategy_type disjoint_pb_strategy_type;
-
         // TODO: disjoint Segment/Box may be called in partition multiple times
         // possibly for non-cartesian segments which could be slow. We should consider
         // passing a range of bounding boxes of segments after calculating them once.
@@ -238,16 +260,17 @@ public:
             <
                 geometry::model::box<typename point_type<MultiPoint>::type>
             >::apply(multipoint, segment_range(linear), visitor,
-                     expand_box_point(),
-                     overlaps_box_point<disjoint_pb_strategy_type>(),
-                     expand_box_segment<envelope_strategy_type>(strategy.get_envelope_strategy()),
-                     overlaps_box_segment<disjoint_strategy_type>(strategy.get_disjoint_strategy()));
+                     expand_box_point<Strategy>(strategy),
+                     overlaps_box_point<Strategy>(strategy),
+                     expand_box_segment<Strategy>(strategy),
+                     overlaps_box_segment<Strategy>(strategy));
 
         return ! visitor.intersection_found();
     }
 
     template <typename Strategy>
-    static inline bool apply(Linear const& linear, MultiPoint const& multipoint, Strategy const& strategy)
+    static inline bool apply(Linear const& linear, MultiPoint const& multipoint,
+                             Strategy const& strategy)
     {
         return apply(multipoint, linear, strategy);
     }
@@ -263,21 +286,19 @@ public:
                              SingleGeometry const& single_geometry,
                              Strategy const& strategy)
     {
-        typedef typename Strategy::disjoint_point_box_strategy_type d_pb_strategy_type;
-
         typedef typename point_type<MultiPoint>::type point1_type;
         typedef typename point_type<SingleGeometry>::type point2_type;
         typedef model::box<point2_type> box2_type;
         
         box2_type box2;
-        geometry::envelope(single_geometry, box2, strategy.get_envelope_strategy());
+        geometry::envelope(single_geometry, box2, strategy);
         geometry::detail::expand_by_epsilon(box2);
 
         typedef typename boost::range_const_iterator<MultiPoint>::type iterator;
         for ( iterator it = boost::begin(multi_point) ; it != boost::end(multi_point) ; ++it )
         {
             // The default strategy is enough for Point/Box
-            if (! detail::disjoint::disjoint_point_box(*it, box2, d_pb_strategy_type())
+            if (! detail::disjoint::disjoint_point_box(*it, box2, strategy)
                 && ! dispatch::disjoint<point1_type, SingleGeometry>::apply(*it, single_geometry, strategy))
             {
                 return false;
@@ -288,7 +309,8 @@ public:
     }
 
     template <typename Strategy>
-    static inline bool apply(SingleGeometry const& single_geometry, MultiPoint const& multi_point, Strategy const& strategy)
+    static inline bool apply(SingleGeometry const& single_geometry, MultiPoint const& multi_point,
+                             Strategy const& strategy)
     {
         return apply(multi_point, single_geometry, strategy);
     }
@@ -299,54 +321,77 @@ template <typename MultiPoint, typename MultiGeometry>
 class multi_point_multi_geometry
 {
 private:
+    template <typename Strategy>
     struct expand_box_point
     {
+        explicit expand_box_point(Strategy const& strategy)
+            : m_strategy(strategy)
+        {}
+
         template <typename Box, typename Point>
-        static inline void apply(Box& total, Point const& point)
+        void apply(Box& total, Point const& point) const
         {
-            geometry::expand(total, point);
+            geometry::expand(total, point, m_strategy);
         }
+
+        Strategy const& m_strategy;
     };
 
+    template <typename Strategy>
     struct expand_box_box_pair
     {
+        explicit expand_box_box_pair(Strategy const& strategy)
+            : m_strategy(strategy)
+        {}
+
         template <typename Box, typename BoxPair>
-        inline void apply(Box& total, BoxPair const& box_pair) const
+        void apply(Box& total, BoxPair const& box_pair) const
         {
-            geometry::expand(total, box_pair.first);
+            geometry::expand(total, box_pair.first, m_strategy);
         }
+
+        Strategy const& m_strategy;
     };
 
-    template <typename DisjointPointBoxStrategy>
+    template <typename Strategy>
     struct overlaps_box_point
     {
+        explicit overlaps_box_point(Strategy const& strategy)
+            : m_strategy(strategy)
+        {}
+
         template <typename Box, typename Point>
-        static inline bool apply(Box const& box, Point const& point)
+        bool apply(Box const& box, Point const& point) const
         {
-            // The default strategy is enough for Point/Box
-            return ! detail::disjoint::disjoint_point_box(point, box,
-                                                          DisjointPointBoxStrategy());
+            return ! detail::disjoint::disjoint_point_box(point, box, m_strategy);
         }
+
+        Strategy const& m_strategy;
     };
 
-    template <typename DisjointBoxBoxStrategy>
+    template <typename Strategy>
     struct overlaps_box_box_pair
     {
+        explicit overlaps_box_box_pair(Strategy const& strategy)
+            : m_strategy(strategy)
+        {}
+
         template <typename Box, typename BoxPair>
-        inline bool apply(Box const& box, BoxPair const& box_pair) const
+        bool apply(Box const& box, BoxPair const& box_pair) const
         {
-            // The default strategy is enough for Box/Box
             return ! detail::disjoint::disjoint_box_box(box_pair.first, box,
-                                                        DisjointBoxBoxStrategy());
+                                                        m_strategy);
         }
+
+        Strategy const& m_strategy;
     };
 
-    template <typename PtSegStrategy>
+    template <typename Strategy>
     class item_visitor_type
     {
     public:
         item_visitor_type(MultiGeometry const& multi_geometry,
-                          PtSegStrategy const& strategy)
+                          Strategy const& strategy)
             : m_intersection_found(false)
             , m_multi_geometry(multi_geometry)
             , m_strategy(strategy)
@@ -355,14 +400,15 @@ private:
         template <typename Point, typename BoxPair>
         inline bool apply(Point const& point, BoxPair const& box_pair)
         {
-            typedef typename PtSegStrategy::disjoint_point_box_strategy_type d_pb_strategy_type;
-
             typedef typename boost::range_value<MultiGeometry>::type single_type;
 
             // The default strategy is enough for Point/Box
             if (! m_intersection_found
-                && ! detail::disjoint::disjoint_point_box(point, box_pair.first, d_pb_strategy_type())
-                && ! dispatch::disjoint<Point, single_type>::apply(point, range::at(m_multi_geometry, box_pair.second), m_strategy))
+                && ! detail::disjoint::disjoint_point_box(point, box_pair.first, m_strategy)
+                && ! dispatch::disjoint
+                        <
+                            Point, single_type
+                        >::apply(point, range::at(m_multi_geometry, box_pair.second), m_strategy))
             {
                 m_intersection_found = true;
                 return false;
@@ -375,7 +421,7 @@ private:
     private:
         bool m_intersection_found;
         MultiGeometry const& m_multi_geometry;
-        PtSegStrategy const& m_strategy;
+        Strategy const& m_strategy;
     };
     // structs for partition -- end
 
@@ -388,38 +434,26 @@ public:
         typedef model::box<point1_type> box1_type;
         typedef model::box<point2_type> box2_type;
         typedef std::pair<box2_type, std::size_t> box_pair_type;
-
-        typename Strategy::envelope_strategy_type const
-            envelope_strategy = strategy.get_envelope_strategy();
         
         std::size_t count2 = boost::size(multi_geometry);
         std::vector<box_pair_type> boxes(count2);
         for (std::size_t i = 0 ; i < count2 ; ++i)
         {
-            geometry::envelope(range::at(multi_geometry, i), boxes[i].first, envelope_strategy);
+            geometry::envelope(range::at(multi_geometry, i), boxes[i].first, strategy);
             geometry::detail::expand_by_epsilon(boxes[i].first);
             boxes[i].second = i;
         }
 
         item_visitor_type<Strategy> visitor(multi_geometry, strategy);
 
-        typedef overlaps_box_point
-            <
-                typename Strategy::disjoint_point_box_strategy_type
-            > overlaps_box_point_type;
-        typedef overlaps_box_box_pair
-            <
-                typename Strategy::disjoint_box_box_strategy_type
-            > overlaps_box_box_pair_type;
-
         geometry::partition
             <
                 box1_type
             >::apply(multi_point, boxes, visitor,
-                     expand_box_point(),
-                     overlaps_box_point_type(),
-                     expand_box_box_pair(),
-                     overlaps_box_box_pair_type());
+                     expand_box_point<Strategy>(strategy),
+                     overlaps_box_point<Strategy>(strategy),
+                     expand_box_box_pair<Strategy>(strategy),
+                     overlaps_box_box_pair<Strategy>(strategy));
 
         return ! visitor.intersection_found();
     }
@@ -493,20 +527,16 @@ struct disjoint
     template <typename Strategy>
     static inline bool apply(MultiPoint1 const& multipoint1,
                              MultiPoint2 const& multipoint2,
-                             Strategy const& )
+                             Strategy const& strategy)
     {
         if ( boost::size(multipoint2) < boost::size(multipoint1) )
         {
             return detail::disjoint::multipoint_multipoint
-                <
-                    MultiPoint2, MultiPoint1
-                >::apply(multipoint2, multipoint1);
+                ::apply(multipoint2, multipoint1, strategy);
         } 
 
         return detail::disjoint::multipoint_multipoint
-            <
-                MultiPoint1, MultiPoint2
-            >::apply(multipoint1, multipoint2);
+            ::apply(multipoint1, multipoint2, strategy);
    }
 };
 

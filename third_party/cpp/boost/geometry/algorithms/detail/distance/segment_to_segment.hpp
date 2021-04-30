@@ -1,8 +1,9 @@
 // Boost.Geometry (aka GGL, Generic Geometry Library)
 
-// Copyright (c) 2014, Oracle and/or its affiliates.
+// Copyright (c) 2014, 2019, Oracle and/or its affiliates.
 
 // Contributed and/or modified by Menelaos Karavelas, on behalf of Oracle
+// Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
 // Licensed under the Boost Software License version 1.0.
 // http://www.boost.org/users/license.html
@@ -70,7 +71,7 @@ public:
     apply(Segment1 const& segment1, Segment2 const& segment2,
           Strategy const& strategy)
     {
-        if (geometry::intersects(segment1, segment2))
+        if (geometry::intersects(segment1, segment2, strategy.get_relate_segment_segment_strategy()))
         {
             return 0;
         }

@@ -4,9 +4,8 @@
 // Copyright (c) 2008-2015 Bruno Lalande, Paris, France.
 // Copyright (c) 2009-2015 Mateusz Loskot, London, UK.
 
-// This file was modified by Oracle on 2015, 2018.
-// Modifications copyright (c) 2015, 2018, Oracle and/or its affiliates.
-
+// This file was modified by Oracle on 2015-2020.
+// Modifications copyright (c) 2015-2020, Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
 // Parts of Boost.Geometry are redesigned from Geodan's Geographic Library
@@ -23,16 +22,14 @@
 #include <cstddef>
 
 #include <boost/math/special_functions/fpclassify.hpp>
-#include <boost/mpl/if.hpp>
 #include <boost/numeric/conversion/cast.hpp>
-#include <boost/type_traits/is_void.hpp>
 
 #include <boost/geometry/arithmetic/determinant.hpp>
 #include <boost/geometry/core/coordinate_type.hpp>
 #include <boost/geometry/core/point_type.hpp>
 #include <boost/geometry/strategies/centroid.hpp>
 #include <boost/geometry/util/math.hpp>
-#include <boost/geometry/util/select_coordinate_type.hpp>
+#include <boost/geometry/util/select_most_precise.hpp>
 
 
 namespace boost { namespace geometry
@@ -132,21 +129,17 @@ private :
     //   whatever it is and whatever the point-type(s) are.
     // Else, use the most appropriate coordinate type
     //    of the two points, but at least double
-    typedef typename
-        boost::mpl::if_c
+    typedef std::conditional_t
         <
-            boost::is_void<CalculationType>::type::value,
+            std::is_void<CalculationType>::value,
             typename select_most_precise
-            <
-                typename select_coordinate_type
-                    <
-                        Point,
-                        PointOfSegment
-                    >::type,
-                double
-            >::type,
+                <
+                    typename coordinate_type<Point>::type,
+                    typename coordinate_type<PointOfSegment>::type,
+                    double
+                >::type,
             CalculationType
-        >::type calculation_type;
+        > calculation_type;
 
     /*! subclass to keep state */
     class sums

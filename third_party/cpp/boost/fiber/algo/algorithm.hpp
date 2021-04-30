@@ -35,7 +35,7 @@ private:
 public:
     typedef intrusive_ptr< algorithm >  ptr_t;
 
-    virtual ~algorithm() {}
+    virtual ~algorithm() = default;
 
     virtual void awakened( context *) noexcept = 0;
 
@@ -47,6 +47,8 @@ public:
 
     virtual void notify() noexcept = 0;
 
+    #if !defined(BOOST_EMBTC)
+      
     friend void intrusive_ptr_add_ref( algorithm * algo) noexcept {
         BOOST_ASSERT( nullptr != algo);
         algo->use_count_.fetch_add( 1, std::memory_order_relaxed);
@@ -59,8 +61,33 @@ public:
             delete algo;
         }
     }
+    
+    #else
+      
+    friend void intrusive_ptr_add_ref( algorithm * algo) noexcept;
+    friend void intrusive_ptr_release( algorithm * algo) noexcept;
+    
+    #endif
+      
 };
 
+#if defined(BOOST_EMBTC)
+
+    inline void intrusive_ptr_add_ref( algorithm * algo) noexcept {
+        BOOST_ASSERT( nullptr != algo);
+        algo->use_count_.fetch_add( 1, std::memory_order_relaxed);
+    }
+
+    inline void intrusive_ptr_release( algorithm * algo) noexcept {
+        BOOST_ASSERT( nullptr != algo);
+        if ( 1 == algo->use_count_.fetch_sub( 1, std::memory_order_release) ) {
+            std::atomic_thread_fence( std::memory_order_acquire);
+            delete algo;
+        }
+    }
+    
+#endif
+    
 class BOOST_FIBERS_DECL algorithm_with_properties_base : public algorithm {
 public:
     // called by fiber_properties::notify() -- don't directly call
@@ -79,7 +106,7 @@ struct algorithm_with_properties : public algorithm_with_properties_base {
     // must override awakened() with properties parameter instead. Otherwise
     // you'd have to remember to start every subclass awakened() override
     // with: algorithm_with_properties<PROPS>::awakened(fb);
-    virtual void awakened( context * ctx) noexcept override final {
+    void awakened( context * ctx) noexcept final {
         fiber_properties * props = super::get_properties( ctx);
         if ( BOOST_LIKELY( nullptr == props) ) {
             // TODO: would be great if PROPS could be allocated on the new
@@ -110,11 +137,11 @@ struct algorithm_with_properties : public algorithm_with_properties_base {
     }
 
     // override this to be notified by PROPS::notify()
-    virtual void property_change( context * ctx, PROPS & props) noexcept {
+    virtual void property_change( context * /* ctx */, PROPS & /* props */) noexcept {
     }
 
     // implementation for algorithm_with_properties_base method
-    void property_change_( context * ctx, fiber_properties * props) noexcept override final {
+    void property_change_( context * ctx, fiber_properties * props) noexcept final {
         property_change( ctx, * static_cast< PROPS * >( props) );
     }
 

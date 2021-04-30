@@ -100,8 +100,8 @@ dispatch_scatter_sendbuf(const communicator& comm,
   // Distribute the sizes
   int myarchsize;
   BOOST_MPI_CHECK_RESULT(MPI_Scatter,
-                         (non_const_data(archsizes), 1, MPI_INTEGER,
-                          &myarchsize, 1, MPI_INTEGER, root, comm));
+                         (non_const_data(archsizes), 1, MPI_INT,
+                          &myarchsize, 1, MPI_INT, root, comm));
   std::vector<int> offsets;
   if (root == comm.rank()) {
     sizes2offsets(archsizes, offsets);
@@ -188,7 +188,7 @@ void
 scatter(const communicator& comm, const std::vector<T>& in_values, 
         T* out_values, int n, int root)
 {
-  ::boost::mpi::scatter(comm, &in_values[0], out_values, n, root);
+  ::boost::mpi::scatter(comm, detail::c_data(in_values), out_values, n, root);
 }
 
 template<typename T>

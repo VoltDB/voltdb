@@ -13,12 +13,10 @@
 #pragma once
 #endif
 
-#include <boost/spirit/include/phoenix_core.hpp>
-#include <boost/spirit/include/phoenix_bind.hpp>
-#include <boost/spirit/include/phoenix_scope.hpp>
-
 #include <boost/spirit/home/support/attributes.hpp>
 #include <boost/spirit/home/lex/lexer/pass_flags.hpp>
+#include <boost/phoenix/core/argument.hpp>
+#include <boost/phoenix/bind.hpp>
 
 ///////////////////////////////////////////////////////////////////////////////
 namespace boost { namespace spirit { namespace lex { namespace lexertl 

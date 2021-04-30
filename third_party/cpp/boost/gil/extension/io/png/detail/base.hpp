@@ -62,12 +62,13 @@ private:
     {
         if( png_ptr )
         {
-            BOOST_ASSERT(png_ptr->_struct && png_ptr->_info);
-
-            png_destroy_read_struct( &png_ptr->_struct
-                                   , &png_ptr->_info
-                                   , nullptr
-                                   );
+            if( png_ptr->_struct && png_ptr->_info )
+            {
+                png_destroy_read_struct( &png_ptr->_struct
+                                       , &png_ptr->_info
+                                       , nullptr
+                                       );
+            }
 
             delete png_ptr;
             png_ptr = nullptr;
@@ -78,11 +79,12 @@ private:
     {
         if( png_ptr )
         {
-            BOOST_ASSERT(png_ptr->_struct && png_ptr->_info);
-
-            png_destroy_write_struct( &png_ptr->_struct
-                                    , &png_ptr->_info
-                                    );
+            if( png_ptr->_struct && png_ptr->_info )
+            {
+                png_destroy_write_struct( &png_ptr->_struct
+                                        , &png_ptr->_info
+                                        );
+            }
 
             delete png_ptr;
             png_ptr = nullptr;

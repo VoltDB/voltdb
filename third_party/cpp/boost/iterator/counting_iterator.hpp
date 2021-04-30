@@ -38,7 +38,7 @@ namespace detail
 
 # else
 
-#  if !BOOST_WORKAROUND(__BORLANDC__, BOOST_TESTED_AT(0x551))
+#  if !BOOST_WORKAROUND(BOOST_BORLANDC, BOOST_TESTED_AT(0x551))
       BOOST_STATIC_CONSTANT(
           bool, value = (
               boost::is_convertible<int,T>::value

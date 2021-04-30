@@ -2,8 +2,8 @@
 
 // Copyright (c) 2008-2015 Barend Gehrels, Amsterdam, the Netherlands.
 
-// This file was modified by Oracle on 2017, 2018.
-// Modifications copyright (c) 2017-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2017, 2018, 2019.
+// Modifications copyright (c) 2017-2019, Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle.
 
 // Use, modification and distribution is subject to the Boost Software License,
@@ -63,18 +63,12 @@ namespace projections
             //static const double C13 = .33333333333333333333;
             static const double one_plus_eps = 1.0000001;
 
-            // template class, using CRTP to implement forward/inverse
             template <typename T, typename Parameters>
             struct base_mbtfpp_spheroid
-                : public base_t_fi<base_mbtfpp_spheroid<T, Parameters>, T, Parameters>
             {
-                inline base_mbtfpp_spheroid(const Parameters& par)
-                    : base_t_fi<base_mbtfpp_spheroid<T, Parameters>, T, Parameters>(*this, par)
-                {}
-
                 // FORWARD(s_forward)  spheroid
                 // Project coordinates from geographic (lon, lat) to cartesian (x, y)
-                inline void fwd(T const& lp_lon, T lp_lat, T& xy_x, T& xy_y) const
+                inline void fwd(Parameters const& , T const& lp_lon, T lp_lat, T& xy_x, T& xy_y) const
                 {
                     static const T C23 = detail::two_thirds<T>();
                     static const T C13 = detail::third<T>();
@@ -86,7 +80,7 @@ namespace projections
 
                 // INVERSE(s_inverse)  spheroid
                 // Project coordinates from cartesian (x, y) to geographic (lon, lat)
-                inline void inv(T const& xy_x, T const& xy_y, T& lp_lon, T& lp_lat) const
+                inline void inv(Parameters const& , T const& xy_x, T const& xy_y, T& lp_lon, T& lp_lat) const
                 {
                     static const T half_pi = detail::half_pi<T>();
                     static const T C23 = detail::two_thirds<T>();
@@ -145,10 +139,9 @@ namespace projections
     struct mbtfpp_spheroid : public detail::mbtfpp::base_mbtfpp_spheroid<T, Parameters>
     {
         template <typename Params>
-        inline mbtfpp_spheroid(Params const& , Parameters const& par)
-            : detail::mbtfpp::base_mbtfpp_spheroid<T, Parameters>(par)
+        inline mbtfpp_spheroid(Params const& , Parameters & par)
         {
-            detail::mbtfpp::setup_mbtfpp(this->m_par);
+            detail::mbtfpp::setup_mbtfpp(par);
         }
     };
 
@@ -157,7 +150,7 @@ namespace projections
     {
 
         // Static projection
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_mbtfpp, mbtfpp_spheroid, mbtfpp_spheroid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI(srs::spar::proj_mbtfpp, mbtfpp_spheroid)
 
         // Factory entry(s)
         BOOST_GEOMETRY_PROJECTIONS_DETAIL_FACTORY_ENTRY_FI(mbtfpp_entry, mbtfpp_spheroid)

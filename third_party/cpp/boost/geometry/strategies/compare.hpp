@@ -4,9 +4,8 @@
 // Copyright (c) 2008-2012 Bruno Lalande, Paris, France.
 // Copyright (c) 2009-2012 Mateusz Loskot, London, UK.
 
-// This file was modified by Oracle on 2017.
-// Modifications copyright (c) 2017, Oracle and/or its affiliates.
-
+// This file was modified by Oracle on 2017-2020.
+// Modifications copyright (c) 2017-2020, Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
 // Parts of Boost.Geometry are redesigned from Geodan's Geographic Library
@@ -21,16 +20,15 @@
 #define BOOST_GEOMETRY_STRATEGIES_COMPARE_HPP
 
 
+#include <algorithm>
 #include <cstddef>
 #include <functional>
-
-#include <boost/mpl/assert.hpp>
-#include <boost/mpl/min.hpp>
 
 #include <boost/geometry/core/access.hpp>
 #include <boost/geometry/core/cs.hpp>
 #include <boost/geometry/core/coordinate_type.hpp>
 #include <boost/geometry/core/coordinate_dimension.hpp>
+#include <boost/geometry/core/static_assert.hpp>
 
 #include <boost/geometry/util/math.hpp>
 
@@ -173,11 +171,8 @@ struct cartesian<ComparePolicy, -1>
             <
                 ComparePolicy,
                 0,
-                boost::mpl::min
-                    <
-                        geometry::dimension<Point1>,
-                        geometry::dimension<Point2>
-                    >::type::value
+                ((std::min)(geometry::dimension<Point1>::value,
+                            geometry::dimension<Point2>::value))
             >::apply(left, right);
     }
 };
@@ -198,12 +193,9 @@ template
 >
 struct default_strategy
 {
-    BOOST_MPL_ASSERT_MSG
-        (
-            false,
-            NOT_IMPLEMENTED_FOR_THESE_TYPES,
-            (types<CSTag1, CSTag2>)
-        );
+    BOOST_GEOMETRY_STATIC_ASSERT_FALSE(
+        "Not implemented for these types.",
+        CSTag1, CSTag2);
 };
 
 

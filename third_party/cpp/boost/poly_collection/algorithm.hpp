@@ -1,4 +1,4 @@
-/* Copyright 2016-2018 Joaquin M Lopez Munoz.
+/* Copyright 2016-2020 Joaquin M Lopez Munoz.
  * Distributed under the Boost Software License, Version 1.0.
  * (See accompanying file LICENSE_1_0.txt or copy at
  * http://www.boost.org/LICENSE_1_0.txt)
@@ -106,7 +106,7 @@ template<
 Function for_each(const Iterator& first,const Iterator& last,Function f)
 {
   for_each_segment(first,last,restitute_range<Ts...>(for_each_alg{},f));
-  return std::move(f);
+  return f;
 }
 
 struct for_each_n_alg

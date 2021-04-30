@@ -9,8 +9,8 @@
 /////////1/////////2/////////3/////////4/////////5/////////6/////////7/////////8
 // vector.hpp: serialization for stl vector templates
 
-// (C) Copyright 2002 Robert Ramey - http://www.rrsd.com . 
-// fast array serialization (C) Copyright 2005 Matthias Troyer 
+// (C) Copyright 2002 Robert Ramey - http://www.rrsd.com .
+// fast array serialization (C) Copyright 2005 Matthias Troyer
 // Use, modification and distribution is subject to the Boost Software
 // License, Version 1.0. (See accompanying file LICENSE_1_0.txt or copy at
 // http://www.boost.org/LICENSE_1_0.txt)
@@ -22,11 +22,12 @@
 #include <boost/config.hpp>
 #include <boost/detail/workaround.hpp>
 
-#include <boost/archive/detail/basic_iarchive.hpp>
 #include <boost/serialization/access.hpp>
 #include <boost/serialization/nvp.hpp>
 #include <boost/serialization/collection_size_type.hpp>
+#include <boost/serialization/library_version_type.hpp>
 #include <boost/serialization/item_version_type.hpp>
+#include <boost/serialization/library_version_type.hpp>
 
 #include <boost/serialization/collections_save_imp.hpp>
 #include <boost/serialization/collections_load_imp.hpp>
@@ -48,7 +49,7 @@
 #define STD std
 #endif
 
-namespace boost { 
+namespace boost {
 namespace serialization {
 
 /////////1/////////2/////////3/////////4/////////5/////////6/////////7/////////8
@@ -75,14 +76,14 @@ inline void load(
     const unsigned int /* file_version */,
     mpl::false_
 ){
-    const boost::archive::library_version_type library_version(
+    const boost::serialization::library_version_type library_version(
         ar.get_library_version()
     );
     // retrieve number of elements
     item_version_type item_version(0);
     collection_size_type count;
     ar >> BOOST_SERIALIZATION_NVP(count);
-    if(boost::archive::library_version_type(3) < library_version){
+    if(boost::serialization::library_version_type(3) < library_version){
         ar >> BOOST_SERIALIZATION_NVP(item_version);
     }
     t.reserve(count);
@@ -138,9 +139,9 @@ inline void save(
     const std::vector<U, Allocator> &t,
     const unsigned int file_version
 ){
-    typedef typename 
+    typedef typename
     boost::serialization::use_array_optimization<Archive>::template apply<
-        typename remove_const<U>::type 
+        typename remove_const<U>::type
     >::type use_optimized;
     save(ar,t,file_version, use_optimized());
 }
@@ -152,15 +153,15 @@ inline void load(
     const unsigned int file_version
 ){
 #ifdef BOOST_SERIALIZATION_VECTOR_135_HPP
-    if (ar.get_library_version()==boost::archive::library_version_type(5))
+    if (ar.get_library_version()==boost::serialization::library_version_type(5))
     {
       load(ar,t,file_version, boost::is_arithmetic<U>());
       return;
     }
 #endif
-    typedef typename 
+    typedef typename
     boost::serialization::use_array_optimization<Archive>::template apply<
-        typename remove_const<U>::type 
+        typename remove_const<U>::type
     >::type use_optimized;
     load(ar,t,file_version, use_optimized());
 }

@@ -1,4 +1,4 @@
- /*=============================================================================
+/*=============================================================================
     Boost.Wave: A Standard compliant C++ preprocessor library
 
     http://www.boost.org/
@@ -8,8 +8,8 @@
     LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 =============================================================================*/
 
-#if !defined(TIME_CONVERSION_HELPER_HPP_DA97E389_1797_43BA_82AE_B071064B3EF4_INCLUDED)
-#define TIME_CONVERSION_HELPER_HPP_DA97E389_1797_43BA_82AE_B071064B3EF4_INCLUDED
+#if !defined(BOOST_TIME_CONVERSION_HELPER_HPP_DA97E389_1797_43BA_82AE_B071064B3EF4_INCLUDED)
+#define BOOST_TIME_CONVERSION_HELPER_HPP_DA97E389_1797_43BA_82AE_B071064B3EF4_INCLUDED
 
 #include <ctime>
 #include <cstring>
@@ -150,4 +150,4 @@ using namespace time_conversion;
 #include BOOST_ABI_SUFFIX
 #endif
 
-#endif // !defined(TIME_CONVERSION_HELPER_HPP_DA97E389_1797_43BA_82AE_B071064B3EF4_INCLUDED)
+#endif // !defined(BOOST_TIME_CONVERSION_HELPER_HPP_DA97E389_1797_43BA_82AE_B071064B3EF4_INCLUDED)

@@ -66,11 +66,15 @@ public:
 Exception thrown when inconsistent return values are passed to overridden
 virtual public functions.
 
-This exception is internally thrown by this library when programmers specify
-return values for public function overrides in derived classes that are not
-consistent with the return types of the virtual public functions being
-overridden in the base classes.
-This allows this library to give more descriptive error messages in such cases.
+This exception is thrown when programmers pass to this library return value
+parameters for public function overrides in derived classes that are not
+consistent with the return type parameter passed for the virtual public function
+being overridden from the base classes.
+This allows this library to give more descriptive error messages in such cases
+of misuse.
+
+This exception is internally thrown by this library and programmers should not
+need to throw it from user code.
 
 @see    @RefSect{tutorial.public_function_overrides__subcontracting_,
         Public Function Overrides}
@@ -117,10 +121,10 @@ This exception is thrown by code expanded by @RefMacro{BOOST_CONTRACT_ASSERT}
 This exception is typically used to report contract assertion failures because
 it contains detailed information about the file name, line number, and source
 code of the asserted condition (so it can be used by this library to provide
-detailed error messages).
+detailed error messages when handling contract assertion failures).
+
 However, any other exception can be used to report a contract assertion failure
 (including user-defined exceptions).
-
 This library will call the appropriate contract failure handler function
 (@RefFunc{boost::contract::precondition_failure}, etc.) when this or any other
 exception is thrown while checking contracts (by default, these failure handler
@@ -171,7 +175,8 @@ public:
     @b Throws: This is declared @c noexcept (or @c throw() before C++11).
     
     @return A string formatted similarly to the following:
-      <c>assertion "`code()`" failed: file "`file()`", line \`line()\`</c>.
+      <c>assertion "`code()`" failed: file "`file()`", line \`line()\`</c>
+            (where `` indicate execution quotes).
             File, line, and code will be omitted from this string if they were
             not specified when constructing this object.
     */
@@ -236,7 +241,8 @@ enum from {
     from_destructor,
     
     /**
-    Assertion failed when checking contracts for functions (members or not).
+    Assertion failed when checking contracts for functions (members or not,
+    public or not).
     */
     from_function
 };
@@ -568,7 +574,7 @@ Set a new failure handler and returns it.
 
 @param f New failure handler functor to set.
 
-@return Same failure handler functor @p f passed as parameter (e.g., fr
+@return Same failure handler functor @p f passed as parameter (e.g., for
         concatenating function calls).
 
 @see    @RefSect{advanced.throw_on_failures__and__noexcept__, Throw on Failure},
@@ -703,7 +709,7 @@ inline void except_failure(from where) /* can throw */ {
 }
 
 /**
-Set failure handler for old value copies at body.
+Set failure handler for old values copied at body.
 
 Set a new failure handler and returns it.
 
@@ -715,7 +721,7 @@ Set a new failure handler and returns it.
         concatenating function calls).
 
 @see    @RefSect{advanced.throw_on_failures__and__noexcept__, Throw on Failure},
-        @RefSect{advanced.old_value_copies_at_body, Old Value Copies at Body}
+        @RefSect{advanced.old_values_copied_at_body, Old Values Copied at Body}
 */
 inline from_failure_handler const& set_old_failure(from_failure_handler const&
         f) /** @cond */ BOOST_NOEXCEPT_OR_NOTHROW /** @endcond */ {
@@ -727,7 +733,7 @@ inline from_failure_handler const& set_old_failure(from_failure_handler const&
 }
 
 /**
-Return failure handler currently set for old value copies at body.
+Return failure handler currently set for old values copied at body.
 
 This is often called only internally by this library.
 
@@ -736,7 +742,7 @@ This is often called only internally by this library.
 @return A copy of the failure handler currently set.
 
 @see    @RefSect{advanced.throw_on_failures__and__noexcept__, Throw on Failure},
-        @RefSect{advanced.old_value_copies_at_body, Old Value Copies at Body}
+        @RefSect{advanced.old_values_copied_at_body, Old Values Copied at Body}
 */
 inline from_failure_handler get_old_failure()
         /** @cond */ BOOST_NOEXCEPT_OR_NOTHROW /** @endcond */ {
@@ -748,7 +754,7 @@ inline from_failure_handler get_old_failure()
 }
 
 /**
-Call failure handler for old value copies at body.
+Call failure handler for old values copied at body.
 
 This is often called only internally by this library.
 
@@ -761,7 +767,7 @@ This is often called only internally by this library.
                 throw exceptions instead of terminating the program).
 
 @see    @RefSect{advanced.throw_on_failures__and__noexcept__, Throw on Failure},
-        @RefSect{advanced.old_value_copies_at_body, Old Value Copies at Body}
+        @RefSect{advanced.old_values_copied_at_body, Old Values Copied at Body}
 */
 inline void old_failure(from where) /* can throw */ {
     #ifndef BOOST_CONTRACT_DISABLE_THREADS

@@ -1,5 +1,5 @@
 /* Pointer to a SG14 status_code
-(C) 2018-2019 Niall Douglas <http://www.nedproductions.biz/> (5 commits)
+(C) 2018-2021 Niall Douglas <http://www.nedproductions.biz/> (5 commits)
 File Created: Sep 2018
 
 
@@ -46,7 +46,10 @@ namespace detail
     using value_type = StatusCode *;
     using _base::string_ref;
 
-    constexpr indirecting_domain() noexcept : _base(0xc44f7bdeb2cc50e9 ^ typename StatusCode::domain_type().id() /* unique-ish based on domain's unique id */) {}
+    constexpr indirecting_domain() noexcept
+        : _base(0xc44f7bdeb2cc50e9 ^ typename StatusCode::domain_type().id() /* unique-ish based on domain's unique id */)
+    {
+    }
     indirecting_domain(const indirecting_domain &) = default;
     indirecting_domain(indirecting_domain &&) = default;  // NOLINT
     indirecting_domain &operator=(const indirecting_domain &) = default;
@@ -100,7 +103,7 @@ namespace detail
 #endif
     virtual void _do_erased_copy(status_code<void> &dst, const status_code<void> &src, size_t /*unused*/) const override  // NOLINT
     {
-      assert(dst.domain() == *this);
+      // Note that dst will not have its domain set
       assert(src.domain() == *this);
       auto &d = static_cast<_mycode &>(dst);               // NOLINT
       const auto &_s = static_cast<const _mycode &>(src);  // NOLINT
@@ -111,7 +114,7 @@ namespace detail
     {
       assert(code.domain() == *this);
       auto &c = static_cast<_mycode &>(code);  // NOLINT
-      delete c.value();  // NOLINT
+      delete c.value();                        // NOLINT
     }
   };
 #if __cplusplus >= 201402L || defined(_MSC_VER)
@@ -130,6 +133,45 @@ inline status_code<erased<typename std::add_pointer<typename std::decay<T>::type
 {
   using status_code_type = typename std::decay<T>::type;
   return status_code<detail::indirecting_domain<status_code_type>>(in_place, new status_code_type(static_cast<T &&>(v)));
+}
+
+/*! If a status code refers to a `status_code_ptr` which indirects to a status
+code of type `StatusCode`, return a pointer to that `StatusCode`. Otherwise return null.
+*/
+template <class StatusCode, class U, typename std::enable_if<is_status_code<StatusCode>::value, bool>::type = true> inline StatusCode *get_if(status_code<erased<U>> *v) noexcept
+{
+  if((0xc44f7bdeb2cc50e9 ^ typename StatusCode::domain_type().id()) != v->domain().id())
+  {
+    return nullptr;
+  }
+  union {
+    U value;
+    StatusCode *ret;
+  };
+  value = v->value();
+  return ret;
+}
+//! \overload Const overload
+template <class StatusCode, class U, typename std::enable_if<is_status_code<StatusCode>::value, bool>::type = true> inline const StatusCode *get_if(const status_code<erased<U>> *v) noexcept
+{
+  if((0xc44f7bdeb2cc50e9 ^ typename StatusCode::domain_type().id()) != v->domain().id())
+  {
+    return nullptr;
+  }
+  union {
+    U value;
+    const StatusCode *ret;
+  };
+  value = v->value();
+  return ret;
+}
+
+/*! If a status code refers to a `status_code_ptr`, return the id of the erased
+status code's domain. Otherwise return a meaningless number.
+*/
+template <class U> inline typename status_code_domain::unique_id_type get_id(const status_code<erased<U>> &v) noexcept
+{
+  return 0xc44f7bdeb2cc50e9 ^ v.domain().id();
 }
 
 BOOST_OUTCOME_SYSTEM_ERROR2_NAMESPACE_END

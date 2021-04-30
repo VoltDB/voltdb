@@ -56,7 +56,7 @@ struct group1
       : a1_(a1)
       {}
 private:
-   group1& operator=(const group1&);
+   // group1& operator=(const group1&);
 };
 
 template <class Ch, class Tr, class T1>

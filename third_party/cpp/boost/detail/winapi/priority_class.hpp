@@ -10,6 +10,10 @@
 #ifndef BOOST_DETAIL_WINAPI_PRIORITY_CLASS_HPP_
 #define BOOST_DETAIL_WINAPI_PRIORITY_CLASS_HPP_
 
+#include <boost/config/header_deprecated.hpp>
+
+BOOST_HEADER_DEPRECATED("<boost/winapi/priority_class.hpp>")
+
 #include <boost/winapi/priority_class.hpp>
 #include <boost/detail/winapi/detail/deprecated_namespace.hpp>
 

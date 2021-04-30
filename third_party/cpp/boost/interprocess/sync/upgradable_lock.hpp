@@ -67,7 +67,7 @@ class upgradable_lock
 
    //!Effects: Default constructs a upgradable_lock.
    //!Postconditions: owns() == false and mutex() == 0.
-   upgradable_lock()
+   upgradable_lock() BOOST_NOEXCEPT
       : mp_mutex(0), m_locked(false)
    {}
 
@@ -123,7 +123,7 @@ class upgradable_lock
    //!   signature. An non-moved upgradable_lock can be moved with the
    //!   expression: "boost::move(lock);". This constructor does not alter the
    //!   state of the mutex, only potentially who owns it.
-   upgradable_lock(BOOST_RV_REF(upgradable_lock<mutex_type>) upgr)
+   upgradable_lock(BOOST_RV_REF(upgradable_lock<mutex_type>) upgr) BOOST_NOEXCEPT
       : mp_mutex(0), m_locked(upgr.owns())
    {  mp_mutex = upgr.release(); }
 
@@ -266,23 +266,23 @@ class upgradable_lock
 
    //!Effects: Returns true if this scoped_lock has acquired the
    //!referenced mutex.
-   bool owns() const
+   bool owns() const BOOST_NOEXCEPT
    {  return m_locked && mp_mutex;  }
 
    //!Conversion to bool.
    //!Returns owns().
-   operator unspecified_bool_type() const
+   operator unspecified_bool_type() const BOOST_NOEXCEPT
    {  return m_locked? &this_type::m_locked : 0;   }
 
    //!Effects: Returns a pointer to the referenced mutex, or 0 if
    //!there is no mutex to reference.
-   mutex_type* mutex() const
+   mutex_type* mutex() const BOOST_NOEXCEPT
    {  return  mp_mutex;  }
 
    //!Effects: Returns a pointer to the referenced mutex, or 0 if there is no
    //!   mutex to reference.
    //!Postconditions: mutex() == 0 and owns() == false.
-   mutex_type* release()
+   mutex_type* release() BOOST_NOEXCEPT
    {
       mutex_type *mut = mp_mutex;
       mp_mutex = 0;
@@ -292,7 +292,7 @@ class upgradable_lock
 
    //!Effects: Swaps state with moved lock.
    //!Throws: Nothing.
-   void swap(upgradable_lock<mutex_type> &other)
+   void swap(upgradable_lock<mutex_type> &other) BOOST_NOEXCEPT
    {
       (simple_swap)(mp_mutex, other.mp_mutex);
       (simple_swap)(m_locked, other.m_locked);

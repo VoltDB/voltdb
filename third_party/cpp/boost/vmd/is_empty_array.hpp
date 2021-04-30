@@ -35,7 +35,7 @@
     
     sequence = a possible empty array
 
-    returns = 1 if the sequence is an empty Boost PP array
+    returns = 1 if the sequence is an empty Boost PP array,
               0 if it is not.
               
     The macro will generate a preprocessing error if the sequence
@@ -67,10 +67,10 @@
     size element is 0 and the second element is a tuple with a single 
     empty element, ie. '(0,())'.
     
-    d        = The next available BOOST_PP_WHILE iteration. 
+    d        = The next available BOOST_PP_WHILE iteration. <br/>
     sequence = a possible empty array
 
-    returns = 1 if the sequence is an empty Boost PP array
+    returns = 1 if the sequence is an empty Boost PP array,
               0 if it is not.
               
     The macro will generate a preprocessing error if the sequence

@@ -5,8 +5,8 @@
     Distributed under the Boost Software License, Version 1.0. (See accompanying
     file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 =============================================================================*/
-#if !defined(SPIRIT_X3_DETAIL_ATTRIBUTES_APR_18_2010_0458PM)
-#define SPIRIT_X3_DETAIL_ATTRIBUTES_APR_18_2010_0458PM
+#ifndef BOOST_SPIRIT_X3_NONTERMINAL_DETAIL_TRANSFORM_ATTRIBUTE_HPP
+#define BOOST_SPIRIT_X3_NONTERMINAL_DETAIL_TRANSFORM_ATTRIBUTE_HPP
 
 #include <boost/spirit/home/x3/support/traits/transform_attribute.hpp>
 #include <boost/spirit/home/x3/support/traits/move_to.hpp>
@@ -25,9 +25,9 @@ namespace boost { namespace spirit { namespace x3
 
         static Transformed pre(Exposed&) { return Transformed(); }
 
-        static void post(Exposed& val, Transformed&& attr)
+        static void post(Exposed& val, Transformed&& attribute)
         {
-            traits::move_to(std::forward<Transformed>(attr), val);
+            traits::move_to(std::forward<Transformed>(attribute), val);
         }
     };
 

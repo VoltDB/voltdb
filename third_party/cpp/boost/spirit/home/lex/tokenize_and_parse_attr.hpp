@@ -57,54 +57,6 @@ namespace boost { namespace spirit { namespace lex
         return compile<qi::domain>(expr).parse(
             iter, lex.end(), unused, unused, attr);
     }
-
-    ///////////////////////////////////////////////////////////////////////////
-    template <typename Iterator, typename Lexer, typename ParserExpr
-      , typename Skipper, BOOST_PP_ENUM_PARAMS(N, typename A)>
-    inline bool
-    tokenize_and_phrase_parse(Iterator& first, Iterator last, Lexer const& lex
-      , ParserExpr const& expr, Skipper const& skipper
-      , BOOST_SCOPED_ENUM(skip_flag) post_skip
-      , BOOST_PP_ENUM_BINARY_PARAMS(N, A, & attr))
-    {
-        // Report invalid expression error as early as possible.
-        // If you got an error_invalid_expression error message here,
-        // then either the expression (expr) or skipper is not a valid
-        // spirit qi expression.
-        BOOST_SPIRIT_ASSERT_MATCH(qi::domain, ParserExpr);
-        BOOST_SPIRIT_ASSERT_MATCH(qi::domain, Skipper);
-
-        typedef
-            typename spirit::result_of::compile<qi::domain, Skipper>::type
-        skipper_type;
-        skipper_type const skipper_ = compile<qi::domain>(skipper);
-
-        typedef fusion::vector<
-            BOOST_PP_ENUM(N, BOOST_SPIRIT_QI_ATTRIBUTE_REFERENCE, A)
-        > vector_type;
-
-        vector_type attr (BOOST_PP_ENUM_PARAMS(N, attr));
-        typename Lexer::iterator_type iter = lex.begin(first, last);
-        if (!compile<qi::domain>(expr).parse(
-                iter, lex.end(), unused, skipper_, attr))
-            return false;
-
-        if (post_skip == skip_flag::postskip)
-            qi::skip_over(first, last, skipper_);
-        return true;
-    }
-
-    template <typename Iterator, typename Lexer, typename ParserExpr
-      , typename Skipper, BOOST_PP_ENUM_PARAMS(N, typename A)>
-    inline bool
-    tokenize_and_phrase_parse(Iterator& first, Iterator last, Lexer const& lex
-      , ParserExpr const& expr, Skipper const& skipper
-      , BOOST_PP_ENUM_BINARY_PARAMS(N, A, & attr))
-    {
-        return tokenize_and_phrase_parse(first, last, expr, skipper
-          , skip_flag::postskip, BOOST_PP_ENUM_PARAMS(N, attr));
-    }
-
 }}}
 
 #undef BOOST_SPIRIT_QI_ATTRIBUTE_REFERENCE

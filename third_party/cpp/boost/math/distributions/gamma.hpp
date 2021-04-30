@@ -12,6 +12,7 @@
 
 #include <boost/math/distributions/fwd.hpp>
 #include <boost/math/special_functions/gamma.hpp>
+#include <boost/math/special_functions/digamma.hpp>
 #include <boost/math/distributions/detail/common_error_handling.hpp>
 #include <boost/math/distributions/complement.hpp>
 
@@ -334,6 +335,15 @@ template <class RealType, class Policy>
 inline RealType kurtosis(const gamma_distribution<RealType, Policy>& dist)
 {
    return kurtosis_excess(dist) + 3;
+}
+
+template <class RealType, class Policy>
+inline RealType entropy(const gamma_distribution<RealType, Policy>& dist)
+{
+   RealType k = dist.shape();
+   RealType theta = dist.scale();
+   using std::log;
+   return k + log(theta) + lgamma(k) + (1-k)*digamma(k);
 }
 
 } // namespace math

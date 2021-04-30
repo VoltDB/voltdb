@@ -20,7 +20,7 @@ namespace boost { namespace yap {
         "ref" and "term" for the non-operator kinds
         <code>expr_kind::expr_ref</code> amd <code>expr_kind::terminal</code>,
         respectively.*/
-    inline char const * op_string(expr_kind kind)
+    inline constexpr char const * op_string(expr_kind kind)
     {
         switch (kind) {
         case expr_kind::expr_ref: return "ref";
@@ -123,9 +123,9 @@ namespace boost { namespace yap {
         std::ostream & print_type(std::ostream & os, hana::tuple<T> const &)
         {
             os << typeindex::type_id<T>().pretty_name();
-            if (std::is_const<T>::value)
+            if (std::is_const<std::remove_reference_t<T>>::value)
                 os << " const";
-            if (std::is_volatile<T>::value)
+            if (std::is_volatile<std::remove_reference_t<T>>::value)
                 os << " volatile";
             if (std::is_lvalue_reference<T>::value)
                 os << " &";

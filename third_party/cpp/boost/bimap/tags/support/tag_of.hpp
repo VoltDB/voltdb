@@ -7,7 +7,7 @@
 // http://www.boost.org/LICENSE_1_0.txt)
 
 /// \file tags/support/tag_of.hpp
-/// \brief Safe way to acces the tag of a type
+/// \brief Safe way to access the tag of a type
 
 #ifndef BOOST_BIMAP_TAGS_SUPPORT_TAG_OF_HPP
 #define BOOST_BIMAP_TAGS_SUPPORT_TAG_OF_HPP

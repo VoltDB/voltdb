@@ -2,8 +2,8 @@
 
 // Copyright (c) 2015-2016 Barend Gehrels, Amsterdam, the Netherlands.
 
-// This file was modified by Oracle on 2018.
-// Modifications copyright (c) 2018 Oracle and/or its affiliates.
+// This file was modified by Oracle on 2018-2020.
+// Modifications copyright (c) 2018-2020 Oracle and/or its affiliates.
 
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
@@ -17,7 +17,7 @@
 #include <cstddef>
 #include <map>
 
-#include <boost/range.hpp>
+#include <boost/range/value_type.hpp>
 
 #include <boost/geometry/algorithms/detail/ring_identifier.hpp>
 #include <boost/geometry/algorithms/detail/overlay/copy_segments.hpp>
@@ -34,12 +34,6 @@ namespace boost { namespace geometry
 #ifndef DOXYGEN_NO_DETAIL
 namespace detail { namespace overlay
 {
-
-// Generic function (is this used somewhere else too?)
-inline ring_identifier ring_id_by_seg_id(segment_identifier const& seg_id)
-{
-    return ring_identifier(seg_id.source_index, seg_id.multi_index, seg_id.ring_index);
-}
 
 template
 <

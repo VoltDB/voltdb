@@ -1,4 +1,4 @@
-/* Copyright 2016-2018 Joaquin M Lopez Munoz.
+/* Copyright 2016-2020 Joaquin M Lopez Munoz.
  * Distributed under the Boost Software License, Version 1.0.
  * (See accompanying file LICENSE_1_0.txt or copy at
  * http://www.boost.org/LICENSE_1_0.txt)
@@ -24,7 +24,7 @@ namespace poly_collection{
 namespace detail{
 
 /* Internal *virtual* interface of segment<Model,Allocator> (please note that
- * a non-virtual interface exists accessible thrown downcasting). Member
+ * a non-virtual interface exists accessible through downcasting). Member
  * functions have been defined to minimize virtual function calls according to
  * usage patterns by poly_collection. For instance, ranges are returned rather
  * than iterators to allow for caching of and end sentinel at a higher level.
@@ -53,7 +53,7 @@ struct segment_backend
   virtual segment_backend_unique_ptr copy()const=0;
   virtual segment_backend_unique_ptr copy(const Allocator&)const=0;
   virtual segment_backend_unique_ptr empty_copy(const Allocator&)const=0;
-  virtual segment_backend_unique_ptr move(const Allocator&)const=0;
+  virtual segment_backend_unique_ptr move(const Allocator&)=0;
   virtual bool                       equal(const segment_backend&)const=0;
 
   virtual Allocator     get_allocator()const noexcept=0;

@@ -18,20 +18,21 @@ Handle public function overrides (for subcontracting).
 
 #ifdef BOOST_CONTRACT_DETAIL_DOXYGEN
     /**
-    Declare an override type with an arbitrary name.
+    Declare an override type trait with an arbitrary name.
 
-    Declare the override type to pass as an explicit template parameter to
-    @RefFunc{boost::contract::public_function} for public function overrides.
+    Declare the override type trait named @c type_name to pass as an explicit
+    template parameter to @RefFunc{boost::contract::public_function} for public
+    function overrides.
     
     @see @RefSect{advanced.named_overrides, Named Overrides}
 
-    @param type_name    Name of the override type this macro will declare.
+    @param type_name    Name of the override type trait this macro will declare.
                         (This is not a variadic macro parameter but it should
                         never contain commas because it is an identifier.)
     @param func_name    Function name of the public function override.
                         This macro is called just once even if the function name
-                        is overloaded (the same override type is used for all
-                        overloaded functions with the same name, see
+                        is overloaded (the same override type trait is used for
+                        all overloaded functions with the same name, see
                         @RefSect{advanced.function_overloads,
                         Function Overloads}).
                         (This is not a variadic macro parameter but it should
@@ -113,17 +114,21 @@ Handle public function overrides (for subcontracting).
 /* PUBLIC */
 
 /**
-Declare an override type named <c>override_<i>func_name</i></c>.
+Declare an override type trait named <c>override_<i>func_name</i></c>.
 
-Declare the override type to pass as an explicit template parameter to
-@RefFunc{boost::contract::public_function} for public function overrides.
+Declare the override type trait named <c>override_<i>func_name</i></c> to pass
+as an explicit template parameter to @RefFunc{boost::contract::public_function}
+for public function overrides.
+Use @RefMacro{BOOST_CONTRACT_NAMED_OVERRIDE} to generate an override type trait
+with a name different than <c>override_<i>func_name</i></c> (usually not
+needed).
 
 @see    @RefSect{tutorial.public_function_overrides__subcontracting_,
         Public Function Overrides}
 
 @param func_name    Function name of the public function override.
                     This macro is called just once even if the function name is
-                    overloaded (the same override type is used for all
+                    overloaded (the same override type trait is used for all
                     overloaded functions with the same name, see
                     @RefSect{advanced.function_overloads, Function Overloads}).
                     (This is not a variadic macro parameter but it should never
@@ -134,10 +139,10 @@ Declare the override type to pass as an explicit template parameter to
     
 #ifdef BOOST_CONTRACT_DETAIL_DOXYGEN
     /**
-    Declare multiple override types at once naming them <c>override_...</c> (for
-    convenience).
+    Declare multiple override type traits at once naming them
+    <c>override_...</c> (for convenience).
 
-    This variadic macro is provided for convenience only,
+    This variadic macro is provided for convenience as
     <c>BOOST_CONTRACT_OVERRIDES(f_1, f_2, ..., f_n)</c> expands to code
     equivalent to:
 
@@ -149,7 +154,7 @@ Declare the override type to pass as an explicit template parameter to
     @endcode
 
     On compilers that do not support variadic macros,
-    the override types can be equivalently programmed one-by-one calling
+    the override type traits can be equivalently programmed one-by-one calling
     @RefMacro{BOOST_CONTRACT_OVERRIDE} for each function name as shown above.
     
     @see    @RefSect{tutorial.public_function_overrides__subcontracting_,

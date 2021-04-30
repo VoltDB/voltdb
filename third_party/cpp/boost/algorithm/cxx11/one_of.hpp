@@ -12,10 +12,12 @@
 #ifndef BOOST_ALGORITHM_ONE_OF_HPP
 #define BOOST_ALGORITHM_ONE_OF_HPP
 
-#include <boost/algorithm/cxx11/none_of.hpp>
-
+#include <boost/config.hpp>
 #include <boost/range/begin.hpp>
 #include <boost/range/end.hpp>
+
+#include <boost/algorithm/cxx11/none_of.hpp>
+
 
 namespace boost { namespace algorithm {
 

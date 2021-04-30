@@ -20,6 +20,7 @@
 
 #include <algorithm>
 #include <functional>
+#include <type_traits>
 
 namespace boost { namespace gil {
 
@@ -38,7 +39,12 @@ template <typename P> struct channel_type;
 /// \ingroup ColorConvert
 /// \brief Color Convertion function object. To be specialized for every src/dst color space
 template <typename C1, typename C2>
-struct default_color_converter_impl {};
+struct default_color_converter_impl
+{
+    static_assert(
+        std::is_same<C1, C2>::value,
+        "default_color_converter_impl not specialized for given color spaces");
+};
 
 /// \ingroup ColorConvert
 /// \brief When the color space is the same, color convertion performs channel depth conversion
@@ -99,6 +105,8 @@ struct default_color_converter_impl<gray_t,rgb_t> {
 
 /// \ingroup ColorConvert
 /// \brief Gray to CMYK
+/// \todo FIXME: Where does this calculation come from? Shouldn't gray be inverted?
+///              Currently, white becomes black and black becomes white.
 template <>
 struct default_color_converter_impl<gray_t,cmyk_t> {
     template <typename P1, typename P2>
@@ -135,26 +143,51 @@ struct default_color_converter_impl<rgb_t,gray_t> {
 /// c = (1 - r - k) / (1 - k)
 /// m = (1 - g - k) / (1 - k)
 /// y = (1 - b - k) / (1 - k)
+/// where `1` denotes max value of channel type of destination pixel.
+///
+/// The conversion from RGB to CMYK is based on CMY->CMYK (Version 2)
+/// from the Principles of Digital Image Processing - Fundamental Techniques
+/// by Burger, Wilhelm, Burge, Mark J.
+/// and it is a gross approximation not precise enough for professional work.
+///
+/// \todo FIXME: The original implementation did not handle properly signed CMYK pixels as destination
+///
 template <>
-struct default_color_converter_impl<rgb_t,cmyk_t> {
-    template <typename P1, typename P2>
-    void operator()(const P1& src, P2& dst) const {
-        using T2 = typename channel_type<P2>::type;
-        get_color(dst,cyan_t())    = channel_invert(channel_convert<T2>(get_color(src,red_t())));          // c = 1 - r
-        get_color(dst,magenta_t()) = channel_invert(channel_convert<T2>(get_color(src,green_t())));        // m = 1 - g
-        get_color(dst,yellow_t())  = channel_invert(channel_convert<T2>(get_color(src,blue_t())));         // y = 1 - b
-        get_color(dst,black_t())   = (std::min)(get_color(dst,cyan_t()),
-                                                (std::min)(get_color(dst,magenta_t()),
-                                                           get_color(dst,yellow_t())));   // k = minimum(c, m, y)
-        T2 x = channel_traits<T2>::max_value()-get_color(dst,black_t());                  // x = 1 - k
-        if (x>0.0001f) {
-            float x1 = channel_traits<T2>::max_value()/float(x);
-            get_color(dst,cyan_t())    = (T2)((get_color(dst,cyan_t())    - get_color(dst,black_t()))*x1);                // c = (c - k) / x
-            get_color(dst,magenta_t()) = (T2)((get_color(dst,magenta_t()) - get_color(dst,black_t()))*x1);                // m = (m - k) / x
-            get_color(dst,yellow_t())  = (T2)((get_color(dst,yellow_t())  - get_color(dst,black_t()))*x1);                // y = (y - k) / x
-        } else {
-            get_color(dst,cyan_t())=get_color(dst,magenta_t())=get_color(dst,yellow_t())=0;
+struct default_color_converter_impl<rgb_t, cmyk_t>
+{
+    template <typename SrcPixel, typename DstPixel>
+    void operator()(SrcPixel const& src, DstPixel& dst) const
+    {
+        using src_t = typename channel_type<SrcPixel>::type;
+        src_t const r = get_color(src, red_t());  
+        src_t const g = get_color(src, green_t());
+        src_t const b = get_color(src, blue_t());
+
+        using dst_t   = typename channel_type<DstPixel>::type;
+        dst_t const c = channel_invert(channel_convert<dst_t>(r)); // c = 1 - r
+        dst_t const m = channel_invert(channel_convert<dst_t>(g)); // m = 1 - g
+        dst_t const y = channel_invert(channel_convert<dst_t>(b)); // y = 1 - b
+        dst_t const k = (std::min)(c, (std::min)(m, y));           // k = minimum(c, m, y)
+
+        // Apply color correction, strengthening, reducing non-zero components by
+        // s = 1 / (1 - k) for k < 1, where 1 denotes dst_t max, otherwise s = 1 (literal).
+        dst_t const dst_max = channel_traits<dst_t>::max_value();
+        dst_t const s_div   = dst_max - k;
+        if (s_div != 0)
+        {
+            double const s              = dst_max / static_cast<double>(s_div);
+            get_color(dst, cyan_t())    = static_cast<dst_t>((c - k) * s);
+            get_color(dst, magenta_t()) = static_cast<dst_t>((m - k) * s);
+            get_color(dst, yellow_t())  = static_cast<dst_t>((y - k) * s);
         }
+        else
+        {
+            // Black only for k = 1 (max of dst_t)
+            get_color(dst, cyan_t())    = channel_traits<dst_t>::min_value();
+            get_color(dst, magenta_t()) = channel_traits<dst_t>::min_value();
+            get_color(dst, yellow_t())  = channel_traits<dst_t>::min_value();
+        }
+        get_color(dst, black_t()) = k; 
     }
 };
 
@@ -211,20 +244,27 @@ struct default_color_converter_impl<cmyk_t,gray_t> {
 };
 
 namespace detail {
+
 template <typename Pixel>
-typename channel_type<Pixel>::type alpha_or_max_impl(const Pixel& p, mpl::true_) {
+auto alpha_or_max_impl(Pixel const& p, std::true_type) -> typename channel_type<Pixel>::type
+{
     return get_color(p,alpha_t());
 }
 template <typename Pixel>
-typename channel_type<Pixel>::type alpha_or_max_impl(const Pixel&  , mpl::false_) {
+auto alpha_or_max_impl(Pixel const&, std::false_type) -> typename channel_type<Pixel>::type
+{
     return channel_traits<typename channel_type<Pixel>::type>::max_value();
 }
+
 } // namespace detail
 
 // Returns max_value if the pixel has no alpha channel. Otherwise returns the alpha.
 template <typename Pixel>
-typename channel_type<Pixel>::type alpha_or_max(const Pixel& p) {
-    return detail::alpha_or_max_impl(p, mpl::contains<typename color_space_type<Pixel>::type,alpha_t>());
+auto alpha_or_max(Pixel const& p) -> typename channel_type<Pixel>::type
+{
+    return detail::alpha_or_max_impl(
+        p,
+        mp11::mp_contains<typename color_space_type<Pixel>::type, alpha_t>());
 }
 
 

@@ -9,13 +9,8 @@
 #define BOOST_GIL_EXTENSION_TOOLBOX_METAFUNCTIONS_GET_NUM_BITS_HPP
 
 #include <boost/gil/channel.hpp>
-
-#include <boost/mpl/and.hpp>
-#include <boost/mpl/int.hpp>
-#include <boost/mpl/not.hpp>
-#include <boost/mpl/size_t.hpp>
-#include <boost/type_traits/is_integral.hpp>
-#include <boost/type_traits/is_class.hpp>
+#include <boost/gil/detail/is_channel_integral.hpp>
+#include <boost/gil/detail/mp11.hpp>
 
 #include <type_traits>
 
@@ -24,50 +19,53 @@ namespace boost{ namespace gil {
 /// get_num_bits metafunctions
 /// \brief Determines the numbers of bits for the given channel type.
 
-template <typename T, class = void >
+template <typename T, class = void>
 struct get_num_bits;
 
-template< typename B, int I, int S, bool M >
-struct get_num_bits< packed_channel_reference< B, I, S, M > > : mpl::int_< S >
+template<typename B, int I, int S, bool M>
+struct get_num_bits<packed_channel_reference<B, I, S, M>>
+    : std::integral_constant<int, S>
 {};
 
-template< typename B, int I, int S, bool M >
-struct get_num_bits< const packed_channel_reference< B, I, S, M > > : mpl::int_< S >
+template<typename B, int I, int S, bool M>
+struct get_num_bits<packed_channel_reference<B, I, S, M> const>
+    : std::integral_constant<int, S>
 {};
 
 template<typename B, int I, bool M>
-struct get_num_bits< packed_dynamic_channel_reference< B, I, M > > : mpl::int_< I >
+struct get_num_bits<packed_dynamic_channel_reference<B, I, M>>
+    : std::integral_constant<int, I>
 {};
 
 template<typename B, int I, bool M>
-struct get_num_bits< const packed_dynamic_channel_reference< B, I, M > > : mpl::int_< I >
+struct get_num_bits<packed_dynamic_channel_reference<B, I, M> const>
+    : std::integral_constant<int, I>
 {};
 
-template< int N >
-struct get_num_bits< packed_channel_value< N > > : mpl::int_< N >
+template<int N>
+struct get_num_bits<packed_channel_value<N>> : std::integral_constant<int, N>
 {};
 
-template< int N >
-struct get_num_bits< const packed_channel_value< N > > : mpl::int_< N >
+template<int N>
+struct get_num_bits<packed_channel_value<N> const> : std::integral_constant<int, N>
 {};
 
 template <typename T>
 struct get_num_bits
-<
-    T,
-    typename std::enable_if
     <
-        mpl::and_
+        T,
+        typename std::enable_if
         <
-            is_integral<T>,
-            mpl::not_<is_class<T>>
-        >::value
-    >::type
-> : mpl::size_t<sizeof(T) * 8>
-{
-};
+            mp11::mp_and
+            <
+                detail::is_channel_integral<T>,
+                mp11::mp_not<std::is_class<T>>
+           >::value
+       >::type
+    >
+    : std::integral_constant<std::size_t, sizeof(T) * 8>
+{};
 
-} // namespace gil
-} // namespace boost
+}} // namespace boost::gil
 
 #endif

@@ -9,8 +9,12 @@
 #ifndef BOOST_HEAP_POLICIES_HPP
 #define BOOST_HEAP_POLICIES_HPP
 
-#include <boost/parameter.hpp>
 #include <boost/concept_check.hpp>
+#include <boost/parameter/name.hpp>
+#include <boost/parameter/template_keyword.hpp>
+#include <boost/parameter/aux_/void.hpp>
+#include <boost/parameter/binding.hpp>
+#include <boost/parameter/parameters.hpp>
 #include <boost/type_traits/conditional.hpp>
 #include <boost/type_traits/integral_constant.hpp>
 #include <boost/type_traits/is_void.hpp>

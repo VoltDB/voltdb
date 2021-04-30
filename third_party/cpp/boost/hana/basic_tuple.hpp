@@ -42,10 +42,18 @@ BOOST_HANA_NAMESPACE_BEGIN
         struct from_other { };
 
         template <typename Indices, typename ...Xn>
+#ifdef BOOST_HANA_WORKAROUND_MSVC_EMPTYBASE
+        struct __declspec(empty_bases) basic_tuple_impl;
+#else
         struct basic_tuple_impl;
+#endif
 
         template <std::size_t ...n, typename ...Xn>
+#ifdef BOOST_HANA_WORKAROUND_MSVC_EMPTYBASE
+        struct __declspec(empty_bases) basic_tuple_impl<std::index_sequence<n...>, Xn...>
+#else
         struct basic_tuple_impl<std::index_sequence<n...>, Xn...>
+#endif
             : detail::ebo<bti<n>, Xn>...
         {
             static constexpr std::size_t size_ = sizeof...(Xn);
@@ -193,7 +201,7 @@ BOOST_HANA_NAMESPACE_BEGIN
         static constexpr auto apply(Xs&& xs, N const&) {
             constexpr std::size_t len = detail::decay<Xs>::type::size_;
             return drop_front_helper<N::value>(static_cast<Xs&&>(xs), std::make_index_sequence<
-                N::value < len ? len - N::value : 0
+                (N::value < len) ? len - N::value : 0
             >{});
         }
     };

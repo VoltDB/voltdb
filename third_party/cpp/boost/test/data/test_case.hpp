@@ -32,7 +32,7 @@
 #include <boost/preprocessor/control/iif.hpp>
 #include <boost/preprocessor/comparison/equal.hpp>
 
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 #include <boost/type_traits/is_copy_constructible.hpp>
 
 #include <boost/test/tools/detail/print_helper.hpp>

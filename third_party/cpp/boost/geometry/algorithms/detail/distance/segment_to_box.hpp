@@ -1,6 +1,6 @@
 // Boost.Geometry (aka GGL, Generic Geometry Library)
 
-// Copyright (c) 2014-2019 Oracle and/or its affiliates.
+// Copyright (c) 2014-2021 Oracle and/or its affiliates.
 
 // Contributed and/or modified by Vissarion Fysikopoulos, on behalf of Oracle
 // Contributed and/or modified by Menelaos Karavelas, on behalf of Oracle
@@ -13,14 +13,12 @@
 #define BOOST_GEOMETRY_ALGORITHMS_DETAIL_DISTANCE_SEGMENT_TO_BOX_HPP
 
 #include <cstddef>
-
 #include <functional>
+#include <type_traits>
 #include <vector>
 
 #include <boost/core/ignore_unused.hpp>
-#include <boost/mpl/if.hpp>
 #include <boost/numeric/conversion/cast.hpp>
-#include <boost/type_traits/is_same.hpp>
 
 #include <boost/geometry/core/access.hpp>
 #include <boost/geometry/core/assert.hpp>
@@ -50,6 +48,9 @@
 #include <boost/geometry/strategies/distance.hpp>
 #include <boost/geometry/strategies/tags.hpp>
 
+// TEMP - remove when distance umbrella strategies are implemented
+#include <boost/geometry/strategies/relate/services.hpp>
+
 
 namespace boost { namespace geometry
 {
@@ -60,17 +61,20 @@ namespace detail { namespace distance
 {
 
 
-// TODO: Take strategy
-template <typename Segment, typename Box>
-inline bool intersects_segment_box(Segment const& segment, Box const& box)
+template <typename Segment, typename Box, typename Strategy>
+inline bool intersects_segment_box(Segment const& segment, Box const& box,
+                                   Strategy const& strategy)
 {
-    typedef typename strategy::disjoint::services::default_strategy
+    // TODO: pass strategy
+    auto const s = strategies::relate::services::strategy_converter
         <
-            Segment, Box
-        >::type strategy_type;
+            // This is the only strategy defined in distance segment/box
+            // strategies that carries the information about the spheroid
+            // so use it for now.
+            decltype(strategy.get_side_strategy())
+        >::get(strategy.get_side_strategy());
 
-    return ! detail::disjoint::disjoint_segment_box::apply(segment, box,
-                                                           strategy_type());
+    return ! detail::disjoint::disjoint_segment_box::apply(segment, box, s);
 }
 
 
@@ -116,7 +120,7 @@ public:
                                     Strategy const& strategy,
                                     bool check_intersection = true)
     {
-        if (check_intersection && intersects_segment_box(segment, box))
+        if (check_intersection && intersects_segment_box(segment, box, strategy))
         {
             return 0;
         }
@@ -231,7 +235,7 @@ public:
                                     Strategy const& strategy,
                                     bool check_intersection = true)
     {
-        if (check_intersection && intersects_segment_box(segment, box))
+        if (check_intersection && intersects_segment_box(segment, box, strategy))
         {
             return 0;
         }
@@ -542,10 +546,8 @@ private:
                                  SBStrategy const& sb_strategy,
                                  ReturnType& result)
         {
-            typedef typename geometry::strategy::side::services::default_strategy
-                <
-                    typename geometry::cs_tag<SegmentPoint>::type
-                >::type side;
+            typename SBStrategy::side_strategy_type
+                side_strategy = sb_strategy.get_side_strategy();
 
             typedef cast_to_result<ReturnType> cast;
             ReturnType diff1 = cast::apply(geometry::get<1>(p1))
@@ -555,12 +557,12 @@ private:
                                 sb_strategy.get_distance_ps_strategy();
 
             int sign = diff1 < 0 ? -1 : 1;
-            if (side::apply(p0, p1, corner1) * sign < 0)
+            if (side_strategy.apply(p0, p1, corner1) * sign < 0)
             {
                 result = cast::apply(ps_strategy.apply(corner1, p0, p1));
                 return true;
             }
-            if (side::apply(p0, p1, corner2) * sign > 0)
+            if (side_strategy.apply(p0, p1, corner2) * sign > 0)
             {
                 result = cast::apply(ps_strategy.apply(corner2, p0, p1));
                 return true;
@@ -682,7 +684,7 @@ public:
                                    BoxPoint const& bottom_right,
                                    SBStrategy const& sb_strategy)
     {
-        BOOST_GEOMETRY_ASSERT( geometry::less<SegmentPoint>()(p0, p1)
+        BOOST_GEOMETRY_ASSERT( (geometry::less<SegmentPoint, -1, typename SBStrategy::cs_tag>()(p0, p1))
                             || geometry::has_nan_coordinate(p0)
                             || geometry::has_nan_coordinate(p1) );
 
@@ -773,25 +775,19 @@ public:
         if (detail::equals::equals_point_point(p[0], p[1],
                 sb_strategy.get_equals_point_point_strategy()))
         {
-            typedef typename boost::mpl::if_
+            typedef std::conditional_t
                 <
-                    boost::is_same
+                    std::is_same
                         <
                             ps_comparable_strategy,
                             SBStrategy
-                        >,
+                        >::value,
                     typename strategy::distance::services::comparable_type
                         <
-                            typename detail::distance::default_strategy
-                                <
-                                    segment_point, Box
-                                >::type
+                            typename SBStrategy::distance_pb_strategy::type
                         >::type,
-                    typename detail::distance::default_strategy
-                        <
-                            segment_point, Box
-                        >::type
-                >::type point_box_strategy_type;
+                    typename SBStrategy::distance_pb_strategy::type
+                > point_box_strategy_type;
 
             return dispatch::distance
                 <
@@ -809,7 +805,8 @@ public:
                            bottom_left, bottom_right,
                            top_left, top_right);
 
-        if (geometry::less<segment_point>()(p[0], p[1]))
+        typedef geometry::less<segment_point, -1, typename SBStrategy::cs_tag> less_type;
+        if (less_type()(p[0], p[1]))
         {
             return segment_to_box_2D
                 <

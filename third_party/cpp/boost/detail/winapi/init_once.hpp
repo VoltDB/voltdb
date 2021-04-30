@@ -10,6 +10,10 @@
 #ifndef BOOST_DETAIL_WINAPI_INIT_ONCE_HPP
 #define BOOST_DETAIL_WINAPI_INIT_ONCE_HPP
 
+#include <boost/config/header_deprecated.hpp>
+
+BOOST_HEADER_DEPRECATED("<boost/winapi/init_once.hpp>")
+
 #include <boost/winapi/init_once.hpp>
 #include <boost/detail/winapi/detail/deprecated_namespace.hpp>
 

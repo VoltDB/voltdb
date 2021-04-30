@@ -138,7 +138,7 @@ struct args_
 
     arg_setter_<char, true> operator()(std::initializer_list<const char*> &&range) const
     {
-        return arg_setter_<char>(range.begin(), range.end());
+        return arg_setter_<char, true>(range.begin(), range.end());
     }
     arg_setter_<char, true> operator+=(std::initializer_list<const char*> &&range) const
     {
@@ -146,11 +146,11 @@ struct args_
     }
     arg_setter_<char, false> operator= (std::initializer_list<const char*> &&range) const
     {
-        return arg_setter_<char, true>(range.begin(), range.end());
+        return arg_setter_<char, false>(range.begin(), range.end());
     }
     arg_setter_<char, true> operator()(std::initializer_list<std::string> &&range) const
     {
-        return arg_setter_<char>(range.begin(), range.end());
+        return arg_setter_<char, true>(range.begin(), range.end());
     }
     arg_setter_<char, true> operator+=(std::initializer_list<std::string> &&range) const
     {
@@ -158,12 +158,12 @@ struct args_
     }
     arg_setter_<char, false> operator= (std::initializer_list<std::string> &&range) const
     {
-        return arg_setter_<char, true>(range.begin(), range.end());
+        return arg_setter_<char, false>(range.begin(), range.end());
     }
 
     arg_setter_<wchar_t, true> operator()(std::initializer_list<const wchar_t*> &&range) const
     {
-        return arg_setter_<wchar_t>(range.begin(), range.end());
+        return arg_setter_<wchar_t, true>(range.begin(), range.end());
     }
     arg_setter_<wchar_t, true> operator+=(std::initializer_list<const wchar_t*> &&range) const
     {
@@ -171,11 +171,11 @@ struct args_
     }
     arg_setter_<wchar_t, false> operator= (std::initializer_list<const wchar_t*> &&range) const
     {
-        return arg_setter_<wchar_t, true>(range.begin(), range.end());
+        return arg_setter_<wchar_t, false>(range.begin(), range.end());
     }
     arg_setter_<wchar_t, true> operator()(std::initializer_list<std::wstring> &&range) const
     {
-        return arg_setter_<wchar_t>(range.begin(), range.end());
+        return arg_setter_<wchar_t, true>(range.begin(), range.end());
     }
     arg_setter_<wchar_t, true> operator+=(std::initializer_list<std::wstring> &&range) const
     {
@@ -183,7 +183,7 @@ struct args_
     }
     arg_setter_<wchar_t, false> operator= (std::initializer_list<std::wstring> &&range) const
     {
-        return arg_setter_<wchar_t, true>(range.begin(), range.end());
+        return arg_setter_<wchar_t, false>(range.begin(), range.end());
     }
 };
 

@@ -7,6 +7,7 @@
 #define BOOST_PROCESS_EXTENSIONS_HPP_
 
 #include <boost/process/detail/handler.hpp>
+#include <boost/process/detail/used_handles.hpp>
 
 #if defined(BOOST_WINDOWS_API)
 #include <boost/process/detail/windows/executor.hpp>
@@ -62,6 +63,9 @@ using ::boost::process::detail::api::async_handler;
 using ::boost::process::detail::get_io_context;
 using ::boost::process::detail::get_last_error;
 using ::boost::process::detail::throw_last_error;
+using ::boost::process::detail::uses_handles;
+using ::boost::process::detail::foreach_used_handle;
+using ::boost::process::detail::get_used_handles;
 
 ///This handler is invoked before the process in launched, to setup parameters. The required signature is `void(Exec &)`, where `Exec` is a template parameter.
 constexpr boost::process::detail::make_handler_t<boost::process::detail::on_setup_>   on_setup;

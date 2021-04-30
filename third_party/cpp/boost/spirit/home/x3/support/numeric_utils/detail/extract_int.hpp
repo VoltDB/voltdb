@@ -112,19 +112,17 @@ namespace boost { namespace spirit { namespace x3 { namespace detail
         template <typename Char>
         inline static bool is_valid(Char ch)
         {
-            if (Radix <= 10)
-                return (ch >= '0' && ch <= static_cast<Char>('0' + Radix -1));
-            return (ch >= '0' && ch <= '9')
-                || (ch >= 'a' && ch <= static_cast<Char>('a' + Radix -10 -1))
-                || (ch >= 'A' && ch <= static_cast<Char>('A' + Radix -10 -1));
+            return (ch >= '0' && ch <= (Radix > 10 ? '9' : static_cast<Char>('0' + Radix -1)))
+                || (Radix > 10 && ch >= 'a' && ch <= static_cast<Char>('a' + Radix -10 -1))
+                || (Radix > 10 && ch >= 'A' && ch <= static_cast<Char>('A' + Radix -10 -1));
         }
 
         template <typename Char>
         inline static unsigned digit(Char ch)
         {
-            if (Radix <= 10 || (ch >= '0' && ch <= '9'))
-                return ch - '0';
-            return char_encoding::ascii::tolower(ch) - 'a' + 10;
+            return (Radix <= 10 || (ch >= '0' && ch <= '9'))
+                ? ch - '0'
+                : char_encoding::ascii::tolower(ch) - 'a' + 10;
         }
     };
 
@@ -300,6 +298,7 @@ namespace boost { namespace spirit { namespace x3 { namespace detail
 #if BOOST_WORKAROUND(BOOST_MSVC, >= 1400)
 # pragma warning(push)
 # pragma warning(disable: 4127)   // conditional expression is constant
+# pragma warning(disable: 4459)   // declaration hides global declaration
 #endif
         template <typename Iterator, typename Attribute>
         inline static bool
@@ -398,6 +397,7 @@ namespace boost { namespace spirit { namespace x3 { namespace detail
 #if BOOST_WORKAROUND(BOOST_MSVC, >= 1400)
 # pragma warning(push)
 # pragma warning(disable: 4127)   // conditional expression is constant
+# pragma warning(disable: 4459)   // declaration hides global declaration
 #endif
         template <typename Iterator, typename Attribute>
         inline static bool

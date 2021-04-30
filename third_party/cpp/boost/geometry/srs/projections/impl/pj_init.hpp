@@ -3,8 +3,8 @@
 
 // Copyright (c) 2008-2012 Barend Gehrels, Amsterdam, the Netherlands.
 
-// This file was modified by Oracle on 2017, 2018.
-// Modifications copyright (c) 2017-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2017-2020.
+// Modifications copyright (c) 2017-2020, Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
 // Use, modification and distribution is subject to the Boost Software License,
@@ -41,16 +41,13 @@
 
 #include <cstdlib>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 #include <boost/algorithm/string.hpp>
-#include <boost/mpl/find.hpp>
-#include <boost/mpl/if.hpp>
-#include <boost/range.hpp>
-#include <boost/type_traits/is_same.hpp>
+#include <boost/tuple/tuple.hpp>
 
-#include <boost/geometry/util/math.hpp>
-#include <boost/geometry/util/condition.hpp>
+#include <boost/geometry/core/static_assert.hpp>
 
 #include <boost/geometry/srs/projections/dpar.hpp>
 #include <boost/geometry/srs/projections/impl/dms_parser.hpp>
@@ -62,6 +59,9 @@
 #include <boost/geometry/srs/projections/impl/projects.hpp>
 #include <boost/geometry/srs/projections/proj4.hpp>
 #include <boost/geometry/srs/projections/spar.hpp>
+
+#include <boost/geometry/util/math.hpp>
+#include <boost/geometry/util/condition.hpp>
 
 
 namespace boost { namespace geometry { namespace projections
@@ -93,20 +93,20 @@ inline void pj_init_proj(srs::dpar::parameters<T> const& params,
     }
 }
 
-template <typename T, BOOST_GEOMETRY_PROJECTIONS_DETAIL_TYPENAME_PX>
-inline void pj_init_proj(srs::spar::parameters<BOOST_GEOMETRY_PROJECTIONS_DETAIL_PX> const& ,
+template <typename T, typename ...Ps>
+inline void pj_init_proj(srs::spar::parameters<Ps...> const& ,
                          parameters<T> & par)
 {
-    typedef srs::spar::parameters<BOOST_GEOMETRY_PROJECTIONS_DETAIL_PX> params_type;
-    typedef typename srs::spar::detail::tuples_find_if
+    typedef srs::spar::parameters<Ps...> params_type;
+    typedef typename geometry::tuples::find_if
         <
             params_type,
             srs::spar::detail::is_param_tr<srs::spar::detail::proj_traits>::pred
         >::type proj_type;
 
-    static const bool is_found = srs::spar::detail::tuples_is_found<proj_type>::value;
+    static const bool is_found = geometry::tuples::is_found<proj_type>::value;
 
-    BOOST_MPL_ASSERT_MSG((is_found), PROJECTION_NOT_NAMED, (params_type));
+    BOOST_GEOMETRY_STATIC_ASSERT((is_found), "Projection not named.", params_type);
 
     par.id = srs::spar::detail::proj_traits<proj_type>::id;
 }
@@ -227,27 +227,27 @@ template
 <
     typename Params,
     bool Vertical,
-    int UnitsI = srs::spar::detail::tuples_find_index_if
+    int UnitsI = geometry::tuples::find_index_if
         <
             Params,
-            boost::mpl::if_c
+            std::conditional_t
                 <
                     Vertical,
                     srs::spar::detail::is_param_t<srs::spar::vunits>,
                     srs::spar::detail::is_param_tr<srs::spar::detail::units_traits>
-                >::type::template pred
+                >::template pred
         >::value,
-    int ToMeterI = srs::spar::detail::tuples_find_index_if
+    int ToMeterI = geometry::tuples::find_index_if
         <
             Params,
-            boost::mpl::if_c
+            std::conditional_t
                 <
                     Vertical,
                     srs::spar::detail::is_param_t<srs::spar::vto_meter>,
                     srs::spar::detail::is_param_t<srs::spar::to_meter>
-                >::type::template pred
+                >::template pred
         >::value,
-    int N = boost::tuples::length<Params>::value
+    int N = geometry::tuples::size<Params>::value
 >
 struct pj_init_units_static
     : pj_init_units_static<Params, Vertical, UnitsI, N, N>
@@ -259,11 +259,11 @@ struct pj_init_units_static<Params, Vertical, UnitsI, N, N>
     static const int n = sizeof(pj_units) / sizeof(pj_units[0]);
     static const int i = srs::spar::detail::units_traits
                     <
-                        typename boost::tuples::element<UnitsI, Params>::type
+                        typename geometry::tuples::element<UnitsI, Params>::type
                     >::id;
     static const bool is_valid = i >= 0 && i < n;
 
-    BOOST_MPL_ASSERT_MSG((is_valid), UNKNOWN_UNIT_ID, (Params));
+    BOOST_GEOMETRY_STATIC_ASSERT((is_valid), "Unknown unit ID.", Params);
 
     template <typename T>
     static void apply(Params const& ,
@@ -289,7 +289,7 @@ struct pj_init_units_static<Params, Vertical, N, ToMeterI, N>
                       T & to_meter, T & fr_meter,
                       T const& , T const& )
     {
-        to_meter = boost::tuples::get<ToMeterI>(params).value;
+        to_meter = geometry::tuples::get<ToMeterI>(params).value;
         fr_meter = 1. / to_meter;
     }
 };
@@ -307,8 +307,8 @@ struct pj_init_units_static<Params, Vertical, N, N, N>
     }
 };
 
-template <typename T, bool Vertical, BOOST_GEOMETRY_PROJECTIONS_DETAIL_TYPENAME_PX>
-inline void pj_init_units(srs::spar::parameters<BOOST_GEOMETRY_PROJECTIONS_DETAIL_PX> const& params,
+template <typename T, bool Vertical, typename ...Ps>
+inline void pj_init_units(srs::spar::parameters<Ps...> const& params,
                           T & to_meter,
                           T & fr_meter,
                           T const& default_to_meter,
@@ -316,7 +316,7 @@ inline void pj_init_units(srs::spar::parameters<BOOST_GEOMETRY_PROJECTIONS_DETAI
 {
     pj_init_units_static
         <
-            srs::spar::parameters<BOOST_GEOMETRY_PROJECTIONS_DETAIL_PX>,
+            srs::spar::parameters<Ps...>,
             Vertical
         >::apply(params, to_meter, fr_meter, default_to_meter, default_fr_meter);
 }
@@ -391,21 +391,21 @@ inline void pj_init_pm(srs::dpar::parameters<T> const& params, T& val)
 template
 <
     typename Params,
-    int I = srs::spar::detail::tuples_find_index_if
+    int I = geometry::tuples::find_index_if
         <
             Params,
             srs::spar::detail::is_param_tr<srs::spar::detail::pm_traits>::pred
         >::value,
-    int N = boost::tuples::length<Params>::value
+    int N = geometry::tuples::size<Params>::value
 >
 struct pj_init_pm_static
 {
     template <typename T>
     static void apply(Params const& params, T & val)
     {
-        typedef typename boost::tuples::element<I, Params>::type param_type;
+        typedef typename geometry::tuples::element<I, Params>::type param_type;
 
-        val = srs::spar::detail::pm_traits<param_type>::value(boost::tuples::get<I>(params));
+        val = srs::spar::detail::pm_traits<param_type>::value(geometry::tuples::get<I>(params));
     }
 };
 template <typename Params, int N>
@@ -418,12 +418,12 @@ struct pj_init_pm_static<Params, N, N>
     }
 };
 
-template <typename T, BOOST_GEOMETRY_PROJECTIONS_DETAIL_TYPENAME_PX>
-inline void pj_init_pm(srs::spar::parameters<BOOST_GEOMETRY_PROJECTIONS_DETAIL_PX> const& params, T& val)
+template <typename T, typename ...Ps>
+inline void pj_init_pm(srs::spar::parameters<Ps...> const& params, T& val)
 {
     pj_init_pm_static
         <
-            srs::spar::parameters<BOOST_GEOMETRY_PROJECTIONS_DETAIL_PX>
+            srs::spar::parameters<Ps...>
         >::apply(params, val);
 }
 

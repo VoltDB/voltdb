@@ -3,8 +3,8 @@
 // Copyright (c) 2007-2012 Barend Gehrels, Amsterdam, the Netherlands.
 // Copyright (c) 2017 Adam Wulkiewicz, Lodz, Poland.
 
-// This file was modified by Oracle on 2017.
-// Modifications copyright (c) 2017 Oracle and/or its affiliates.
+// This file was modified by Oracle on 2017-2020.
+// Modifications copyright (c) 2017-2020 Oracle and/or its affiliates.
 
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
@@ -30,7 +30,9 @@
   #endif
 #endif
 
-#include <boost/range.hpp>
+#include <boost/range/begin.hpp>
+#include <boost/range/end.hpp>
+#include <boost/range/value_type.hpp>
 
 #include <boost/geometry/algorithms/detail/ring_identifier.hpp>
 #include <boost/geometry/algorithms/detail/overlay/handle_colocations.hpp>
@@ -53,9 +55,9 @@ namespace detail { namespace overlay
 {
 
 template <typename Turns>
-struct discarded_turn
+struct discarded_indexed_turn
 {
-    discarded_turn(Turns const& turns)
+    discarded_indexed_turn(Turns const& turns)
         : m_turns(turns)
     {}
 
@@ -272,13 +274,24 @@ inline void enrich_adapt(Operations& operations, Turns& turns)
     }
 
     // Remove discarded turns from operations to avoid having them as next turn
-    discarded_turn<Turns> const predicate(turns);
+    discarded_indexed_turn<Turns> const predicate(turns);
     operations.erase(std::remove_if(boost::begin(operations),
         boost::end(operations), predicate), boost::end(operations));
 }
 
-template <typename Turns, typename MappedVector>
-inline void create_map(Turns const& turns, MappedVector& mapped_vector)
+struct enriched_map_default_include_policy
+{
+    template <typename Operation>
+    static inline bool include(Operation const& )
+    {
+        // By default include all operations
+        return true;
+    }
+};
+
+template <typename Turns, typename MappedVector, typename IncludePolicy>
+inline void create_map(Turns const& turns, MappedVector& mapped_vector,
+                       IncludePolicy const& include_policy)
 {
     typedef typename boost::range_value<Turns>::type turn_type;
     typedef typename turn_type::container_type container_type;
@@ -306,17 +319,20 @@ inline void create_map(Turns const& turns, MappedVector& mapped_vector)
             op_it != boost::end(turn.operations);
             ++op_it, ++op_index)
         {
-            ring_identifier const ring_id
-                (
-                    op_it->seg_id.source_index,
-                    op_it->seg_id.multi_index,
-                    op_it->seg_id.ring_index
-                );
-            mapped_vector[ring_id].push_back
-                (
-                    indexed_type(index, op_index, *op_it,
-                        it->operations[1 - op_index].seg_id)
-                );
+            if (include_policy.include(op_it->operation))
+            {
+                ring_identifier const ring_id
+                    (
+                        op_it->seg_id.source_index,
+                        op_it->seg_id.multi_index,
+                        op_it->seg_id.ring_index
+                    );
+                mapped_vector[ring_id].push_back
+                    (
+                        indexed_type(index, op_index, *op_it,
+                            it->operations[1 - op_index].seg_id)
+                    );
+            }
         }
     }
 }
@@ -381,13 +397,13 @@ inline void calculate_remaining_distance(Turns& turns)
 \tparam Clusters type of cluster container
 \tparam Geometry1 \tparam_geometry
 \tparam Geometry2 \tparam_geometry
-\tparam SideStrategy side strategy type
+\tparam PointInGeometryStrategy point in geometry strategy type
 \param turns container containing intersection points
 \param clusters container containing clusters
 \param geometry1 \param_geometry
 \param geometry2 \param_geometry
 \param robust_policy policy to handle robustness issues
-\param strategy strategy
+\param strategy point in geometry strategy
  */
 template
 <
@@ -397,13 +413,13 @@ template
     typename Clusters,
     typename Geometry1, typename Geometry2,
     typename RobustPolicy,
-    typename SideStrategy
+    typename IntersectionStrategy
 >
 inline void enrich_intersection_points(Turns& turns,
     Clusters& clusters,
     Geometry1 const& geometry1, Geometry2 const& geometry2,
     RobustPolicy const& robust_policy,
-    SideStrategy const& strategy)
+    IntersectionStrategy const& strategy)
 {
     static const detail::overlay::operation_type target_operation
             = detail::overlay::operation_from_overlay<OverlayType>::value;
@@ -425,6 +441,9 @@ inline void enrich_intersection_points(Turns& turns,
             ring_identifier,
             std::vector<indexed_turn_operation>
         > mapped_vector_type;
+
+    // From here on, turn indexes are used (in clusters, next_index, etc)
+    // and may only be flagged as discarded
 
     bool has_cc = false;
     bool const has_colocations
@@ -474,19 +493,22 @@ inline void enrich_intersection_points(Turns& turns,
             <
                 OverlayType,
                 target_operation
-            >::apply(turns, clusters, geometry1, geometry2);
+            >::apply(turns, clusters, geometry1, geometry2,
+                     strategy);
         detail::overlay::discard_open_turns
             <
                 OverlayType,
                 target_operation
-            >::apply(turns, clusters, geometry1, geometry2);
+            >::apply(turns, clusters, geometry1, geometry2,
+                     strategy);
     }
 
     // Create a map of vectors of indexed operation-types to be able
     // to sort intersection points PER RING
     mapped_vector_type mapped_vector;
 
-    detail::overlay::create_map(turns, mapped_vector);
+    detail::overlay::create_map(turns, mapped_vector,
+                                detail::overlay::enriched_map_default_include_policy());
 
     // No const-iterator; contents of mapped copy is temporary,
     // and changed by enrich
@@ -502,7 +524,7 @@ inline void enrich_intersection_points(Turns& turns,
         detail::overlay::enrich_sort<Reverse1, Reverse2>(
                     mit->second, turns,
                     geometry1, geometry2,
-                    robust_policy, strategy);
+                    robust_policy, strategy.side()); // TODO: pass strategy
     }
 
     for (typename mapped_vector_type::iterator mit
@@ -532,7 +554,7 @@ inline void enrich_intersection_points(Turns& turns,
                 Reverse2,
                 OverlayType
             >(clusters, turns, target_operation,
-              geometry1, geometry2, strategy);
+              geometry1, geometry2, strategy.side()); // TODO: pass strategy
 
         detail::overlay::cleanup_clusters(turns, clusters);
     }

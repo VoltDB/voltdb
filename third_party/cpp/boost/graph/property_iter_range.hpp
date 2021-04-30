@@ -23,96 +23,98 @@
 #include <boost/mpl/if.hpp>
 #include <boost/type_traits/same_traits.hpp>
 
-namespace boost {
+namespace boost
+{
 
 //======================================================================
 // graph property iterator range
 
-  template <class Graph, class PropertyTag>
-  class graph_property_iter_range {
-    typedef typename property_map<Graph, PropertyTag>::type map_type;
-    typedef typename property_map<Graph, PropertyTag>::const_type 
-      const_map_type;
-    typedef typename property_kind<PropertyTag>::type Kind;
-    typedef typename mpl::if_c<is_same<Kind, vertex_property_tag>::value,
-       typename graph_traits<Graph>::vertex_iterator,
-       typename graph_traits<Graph>::edge_iterator>::type iter;
-  public:
-    typedef typename property_map_iterator_generator<map_type, iter>::type 
-      iterator;
-    typedef typename property_map_iterator_generator<const_map_type, iter>
-      ::type const_iterator;
-    typedef std::pair<iterator, iterator> type;
-    typedef std::pair<const_iterator, const_iterator> const_type;
-  };
+template < class Graph, class PropertyTag > class graph_property_iter_range
+{
+    typedef typename property_map< Graph, PropertyTag >::type map_type;
+    typedef
+        typename property_map< Graph, PropertyTag >::const_type const_map_type;
+    typedef typename property_kind< PropertyTag >::type Kind;
+    typedef typename mpl::if_c< is_same< Kind, vertex_property_tag >::value,
+        typename graph_traits< Graph >::vertex_iterator,
+        typename graph_traits< Graph >::edge_iterator >::type iter;
 
-  namespace detail {
+public:
+    typedef typename property_map_iterator_generator< map_type, iter >::type
+        iterator;
+    typedef
+        typename property_map_iterator_generator< const_map_type, iter >::type
+            const_iterator;
+    typedef std::pair< iterator, iterator > type;
+    typedef std::pair< const_iterator, const_iterator > const_type;
+};
 
-    template<class Graph,class Tag>
-    typename graph_property_iter_range<Graph,Tag>::type
-    get_property_iter_range_kind(Graph& graph, const Tag& tag, 
-                                 const vertex_property_tag& )
+namespace detail
+{
+
+    template < class Graph, class Tag >
+    typename graph_property_iter_range< Graph, Tag >::type
+    get_property_iter_range_kind(
+        Graph& graph, const Tag& tag, const vertex_property_tag&)
     {
-      typedef typename graph_property_iter_range<Graph,Tag>::iterator iter;
-      return std::make_pair(iter(vertices(graph).first, get(tag, graph)),
-                            iter(vertices(graph).second, get(tag, graph)));
+        typedef typename graph_property_iter_range< Graph, Tag >::iterator iter;
+        return std::make_pair(iter(vertices(graph).first, get(tag, graph)),
+            iter(vertices(graph).second, get(tag, graph)));
     }
 
-    template<class Graph,class Tag>
-    typename graph_property_iter_range<Graph,Tag>::const_type
-    get_property_iter_range_kind(const Graph& graph, const Tag& tag, 
-                                 const vertex_property_tag& )
+    template < class Graph, class Tag >
+    typename graph_property_iter_range< Graph, Tag >::const_type
+    get_property_iter_range_kind(
+        const Graph& graph, const Tag& tag, const vertex_property_tag&)
     {
-      typedef typename graph_property_iter_range<Graph,Tag>
-        ::const_iterator iter;
-      return std::make_pair(iter(vertices(graph).first, get(tag, graph)),
-                            iter(vertices(graph).second, get(tag, graph)));
+        typedef typename graph_property_iter_range< Graph, Tag >::const_iterator
+            iter;
+        return std::make_pair(iter(vertices(graph).first, get(tag, graph)),
+            iter(vertices(graph).second, get(tag, graph)));
     }
 
-
-    template<class Graph,class Tag>
-    typename graph_property_iter_range<Graph,Tag>::type
-    get_property_iter_range_kind(Graph& graph, const Tag& tag, 
-                                 const edge_property_tag& )
+    template < class Graph, class Tag >
+    typename graph_property_iter_range< Graph, Tag >::type
+    get_property_iter_range_kind(
+        Graph& graph, const Tag& tag, const edge_property_tag&)
     {
-      typedef typename graph_property_iter_range<Graph,Tag>::iterator iter;
-      return std::make_pair(iter(edges(graph).first, get(tag, graph)),
-                            iter(edges(graph).second, get(tag, graph)));
+        typedef typename graph_property_iter_range< Graph, Tag >::iterator iter;
+        return std::make_pair(iter(edges(graph).first, get(tag, graph)),
+            iter(edges(graph).second, get(tag, graph)));
     }
 
-    template<class Graph,class Tag>
-    typename graph_property_iter_range<Graph,Tag>::const_type
-    get_property_iter_range_kind(const Graph& graph, const Tag& tag, 
-                                 const edge_property_tag& )
+    template < class Graph, class Tag >
+    typename graph_property_iter_range< Graph, Tag >::const_type
+    get_property_iter_range_kind(
+        const Graph& graph, const Tag& tag, const edge_property_tag&)
     {
-      typedef typename graph_property_iter_range<Graph,Tag>
-        ::const_iterator iter;
-      return std::make_pair(iter(edges(graph).first, get(tag, graph)),
-                            iter(edges(graph).second, get(tag, graph)));
+        typedef typename graph_property_iter_range< Graph, Tag >::const_iterator
+            iter;
+        return std::make_pair(iter(edges(graph).first, get(tag, graph)),
+            iter(edges(graph).second, get(tag, graph)));
     }
 
-  } // namespace detail
+} // namespace detail
 
-  //======================================================================
-  // get an iterator range of properties
+//======================================================================
+// get an iterator range of properties
 
-  template<class Graph, class Tag>
-  typename graph_property_iter_range<Graph, Tag>::type
-  get_property_iter_range(Graph& graph, const Tag& tag)
-  {
-    typedef typename property_kind<Tag>::type Kind;
+template < class Graph, class Tag >
+typename graph_property_iter_range< Graph, Tag >::type get_property_iter_range(
+    Graph& graph, const Tag& tag)
+{
+    typedef typename property_kind< Tag >::type Kind;
     return detail::get_property_iter_range_kind(graph, tag, Kind());
-  }
+}
 
-  template<class Graph, class Tag>
-  typename graph_property_iter_range<Graph, Tag>::const_type
-  get_property_iter_range(const Graph& graph, const Tag& tag)
-  {
-    typedef typename property_kind<Tag>::type Kind;
+template < class Graph, class Tag >
+typename graph_property_iter_range< Graph, Tag >::const_type
+get_property_iter_range(const Graph& graph, const Tag& tag)
+{
+    typedef typename property_kind< Tag >::type Kind;
     return detail::get_property_iter_range_kind(graph, tag, Kind());
-  }
+}
 
 } // namespace boost
-
 
 #endif // BOOST_GRAPH_PROPERTY_ITER_RANGE_HPP

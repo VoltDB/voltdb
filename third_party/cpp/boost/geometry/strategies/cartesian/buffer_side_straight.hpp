@@ -47,6 +47,13 @@ class side_straight
 {
 public :
 #ifndef DOXYGEN_SHOULD_SKIP_THIS
+
+    // Returns true if the buffer distance is always the same
+    static inline bool equidistant()
+    {
+        return true;
+    }
+
     template
     <
         typename Point,

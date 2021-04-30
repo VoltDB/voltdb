@@ -335,7 +335,7 @@ void
 reduce(const communicator & comm, std::vector<T> const & in_values, Op op,
        int root)
 {
-  reduce(comm, &in_values.front(), in_values.size(), op, root);
+  reduce(comm, detail::c_data(in_values), in_values.size(), op, root);
 }
 
 template<typename T, typename Op>
@@ -344,7 +344,7 @@ reduce(const communicator & comm, std::vector<T> const & in_values,
        std::vector<T> & out_values, Op op, int root)
 {
   if (root == comm.rank()) out_values.resize(in_values.size());
-  reduce(comm, &in_values.front(), in_values.size(), &out_values.front(), op,
+  reduce(comm, detail::c_data(in_values), in_values.size(), detail::c_data(out_values), op,
          root);
 }
 

@@ -12,6 +12,7 @@
 #ifndef BOOST_ALGORITHM_IOTA_HPP
 #define BOOST_ALGORITHM_IOTA_HPP
 
+#include <boost/config.hpp>
 #include <boost/range/begin.hpp>
 #include <boost/range/end.hpp>
 

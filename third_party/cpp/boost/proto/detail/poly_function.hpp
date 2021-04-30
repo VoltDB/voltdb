@@ -111,8 +111,8 @@ namespace boost { namespace proto { namespace detail
             return this->value;
         }
 
+        BOOST_DELETED_FUNCTION(arg &operator =(arg const &))
     private:
-        arg &operator =(arg const &);
         type value;
     };
 
@@ -135,8 +135,8 @@ namespace boost { namespace proto { namespace detail
             return this->value;
         }
 
+        BOOST_DELETED_FUNCTION(arg &operator =(arg const &))
     private:
-        arg &operator =(arg const &);
         type value;
     };
 

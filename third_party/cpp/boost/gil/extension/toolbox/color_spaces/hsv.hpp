@@ -12,8 +12,7 @@
 
 #include <boost/gil/color_convert.hpp>
 #include <boost/gil/typedefs.hpp>
-
-#include <boost/mpl/vector.hpp>
+#include <boost/gil/detail/mp11.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -34,17 +33,17 @@ struct value_t {};
 /// \}
 
 /// \ingroup ColorSpaceModel
-using hsv_t = mpl::vector3
-    <
-        hsv_color_space::hue_t,
-        hsv_color_space::saturation_t,
-        hsv_color_space::value_t
-    >;
+using hsv_t = mp11::mp_list
+<
+    hsv_color_space::hue_t,
+    hsv_color_space::saturation_t,
+    hsv_color_space::value_t
+>;
 
 /// \ingroup LayoutModel
 using hsv_layout_t = layout<hsv_t>;
 
-GIL_DEFINE_ALL_TYPEDEFS(32f, float32_t, hsv)
+BOOST_GIL_DEFINE_ALL_TYPEDEFS(32f, float32_t, hsv)
 
 /// \ingroup ColorConvert
 /// \brief RGB to HSV
@@ -131,7 +130,7 @@ struct default_color_converter_impl<hsv_t,rgb_t>
       float32_t red, green, blue;
 
       //If saturation is 0, the color is a shade of gray
-      if( abs( get_color( src, saturation_t() )) < 0.0001f  )
+      if (std::abs(get_color(src, saturation_t())) < 0.0001f)
       {
          // If saturation is 0, the color is a shade of gray
          red   = get_color( src, value_t() );

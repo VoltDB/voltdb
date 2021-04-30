@@ -12,6 +12,7 @@
 
 #include <boost/cstdint.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 #include <utility>

@@ -405,7 +405,7 @@
 #define BOOST_THREAD_FUTURE_USES_OPTIONAL
 #endif
 
-#if BOOST_WORKAROUND(__BORLANDC__, < 0x600)
+#if BOOST_WORKAROUND(BOOST_BORLANDC, < 0x600)
 #  pragma warn -8008 // Condition always true/false
 #  pragma warn -8080 // Identifier declared but never used
 #  pragma warn -8057 // Parameter never used
@@ -470,7 +470,8 @@
 #else //Use default
 #   if defined(BOOST_THREAD_PLATFORM_WIN32)
 #       if defined(BOOST_MSVC) || defined(BOOST_INTEL_WIN) \
-      || defined(__MINGW32__) || defined(MINGW32) || defined(BOOST_MINGW32)
+      || defined(__MINGW32__) || defined(MINGW32) || defined(BOOST_MINGW32) \
+      || (defined(_MSC_VER) && defined(__clang__))
       //For compilers supporting auto-tss cleanup
             //with Boost.Threads lib, use Boost.Threads lib
 #           define BOOST_THREAD_USE_LIB

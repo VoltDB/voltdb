@@ -8,8 +8,8 @@
     LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 =============================================================================*/
 
-#if !defined(CPP_EXCEPTIONS_HPP_5190E447_A781_4521_A275_5134FF9917D7_INCLUDED)
-#define CPP_EXCEPTIONS_HPP_5190E447_A781_4521_A275_5134FF9917D7_INCLUDED
+#if !defined(BOOST_CPP_EXCEPTIONS_HPP_5190E447_A781_4521_A275_5134FF9917D7_INCLUDED)
+#define BOOST_CPP_EXCEPTIONS_HPP_5190E447_A781_4521_A275_5134FF9917D7_INCLUDED
 
 #include <exception>
 #include <string>
@@ -76,7 +76,7 @@ public:
     }
     ~cpp_exception() throw() {}
 
-    virtual char const *what() const throw() = 0;           // to be overloaded
+    char const *what() const throw() BOOST_OVERRIDE = 0;    // to be overloaded
     virtual char const *description() const throw() = 0;
     virtual int get_errorcode() const throw() = 0;
     virtual int get_severity() const throw() = 0;
@@ -106,6 +106,7 @@ public:
         macro_insertion_error,
         bad_include_file,
         bad_include_statement,
+        bad_has_include_expression,
         ill_formed_directive,
         error_directive,
         warning_directive,
@@ -115,6 +116,9 @@ public:
         ill_formed_operator,
         bad_define_statement,
         bad_define_statement_va_args,
+        bad_define_statement_va_opt,
+        bad_define_statement_va_opt_parens,
+        bad_define_statement_va_opt_recurse,
         too_few_macroarguments,
         too_many_macroarguments,
         empty_macroarguments,
@@ -161,27 +165,27 @@ public:
     }
     ~preprocess_exception() throw() {}
 
-    virtual char const *what() const throw()
+    char const *what() const throw() BOOST_OVERRIDE
     {
         return "boost::wave::preprocess_exception";
     }
-    virtual char const *description() const throw()
+    char const *description() const throw() BOOST_OVERRIDE
     {
         return buffer;
     }
-    virtual int get_severity() const throw()
+    int get_severity() const throw() BOOST_OVERRIDE
     {
         return severity_level(code);
     }
-    virtual int get_errorcode() const throw()
+    int get_errorcode() const throw() BOOST_OVERRIDE
     {
         return code;
     }
-    virtual char const* get_related_name() const throw()
+    char const* get_related_name() const throw() BOOST_OVERRIDE
     {
         return "<unknown>";
     }
-    virtual bool is_recoverable() const throw()
+    bool is_recoverable() const throw() BOOST_OVERRIDE
     {
         switch (get_errorcode()) {
         // these are the exceptions thrown during processing not supposed to
@@ -195,6 +199,7 @@ public:
         case preprocess_exception::invalid_macroname:
         case preprocess_exception::bad_include_file:
         case preprocess_exception::bad_include_statement:
+        case preprocess_exception::bad_has_include_expression:
         case preprocess_exception::ill_formed_directive:
         case preprocess_exception::error_directive:
         case preprocess_exception::warning_directive:
@@ -204,6 +209,9 @@ public:
         case preprocess_exception::unbalanced_if_endif:
         case preprocess_exception::bad_define_statement:
         case preprocess_exception::bad_define_statement_va_args:
+        case preprocess_exception::bad_define_statement_va_opt:
+        case preprocess_exception::bad_define_statement_va_opt_parens:
+        case preprocess_exception::bad_define_statement_va_opt_recurse:
         case preprocess_exception::bad_line_statement:
         case preprocess_exception::bad_line_number:
         case preprocess_exception::bad_line_filename:
@@ -237,8 +245,8 @@ public:
 
     static char const *error_text(int code)
     {
-    // error texts in this array must appear in the same order as the items in
-    // the error enum above
+        // error texts in this array must appear in the same order as the items in
+        // the error enum above
         static char const *preprocess_exception_errors[] = {
             "no error",                                 // no_error
             "unexpected error (should not happen)",     // unexpected_error
@@ -246,6 +254,7 @@ public:
             "macro definition failed (out of memory?)", // macro_insertion_error
             "could not find include file",              // bad_include_file
             "ill formed #include directive",            // bad_include_statement
+            "ill formed __has_include expression",      // bad_has_include_expression
             "ill formed preprocessor directive",        // ill_formed_directive
             "encountered #error directive or #pragma wave stop()", // error_directive
             "encountered #warning directive",           // warning_directive
@@ -256,6 +265,11 @@ public:
             "ill formed #define directive",             // bad_define_statement
             "__VA_ARGS__ can only appear in the "
             "expansion of a C99 variadic macro",        // bad_define_statement_va_args
+            "__VA_OPT__ can only appear in the "
+            "expansion of a C++20 variadic macro",      // bad_define_statement_va_opt
+            "__VA_OPT__ must be followed by a left "
+            "paren in a C++20 variadic macro",          // bad_define_statement_va_opt_parens
+            "__VA_OPT__() may not contain __VA_OPT__",  // bad_define_statement_va_opt_recurse
             "too few macro arguments",                  // too_few_macroarguments
             "too many macro arguments",                 // too_many_macroarguments
             "empty macro arguments are not supported in pure C++ mode, "
@@ -310,6 +324,7 @@ public:
             util::severity_fatal,              // macro_insertion_error
             util::severity_error,              // bad_include_file
             util::severity_error,              // bad_include_statement
+            util::severity_error,              // bad_has_include_expression
             util::severity_error,              // ill_formed_directive
             util::severity_fatal,              // error_directive
             util::severity_warning,            // warning_directive
@@ -319,6 +334,9 @@ public:
             util::severity_error,              // ill_formed_operator
             util::severity_error,              // bad_define_statement
             util::severity_error,              // bad_define_statement_va_args
+            util::severity_error,              // bad_define_statement_va_opt
+            util::severity_error,              // bad_define_statement_va_opt_parens
+            util::severity_error,              // bad_define_statement_va_opt_recurse
             util::severity_warning,            // too_few_macroarguments
             util::severity_warning,            // too_many_macroarguments
             util::severity_warning,            // empty_macroarguments
@@ -381,11 +399,11 @@ public:
     }
     ~macro_handling_exception() throw() {}
 
-    virtual char const *what() const throw()
+    char const *what() const throw() BOOST_OVERRIDE
     {
         return "boost::wave::macro_handling_exception";
     }
-    char const* get_related_name() const throw()
+    char const* get_related_name() const throw() BOOST_OVERRIDE
     {
         return name;
     }
@@ -418,4 +436,4 @@ is_recoverable(cpp_exception const& e)
 #include BOOST_ABI_SUFFIX
 #endif
 
-#endif // !defined(CPP_EXCEPTIONS_HPP_5190E447_A781_4521_A275_5134FF9917D7_INCLUDED)
+#endif // !defined(BOOST_CPP_EXCEPTIONS_HPP_5190E447_A781_4521_A275_5134FF9917D7_INCLUDED)

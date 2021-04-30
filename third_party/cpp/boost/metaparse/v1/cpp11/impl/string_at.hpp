@@ -6,8 +6,6 @@
 //    (See accompanying file LICENSE_1_0.txt or copy at
 //          http://www.boost.org/LICENSE_1_0.txt)
 
-#include <boost/metaparse/v1/impl/no_char.hpp>
-
 #include <boost/metaparse/limit_string_size.hpp>
 
 namespace boost
@@ -19,12 +17,12 @@ namespace boost
       namespace impl
       {
         template <int MaxLen, int Len, class T>
-        constexpr int string_at(const T (&s)[Len], int n)
+        constexpr T string_at(const T (&s)[Len], int n)
         {
           // "MaxLen + 1" adds the \0 character of the string literal to the
           // limit
           static_assert(Len <= MaxLen + 1, "String literal is too long.");
-          return n >= Len - 1 ? BOOST_NO_CHAR : s[n];
+          return n >= Len - 1 ? T() : s[n];
         }
       }
     }

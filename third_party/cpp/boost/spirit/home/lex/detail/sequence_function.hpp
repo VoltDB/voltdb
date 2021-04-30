@@ -33,9 +33,8 @@ namespace boost { namespace spirit { namespace lex { namespace detail
         String const& state;
         String const& targetstate;
 
-    private:
         // silence MSVC warning C4512: assignment operator could not be generated
-        sequence_collect_function& operator= (sequence_collect_function const&);
+        BOOST_DELETED_FUNCTION(sequence_collect_function& operator= (sequence_collect_function const&))
     };
 
     template <typename LexerDef>
@@ -53,9 +52,8 @@ namespace boost { namespace spirit { namespace lex { namespace detail
 
         LexerDef& def;
 
-    private:
         // silence MSVC warning C4512: assignment operator could not be generated
-        sequence_add_actions_function& operator= (sequence_add_actions_function const&);
+        BOOST_DELETED_FUNCTION(sequence_add_actions_function& operator= (sequence_add_actions_function const&))
     };
 
 }}}}

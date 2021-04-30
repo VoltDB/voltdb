@@ -31,7 +31,7 @@
 
     \brief removes an element from a seq.
 
-    seq = seq from which an element is to be removed.
+    seq = seq from which an element is to be removed. <br/>
     index = The zero-based position in seq of the element to be removed.
 
     If index is greater or equal to the seq size the result is undefined.

@@ -4,8 +4,8 @@
 // Copyright (c) 2008-2012 Bruno Lalande, Paris, France.
 // Copyright (c) 2009-2012 Mateusz Loskot, London, UK.
 
-// This file was modified by Oracle on 2014.
-// Modifications copyright (c) 2014 Oracle and/or its affiliates.
+// This file was modified by Oracle on 2014-2020.
+// Modifications copyright (c) 2014-2020 Oracle and/or its affiliates.
 
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
@@ -24,11 +24,10 @@
 #include <cstddef>
 
 #include <boost/static_assert.hpp>
-#include <boost/type_traits/is_pointer.hpp>
 
 #include <boost/geometry/core/tag.hpp>
 #include <boost/geometry/core/tags.hpp>
-#include <boost/geometry/util/bare_type.hpp>
+#include <boost/geometry/util/type_traits_std.hpp>
 
 
 namespace boost { namespace geometry
@@ -111,7 +110,7 @@ struct radius_type
     typedef typename core_dispatch::radius_type
                         <
                             typename tag<Geometry>::type,
-                            typename util::bare_type<Geometry>::type
+                            typename util::remove_cptrref<Geometry>::type
                         >::type type;
 };
 
@@ -128,9 +127,9 @@ inline typename radius_type<Geometry>::type get_radius(Geometry const& geometry)
     return core_dispatch::radius_access
             <
                 typename tag<Geometry>::type,
-                typename util::bare_type<Geometry>::type,
+                typename util::remove_cptrref<Geometry>::type,
                 I,
-                typename boost::is_pointer<Geometry>::type
+                typename std::is_pointer<Geometry>::type
             >::get(geometry);
 }
 
@@ -148,9 +147,9 @@ inline void set_radius(Geometry& geometry,
     core_dispatch::radius_access
         <
             typename tag<Geometry>::type,
-            typename util::bare_type<Geometry>::type,
+            typename util::remove_cptrref<Geometry>::type,
             I,
-            typename boost::is_pointer<Geometry>::type
+            typename std::is_pointer<Geometry>::type
         >::set(geometry, radius);
 }
 
@@ -185,7 +184,7 @@ namespace core_dispatch
 template <typename Tag,
           typename Geometry,
           std::size_t Dimension>
-struct radius_access<Tag, Geometry, Dimension, boost::true_type>
+struct radius_access<Tag, Geometry, Dimension, std::true_type>
 {
     typedef typename geometry::radius_type<Geometry>::type radius_type;
 
@@ -196,7 +195,7 @@ struct radius_access<Tag, Geometry, Dimension, boost::true_type>
                     Tag,
                     Geometry,
                     Dimension,
-                    typename boost::is_pointer<Geometry>::type
+                    typename std::is_pointer<Geometry>::type
                 >::get(*geometry);
     }
 
@@ -207,7 +206,7 @@ struct radius_access<Tag, Geometry, Dimension, boost::true_type>
                     Tag,
                     Geometry,
                     Dimension,
-                    typename boost::is_pointer<Geometry>::type
+                    typename std::is_pointer<Geometry>::type
                 >::set(*geometry, value);
     }
 };
@@ -220,7 +219,7 @@ struct radius_type<srs_sphere_tag, Geometry>
 };
 
 template <typename Geometry, std::size_t Dimension>
-struct radius_access<srs_sphere_tag, Geometry, Dimension, boost::false_type>
+struct radius_access<srs_sphere_tag, Geometry, Dimension, std::false_type>
     : detail::radius_access<srs_sphere_tag, Geometry, Dimension>
 {
     //BOOST_STATIC_ASSERT(Dimension == 0);
@@ -234,7 +233,7 @@ struct radius_type<srs_spheroid_tag, Geometry>
 };
 
 template <typename Geometry, std::size_t Dimension>
-struct radius_access<srs_spheroid_tag, Geometry, Dimension, boost::false_type>
+struct radius_access<srs_spheroid_tag, Geometry, Dimension, std::false_type>
     : detail::radius_access<srs_spheroid_tag, Geometry, Dimension>
 {
     //BOOST_STATIC_ASSERT(Dimension == 0 || Dimension == 2);

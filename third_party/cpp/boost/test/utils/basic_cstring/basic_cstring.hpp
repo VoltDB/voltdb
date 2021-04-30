@@ -26,6 +26,10 @@
 // STL
 #include <string>
 
+#if defined(BOOST_TEST_STRING_VIEW)
+#include <string_view>
+#endif
+
 #include <boost/test/detail/suppress_warnings.hpp>
 
 //____________________________________________________________________________//
@@ -165,6 +169,30 @@ private:
     iterator        m_end;
     static CharT null;
 };
+
+// ************************************************************************** //
+// **************         cstring_string_view_helper           ************** //
+// ************************************************************************** //
+
+
+#if defined(BOOST_TEST_STRING_VIEW)
+// Helper for instanciating a subclass of cstring using a string_view. We do not
+// change the API of cstring using BOOST_TEST_STRING_VIEW as the code should remain
+// compatible between boost.test and test module using different compiler options.
+//! @internal
+template <class CharT, class string_view_t = std::basic_string_view<CharT>>
+class BOOST_SYMBOL_VISIBLE stringview_cstring_helper : public basic_cstring<CharT> {
+public:
+  stringview_cstring_helper(string_view_t const& sv)
+  : basic_cstring<CharT>(const_cast<CharT*>(sv.data()), sv.size())
+  {}
+};
+#endif
+
+
+// ************************************************************************** //
+// **************            basic_cstring::impl               ************** //
+// ************************************************************************** //
 
 //____________________________________________________________________________//
 

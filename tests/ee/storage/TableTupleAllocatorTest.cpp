@@ -2153,58 +2153,6 @@ TEST_F(TableTupleAllocatorTest, TestFinalizer_Snapshot) {
     ASSERT_TRUE(verifier.ok(0));
 }
 
-TEST_F(TableTupleAllocatorTest, TestSimulateDuplicateSnapshotRead_mt) {
-    // test finalizer on iterator
-    using Alloc = HookedCompactingChunks<TxnPreHook<NonCompactingChunks<EagerNonCompactingChunk>, HistoryRetainTrait<gc_policy::always>>>;
-    using Gen = StringGen<TupleSize>;
-    Gen gen;
-    Alloc alloc(TupleSize);
-    constexpr size_t BigNumTuples = NumTuples * 5;
-    array<void*, BigNumTuples> addresses;
-    for (size_t i = 0; i < BigNumTuples; ++i) {
-        addresses[i] = gen.fill(alloc.allocate());
-    }
-    auto const& iter = alloc.template freeze<truth>();
-    // deleting thread that triggers massive chained compaction,
-    // by deleting one tuple at a time, in the compacting direction.
-    // Synchronized perfectly with the snapshot iterator thread
-    // on each deletion
-    auto const deleting_thread = [&alloc, &addresses, this] () {
-        int j = 0;
-        do {
-            for (int i = j + AllocsPerChunk - (j == 0 ? 2 : 1); i >= j; --i) {
-                alloc.remove_reserve(1);
-                alloc.template remove_add<truth>(const_cast<void*>(addresses[i]));
-                ASSERT_EQ(1, alloc.remove_force([this] (vector<pair<void*, void*>> const& entries) {
-                                ASSERT_EQ(1, entries.size());
-                                ASSERT_EQ(AllocsPerChunk - 1,
-                                        Gen::of(reinterpret_cast<unsigned char*>(entries[0].second)));
-                                memcpy(entries[0].first, entries[0].second, TupleSize);
-                            }));
-            }
-        } while ((j += AllocsPerChunk) < BigNumTuples);
-        ASSERT_EQ(1, alloc.size());
-    };
-    // snapshot thread that validates. Synchronized perfectly
-    // with deleting thread on each advancement
-    auto const snapshot_thread = [&iter, this, BigNumTuples] () {
-        auto iterating_counter = 0lu;
-        while (! iter->drained()) {
-            ASSERT_EQ(iterating_counter, Gen::of(reinterpret_cast<unsigned char*>(**iter)));
-            ++(*iter);
-            ++iterating_counter;
-            if (iter->drained()) {
-                break;
-            }
-        }
-        ASSERT_EQ(BigNumTuples, iterating_counter);
-    };
-    thread t1(deleting_thread);
-    snapshot_thread();
-    t1.join();
-    alloc.template thaw<truth>();
-}
-
 TEST_F(TableTupleAllocatorTest, TestSnapIterBug_rep1) {
     // test finalizer on iterator
     using Alloc = HookedCompactingChunks<TxnPreHook<NonCompactingChunks<EagerNonCompactingChunk>, HistoryRetainTrait<gc_policy::always>>>;

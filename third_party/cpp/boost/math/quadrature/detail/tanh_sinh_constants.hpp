@@ -59,11 +59,11 @@ namespace boost {
             public:
                tanh_sinh_detail_constants(std::size_t max_refinements, std::size_t initial_commit = 4) : m_max_refinements(max_refinements), m_committed_refinements(initial_commit)
                {
-                  typedef mpl::int_<initializer_selector> tag_type;
+                  typedef std::integral_constant<int, initializer_selector> tag_type;
                   init(tag_type());
                }
 
-               void init(const mpl::int_<0>&)
+               void init(const std::integral_constant<int, 0>&)
                {
                   using std::tanh;
                   using std::sinh;
@@ -121,7 +121,7 @@ namespace boost {
                      m_weights[row].swap(temp);
                   }
                }
-               void init(const mpl::int_<1>&)
+               void init(const std::integral_constant<int, 1>&)
                {
                   m_inital_row_length = 4;
                   m_abscissas.reserve(m_max_refinements + 1);

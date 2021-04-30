@@ -13,7 +13,7 @@
 */
 
 #include <boost/histogram/accumulators/weighted_sum.hpp>
-#include <boost/histogram/detail/meta.hpp>
+#include <boost/histogram/detail/detect.hpp>
 #include <boost/histogram/histogram.hpp>
 #include <boost/histogram/storage_adaptor.hpp>
 #include <boost/histogram/unlimited_storage.hpp> // = default_storage
@@ -30,10 +30,12 @@ namespace histogram {
   @param axis First axis instance.
   @param axes Other axis instances.
 */
-template <class Storage, class Axis, class... Axes, class = detail::requires_axis<Axis>>
+template <class Storage, class Axis, class... Axes,
+          class = detail::requires_storage_or_adaptible<Storage>,
+          class = detail::requires_axis<Axis>>
 auto make_histogram_with(Storage&& storage, Axis&& axis, Axes&&... axes) {
   auto a = std::make_tuple(std::forward<Axis>(axis), std::forward<Axes>(axes)...);
-  using U = detail::remove_cvref_t<Storage>;
+  using U = std::decay_t<Storage>;
   using S = mp11::mp_if<detail::is_storage<U>, U, storage_adaptor<U>>;
   return histogram<decltype(a), S>(std::move(a), S(std::forward<Storage>(storage)));
 }
@@ -66,11 +68,12 @@ auto make_weighted_histogram(Axis&& axis, Axes&&... axes) {
   @param iterable Iterable range of axis objects.
 */
 template <class Storage, class Iterable,
+          class = detail::requires_storage_or_adaptible<Storage>,
           class = detail::requires_sequence_of_any_axis<Iterable>>
 auto make_histogram_with(Storage&& storage, Iterable&& iterable) {
-  using U = detail::remove_cvref_t<Storage>;
+  using U = std::decay_t<Storage>;
   using S = mp11::mp_if<detail::is_storage<U>, U, storage_adaptor<U>>;
-  using It = detail::remove_cvref_t<Iterable>;
+  using It = std::decay_t<Iterable>;
   using A = mp11::mp_if<detail::is_indexable_container<It>, It,
                         std::vector<mp11::mp_first<It>>>;
   return histogram<A, S>(std::forward<Iterable>(iterable),
@@ -101,9 +104,11 @@ auto make_weighted_histogram(Iterable&& iterable) {
   @param begin Iterator to range of axis objects.
   @param end   Iterator to range of axis objects.
 */
-template <class Storage, class Iterator, class = detail::requires_iterator<Iterator>>
+template <class Storage, class Iterator,
+          class = detail::requires_storage_or_adaptible<Storage>,
+          class = detail::requires_iterator<Iterator>>
 auto make_histogram_with(Storage&& storage, Iterator begin, Iterator end) {
-  using T = detail::remove_cvref_t<decltype(*begin)>;
+  using T = std::decay_t<decltype(*begin)>;
   return make_histogram_with(std::forward<Storage>(storage), std::vector<T>(begin, end));
 }
 

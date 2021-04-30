@@ -9,8 +9,8 @@
 
 // Implement quadruple-precision (and extended) support for <complex>.
 
-#ifndef _BOOST_CSTDFLOAT_COMPLEX_2014_02_15_HPP_
-  #define _BOOST_CSTDFLOAT_COMPLEX_2014_02_15_HPP_
+#ifndef BOOST_MATH_CSTDFLOAT_COMPLEX_2014_02_15_HPP_
+  #define BOOST_MATH_CSTDFLOAT_COMPLEX_2014_02_15_HPP_
 
   #include <boost/math/cstdfloat/cstdfloat_types.hpp>
   #include <boost/math/cstdfloat/cstdfloat_limits.hpp>
@@ -35,4 +35,4 @@
 
   #endif // Not BOOST_CSTDFLOAT_NO_LIBQUADMATH_SUPPORT (i.e., the user would like to have libquadmath support)
 
-#endif // _BOOST_CSTDFLOAT_COMPLEX_2014_02_15_HPP_
+#endif // BOOST_MATH_CSTDFLOAT_COMPLEX_2014_02_15_HPP_

@@ -18,8 +18,11 @@ namespace boost { namespace msm { namespace back
     // helper to replace std::plus as the lack of implicit conversion makes it not usable in one of our bind
     template<class _Ty,class _Tz>
     struct plus2
-        : public std::binary_function<_Ty, _Tz, _Ty>
     {
+        typedef _Ty first_argument_type;
+        typedef _Tz second_argument_type;
+        typedef _Ty result_type;
+
         // functor for operator+
         _Ty operator()( _Ty _Left, _Tz _Right) const
         {

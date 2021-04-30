@@ -56,7 +56,7 @@
 
 #endif
 
-#if BOOST_WORKAROUND(__BORLANDC__, BOOST_TESTED_AT(0x564))
+#if BOOST_WORKAROUND(BOOST_BORLANDC, BOOST_TESTED_AT(0x564))
 // BCB requires full type definition for is_array<> to work correctly.
 #include <boost/array.hpp>
 #endif
@@ -65,7 +65,7 @@ namespace boost
 {
 
 // this here is necessary to avoid compiler error in <boost/array.hpp>
-#if !BOOST_WORKAROUND(__BORLANDC__, BOOST_TESTED_AT(0x564))
+#if !BOOST_WORKAROUND(BOOST_BORLANDC, BOOST_TESTED_AT(0x564))
     template< class T, std::size_t sz >
     class array;
 #endif
@@ -104,28 +104,28 @@ namespace assign_detail
 
     struct array_type_tag
     {
-    #if BOOST_WORKAROUND(__BORLANDC__, BOOST_TESTED_AT(0x564))
+    #if BOOST_WORKAROUND(BOOST_BORLANDC, BOOST_TESTED_AT(0x564))
     private:
       char dummy_;  // BCB would by default use 8 bytes
     #endif
     };
     struct adapter_type_tag
     {
-    #if BOOST_WORKAROUND(__BORLANDC__, BOOST_TESTED_AT(0x564))
+    #if BOOST_WORKAROUND(BOOST_BORLANDC, BOOST_TESTED_AT(0x564))
     private:
       char dummy_;  // BCB would by default use 8 bytes
     #endif
     };
     struct pair_type_tag
     {
-    #if BOOST_WORKAROUND(__BORLANDC__, BOOST_TESTED_AT(0x564))
+    #if BOOST_WORKAROUND(BOOST_BORLANDC, BOOST_TESTED_AT(0x564))
     private:
       char dummy_;  // BCB would by default use 8 bytes
     #endif
     };
     struct default_type_tag
     {
-    #if BOOST_WORKAROUND(__BORLANDC__, BOOST_TESTED_AT(0x564))
+    #if BOOST_WORKAROUND(BOOST_BORLANDC, BOOST_TESTED_AT(0x564))
     private:
       char dummy_;  // BCB would by default use 8 bytes
     #endif

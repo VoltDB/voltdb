@@ -4,9 +4,8 @@
 // Copyright (c) 2008-2012 Bruno Lalande, Paris, France.
 // Copyright (c) 2009-2012 Mateusz Loskot, London, UK.
 
-// This file was modified by Oracle on 2013, 2014, 2017, 2018.
-// Modifications copyright (c) 2013-2018 Oracle and/or its affiliates.
-
+// This file was modified by Oracle on 2013-2021.
+// Modifications copyright (c) 2013-2021 Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
 // Parts of Boost.Geometry are redesigned from Geodan's Geographic Library
@@ -30,6 +29,8 @@
 #include <boost/geometry/strategies/cartesian/point_in_box.hpp>
 #include <boost/geometry/strategies/cartesian/box_in_box.hpp>
 #include <boost/geometry/strategies/default_strategy.hpp>
+#include <boost/geometry/strategies/detail.hpp>
+#include <boost/geometry/strategies/relate/services.hpp>
 
 
 namespace boost { namespace geometry
@@ -56,9 +57,14 @@ struct covered_by
 
 namespace resolve_strategy {
 
+template
+<
+    typename Strategy,
+    bool IsUmbrella = strategies::detail::is_umbrella_strategy<Strategy>::value
+>
 struct covered_by
 {
-    template <typename Geometry1, typename Geometry2, typename Strategy>
+    template <typename Geometry1, typename Geometry2>
     static inline bool apply(Geometry1 const& geometry1,
                              Geometry2 const& geometry2,
                              Strategy const& strategy)
@@ -68,23 +74,49 @@ struct covered_by
         concepts::check<Geometry2 const>();
         assert_dimension_equal<Geometry1, Geometry2>();
 
-        return dispatch::covered_by<Geometry1, Geometry2>::apply(geometry1,
-                                                                 geometry2,
-                                                                 strategy);
+        return dispatch::covered_by
+            <
+                Geometry1, Geometry2
+            >::apply(geometry1, geometry2, strategy);
     }
+};
 
+template <typename Strategy>
+struct covered_by<Strategy, false>
+{
+    template <typename Geometry1, typename Geometry2>
+    static inline bool apply(Geometry1 const& geometry1,
+                             Geometry2 const& geometry2,
+                             Strategy const& strategy)
+    {
+        using strategies::relate::services::strategy_converter;
+
+        return covered_by
+            <
+                decltype(strategy_converter<Strategy>::get(strategy))
+            >::apply(geometry1, geometry2,
+                        strategy_converter<Strategy>::get(strategy));
+    }
+};
+
+template <>
+struct covered_by<default_strategy, false>
+{
     template <typename Geometry1, typename Geometry2>
     static inline bool apply(Geometry1 const& geometry1,
                              Geometry2 const& geometry2,
                              default_strategy)
     {
-        typedef typename strategy::covered_by::services::default_strategy
+        typedef typename strategies::relate::services::default_strategy
             <
                 Geometry1,
                 Geometry2
             >::type strategy_type;
 
-        return covered_by::apply(geometry1, geometry2, strategy_type());
+        return covered_by
+            <
+                strategy_type
+            >::apply(geometry1, geometry2, strategy_type());
     }
 };
 
@@ -101,7 +133,7 @@ struct covered_by
                              Geometry2 const& geometry2,
                              Strategy const& strategy)
     {
-        return resolve_strategy::covered_by
+        return resolve_strategy::covered_by<Strategy>
                                ::apply(geometry1, geometry2, strategy);
     }
 };
@@ -217,7 +249,11 @@ struct covered_by<
 \note The default strategy is used for covered_by detection
 
 \qbk{[include reference/algorithms/covered_by.qbk]}
-
+\qbk{
+[heading Examples]
+[covered_by]
+[covered_by_output]
+}
  */
 template<typename Geometry1, typename Geometry2>
 inline bool covered_by(Geometry1 const& geometry1, Geometry2 const& geometry2)

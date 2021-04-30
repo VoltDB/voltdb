@@ -4,8 +4,8 @@
 // Copyright (c) 2008-2015 Bruno Lalande, Paris, France.
 // Copyright (c) 2009-2015 Mateusz Loskot, London, UK.
 
-// This file was modified by Oracle on 2015-2018.
-// Modifications copyright (c) 2015-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2015-2020.
+// Modifications copyright (c) 2015-2020, Oracle and/or its affiliates.
 
 // Contributed and/or modified by Vissarion Fysikopoulos, on behalf of Oracle
 // Contributed and/or modified by Menelaos Karavelas, on behalf of Oracle
@@ -25,10 +25,8 @@
 #include <boost/geometry/algorithms/detail/assign_indexed_point.hpp>
 #include <boost/geometry/algorithms/dispatch/envelope.hpp>
 
-// For backward compatibility
-#include <boost/geometry/strategies/cartesian/envelope_segment.hpp>
-#include <boost/geometry/strategies/spherical/envelope_segment.hpp>
-#include <boost/geometry/strategies/geographic/envelope_segment.hpp>
+// TEMP
+#include <boost/geometry/strategies/detail.hpp>
 
 namespace boost { namespace geometry
 {
@@ -37,18 +35,37 @@ namespace boost { namespace geometry
 namespace detail { namespace envelope
 {
 
-template <std::size_t DimensionCount>
-struct envelope_segment
+// TEMP
+template
+<
+    typename Strategy,
+    bool IsUmbrella = strategies::detail::is_umbrella_strategy<Strategy>::value
+>
+struct envelope_segment_call_strategy
 {
-    template <typename Point, typename Box, typename Strategy>
-    static inline void apply(Point const& p1,
-                             Point const& p2,
-                             Box& mbr,
+    template <typename Point, typename Segment, typename Box>
+    static inline void apply(Point const& p1, Point const& p2,
+                             Segment const& segment, Box& mbr,
+                             Strategy const& strategy)
+    {
+        strategy.envelope(segment, mbr).apply(p1, p2, mbr);
+    }
+};
+
+template <typename Strategy>
+struct envelope_segment_call_strategy<Strategy, false>
+{
+    template <typename Point, typename Segment, typename Box>
+    static inline void apply(Point const& p1, Point const& p2,
+                             Segment const&, Box& mbr,
                              Strategy const& strategy)
     {
         strategy.apply(p1, p2, mbr);
     }
+};
 
+struct envelope_segment
+{
     template <typename Segment, typename Box, typename Strategy>
     static inline void apply(Segment const& segment, Box& mbr,
                              Strategy const& strategy)
@@ -56,7 +73,9 @@ struct envelope_segment
         typename point_type<Segment>::type p[2];
         detail::assign_point_from_index<0>(segment, p[0]);
         detail::assign_point_from_index<1>(segment, p[1]);
-        apply(p[0], p[1], mbr, strategy);
+
+        // TEMP - expand calls this and Umbrella strategies are not yet supported there
+        envelope_segment_call_strategy<Strategy>::apply(p[0], p[1], segment, mbr, strategy);
     }
 };
 
@@ -77,13 +96,10 @@ struct envelope<Segment, segment_tag>
                              Box& mbr,
                              Strategy const& strategy)
     {
-        typename point_type<Segment>::type p[2];
-        detail::assign_point_from_index<0>(segment, p[0]);
-        detail::assign_point_from_index<1>(segment, p[1]);
         detail::envelope::envelope_segment
-            <
+            /*<
                dimension<Segment>::value
-            >::apply(p[0], p[1], mbr, strategy);
+            >*/::apply(segment, mbr, strategy);
     }
 };
 

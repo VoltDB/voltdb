@@ -1,5 +1,5 @@
 /* Proposed SG14 status_code
-(C) 2018-2019 Niall Douglas <http://www.nedproductions.biz/> (5 commits)
+(C) 2018-2021 Niall Douglas <http://www.nedproductions.biz/> (5 commits)
 File Created: Feb 2018
 
 
@@ -33,7 +33,7 @@ DEALINGS IN THE SOFTWARE.
 
 #include "error.hpp"
 
-#include <iostream>
+#include <ostream>
 
 BOOST_OUTCOME_SYSTEM_ERROR2_NAMESPACE_BEGIN
 
@@ -51,15 +51,22 @@ inline std::ostream &operator<<(std::ostream &s, const status_code<DomainType> &
   return s << v.domain().name().c_str() << ": " << v.value();
 }
 
+/*! Print a status code domain's `string_ref` to a `std::ostream &`.
+ */
+inline std::ostream &operator<<(std::ostream &s, const status_code_domain::string_ref &v)
+{
+  return s << v.c_str();
+}
+
 /*! Print the erased status code to a `std::ostream &`.
-*/
+ */
 template <class ErasedType> inline std::ostream &operator<<(std::ostream &s, const status_code<erased<ErasedType>> &v)
 {
   if(v.empty())
   {
     return s << "(empty)";
   }
-  return s << v.domain().name().c_str() << ": " << v.message().c_str();
+  return s << v.domain().name() << ": " << v.message();
 }
 
 /*! Print the generic code to a `std::ostream &`.
@@ -70,7 +77,7 @@ inline std::ostream &operator<<(std::ostream &s, const generic_code &v)
   {
     return s << "(empty)";
   }
-  return s << v.domain().name().c_str() << ": " << v.message().c_str();
+  return s << v.domain().name() << ": " << v.message();
 }
 
 BOOST_OUTCOME_SYSTEM_ERROR2_NAMESPACE_END

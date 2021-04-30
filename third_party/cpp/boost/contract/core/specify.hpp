@@ -8,10 +8,10 @@
 // See: http://www.boost.org/doc/libs/release/libs/contract/doc/html/index.html
 
 /** @file
-Specify preconditions, old value copies at body, postconditions, and exception
+Specify preconditions, old values copied at body, postconditions, and exception
 guarantees
 
-Preconditions, old value copies at body, postconditions, and exception
+Preconditions, old values copied at body, postconditions, and exception
 guarantees are all optionals but, when they are specified, they need to be
 specified in that order.
 */
@@ -42,7 +42,9 @@ specified in that order.
 // is used instead of `check c = ...` but only up to C++17. C++17 strong copy
 // elision on function return values prevents this lib from generating a
 // compile-time error in those cases, but the lib will still generate a run-time
-// error according with ON_MISSING_CHECK_DECL.
+// error according with ON_MISSING_CHECK_DECL. Furthermore, on some C++98
+// compilers, this private copy ctor gives a warning (because of lack of copy
+// optimization on those compilers), this warning can be ignored.
 #if     !defined(BOOST_CONTRACT_NO_CONDITIONS) || \
         defined(BOOST_CONTRACT_STATIC_LINK)
     #define BOOST_CONTRACT_SPECIFY_CLASS_IMPL_(class_type, cond_type) \
@@ -138,7 +140,7 @@ Used to prevent setting other contract conditions after exception guarantees.
 
 This class has no member function so it is used to prevent specifying additional
 functors to check any other contract.
-This object is internally constructed by this library when users specify
+This object is internally constructed by the library when users specify
 contracts calling @RefFunc{boost::contract::function} and similar functions
 (that is why this class does not have a public constructor).
 
@@ -149,11 +151,11 @@ public:
     /**
     Destruct this object.
 
-    @b Throws:  This can throw in case programmers specify failure handlers that
-                throw exceptions instead of terminating the program (see
+    @b Throws:  This is declared @c noexcept(false) since C++11 to allow users
+                to program failure handlers that throw exceptions on contract
+                assertion failures (not the default, see
                 @RefSect{advanced.throw_on_failures__and__noexcept__,
                 Throw on Failure}).
-                (This is declared @c noexcept(false) since C++11.)
     */
     ~specify_nothing() BOOST_NOEXCEPT_IF(false) {}
     
@@ -186,7 +188,7 @@ Allow to specify exception guarantees.
 
 Allow to specify the functor this library will call to check exception
 guarantees.
-This object is internally constructed by this library when users specify
+This object is internally constructed by the library when users specify
 contracts calling @RefFunc{boost::contract::function} and similar functions
 (that is why this class does not have a public constructor).
 
@@ -197,11 +199,11 @@ public:
     /**
     Destruct this object.
 
-    @b Throws:  This can throw in case programmers specify failure handlers that
-                throw exceptions instead of terminating the program (see
+    @b Throws:  This is declared @c noexcept(false) since C++11 to allow users
+                to program failure handlers that throw exceptions on contract
+                assertion failures (not the default, see
                 @RefSect{advanced.throw_on_failures__and__noexcept__,
                 Throw on Failure}).
-                (This is declared @c noexcept(false) since C++11.)
     */
     ~specify_except() BOOST_NOEXCEPT_IF(false) {}
 
@@ -222,9 +224,13 @@ public:
             by this function does not allow to specify any additional contract.
     */
     template<typename F>
-    specify_nothing except(F const& f) {
-        BOOST_CONTRACT_SPECIFY_EXCEPT_IMPL_
-    }
+    specify_nothing except(
+        F const&
+        #if !defined(BOOST_CONTRACT_NO_EXCEPTS) || \
+                defined(BOOST_CONTRACT_DETAIL_DOXYGEN)
+            f
+        #endif // Else, no name (avoid unused param warning).
+    ) { BOOST_CONTRACT_SPECIFY_EXCEPT_IMPL_ }
 
 /** @cond */
 private:
@@ -251,7 +257,7 @@ Allow to specify postconditions or exception guarantees.
 
 Allow to specify functors this library will call to check postconditions or
 exception guarantees.
-This object is internally constructed by this library when users specify
+This object is internally constructed by the library when users specify
 contracts calling @RefFunc{boost::contract::function} and similar functions
 (that is why this class does not have a public constructor).
 
@@ -259,9 +265,12 @@ contracts calling @RefFunc{boost::contract::function} and similar functions
         @RefSect{tutorial.exception_guarantees, Exception Guarantees}
 
 @tparam VirtualResult   Return type of the enclosing function declaring the
-                        contract if that function is either a virtual public
-                        function or a public function override.
-                        Otherwise, this type is always @c void.
+                        contract if that is either a virtual or an
+                        overriding public function, otherwise this is always
+                        @c void.
+                        (Usually this template parameter is automatically
+                        deduced by C++ and it does not need to be explicitly
+                        specified by programmers.)
 */
 template<typename VirtualResult = void>
 class specify_postcondition_except { // Privately copyable (as *).
@@ -269,11 +278,11 @@ public:
     /**
     Destruct this object.
 
-    @b Throws:  This can throw in case programmers specify failure handlers that
-                throw exceptions instead of terminating the program (see
+    @b Throws:  This is declared @c noexcept(false) since C++11 to allow users
+                to program failure handlers that throw exceptions on contract
+                assertion failures (not the default, see
                 @RefSect{advanced.throw_on_failures__and__noexcept__,
                 Throw on Failure}).
-                (This is declared @c noexcept(false) since C++11.)
     */
     ~specify_postcondition_except() BOOST_NOEXCEPT_IF(false) {}
 
@@ -281,7 +290,7 @@ public:
     Allow to specify postconditions.
 
     @param f    Functor called by this library to check postconditions
-                @c f(...).
+                @c f() or @c f(result).
                 Assertions within this functor are usually programmed using
                 @RefMacro{BOOST_CONTRACT_ASSERT}, but any exception thrown by a
                 call to this functor indicates a contract assertion failure (and
@@ -289,18 +298,25 @@ public:
                 @RefFunc{boost::contract::postcondition_failure}).
                 This functor should capture variables by (constant) references
                 (to access the values they will have at function exit).
-                This functor must be a nullary functor if @c VirtualResult is
-                @c void, otherwise it must be a unary functor accepting the
-                return value as a parameter of type <c>VirtualResult const&</c>
-                (to avoid extra copies of the return value, or of type
-                @c VirtualResult or <c>VirtualResult const</c> if extra copies
-                of the return value are irrelevant).
+                This functor must be a nullary functor @c f() if
+                @c VirtualResult is @c void, otherwise it must be a unary
+                functor @c f(result) accepting the return value @c result as a
+                parameter of type <c>VirtualResult const&</c> (to avoid extra
+                copies of the return value, or of type @c VirtualResult or
+                <c>VirtualResult const</c> if extra copies of the return value
+                are irrelevant).
 
     @return After postconditions have been specified, the object returned by
             this function allows to optionally specify exception guarantees.
     */
     template<typename F>
-    specify_except postcondition(F const& f) {
+    specify_except postcondition(
+        F const&
+        #if !defined(BOOST_CONTRACT_NO_POSTCONDITIONS) || \
+                defined(BOOST_CONTRACT_DETAIL_DOXYGEN)
+            f
+        #endif // Else, no name (avoid unused param warning).
+    ) {
         BOOST_CONTRACT_SPECIFY_POSTCONDITION_IMPL_
     }
     
@@ -321,9 +337,13 @@ public:
             by this function does not allow to specify any additional contract.
     */
     template<typename F>
-    specify_nothing except(F const& f) {
-        BOOST_CONTRACT_SPECIFY_EXCEPT_IMPL_
-    }
+    specify_nothing except(
+        F const&
+        #if !defined(BOOST_CONTRACT_NO_EXCEPTS) || \
+                defined(BOOST_CONTRACT_DETAIL_DOXYGEN)
+            f
+        #endif // Else, no name (avoid unused param warning).
+    ) { BOOST_CONTRACT_SPECIFY_EXCEPT_IMPL_ }
 
 /** @cond */
 private:
@@ -342,23 +362,26 @@ private:
 };
 
 /**
-Allow to specify old value copies at body, postconditions, and exception
+Allow to specify old values copied at body, postconditions, and exception
 guarantees.
 
-Allow to specify functors this library will call to copy old value at body, 
+Allow to specify functors this library will call to copy old values at body, 
 check postconditions, and check exception guarantees.
-This object is internally constructed by this library when users specify
+This object is internally constructed by the library when users specify
 contracts calling @RefFunc{boost::contract::function} and similar functions
 (that is why this class does not have a public constructor).
 
-@see    @RefSect{advanced.old_value_copies_at_body, Old Value Copies at Body},
+@see    @RefSect{advanced.old_values_copied_at_body, Old Values Copied at Body},
         @RefSect{tutorial.postconditions, Postconditions},
         @RefSect{tutorial.exception_guarantees, Exception Guarantees}
 
 @tparam VirtualResult   Return type of the enclosing function declaring the
-                        contract if that function is either a virtual public
-                        function or a public function override.
-                        Otherwise, this type is always @c void.
+                        contract if that is either a virtual or an
+                        overriding public function, otherwise this is always
+                        @c void.
+                        (Usually this template parameter is automatically
+                        deduced by C++ and it does not need to be explicitly
+                        specified by programmers.)
 */
 template<typename VirtualResult = void>
 class specify_old_postcondition_except { // Privately copyable (as *).
@@ -366,20 +389,20 @@ public:
     /**
     Destruct this object.
 
-    @b Throws:  This can throw in case programmers specify failure handlers that
-                throw exceptions instead of terminating the program (see
+    @b Throws:  This is declared @c noexcept(false) since C++11 to allow users
+                to program failure handlers that throw exceptions on contract
+                assertion failures (not the default, see
                 @RefSect{advanced.throw_on_failures__and__noexcept__,
                 Throw on Failure}).
-                (This is declared @c noexcept(false) since C++11.)
     */
     ~specify_old_postcondition_except() BOOST_NOEXCEPT_IF(false) {}
     
     /**
-    Allow to specify old value copies at body.
+    Allow to specify old values copied at body.
 
     It should often be sufficient to initialize old value pointers as soon as
     they are declared, without using this function (see
-    @RefSect{advanced.old_value_copies_at_body, Old Value Copies at Body}).
+    @RefSect{advanced.old_values_copied_at_body, Old Values Copied at Body}).
 
     @param f    Nullary functor called by this library @c f() to assign old
                 value copies just before the body is executed but after entry
@@ -395,12 +418,18 @@ public:
                 value expressions can be captured by (constant) value, or better
                 by (constant) reference to avoid extra copies).
 
-    @return After old value copies at body have been specified, the object
+    @return After old values copied at body have been specified, the object
             returned by this function allows to optionally specify
             postconditions and exception guarantees.
     */
     template<typename F>
-    specify_postcondition_except<VirtualResult> old(F const& f) {
+    specify_postcondition_except<VirtualResult> old(
+        F const&
+        #if !defined(BOOST_CONTRACT_NO_OLDS) || \
+                defined(BOOST_CONTRACT_DETAIL_DOXYGEN)
+            f
+        #endif // Else, no name (avoid unused param warning).
+    ) {
         BOOST_CONTRACT_SPECIFY_OLD_IMPL_
     }
 
@@ -408,7 +437,7 @@ public:
     Allow to specify postconditions.
 
     @param f    Functor called by this library to check postconditions
-                @c f(...).
+                @c f() or @c f(result).
                 Assertions within this functor are usually programmed using
                 @RefMacro{BOOST_CONTRACT_ASSERT}, but any exception thrown by a
                 call to this functor indicates a contract assertion failure (and
@@ -416,18 +445,25 @@ public:
                 @RefFunc{boost::contract::postcondition_failure}).
                 This functor should capture variables by (constant) references
                 (to access the values they will have at function exit).
-                This functor must be a nullary functor if @c VirtualResult is
-                @c void, otherwise it must be a unary functor accepting the
-                return value as a parameter of type <c>VirtualResult const&</c>
-                (to avoid extra copies of the return value, or of type
-                @c VirtualResult or <c>VirtualResult const</c> if extra copies
-                of the return value are irrelevant).
+                This functor must be a nullary functor @c f() if
+                @c VirtualResult is @c void, otherwise it must be a unary
+                functor @c f(result) accepting the return value @c result as a
+                parameter of type <c>VirtualResult const&</c> (to avoid extra
+                copies of the return value, or of type @c VirtualResult or
+                <c>VirtualResult const</c> if extra copies of the return value
+                are irrelevant).
 
     @return After postconditions have been specified, the object returned by
             this function allows to optionally specify exception guarantees.
     */
     template<typename F>
-    specify_except postcondition(F const& f) {
+    specify_except postcondition(
+        F const&
+        #if !defined(BOOST_CONTRACT_NO_POSTCONDITIONS) || \
+                defined(BOOST_CONTRACT_DETAIL_DOXYGEN)
+            f
+        #endif // Else, no name (avoid unused param warning).
+    ) {
         BOOST_CONTRACT_SPECIFY_POSTCONDITION_IMPL_
     }
     
@@ -448,9 +484,13 @@ public:
             by this function does not allow to specify any additional contract.
     */
     template<typename F>
-    specify_nothing except(F const& f) {
-        BOOST_CONTRACT_SPECIFY_EXCEPT_IMPL_
-    }
+    specify_nothing except(
+        F const&
+        #if !defined(BOOST_CONTRACT_NO_EXCEPTS) || \
+                defined(BOOST_CONTRACT_DETAIL_DOXYGEN)
+            f
+        #endif // Else, no name (avoid unused param warning).
+    ) { BOOST_CONTRACT_SPECIFY_EXCEPT_IMPL_ }
 
 /** @cond */
 private:
@@ -474,24 +514,27 @@ private:
 };
 
 /**
-Allow to specify preconditions, old value copies at body, postconditions, and
+Allow to specify preconditions, old values copied at body, postconditions, and
 exception guarantees.
 
 Allow to specify functors this library will call to check preconditions, copy
 old values at body, check postconditions, and check exception guarantees.
-This object is internally constructed by this library when users specify
+This object is internally constructed by the library when users specify
 contracts calling @RefFunc{boost::contract::function} and similar functions
 (that is why this class does not have a public constructor).
 
 @see    @RefSect{tutorial.preconditions, Preconditions},
-        @RefSect{advanced.old_value_copies_at_body, Old Value Copies at Body},
+        @RefSect{advanced.old_values_copied_at_body, Old Values Copied at Body},
         @RefSect{tutorial.postconditions, Postconditions},
         @RefSect{tutorial.exception_guarantees, Exception Guarantees}
 
 @tparam VirtualResult   Return type of the enclosing function declaring the
-                        contract if that function is either a virtual public
-                        function or a public function override.
-                        Otherwise, this type is always @c void.
+                        contract if that is either a virtual or an
+                        overriding public function, otherwise this is always
+                        @c void.
+                        (Usually this template parameter is automatically
+                        deduced by C++ and it does not need to be explicitly
+                        specified by programmers.)
 */
 template<
     typename VirtualResult /* = void (already in fwd decl from decl.hpp) */
@@ -504,11 +547,11 @@ public:
     /**
     Destruct this object.
 
-    @b Throws:  This can throw in case programmers specify failure handlers that
-                throw exceptions instead of terminating the program (see
+    @b Throws:  This is declared @c noexcept(false) since C++11 to allow users
+                to program failure handlers that throw exceptions on contract
+                assertion failures (not the default, see
                 @RefSect{advanced.throw_on_failures__and__noexcept__,
                 Throw on Failure}).
-                (This is declared @c noexcept(false) since C++11.)
     */
     ~specify_precondition_old_postcondition_except() BOOST_NOEXCEPT_IF(false) {}
     
@@ -526,20 +569,26 @@ public:
                 better by (constant) reference (to avoid extra copies).
 
     @return After preconditions have been specified, the object returned by this
-            function allows to optionally specify old value copies at body,
+            function allows to optionally specify old values copied at body,
             postconditions, and exception guarantees.
     */
     template<typename F>
-    specify_old_postcondition_except<VirtualResult> precondition(F const& f) {
+    specify_old_postcondition_except<VirtualResult> precondition(
+        F const&
+        #if !defined(BOOST_CONTRACT_NO_PRECONDITIONS) || \
+                defined(BOOST_CONTRACT_DETAIL_DOXYGEN)
+            f
+        #endif // Else, no name (avoid unused param warning).
+    ) {
         BOOST_CONTRACT_SPECIFY_PRECONDITION_IMPL_
     }
 
     /**
-    Allow to specify old value copies at body.
+    Allow to specify old values copied at body.
 
     It should often be sufficient to initialize old value pointers as soon as
     they are declared, without using this function (see
-    @RefSect{advanced.old_value_copies_at_body, Old Value Copies at Body}).
+    @RefSect{advanced.old_values_copied_at_body, Old Values Copied at Body}).
 
     @param f    Nullary functor called by this library @c f() to assign old
                 value copies just before the body is executed but after entry
@@ -555,12 +604,18 @@ public:
                 value expressions can be captured by (constant) value, or better
                 by (constant) reference to avoid extra copies).
 
-    @return After old value copies at body have been specified, the object
+    @return After old values copied at body have been specified, the object
             returned by this functions allows to optionally specify
             postconditions and exception guarantees.
     */
     template<typename F>
-    specify_postcondition_except<VirtualResult> old(F const& f) {
+    specify_postcondition_except<VirtualResult> old(
+        F const&
+        #if !defined(BOOST_CONTRACT_NO_OLDS) || \
+                defined(BOOST_CONTRACT_DETAIL_DOXYGEN)
+            f
+        #endif // Else, no name (avoid unused param warning).
+    ) {
         BOOST_CONTRACT_SPECIFY_OLD_IMPL_
     }
 
@@ -568,7 +623,7 @@ public:
     Allow to specify postconditions.
 
     @param f    Functor called by this library to check postconditions
-                @c f(...).
+                @c f() or @c f(result).
                 Assertions within this functor are usually programmed using
                 @RefMacro{BOOST_CONTRACT_ASSERT}, but any exception thrown by a
                 call to this functor indicates a contract assertion failure (and
@@ -576,18 +631,25 @@ public:
                 @RefFunc{boost::contract::postcondition_failure}).
                 This functor should capture variables by (constant) references
                 (to access the values they will have at function exit).
-                This functor must be a nullary functor if @c VirtualResult is
-                @c void, otherwise it must be a unary functor accepting the
-                return value as a parameter of type <c>VirtualResult const&</c>
-                (to avoid extra copies of the return value, or of type
-                @c VirtualResult or <c>VirtualResult const</c> if extra copies
-                of the return value are irrelevant).
+                This functor must be a nullary functor @c f() if
+                @c VirtualResult is @c void, otherwise it must be a unary
+                functor @c f(result) accepting the return value @c result as a
+                parameter of type <c>VirtualResult const&</c> (to avoid extra
+                copies of the return value, or of type @c VirtualResult or
+                <c>VirtualResult const</c> if extra copies of the return value
+                are irrelevant).
 
     @return After postconditions have been specified, the object returned by
             this function allows to optionally specify exception guarantees.
     */
     template<typename F>
-    specify_except postcondition(F const& f) {
+    specify_except postcondition(
+        F const&
+        #if !defined(BOOST_CONTRACT_NO_POSTCONDITIONS) || \
+                defined(BOOST_CONTRACT_DETAIL_DOXYGEN)
+            f
+        #endif // Else, no name (avoid unused param warning).
+    ) {
         BOOST_CONTRACT_SPECIFY_POSTCONDITION_IMPL_
     }
     
@@ -608,9 +670,13 @@ public:
             by this function does not allow to specify any additional contract.
     */
     template<typename F>
-    specify_nothing except(F const& f) {
-        BOOST_CONTRACT_SPECIFY_EXCEPT_IMPL_
-    }
+    specify_nothing except(
+        F const&
+        #if !defined(BOOST_CONTRACT_NO_EXCEPTS) || \
+                defined(BOOST_CONTRACT_DETAIL_DOXYGEN)
+            f
+        #endif // Else, no name (avoid unused param warning).
+    ) { BOOST_CONTRACT_SPECIFY_EXCEPT_IMPL_ }
 
 /** @cond */
 private:

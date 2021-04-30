@@ -63,6 +63,10 @@ namespace impl
                         * ( accumulators::moment<2>(args) - mean(args) * mean(args) )
                     ) - 3.;
         }
+        
+        // serialization is done by accumulators it depends on
+        template<class Archive>
+        void serialize(Archive & ar, const unsigned int file_version) {}
     };
 
 } // namespace impl

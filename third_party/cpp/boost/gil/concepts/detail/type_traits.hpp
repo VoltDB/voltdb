@@ -8,13 +8,14 @@
 #ifndef BOOST_GIL_CONCEPTS_DETAIL_TYPE_TRAITS_HPP
 #define BOOST_GIL_CONCEPTS_DETAIL_TYPE_TRAITS_HPP
 
-#include <boost/type_traits.hpp>
+#include <type_traits>
 
 namespace boost { namespace gil { namespace detail {
 
+// TODO: C++20: deprecate and replace with std::std_remove_cvref
 template <typename T>
 struct remove_const_and_reference
-    : ::boost::remove_const<typename ::boost::remove_reference<T>::type>
+    : std::remove_const<typename std::remove_reference<T>::type>
 {
 };
 

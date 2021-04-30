@@ -2,6 +2,10 @@
 
 // Copyright (c) 2007-2012 Barend Gehrels, Amsterdam, the Netherlands.
 
+// This file was modified by Oracle on 2020-2021.
+// Modifications copyright (c) 2020-2021, Oracle and/or its affiliates.
+// Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
+
 // Use, modification and distribution is subject to the Boost Software License,
 // Version 1.0. (See accompanying file LICENSE_1_0.txt or copy at
 // http://www.boost.org/LICENSE_1_0.txt)
@@ -11,19 +15,21 @@
 
 
 #include <boost/array.hpp>
-#include <boost/mpl/assert.hpp>
-#include <boost/range.hpp>
+#include <boost/range/begin.hpp>
+#include <boost/range/end.hpp>
+#include <boost/range/size.hpp>
+#include <boost/range/value_type.hpp>
 
-#include <boost/geometry/core/assert.hpp>
-#include <boost/geometry/core/ring_type.hpp>
-#include <boost/geometry/core/exterior_ring.hpp>
-#include <boost/geometry/core/interior_rings.hpp>
-#include <boost/geometry/core/tags.hpp>
 #include <boost/geometry/algorithms/convert.hpp>
 #include <boost/geometry/algorithms/detail/signed_size_type.hpp>
+#include <boost/geometry/core/assert.hpp>
+#include <boost/geometry/core/exterior_ring.hpp>
+#include <boost/geometry/core/interior_rings.hpp>
+#include <boost/geometry/core/ring_type.hpp>
+#include <boost/geometry/core/static_assert.hpp>
+#include <boost/geometry/core/tags.hpp>
 #include <boost/geometry/geometries/concepts/check.hpp>
 #include <boost/geometry/util/range.hpp>
-#include <boost/geometry/iterators/ever_circling_iterator.hpp>
 #include <boost/geometry/views/closeable_view.hpp>
 #include <boost/geometry/views/reversible_view.hpp>
 
@@ -36,12 +42,22 @@ namespace boost { namespace geometry
 namespace detail { namespace copy_segments
 {
 
+inline signed_size_type circular_offset(signed_size_type segment_count, signed_size_type index,
+                                        signed_size_type offset)
+{
+    signed_size_type result = (index + offset) % segment_count;
+    if (result < 0)
+    {
+       result += segment_count;
+    }
+    return result;
+}
 
 template <typename Range, bool Reverse, typename SegmentIdentifier, typename PointOut>
 struct copy_segment_point_range
 {
     static inline bool apply(Range const& range,
-            SegmentIdentifier const& seg_id, int offset,
+            SegmentIdentifier const& seg_id, signed_size_type offset,
             PointOut& point)
     {
         typedef typename closeable_view
@@ -59,15 +75,13 @@ struct copy_segment_point_range
         cview_type cview(range);
         rview_type view(cview);
 
-        typedef typename boost::range_iterator<rview_type>::type iterator;
-        geometry::ever_circling_iterator<iterator> it(boost::begin(view), boost::end(view),
-                    boost::begin(view) + seg_id.segment_index, true);
+        std::size_t const segment_count = boost::size(view) - 1;
+        signed_size_type const target = circular_offset(segment_count, seg_id.segment_index, offset);
+        BOOST_GEOMETRY_ASSERT(target >= 0
+                           && std::size_t(target) < boost::size(view));
 
-        for (signed_size_type i = 0; i < offset; ++i, ++it)
-        {
-        }
+        geometry::convert(range::at(view, target), point);
 
-        geometry::convert(*it, point);
         return true;
     }
 };
@@ -77,7 +91,7 @@ template <typename Polygon, bool Reverse, typename SegmentIdentifier, typename P
 struct copy_segment_point_polygon
 {
     static inline bool apply(Polygon const& polygon,
-            SegmentIdentifier const& seg_id, int offset,
+            SegmentIdentifier const& seg_id, signed_size_type offset,
             PointOut& point)
     {
         // Call ring-version with the right ring
@@ -103,18 +117,17 @@ template <typename Box, bool Reverse, typename SegmentIdentifier, typename Point
 struct copy_segment_point_box
 {
     static inline bool apply(Box const& box,
-            SegmentIdentifier const& seg_id, int offset,
+            SegmentIdentifier const& seg_id, signed_size_type offset,
             PointOut& point)
     {
-        signed_size_type index = seg_id.segment_index;
-        for (int i = 0; i < offset; i++)
-        {
-            index++;
-        }
-
         boost::array<typename point_type<Box>::type, 4> bp;
         assign_box_corners_oriented<Reverse>(box, bp);
-        point = bp[index % 4];
+
+        signed_size_type const target = circular_offset(4, seg_id.segment_index, offset);
+        BOOST_GEOMETRY_ASSERT(target >= 0
+                           && std::size_t(target) < bp.size());
+
+        point = bp[target];
         return true;
     }
 };
@@ -130,15 +143,11 @@ template
 struct copy_segment_point_multi
 {
     static inline bool apply(MultiGeometry const& multi,
-                             SegmentIdentifier const& seg_id, int offset,
+                             SegmentIdentifier const& seg_id, signed_size_type offset,
                              PointOut& point)
     {
-
-        BOOST_GEOMETRY_ASSERT
-            (
-                seg_id.multi_index >= 0
-                && seg_id.multi_index < int(boost::size(multi))
-            );
+        BOOST_GEOMETRY_ASSERT(seg_id.multi_index >= 0
+               && std::size_t(seg_id.multi_index) < boost::size(multi));
 
         // Call the single-version
         return Policy::apply(range::at(multi, seg_id.multi_index), seg_id, offset, point);
@@ -165,11 +174,9 @@ template
 >
 struct copy_segment_point
 {
-    BOOST_MPL_ASSERT_MSG
-        (
-            false, NOT_OR_NOT_YET_IMPLEMENTED_FOR_THIS_GEOMETRY_TYPE
-            , (types<GeometryIn>)
-        );
+    BOOST_GEOMETRY_STATIC_ASSERT_FALSE(
+        "Not or not yet implemented for this Geometry type.",
+        Tag, GeometryIn);
 };
 
 
@@ -273,16 +280,13 @@ struct copy_segment_point
 #endif // DOXYGEN_NO_DISPATCH
 
 
-
-
-
 /*!
     \brief Helper function, copies a point from a segment
     \ingroup overlay
  */
 template<bool Reverse, typename Geometry, typename SegmentIdentifier, typename PointOut>
 inline bool copy_segment_point(Geometry const& geometry,
-            SegmentIdentifier const& seg_id, int offset,
+            SegmentIdentifier const& seg_id, signed_size_type offset,
             PointOut& point_out)
 {
     concepts::check<Geometry const>();
@@ -311,7 +315,7 @@ template
     typename PointOut
 >
 inline bool copy_segment_point(Geometry1 const& geometry1, Geometry2 const& geometry2,
-            SegmentIdentifier const& seg_id, int offset,
+            SegmentIdentifier const& seg_id, signed_size_type offset,
             PointOut& point_out)
 {
     concepts::check<Geometry1 const>();
@@ -392,7 +396,6 @@ inline bool copy_segment_points(Geometry1 const& geometry1, Geometry2 const& geo
         && copy_segment_point<Reverse1, Reverse2>(geometry1, geometry2, seg_id, 1, point2)
         && copy_segment_point<Reverse1, Reverse2>(geometry1, geometry2, seg_id, 2, point3);
 }
-
 
 
 }} // namespace boost::geometry

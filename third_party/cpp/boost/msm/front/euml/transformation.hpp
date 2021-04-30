@@ -39,7 +39,12 @@ BOOST_MSM_EUML_FUNCTION(Fill_ , std::fill , fill_ , void , void )
 BOOST_MSM_EUML_FUNCTION(Generate_ , std::generate , generate_ , void , void )
 BOOST_MSM_EUML_FUNCTION(Unique_ , std::unique , unique_ , RESULT_TYPE_PARAM1 , RESULT_TYPE2_PARAM1 )
 BOOST_MSM_EUML_FUNCTION(UniqueCopy_ , std::unique_copy , unique_copy_ , RESULT_TYPE_PARAM3 , RESULT_TYPE2_PARAM3 )
+#if __cplusplus < 201703L
 BOOST_MSM_EUML_FUNCTION(RandomShuffle_ , std::random_shuffle , random_shuffle_ , void , void )
+#endif
+#if __cplusplus >= 201103L
+BOOST_MSM_EUML_FUNCTION(Shuffle_ , std::shuffle , shuffle_ , void , void )
+#endif
 BOOST_MSM_EUML_FUNCTION(RotateCopy_ , std::rotate_copy , rotate_copy_ , RESULT_TYPE_PARAM4 , RESULT_TYPE2_PARAM4 )
 BOOST_MSM_EUML_FUNCTION(Partition_ , std::partition , partition_ , RESULT_TYPE_PARAM1 , RESULT_TYPE2_PARAM1 )
 BOOST_MSM_EUML_FUNCTION(StablePartition_ , std::stable_partition , stable_partition_ , RESULT_TYPE_PARAM1 , RESULT_TYPE2_PARAM1 )

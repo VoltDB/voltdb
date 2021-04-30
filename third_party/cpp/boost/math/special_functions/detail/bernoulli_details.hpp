@@ -12,6 +12,8 @@
 #include <boost/math/tools/atomic.hpp>
 #include <boost/utility/enable_if.hpp>
 #include <boost/math/tools/toms748_solve.hpp>
+#include <boost/math/tools/cxx03_warn.hpp>
+#include <boost/math/special_functions/fpclassify.hpp>
 #include <vector>
 
 namespace boost{ namespace math{ namespace detail{
@@ -69,7 +71,7 @@ T t2n_asymptotic(int n)
 //
 struct max_bernoulli_root_functor
 {
-   max_bernoulli_root_functor(long long t) : target(static_cast<double>(t)) {}
+   max_bernoulli_root_functor(ulong_long_type t) : target(static_cast<double>(t)) {}
    double operator()(double n)
    {
       BOOST_MATH_STD_USING
@@ -91,17 +93,24 @@ private:
 };
 
 template <class T, class Policy>
-inline std::size_t find_bernoulli_overflow_limit(const mpl::false_&)
+inline std::size_t find_bernoulli_overflow_limit(const std::false_type&)
 {
-   long long t = lltrunc(boost::math::tools::log_max_value<T>());
+   // Set a limit on how large the result can ever be:
+   static const double max_result = static_cast<double>((std::numeric_limits<std::size_t>::max)() - 1000u);
+
+   ulong_long_type t = lltrunc(boost::math::tools::log_max_value<T>());
    max_bernoulli_root_functor fun(t);
    boost::math::tools::equal_floor tol;
    boost::uintmax_t max_iter = boost::math::policies::get_max_root_iterations<Policy>();
-   return static_cast<std::size_t>(boost::math::tools::toms748_solve(fun, sqrt(double(t)), double(t), tol, max_iter).first) / 2;
+   double result = boost::math::tools::toms748_solve(fun, sqrt(double(t)), double(t), tol, max_iter).first / 2;
+   if (result > max_result)
+      result = max_result;
+   
+   return static_cast<std::size_t>(result);
 }
 
 template <class T, class Policy>
-inline std::size_t find_bernoulli_overflow_limit(const mpl::true_&)
+inline std::size_t find_bernoulli_overflow_limit(const std::true_type&)
 {
    return max_bernoulli_index<bernoulli_imp_variant<T>::value>::value;
 }
@@ -111,7 +120,7 @@ std::size_t b2n_overflow_limit()
 {
    // This routine is called at program startup if it's called at all:
    // that guarantees safe initialization of the static variable.
-   typedef mpl::bool_<(bernoulli_imp_variant<T>::value >= 1) && (bernoulli_imp_variant<T>::value <= 3)> tag_type;
+   typedef std::integral_constant<bool, (bernoulli_imp_variant<T>::value >= 1) && (bernoulli_imp_variant<T>::value <= 3)> tag_type;
    static const std::size_t lim = find_bernoulli_overflow_limit<T, Policy>(tag_type());
    return lim;
 }
@@ -653,7 +662,7 @@ inline bernoulli_numbers_cache<T, Policy>& get_bernoulli_numbers_cache()
 {
    //
    // Force this function to be called at program startup so all the static variables
-   // get initailzed then (thread safety).
+   // get initialized then (thread safety).
    //
    bernoulli_initializer<T, Policy>::force_instantiate();
    static bernoulli_numbers_cache<T, Policy> data;

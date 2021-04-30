@@ -87,10 +87,12 @@ const int null                               = 0;
 struct lzma_params {
 
     // Non-explicit constructor.
-    lzma_params( uint32_t level = lzma::default_compression )
+    lzma_params( uint32_t level = lzma::default_compression, uint32_t threads = 1 )
         : level(level)
+        , threads(threads)
         { }
     uint32_t level;
+    uint32_t threads;
 };
 
 //
@@ -170,8 +172,10 @@ private:
                   lzma::alloc_func,
                   lzma::free_func,
                   void* derived );
-    void*         stream_;         // Actual type: lzmadec_stream*.
-    uint32_t level;
+    void init_stream(bool compress);
+    void*    stream_;         // Actual type: lzma_stream*.
+    uint32_t level_;
+    uint32_t threads_;
 };
 
 //
@@ -182,7 +186,7 @@ private:
 template<typename Alloc = std::allocator<char> >
 class lzma_compressor_impl : public lzma_base, public lzma_allocator<Alloc> {
 public:
-    lzma_compressor_impl(const lzma_params& = lzma::default_compression);
+    lzma_compressor_impl(const lzma_params& = lzma_params());
     ~lzma_compressor_impl();
     bool filter( const char*& src_begin, const char* src_end,
                  char*& dest_begin, char* dest_end, bool flush );
@@ -222,7 +226,7 @@ private:
 public:
     typedef typename base_type::char_type               char_type;
     typedef typename base_type::category                category;
-    basic_lzma_compressor( const lzma_params& = lzma::default_compression,
+    basic_lzma_compressor( const lzma_params& = lzma_params(),
                            std::streamsize buffer_size = default_device_buffer_size );
 };
 BOOST_IOSTREAMS_PIPABLE(basic_lzma_compressor, 1)

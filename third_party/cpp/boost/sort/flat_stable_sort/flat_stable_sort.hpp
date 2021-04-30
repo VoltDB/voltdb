@@ -179,7 +179,7 @@ bool flat_stable_sort <Iter_t, Compare, Power2>
     size_t nblock = size_t(itx_last - itx_first);
     range_it rng = get_group_range(*itx_first, nblock);
     size_t nelem = rng.size();
-    size_t min_process = std::max(BLOCK_SIZE, (nelem >> 3));
+    size_t min_process = (std::max)(BLOCK_SIZE, (nelem >> 3));
 
     size_t nsorted1 = bsc::number_stable_sorted_forward (rng.first, rng.last,
                                                          min_process, cmp);
@@ -221,7 +221,7 @@ bool flat_stable_sort <Iter_t, Compare, Power2>
     range_it rng = get_group_range(*itx_first, nblock);
 
     size_t nelem = rng.size();
-    size_t min_process = std::max(BLOCK_SIZE, (nelem >> 3));
+    size_t min_process = (std::max)(BLOCK_SIZE, (nelem >> 3));
 
     size_t nsorted2 = bsc::number_stable_sorted_backward(rng.first, rng.last,
                                                          min_process, cmp);

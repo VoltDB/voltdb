@@ -1,5 +1,5 @@
 
-//  (C) Copyright Edward Diener 2011-2015
+//  (C) Copyright Edward Diener 2011-2015,2019
 //  Use, modification and distribution are subject to the Boost Software License,
 //  Version 1.0. (See accompanying file LICENSE_1_0.txt or copy at
 //  http://www.boost.org/LICENSE_1_0.txt).
@@ -33,18 +33,25 @@
     The macro is a variadic macro taking any input.
     For the VC++8 compiler (VS2005) the macro takes a single parameter of input to check.
     
-    The macro is not perfect, and can not be so. The problem
-    area is if the input to be checked is a function-like
-    macro name, in which case either a compiler error can result
-    or a false result can occur.
+    For all levels of C++ prior to C++20 the macro is not perfect, 
+    and can not be so. The problem area is if the input to be
+    checked is a function-like macro name, in which case either
+    a compiler error can result or a false result can occur.
+    
+    For C++20, with its support for the new __VA_OPT__ preprocessor
+    construct, the macro will always work correctly no matter what
+    the variadic input, and is therefore 100% reliable.
     
     This macro is a replacement, using variadic macro support,
     for the undocumented macro BOOST_PP_IS_EMPTY in the Boost
     PP library. The code is taken from a posting by Paul Mensonides
     of a variadic version for BOOST_PP_IS_EMPTY, and changed 
-    in order to also support VC++.
+    in order to also support VC++. The code for the C++20
+    implementation of the macro, using the __VA_OPT__ preprocessor
+    construct, is the author's own and reuses code added to the
+    Boost preprocessor library by this author.
     
-    .... = variadic input, for VC++8 this must be a single parameter
+    ... = variadic input, for VC++8 this must be a single parameter
 
     returns = 1 if the input is empty, 0 if it is not
     
@@ -74,7 +81,26 @@
 
 #else
 
+# if defined(__cplusplus) && __cplusplus > 201703L
+#include <boost/preprocessor/variadic/has_opt.hpp>
+#include <boost/preprocessor/facilities/is_empty.hpp>
 #define BOOST_VMD_IS_EMPTY(...) \
+    BOOST_VMD_DETAIL_IS_EMPTY_IIF \
+      ( \
+      BOOST_PP_VARIADIC_HAS_OPT() \
+      ) \
+      ( \
+      BOOST_PP_IS_EMPTY_OPT, \
+      BOOST_VMD_IS_EMPTY_NO_OPT \
+      ) \
+    (__VA_ARGS__) \
+/**/
+# else
+#define BOOST_VMD_IS_EMPTY(...) \
+    BOOST_VMD_IS_EMPTY_NO_OPT(__VA_ARGS__) \
+/**/
+# endif
+#define BOOST_VMD_IS_EMPTY_NO_OPT(...) \
     BOOST_VMD_DETAIL_IS_EMPTY_IIF \
       ( \
       BOOST_PP_IS_BEGIN_PARENS \
@@ -88,8 +114,6 @@
       ) \
     (__VA_ARGS__) \
 /**/
-
 #endif /* BOOST_VMD_MSVC_V8 */
-
 #endif /* BOOST_PP_VARIADICS */
 #endif /* BOOST_VMD_IS_EMPTY_HPP */

@@ -5,8 +5,8 @@
     Distributed under the Boost Software License, Version 1.0. (See accompanying
     file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 =============================================================================*/
-#if !defined(SPIRIT_REPEAT_NOVEMBER_14_2008_1148AM)
-#define SPIRIT_REPEAT_NOVEMBER_14_2008_1148AM
+#ifndef BOOST_SPIRIT_QI_DIRECTIVE_REPEAT_HPP
+#define BOOST_SPIRIT_QI_DIRECTIVE_REPEAT_HPP
 
 #if defined(_MSC_VER)
 #pragma once
@@ -91,9 +91,8 @@ namespace boost { namespace spirit { namespace qi
 
         T const exact;
 
-    private:
         // silence MSVC warning C4512: assignment operator could not be generated
-        exact_iterator& operator= (exact_iterator const&);
+        BOOST_DELETED_FUNCTION(exact_iterator& operator= (exact_iterator const&))
     };
 
     template <typename T>
@@ -111,9 +110,8 @@ namespace boost { namespace spirit { namespace qi
         T const min;
         T const max;
 
-    private:
         // silence MSVC warning C4512: assignment operator could not be generated
-        finite_iterator& operator= (finite_iterator const&);
+        BOOST_DELETED_FUNCTION(finite_iterator& operator= (finite_iterator const&))
     };
 
     template <typename T>
@@ -129,9 +127,8 @@ namespace boost { namespace spirit { namespace qi
 
         T const min;
 
-    private:
         // silence MSVC warning C4512: assignment operator could not be generated
-        infinite_iterator& operator= (infinite_iterator const&);
+        BOOST_DELETED_FUNCTION(infinite_iterator& operator= (infinite_iterator const&))
     };
 
     template <typename Subject, typename LoopIter>
@@ -209,9 +206,8 @@ namespace boost { namespace spirit { namespace qi
         Subject subject;
         LoopIter iter;
 
-    private:
         // silence MSVC warning C4512: assignment operator could not be generated
-        repeat_parser& operator= (repeat_parser const&);
+        BOOST_DELETED_FUNCTION(repeat_parser& operator= (repeat_parser const&))
     };
 
     ///////////////////////////////////////////////////////////////////////////

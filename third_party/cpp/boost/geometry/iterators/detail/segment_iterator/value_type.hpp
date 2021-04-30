@@ -1,8 +1,9 @@
 // Boost.Geometry (aka GGL, Generic Geometry Library)
 
-// Copyright (c) 2014-2015, Oracle and/or its affiliates.
+// Copyright (c) 2014-2020, Oracle and/or its affiliates.
 
 // Contributed and/or modified by Menelaos Karavelas, on behalf of Oracle
+// Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
 // Licensed under the Boost Software License version 1.0.
 // http://www.boost.org/users/license.html
@@ -12,14 +13,10 @@
 
 #include <iterator>
 
-#include <boost/mpl/if.hpp>
-#include <boost/type_traits/is_reference.hpp>
-
-#include <boost/geometry/iterators/point_iterator.hpp>
-#include <boost/geometry/util/bare_type.hpp>
 #include <boost/geometry/geometries/segment.hpp>
 #include <boost/geometry/geometries/pointing_segment.hpp>
-
+#include <boost/geometry/iterators/point_iterator.hpp>
+#include <boost/geometry/util/type_traits_std.hpp>
 
 namespace boost { namespace geometry
 {
@@ -49,18 +46,18 @@ struct value_type
     // it would store pointers to temporary objects. Instead we use a
     // segment, which does a full copy of the temporary objects
     // returned by the point iterator.
-    typedef typename boost::mpl::if_
+    typedef std::conditional_t
         <
-            boost::is_reference<point_iterator_reference_type>,
+            std::is_reference<point_iterator_reference_type>::value,
             geometry::model::pointing_segment<point_iterator_value_type>,
             geometry::model::segment
                 <
-                    typename geometry::util::bare_type
+                    typename util::remove_cptrref
                         <
                             point_iterator_value_type
                         >::type
                 >
-        >::type type;
+        > type;
 };
 
 }} // namespace detail::segment_iterator

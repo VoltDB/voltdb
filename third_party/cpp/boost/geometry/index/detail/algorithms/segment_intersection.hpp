@@ -4,12 +4,20 @@
 //
 // Copyright (c) 2011-2014 Adam Wulkiewicz, Lodz, Poland.
 //
+// This file was modified by Oracle on 2020.
+// Modifications copyright (c) 2020, Oracle and/or its affiliates.
+// Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
+//
 // Use, modification and distribution is subject to the Boost Software License,
 // Version 1.0. (See accompanying file LICENSE_1_0.txt or copy at
 // http://www.boost.org/LICENSE_1_0.txt)
 
 #ifndef BOOST_GEOMETRY_INDEX_DETAIL_ALGORITHMS_SEGMENT_INTERSECTION_HPP
 #define BOOST_GEOMETRY_INDEX_DETAIL_ALGORITHMS_SEGMENT_INTERSECTION_HPP
+
+#include <type_traits>
+
+#include <boost/geometry/core/static_assert.hpp>
 
 namespace boost { namespace geometry { namespace index { namespace detail {
 
@@ -25,8 +33,8 @@ namespace boost { namespace geometry { namespace index { namespace detail {
 //    >::type type;
 //
 //
-//    BOOST_MPL_ASSERT_MSG((!::boost::is_unsigned<type>::value),
-//        THIS_TYPE_SHOULDNT_BE_UNSIGNED, (type));
+//    BOOST_GEOMETRY_STATIC_ASSERT((!std::is_unsigned<type>::value),
+//        "Distance type can not be unsigned.", type);
 //};
 
 namespace dispatch {
@@ -93,13 +101,17 @@ struct box_segment_intersection<Box, Point, 1>
 template <typename Indexable, typename Point, typename Tag>
 struct segment_intersection
 {
-    BOOST_MPL_ASSERT_MSG((false), NOT_IMPLEMENTED_FOR_THIS_GEOMETRY, (segment_intersection));
+    BOOST_GEOMETRY_STATIC_ASSERT_FALSE(
+        "Not implemented for this Indexable type.",
+        Indexable, Point, Tag);
 };
 
 template <typename Indexable, typename Point>
 struct segment_intersection<Indexable, Point, point_tag>
 {
-    BOOST_MPL_ASSERT_MSG((false), SEGMENT_POINT_INTERSECTION_UNAVAILABLE, (segment_intersection));
+    BOOST_GEOMETRY_STATIC_ASSERT_FALSE(
+        "Segment-Point intersection unavailable.",
+        Indexable, Point);
 };
 
 template <typename Indexable, typename Point>
@@ -113,8 +125,10 @@ struct segment_intersection<Indexable, Point, box_tag>
 
 // TODO: this ASSERT CHECK is wrong for user-defined CoordinateTypes!
 
-        static const bool check = !::boost::is_integral<RelativeDistance>::value;
-        BOOST_MPL_ASSERT_MSG(check, RELATIVE_DISTANCE_MUST_BE_FLOATING_POINT_TYPE, (RelativeDistance));
+        static const bool check = !std::is_integral<RelativeDistance>::value;
+        BOOST_GEOMETRY_STATIC_ASSERT(check,
+            "RelativeDistance must be a floating point type.",
+            RelativeDistance);
 
         RelativeDistance t_near = -(::std::numeric_limits<RelativeDistance>::max)();
         RelativeDistance t_far = (::std::numeric_limits<RelativeDistance>::max)();

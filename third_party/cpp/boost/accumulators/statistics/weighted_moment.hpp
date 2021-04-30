@@ -60,6 +60,13 @@ namespace impl
             return numeric::fdiv(this->sum, sum_of_weights(args));
         }
 
+        // make this accumulator serializeable
+        template<class Archive>
+        void serialize(Archive & ar, const unsigned int file_version)
+        { 
+            ar & sum;
+        }
+
     private:
         weighted_sample sum;
     };

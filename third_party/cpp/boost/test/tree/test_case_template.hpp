@@ -19,8 +19,8 @@
 #include <boost/test/tree/test_unit.hpp>
 
 #include <boost/test/utils/class_properties.hpp>
-
 #include <boost/test/tree/observer.hpp>
+#include <boost/test/utils/algorithm.hpp>
 
 
 // Boost
@@ -94,6 +94,16 @@ struct generate_test_case_4_type {
 #else
         full_name += BOOST_CURRENT_FUNCTION;
 #endif
+
+        // replacing ',' by ', ' first, and then removing any double space
+        static const std::string to_replace[] =  { "class ", "struct ", ",", "  ", " <", " >"};
+        static const std::string replacement[] = { "", "" , ", ", " ", "<" , ">"};
+
+        full_name = unit_test::utils::replace_all_occurrences_of(
+            full_name,
+            to_replace, to_replace + sizeof(to_replace)/sizeof(to_replace[0]),
+            replacement, replacement + sizeof(replacement)/sizeof(replacement[0]));
+
         typedef typename boost::remove_reference<TestType>::type TestTypewoRef;
         if( boost::is_const<TestTypewoRef>::value )
             full_name += "_const";
@@ -126,7 +136,7 @@ private:
 
 class template_test_case_gen_base : public test_unit_generator {
 public:
-    virtual test_unit* next() const
+    test_unit* next() const BOOST_OVERRIDE
     {
         if( m_test_cases.empty() )
             return 0;

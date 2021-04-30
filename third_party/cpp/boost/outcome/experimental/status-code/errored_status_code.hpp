@@ -1,5 +1,5 @@
 /* Proposed SG14 status_code
-(C) 2018-2019 Niall Douglas <http://www.nedproductions.biz/> (5 commits)
+(C) 2018-2021 Niall Douglas <http://www.nedproductions.biz/> (5 commits)
 File Created: Jun 2018
 
 
@@ -31,7 +31,7 @@ DEALINGS IN THE SOFTWARE.
 #ifndef BOOST_OUTCOME_SYSTEM_ERROR2_ERRORED_STATUS_CODE_HPP
 #define BOOST_OUTCOME_SYSTEM_ERROR2_ERRORED_STATUS_CODE_HPP
 
-#include "generic_code.hpp"
+#include "quick_status_code_from_enum.hpp"
 #include "status_code_ptr.hpp"
 
 BOOST_OUTCOME_SYSTEM_ERROR2_NAMESPACE_BEGIN
@@ -100,7 +100,18 @@ public:
                                     && std::is_constructible<errored_status_code, MakeStatusCodeResult>::value,  // ADLed status code is compatible
                                     bool>::type = true>
   errored_status_code(T &&v, Args &&... args) noexcept(noexcept(make_status_code(std::declval<T>(), std::declval<Args>()...)))  // NOLINT
-  : errored_status_code(make_status_code(static_cast<T &&>(v), static_cast<Args &&>(args)...))
+      : errored_status_code(make_status_code(static_cast<T &&>(v), static_cast<Args &&>(args)...))
+  {
+    _check();
+  }
+  //! Implicit construction from any `quick_status_code_from_enum<Enum>` enumerated type.
+  template <class Enum,                                                                                      //
+            class QuickStatusCodeType = typename quick_status_code_from_enum<Enum>::code_type,               // Enumeration has been activated
+            typename std::enable_if<std::is_constructible<errored_status_code, QuickStatusCodeType>::value,  // Its status code is compatible
+
+                                    bool>::type = true>
+  errored_status_code(Enum &&v) noexcept(std::is_nothrow_constructible<errored_status_code, QuickStatusCodeType>::value)  // NOLINT
+      : errored_status_code(QuickStatusCodeType(static_cast<Enum &&>(v)))
   {
     _check();
   }
@@ -143,15 +154,17 @@ public:
     _check();
   }
 
+  //! Always false (including at compile time), as errored status codes are never successful.
+  constexpr bool success() const noexcept { return false; }
   //! Return a const reference to the `value_type`.
   constexpr const value_type &value() const &noexcept { return this->_value; }
 };
 
 namespace traits
 {
-  template <class DomainType> struct is_move_relocating<errored_status_code<DomainType>>
+  template <class DomainType> struct is_move_bitcopying<errored_status_code<DomainType>>
   {
-    static constexpr bool value = is_move_relocating<typename DomainType::value_type>::value;
+    static constexpr bool value = is_move_bitcopying<typename DomainType::value_type>::value;
   };
 }  // namespace traits
 
@@ -199,20 +212,40 @@ public:
 
   /***** KEEP THESE IN SYNC WITH STATUS_CODE *****/
   //! Implicit copy construction from any other status code if its value type is trivially copyable and it would fit into our storage
-  template <class DomainType,                                                                              //
-            typename std::enable_if<!detail::is_erased_status_code<status_code<DomainType>>::value         //
-                                    && std::is_trivially_copyable<typename DomainType::value_type>::value  //
+  template <class DomainType,                                                                           //
+            typename std::enable_if<std::is_trivially_copyable<typename DomainType::value_type>::value  //
                                     && detail::type_erasure_is_safe<value_type, typename DomainType::value_type>::value,
                                     bool>::type = true>
-  errored_status_code(const status_code<DomainType> &v) noexcept : _base(v)  // NOLINT
+  errored_status_code(const status_code<DomainType> &v) noexcept
+      : _base(v)  // NOLINT
   {
     _check();
   }
-  //! Implicit move construction from any other status code if its value type is trivially copyable or move relocating and it would fit into our storage
+  //! Implicit copy construction from any other status code if its value type is trivially copyable and it would fit into our storage
+  template <class DomainType,                                                                           //
+            typename std::enable_if<std::is_trivially_copyable<typename DomainType::value_type>::value  //
+                                    && detail::type_erasure_is_safe<value_type, typename DomainType::value_type>::value,
+                                    bool>::type = true>
+  errored_status_code(const errored_status_code<DomainType> &v) noexcept
+      : _base(static_cast<const status_code<DomainType> &>(v))  // NOLINT
+  {
+    _check();
+  }
+  //! Implicit move construction from any other status code if its value type is trivially copyable or move bitcopying and it would fit into our storage
   template <class DomainType,  //
             typename std::enable_if<detail::type_erasure_is_safe<value_type, typename DomainType::value_type>::value,
                                     bool>::type = true>
-  errored_status_code(status_code<DomainType> &&v) noexcept : _base(static_cast<status_code<DomainType> &&>(v))  // NOLINT
+  errored_status_code(status_code<DomainType> &&v) noexcept
+      : _base(static_cast<status_code<DomainType> &&>(v))  // NOLINT
+  {
+    _check();
+  }
+  //! Implicit move construction from any other status code if its value type is trivially copyable or move bitcopying and it would fit into our storage
+  template <class DomainType,  //
+            typename std::enable_if<detail::type_erasure_is_safe<value_type, typename DomainType::value_type>::value,
+                                    bool>::type = true>
+  errored_status_code(errored_status_code<DomainType> &&v) noexcept
+      : _base(static_cast<status_code<DomainType> &&>(v))  // NOLINT
   {
     _check();
   }
@@ -225,17 +258,31 @@ public:
                                     && std::is_constructible<errored_status_code, MakeStatusCodeResult>::value,  // ADLed status code is compatible
                                     bool>::type = true>
   errored_status_code(T &&v, Args &&... args) noexcept(noexcept(make_status_code(std::declval<T>(), std::declval<Args>()...)))  // NOLINT
-  : errored_status_code(make_status_code(static_cast<T &&>(v), static_cast<Args &&>(args)...))
+      : errored_status_code(make_status_code(static_cast<T &&>(v), static_cast<Args &&>(args)...))
   {
     _check();
   }
+  //! Implicit construction from any `quick_status_code_from_enum<Enum>` enumerated type.
+  template <class Enum,                                                                                      //
+            class QuickStatusCodeType = typename quick_status_code_from_enum<Enum>::code_type,               // Enumeration has been activated
+            typename std::enable_if<std::is_constructible<errored_status_code, QuickStatusCodeType>::value,  // Its status code is compatible
+
+                                    bool>::type = true>
+  errored_status_code(Enum &&v) noexcept(std::is_nothrow_constructible<errored_status_code, QuickStatusCodeType>::value)  // NOLINT
+      : errored_status_code(QuickStatusCodeType(static_cast<Enum &&>(v)))
+  {
+    _check();
+  }
+
+  //! Always false (including at compile time), as errored status codes are never successful.
+  constexpr bool success() const noexcept { return false; }
   //! Return the erased `value_type` by value.
   constexpr value_type value() const noexcept { return this->_value; }
 };
 
 namespace traits
 {
-  template <class ErasedType> struct is_move_relocating<errored_status_code<erased<ErasedType>>>
+  template <class ErasedType> struct is_move_bitcopying<errored_status_code<erased<ErasedType>>>
   {
     static constexpr bool value = true;
   };
@@ -276,8 +323,7 @@ template <class DomainType1, class DomainType2> inline bool operator!=(const err
 template <class DomainType1, class T,                                                                       //
           class MakeStatusCodeResult = typename detail::safe_get_make_status_code_result<const T &>::type,  // Safe ADL lookup of make_status_code(), returns void if not found
           typename std::enable_if<is_status_code<MakeStatusCodeResult>::value, bool>::type = true>          // ADL makes a status code
-inline bool
-operator==(const errored_status_code<DomainType1> &a, const T &b)
+inline bool operator==(const errored_status_code<DomainType1> &a, const T &b)
 {
   return a.equivalent(make_status_code(b));
 }
@@ -285,8 +331,7 @@ operator==(const errored_status_code<DomainType1> &a, const T &b)
 template <class T, class DomainType1,                                                                       //
           class MakeStatusCodeResult = typename detail::safe_get_make_status_code_result<const T &>::type,  // Safe ADL lookup of make_status_code(), returns void if not found
           typename std::enable_if<is_status_code<MakeStatusCodeResult>::value, bool>::type = true>          // ADL makes a status code
-inline bool
-operator==(const T &a, const errored_status_code<DomainType1> &b)
+inline bool operator==(const T &a, const errored_status_code<DomainType1> &b)
 {
   return b.equivalent(make_status_code(a));
 }
@@ -294,8 +339,7 @@ operator==(const T &a, const errored_status_code<DomainType1> &b)
 template <class DomainType1, class T,                                                                       //
           class MakeStatusCodeResult = typename detail::safe_get_make_status_code_result<const T &>::type,  // Safe ADL lookup of make_status_code(), returns void if not found
           typename std::enable_if<is_status_code<MakeStatusCodeResult>::value, bool>::type = true>          // ADL makes a status code
-inline bool
-operator!=(const errored_status_code<DomainType1> &a, const T &b)
+inline bool operator!=(const errored_status_code<DomainType1> &a, const T &b)
 {
   return !a.equivalent(make_status_code(b));
 }
@@ -303,10 +347,41 @@ operator!=(const errored_status_code<DomainType1> &a, const T &b)
 template <class T, class DomainType1,                                                                       //
           class MakeStatusCodeResult = typename detail::safe_get_make_status_code_result<const T &>::type,  // Safe ADL lookup of make_status_code(), returns void if not found
           typename std::enable_if<is_status_code<MakeStatusCodeResult>::value, bool>::type = true>          // ADL makes a status code
-inline bool
-operator!=(const T &a, const errored_status_code<DomainType1> &b)
+inline bool operator!=(const T &a, const errored_status_code<DomainType1> &b)
 {
   return !b.equivalent(make_status_code(a));
+}
+//! True if the status code's are semantically equal via `equivalent()` to `quick_status_code_from_enum<T>::code_type(b)`.
+template <class DomainType1, class T,                                                     //
+          class QuickStatusCodeType = typename quick_status_code_from_enum<T>::code_type  // Enumeration has been activated
+          >
+inline bool operator==(const errored_status_code<DomainType1> &a, const T &b)
+{
+  return a.equivalent(QuickStatusCodeType(b));
+}
+//! True if the status code's are semantically equal via `equivalent()` to `quick_status_code_from_enum<T>::code_type(a)`.
+template <class T, class DomainType1,                                                     //
+          class QuickStatusCodeType = typename quick_status_code_from_enum<T>::code_type  // Enumeration has been activated
+          >
+inline bool operator==(const T &a, const errored_status_code<DomainType1> &b)
+{
+  return b.equivalent(QuickStatusCodeType(a));
+}
+//! True if the status code's are not semantically equal via `equivalent()` to `quick_status_code_from_enum<T>::code_type(b)`.
+template <class DomainType1, class T,                                                     //
+          class QuickStatusCodeType = typename quick_status_code_from_enum<T>::code_type  // Enumeration has been activated
+          >
+inline bool operator!=(const errored_status_code<DomainType1> &a, const T &b)
+{
+  return !a.equivalent(QuickStatusCodeType(b));
+}
+//! True if the status code's are not semantically equal via `equivalent()` to `quick_status_code_from_enum<T>::code_type(a)`.
+template <class T, class DomainType1,                                                     //
+          class QuickStatusCodeType = typename quick_status_code_from_enum<T>::code_type  // Enumeration has been activated
+          >
+inline bool operator!=(const T &a, const errored_status_code<DomainType1> &b)
+{
+  return !b.equivalent(QuickStatusCodeType(a));
 }
 
 

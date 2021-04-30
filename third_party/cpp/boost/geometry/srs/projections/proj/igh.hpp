@@ -2,8 +2,8 @@
 
 // Copyright (c) 2008-2015 Barend Gehrels, Amsterdam, the Netherlands.
 
-// This file was modified by Oracle on 2017, 2018.
-// Modifications copyright (c) 2017-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2017, 2018, 2019.
+// Modifications copyright (c) 2017-2019, Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle.
 
 // Use, modification and distribution is subject to the Boost Software License,
@@ -40,15 +40,16 @@
 #ifndef BOOST_GEOMETRY_PROJECTIONS_IGH_HPP
 #define BOOST_GEOMETRY_PROJECTIONS_IGH_HPP
 
-#include <boost/geometry/util/math.hpp>
-#include <boost/shared_ptr.hpp>
-
 #include <boost/geometry/srs/projections/impl/base_static.hpp>
 #include <boost/geometry/srs/projections/impl/base_dynamic.hpp>
 #include <boost/geometry/srs/projections/impl/projects.hpp>
 #include <boost/geometry/srs/projections/impl/factory_entry.hpp>
 #include <boost/geometry/srs/projections/proj/gn_sinu.hpp>
 #include <boost/geometry/srs/projections/proj/moll.hpp>
+
+#include <boost/geometry/util/math.hpp>
+
+#include <boost/shared_ptr.hpp>
 
 namespace boost { namespace geometry
 {
@@ -58,13 +59,69 @@ namespace projections
     #ifndef DOXYGEN_NO_DETAIL
     namespace detail { namespace igh
     {
-            // TODO: consider replacing dynamically created projections
-            // with member objects
+            template <typename T>
+            struct par_igh_zone
+            {
+                T x0;
+                T y0;
+                T lam0;
+            };
+
+            // NOTE: x0, y0, lam0 are not used in moll nor sinu projections
+            // so it is a waste of memory to keep 12 copies of projections
+            // with parameters as in the original Proj4.
+
+            // TODO: It would be possible to further decrease the size of par_igh
+            // because spherical sinu and moll has constant parameters.
+            // TODO: Furthermore there is no need to store par_igh_zone parameters
+            // since they are constant for zones. In both fwd() and inv() there are
+            // parts of code dependent on specific zones (if statements) anyway
+            // so these parameters could be hardcoded there instead of stored.
+
             template <typename T, typename Parameters>
             struct par_igh
             {
-                boost::shared_ptr<base_v<T, Parameters> > pj[12];
+                moll_spheroid<T, Parameters> moll;
+                sinu_spheroid<T, Parameters> sinu;
+                par_igh_zone<T> zones[12];
                 T dy0;
+
+                // NOTE: The constructors of moll and sinu projections sets
+                // par.es = 0
+
+                template <typename Params>
+                inline par_igh(Params const& params, Parameters & par)
+                    : moll(params, par)
+                    , sinu(params, par)
+                {}
+
+                inline void fwd(int zone, Parameters const& par, T const& lp_lon, T const& lp_lat, T & xy_x, T & xy_y) const
+                {
+                    if (zone <= 2 || zone >= 9) // 1, 2, 9, 10, 11, 12
+                        moll.fwd(par, lp_lon, lp_lat, xy_x, xy_y);
+                    else // 3, 4, 5, 6, 7, 8
+                        sinu.fwd(par, lp_lon, lp_lat, xy_x, xy_y);
+                }
+
+                inline void inv(int zone, Parameters const& par, T const& xy_x, T const& xy_y, T & lp_lon, T & lp_lat) const
+                {
+                    if (zone <= 2 || zone >= 9) // 1, 2, 9, 10, 11, 12
+                        moll.inv(par, xy_x, xy_y, lp_lon, lp_lat);
+                    else // 3, 4, 5, 6, 7, 8
+                        sinu.inv(par, xy_x, xy_y, lp_lon, lp_lat);
+                }
+
+                inline void set_zone(int zone, T const& x_0, T const& y_0, T const& lon_0)
+                {
+                    zones[zone - 1].x0 = x_0;
+                    zones[zone - 1].y0 = y_0;
+                    zones[zone - 1].lam0 = lon_0;
+                }
+
+                inline par_igh_zone<T> const& get_zone(int zone) const
+                {
+                    return zones[zone - 1];
+                }
             };
 
             /* 40d 44' 11.8" [degrees] */
@@ -98,36 +155,19 @@ namespace projections
 
             static const double epsilon = 1.e-10; // allow a little 'slack' on zone edge positions
 
-            // Converted from #define SETUP(n, proj, x_0, y_0, lon_0)
-            template <template <typename, typename, typename> class Entry, typename Params, typename Parameters, typename T>
-            inline void do_setup(int n, Params const& params, Parameters const& par, par_igh<T, Parameters>& proj_parm,
-                                 T const& x_0, T const& y_0,
-                                 T const& lon_0)
-            {
-                // NOTE: in the original proj4 these projections are initialized
-                // with zeroed parameters which could be done here as well instead
-                // of initializing with parent projection's parameters.
-                Entry<Params, T, Parameters> entry;
-                proj_parm.pj[n-1].reset(entry.create_new(params, par));
-                proj_parm.pj[n-1]->mutable_params().x0 = x_0;
-                proj_parm.pj[n-1]->mutable_params().y0 = y_0;
-                proj_parm.pj[n-1]->mutable_params().lam0 = lon_0;
-            }
-
-            // template class, using CRTP to implement forward/inverse
             template <typename T, typename Parameters>
             struct base_igh_spheroid
-                : public base_t_fi<base_igh_spheroid<T, Parameters>, T, Parameters>
             {
                 par_igh<T, Parameters> m_proj_parm;
 
-                inline base_igh_spheroid(const Parameters& par)
-                    : base_t_fi<base_igh_spheroid<T, Parameters>, T, Parameters>(*this, par)
+                template <typename Params>
+                inline base_igh_spheroid(Params const& params, Parameters & par)
+                    : m_proj_parm(params, par)
                 {}
 
                 // FORWARD(s_forward)  spheroid
                 // Project coordinates from geographic (lon, lat) to cartesian (x, y)
-                inline void fwd(T lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
+                inline void fwd(Parameters const& par, T lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
                 {
                     static const T d4044118 = igh::d4044118<T>();
                     static const T d20  =  igh::d20<T>();
@@ -155,15 +195,15 @@ namespace projections
                           else z = 12;                      // 12
                         }
 
-                        lp_lon -= this->m_proj_parm.pj[z-1]->params().lam0;
-                        this->m_proj_parm.pj[z-1]->fwd(lp_lon, lp_lat, xy_x, xy_y);
-                        xy_x += this->m_proj_parm.pj[z-1]->params().x0;
-                        xy_y += this->m_proj_parm.pj[z-1]->params().y0;
+                        lp_lon -= this->m_proj_parm.get_zone(z).lam0;
+                        this->m_proj_parm.fwd(z, par, lp_lon, lp_lat, xy_x, xy_y);
+                        xy_x += this->m_proj_parm.get_zone(z).x0;
+                        xy_y += this->m_proj_parm.get_zone(z).y0;
                 }
 
                 // INVERSE(s_inverse)  spheroid
                 // Project coordinates from cartesian (x, y) to geographic (lon, lat)
-                inline void inv(T xy_x, T xy_y, T& lp_lon, T& lp_lat) const
+                inline void inv(Parameters const& par, T xy_x, T xy_y, T& lp_lon, T& lp_lat) const
                 {
                     static const T d4044118 = igh::d4044118<T>();
                     static const T d10  =  igh::d10<T>();
@@ -205,10 +245,10 @@ namespace projections
                         {
                           int ok = 0;
 
-                          xy_x -= this->m_proj_parm.pj[z-1]->params().x0;
-                          xy_y -= this->m_proj_parm.pj[z-1]->params().y0;
-                          this->m_proj_parm.pj[z-1]->inv(xy_x, xy_y, lp_lon, lp_lat);
-                          lp_lon += this->m_proj_parm.pj[z-1]->params().lam0;
+                          xy_x -= this->m_proj_parm.get_zone(z).x0;
+                          xy_y -= this->m_proj_parm.get_zone(z).y0;
+                          this->m_proj_parm.inv(z, par, xy_x, xy_y, lp_lon, lp_lat);
+                          lp_lon += this->m_proj_parm.get_zone(z).lam0;
 
                           switch (z) {
                             case  1: ok = (lp_lon >= -d180-epsilon && lp_lon <=  -d40+epsilon) ||
@@ -282,40 +322,37 @@ namespace projections
                     T xy1_x, xy1_y;
                     T xy3_x, xy3_y;
 
-                    // IMPORTANT: Force spherical sinu projection
-                    // This is required because unlike in the original proj4 here
-                    // parameters are used to initialize underlying projections.
-                    // In the original code zeroed parameters are passed which
-                    // could be done here as well though.
-                    par.es = 0.;
-
                     // sinusoidal zones
-                    do_setup<sinu_entry>(3, params, par, proj_parm, -d100, d0, -d100);
-                    do_setup<sinu_entry>(4, params, par, proj_parm,   d30, d0,   d30);
-                    do_setup<sinu_entry>(5, params, par, proj_parm, -d160, d0, -d160);
-                    do_setup<sinu_entry>(6, params, par, proj_parm,  -d60, d0,  -d60);
-                    do_setup<sinu_entry>(7, params, par, proj_parm,   d20, d0,   d20);
-                    do_setup<sinu_entry>(8, params, par, proj_parm,  d140, d0,  d140);
+                    proj_parm.set_zone(3, -d100, d0, -d100);
+                    proj_parm.set_zone(4,   d30, d0,   d30);
+                    proj_parm.set_zone(5, -d160, d0, -d160);
+                    proj_parm.set_zone(6,  -d60, d0,  -d60);
+                    proj_parm.set_zone(7,   d20, d0,   d20);
+                    proj_parm.set_zone(8,  d140, d0,  d140);
 
                     // mollweide zones
-                    do_setup<moll_entry>(1, params, par, proj_parm, -d100, d0, -d100);
+                    proj_parm.set_zone(1, -d100, d0, -d100);
+
+                    // NOTE: x0, y0, lam0 are not used in moll nor sinu fwd
+                    // so the order of initialization doesn't matter that much.
+                    // But keep the original one from Proj4.
 
                     // y0 ?
-                     proj_parm.pj[0]->fwd(lp_lam, lp_phi, xy1_x, xy1_y); // zone 1
-                     proj_parm.pj[2]->fwd(lp_lam, lp_phi, xy3_x, xy3_y); // zone 3
+                    proj_parm.fwd(1, par, lp_lam, lp_phi, xy1_x, xy1_y); // zone 1
+                    proj_parm.fwd(3, par, lp_lam, lp_phi, xy3_x, xy3_y); // zone 3
                     // y0 + xy1_y = xy3_y for lt = 40d44'11.8"
                     proj_parm.dy0 = xy3_y - xy1_y;
 
-                    proj_parm.pj[0]->mutable_params().y0 = proj_parm.dy0;
+                    proj_parm.zones[0].y0 = proj_parm.dy0; // zone 1
 
                     // mollweide zones (cont'd)
-                    do_setup<moll_entry>( 2, params, par, proj_parm,   d30,  proj_parm.dy0,   d30);
-                    do_setup<moll_entry>( 9, params, par, proj_parm, -d160, -proj_parm.dy0, -d160);
-                    do_setup<moll_entry>(10, params, par, proj_parm,  -d60, -proj_parm.dy0,  -d60);
-                    do_setup<moll_entry>(11, params, par, proj_parm,   d20, -proj_parm.dy0,   d20);
-                    do_setup<moll_entry>(12, params, par, proj_parm,  d140, -proj_parm.dy0,  d140);
+                    proj_parm.set_zone(2,   d30,  proj_parm.dy0,   d30);
+                    proj_parm.set_zone(9, -d160, -proj_parm.dy0, -d160);
+                    proj_parm.set_zone(10, -d60, -proj_parm.dy0,  -d60);
+                    proj_parm.set_zone(11,  d20, -proj_parm.dy0,   d20);
+                    proj_parm.set_zone(12, d140, -proj_parm.dy0,  d140);
 
-                    // Already done before
+                    // NOTE: Already done before in sinu and moll constructor
                     //par.es = 0.;
             }
 
@@ -338,10 +375,10 @@ namespace projections
     struct igh_spheroid : public detail::igh::base_igh_spheroid<T, Parameters>
     {
         template <typename Params>
-        inline igh_spheroid(Params const& params, Parameters const& par)
-            : detail::igh::base_igh_spheroid<T, Parameters>(par)
+        inline igh_spheroid(Params const& params, Parameters & par)
+            : detail::igh::base_igh_spheroid<T, Parameters>(params, par)
         {
-            detail::igh::setup_igh(params, this->m_par, this->m_proj_parm);
+            detail::igh::setup_igh(params, par, this->m_proj_parm);
         }
     };
 
@@ -350,7 +387,7 @@ namespace projections
     {
 
         // Static projection
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_igh, igh_spheroid, igh_spheroid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI(srs::spar::proj_igh, igh_spheroid)
 
         // Factory entry(s)
         BOOST_GEOMETRY_PROJECTIONS_DETAIL_FACTORY_ENTRY_FI(igh_entry, igh_spheroid)

@@ -3,7 +3,7 @@
 // See http://www.boost.org for updates, documentation, and revision history.
 //-----------------------------------------------------------------------------
 //
-// Copyright (c) 2013-2019 Antony Polukhin
+// Copyright (c) 2013-2021 Antony Polukhin
 //
 // Distributed under the Boost Software License, Version 1.0. (See
 // accompanying file LICENSE_1_0.txt or copy at
@@ -132,11 +132,16 @@ public: // visitor interfaces
 }} // namespace detail::variant
 
 #ifndef BOOST_VARIANT_AUX_GET_EXPLICIT_TEMPLATE_TYPE
-#   if !BOOST_WORKAROUND(__BORLANDC__, BOOST_TESTED_AT(0x0551))
+#   if !BOOST_WORKAROUND(BOOST_BORLANDC, BOOST_TESTED_AT(0x0551))
 #       define BOOST_VARIANT_AUX_GET_EXPLICIT_TEMPLATE_TYPE(t)
 #   else
-#       define BOOST_VARIANT_AUX_GET_EXPLICIT_TEMPLATE_TYPE(t)  \
-        , t* = 0
+#       if defined(BOOST_NO_NULLPTR)
+#           define BOOST_VARIANT_AUX_GET_EXPLICIT_TEMPLATE_TYPE(t)  \
+            , t* = 0
+#       else
+#           define BOOST_VARIANT_AUX_GET_EXPLICIT_TEMPLATE_TYPE(t)  \
+            , t* = nullptr
+#       endif
 #   endif
 #endif
 

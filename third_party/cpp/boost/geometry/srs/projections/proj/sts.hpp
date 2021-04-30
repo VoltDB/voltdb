@@ -2,8 +2,8 @@
 
 // Copyright (c) 2008-2015 Barend Gehrels, Amsterdam, the Netherlands.
 
-// This file was modified by Oracle on 2017, 2018.
-// Modifications copyright (c) 2017-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2017, 2018, 2019.
+// Modifications copyright (c) 2017-2019, Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle.
 
 // Use, modification and distribution is subject to the Boost Software License,
@@ -61,20 +61,14 @@ namespace projections
                 bool tan_mode;
             };
 
-            // template class, using CRTP to implement forward/inverse
             template <typename T, typename Parameters>
             struct base_sts_spheroid
-                : public base_t_fi<base_sts_spheroid<T, Parameters>, T, Parameters>
             {
                 par_sts<T> m_proj_parm;
 
-                inline base_sts_spheroid(const Parameters& par)
-                    : base_t_fi<base_sts_spheroid<T, Parameters>, T, Parameters>(*this, par)
-                {}
-
                 // FORWARD(s_forward)  spheroid
                 // Project coordinates from geographic (lon, lat) to cartesian (x, y)
-                inline void fwd(T const& lp_lon, T lp_lat, T& xy_x, T& xy_y) const
+                inline void fwd(Parameters const& , T const& lp_lon, T lp_lat, T& xy_x, T& xy_y) const
                 {
                     T c;
 
@@ -93,7 +87,7 @@ namespace projections
 
                 // INVERSE(s_inverse)  spheroid
                 // Project coordinates from cartesian (x, y) to geographic (lon, lat)
-                inline void inv(T const& xy_x, T xy_y, T& lp_lon, T& lp_lat) const
+                inline void inv(Parameters const& , T const& xy_x, T xy_y, T& lp_lon, T& lp_lat) const
                 {
                     T c;
 
@@ -172,10 +166,9 @@ namespace projections
     struct kav5_spheroid : public detail::sts::base_sts_spheroid<T, Parameters>
     {
         template <typename Params>
-        inline kav5_spheroid(Params const& , Parameters const& par)
-            : detail::sts::base_sts_spheroid<T, Parameters>(par)
+        inline kav5_spheroid(Params const& , Parameters & par)
         {
-            detail::sts::setup_kav5(this->m_par, this->m_proj_parm);
+            detail::sts::setup_kav5(par, this->m_proj_parm);
         }
     };
 
@@ -195,10 +188,9 @@ namespace projections
     struct qua_aut_spheroid : public detail::sts::base_sts_spheroid<T, Parameters>
     {
         template <typename Params>
-        inline qua_aut_spheroid(Params const& , Parameters const& par)
-            : detail::sts::base_sts_spheroid<T, Parameters>(par)
+        inline qua_aut_spheroid(Params const& , Parameters & par)
         {
-            detail::sts::setup_qua_aut(this->m_par, this->m_proj_parm);
+            detail::sts::setup_qua_aut(par, this->m_proj_parm);
         }
     };
 
@@ -218,10 +210,9 @@ namespace projections
     struct mbt_s_spheroid : public detail::sts::base_sts_spheroid<T, Parameters>
     {
         template <typename Params>
-        inline mbt_s_spheroid(Params const& , Parameters const& par)
-            : detail::sts::base_sts_spheroid<T, Parameters>(par)
+        inline mbt_s_spheroid(Params const& , Parameters & par)
         {
-            detail::sts::setup_mbt_s(this->m_par, this->m_proj_parm);
+            detail::sts::setup_mbt_s(par, this->m_proj_parm);
         }
     };
 
@@ -241,10 +232,9 @@ namespace projections
     struct fouc_spheroid : public detail::sts::base_sts_spheroid<T, Parameters>
     {
         template <typename Params>
-        inline fouc_spheroid(Params const& , Parameters const& par)
-            : detail::sts::base_sts_spheroid<T, Parameters>(par)
+        inline fouc_spheroid(Params const& , Parameters & par)
         {
-            detail::sts::setup_fouc(this->m_par, this->m_proj_parm);
+            detail::sts::setup_fouc(par, this->m_proj_parm);
         }
     };
 
@@ -253,10 +243,10 @@ namespace projections
     {
 
         // Static projection
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_kav5, kav5_spheroid, kav5_spheroid)
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_qua_aut, qua_aut_spheroid, qua_aut_spheroid)
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_mbt_s, mbt_s_spheroid, mbt_s_spheroid)
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_fouc, fouc_spheroid, fouc_spheroid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI(srs::spar::proj_kav5, kav5_spheroid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI(srs::spar::proj_qua_aut, qua_aut_spheroid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI(srs::spar::proj_mbt_s, mbt_s_spheroid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI(srs::spar::proj_fouc, fouc_spheroid)
 
         // Factory entry(s)
         BOOST_GEOMETRY_PROJECTIONS_DETAIL_FACTORY_ENTRY_FI(kav5_entry, kav5_spheroid)

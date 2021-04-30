@@ -5,8 +5,8 @@
 // Copyright (c) 2009-2013 Mateusz Loskot, London, UK.
 // Copyright (c) 2013-2014 Adam Wulkiewicz, Lodz, Poland.
 
-// This file was modified by Oracle on 2017.
-// Modifications copyright (c) 2017 Oracle and/or its affiliates.
+// This file was modified by Oracle on 2017-2020.
+// Modifications copyright (c) 2017-2020 Oracle and/or its affiliates.
 
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
@@ -19,8 +19,9 @@
 
 #include <deque>
 
-#include <boost/range.hpp>
-#include <boost/type_traits/remove_reference.hpp>
+#include <boost/range/begin.hpp>
+#include <boost/range/end.hpp>
+#include <boost/range/size.hpp>
 
 #include <boost/variant/apply_visitor.hpp>
 #include <boost/variant/static_visitor.hpp>
@@ -84,7 +85,9 @@ struct range_remove_spikes
             return;
         }
 
-        std::deque<point_type> cleaned;
+        std::vector<point_type> cleaned;
+        cleaned.reserve(n);
+
         for (typename boost::range_iterator<Range const>::type it = boost::begin(range);
             it != boost::end(range); ++it)
         {
@@ -102,10 +105,16 @@ struct range_remove_spikes
             }
         }
 
+        typedef typename std::vector<point_type>::iterator cleaned_iterator;
+        cleaned_iterator cleaned_b = cleaned.begin();
+        cleaned_iterator cleaned_e = cleaned.end();
+        std::size_t cleaned_count = cleaned.size();
+
         // For a closed-polygon, remove closing point, this makes checking first point(s) easier and consistent
         if ( BOOST_GEOMETRY_CONDITION(geometry::closure<Range>::value == geometry::closed) )
         {
-            cleaned.pop_back();
+            --cleaned_e;
+            --cleaned_count;
         }
 
         bool found = false;
@@ -113,45 +122,50 @@ struct range_remove_spikes
         {
             found = false;
             // Check for spike in first point
-            int const penultimate = 2;
-            while(cleaned.size() >= 3
-                  && detail::is_spike_or_equal(range::at(cleaned, cleaned.size() - penultimate),
-                                               range::back(cleaned),
-                                               range::front(cleaned),
+            while(cleaned_count >= 3
+                  && detail::is_spike_or_equal(*(cleaned_e - 2), // prev
+                                               *(cleaned_e - 1), // back
+                                               *(cleaned_b),     // front
                                                strategy))
             {
-                cleaned.pop_back();
+                --cleaned_e;
+                --cleaned_count;
                 found = true;
             }
             // Check for spike in second point
-            while(cleaned.size() >= 3
-                  && detail::is_spike_or_equal(range::back(cleaned),
-                                               range::front(cleaned),
-                                               range::at(cleaned, 1),
+            while(cleaned_count >= 3
+                  && detail::is_spike_or_equal(*(cleaned_e - 1), // back
+                                               *(cleaned_b),     // front
+                                               *(cleaned_b + 1), // next
                                                strategy))
             {
-                cleaned.pop_front();
+                ++cleaned_b;
+                --cleaned_count;
                 found = true;
             }
         }
         while (found);
 
-        if (cleaned.size() == 2)
+        if (cleaned_count == 2)
         {
             // Ticket #9871: open polygon with only two points.
             // the second point forms, by definition, a spike
-            cleaned.pop_back();
+            --cleaned_e;
+            //--cleaned_count;
         }
 
         // Close if necessary
         if ( BOOST_GEOMETRY_CONDITION(geometry::closure<Range>::value == geometry::closed) )
         {
-            cleaned.push_back(cleaned.front());
+            BOOST_GEOMETRY_ASSERT(cleaned_e != cleaned.end());
+            *cleaned_e = *cleaned_b;
+            ++cleaned_e;
+            //++cleaned_count;
         }
 
         // Copy output
         geometry::clear(range);
-        std::copy(cleaned.begin(), cleaned.end(), range::back_inserter(range));
+        std::copy(cleaned_b, cleaned_e, range::back_inserter(range));
     }
 };
 

@@ -8,8 +8,8 @@
     LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 =============================================================================*/
 
-#if !defined(CPP_CHLIT_GRAMMAR_HPP_9527D349_6592_449A_A409_42A001E6C64C_INCLUDED)
-#define CPP_CHLIT_GRAMMAR_HPP_9527D349_6592_449A_A409_42A001E6C64C_INCLUDED
+#if !defined(BOOST_CPP_CHLIT_GRAMMAR_HPP_9527D349_6592_449A_A409_42A001E6C64C_INCLUDED)
+#define BOOST_CPP_CHLIT_GRAMMAR_HPP_9527D349_6592_449A_A409_42A001E6C64C_INCLUDED
 
 #include <limits>     // std::numeric_limits
 #include <climits>    // CHAR_BIT
@@ -274,7 +274,7 @@ struct chlit_grammar :
             BOOST_SPIRIT_DEBUG_TRACE_RULE(ch_lit, TRACE_CHLIT_GRAMMAR);
         }
 
-    // start rule of this grammar
+        // start rule of this grammar
         rule_t const& start() const
         { return ch_lit; }
     };
@@ -316,22 +316,22 @@ parse_info<typename TokenT::string_type::const_iterator> hit =
             token_val.c_str(), token.get_position());
     }
     else {
-    // range check
+        // range check
         if ('L' == token_val[0]) {
-        // recognized wide character
+            // recognized wide character
             if (g.overflow ||
                 result > (IntegralResult)(std::numeric_limits<wchar_t>::max)())
             {
-            // out of range
+                // out of range
                 status = error_character_overflow;
             }
         }
         else {
-        // recognized narrow ('normal') character
+            // recognized narrow ('normal') character
             if (g.overflow ||
                 result > (IntegralResult)(std::numeric_limits<unsigned char>::max)())
             {
-            // out of range
+                // out of range
                 status = error_character_overflow;
             }
         }
@@ -351,4 +351,4 @@ parse_info<typename TokenT::string_type::const_iterator> hit =
 #include BOOST_ABI_SUFFIX
 #endif
 
-#endif // !defined(CPP_CHLIT_GRAMMAR_HPP_9527D349_6592_449A_A409_42A001E6C64C_INCLUDED)
+#endif // !defined(BOOST_CPP_CHLIT_GRAMMAR_HPP_9527D349_6592_449A_A409_42A001E6C64C_INCLUDED)

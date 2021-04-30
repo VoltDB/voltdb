@@ -10,7 +10,8 @@
 #include <limits>
 #include <type_traits> // is_base_of, is_same, is_floating_point, conditional
 #include <algorithm>   // max
-#include <cassert>
+#include <istream>
+#include <ostream>
 
 #include <boost/config.hpp>
 
@@ -20,7 +21,6 @@
 
 #include "checked_integer.hpp"
 #include "checked_result.hpp"
-#include "checked_result_operations.hpp"
 #include "safe_base.hpp"
 
 #include "interval.hpp"
@@ -32,27 +32,29 @@ namespace safe_numerics {
 /////////////////////////////////////////////////////////////////
 // validation
 
-template<typename R, R Min, R Max, typename T, typename E>
+template<typename R, R Min, R Max, typename E>
 struct validate_detail {
     using r_type = checked_result<R>;
 
     struct exception_possible {
+        template<typename T>
         constexpr static R return_value(
             const T & t
         ){
             // INT08-C
             const r_type rx = heterogeneous_checked_operation<
                 R,
+                Min,
+                Max,
                 typename base_type<T>::type,
                 dispatch_and_return<E, R>
             >::cast(t);
-            const R r = rx.exception()
-                ? static_cast<R>(t)
-                : rx.m_r;
-            return r;
+
+            return rx;
         }
     };
     struct exception_not_possible {
+        template<typename T>
         constexpr static R return_value(
             const T & t
         ){
@@ -60,6 +62,7 @@ struct validate_detail {
         }
     };
 
+    template<typename T>
     constexpr static R return_value(const T & t){
         constexpr const interval<r_type> t_interval{
             checked::cast<R>(base_value(std::numeric_limits<T>::min())),
@@ -67,13 +70,10 @@ struct validate_detail {
         };
         constexpr const interval<r_type> r_interval{r_type(Min), r_type(Max)};
 
-        /*
         static_assert(
-            true != r_interval.excludes(t_interval),
-            "ranges don't overlap: can't cast"
+            true != static_cast<bool>(r_interval.excludes(t_interval)),
+            "can't cast from ranges that don't overlap"
         );
-        */
-
         return std::conditional<
             static_cast<bool>(r_interval.includes(t_interval)),
             exception_not_possible,
@@ -84,75 +84,50 @@ struct validate_detail {
 
 template<class Stored, Stored Min, Stored Max, class P, class E>
 template<class T>
-constexpr Stored safe_base<Stored, Min, Max, P, E>::
+constexpr inline Stored safe_base<Stored, Min, Max, P, E>::
 validated_cast(const T & t) const {
-    return validate_detail<Stored,Min,Max,T,E>::return_value(t);
-}
-
-template<class Stored, Stored Min, Stored Max, class P, class E>
-template<typename T, T N, class P1, class E1>
-constexpr Stored safe_base<Stored, Min, Max, P, E>::
-validated_cast(const safe_literal_impl<T, N, P1, E1> &) const {
-    constexpr const interval<Stored> this_interval{};
-    // if static values don't overlap, the program can never function
-    static_assert(
-        this_interval.includes(N),
-        "safe type cannot be constructed from this value"
-    );
-    return static_cast<Stored>(N);
+    return validate_detail<Stored,Min,Max,E>::return_value(t);
 }
 
 /////////////////////////////////////////////////////////////////
 // constructors
 
+// default constructor
 template<class Stored, Stored Min, Stored Max, class P, class E>
-    constexpr /*explicit*/ safe_base<Stored, Min, Max, P, E>::safe_base(
+constexpr inline /*explicit*/ safe_base<Stored, Min, Max, P, E>::safe_base(){
+    dispatch<E, safe_numerics_error::uninitialized_value>(
+        "safe values must be initialized"
+    );
+}
+// construct an instance of a safe type from an instance of a convertible underlying type.
+template<class Stored, Stored Min, Stored Max, class P, class E>
+constexpr inline /*explicit*/ safe_base<Stored, Min, Max, P, E>::safe_base(
     const Stored & rhs,
     skip_validation
 ) :
     m_t(rhs)
 {}
 
+// construct an instance from an instance of a convertible underlying type.
 template<class Stored, Stored Min, Stored Max, class P, class E>
-constexpr /*explicit*/ safe_base<Stored, Min, Max, P, E>::safe_base(){
-    dispatch<E, safe_numerics_error::uninitialized_value>(
-        "safe values must be initialized"
-    );
-}
-
-// construct an instance of a safe type
-// from an instance of a convertible underlying type.
-template<class Stored, Stored Min, Stored Max, class P, class E>
-template<class T>
-constexpr /*explicit*/ safe_base<Stored, Min, Max, P, E>::safe_base(
-    const T & t,
-    typename std::enable_if<
-        is_safe<T>::value,
-        bool
-    >::type
-) :
+    template<
+        class T,
+        typename std::enable_if<
+            std::is_convertible<T, Stored>::value,
+            bool
+        >::type
+    >
+constexpr inline /*explicit*/ safe_base<Stored, Min, Max, P, E>::safe_base(const T &t) :
     m_t(validated_cast(t))
 {}
 
+// construct an instance of a safe type from a literal value
 template<class Stored, Stored Min, Stored Max, class P, class E>
-template<class T>
-constexpr /*explicit*/ safe_base<Stored, Min, Max, P, E>::safe_base(
-    const T & t,
-    typename std::enable_if<
-        std::is_integral<T>::value,
-        bool
-    >::type
+template<typename T, T N, class Px, class Ex>
+constexpr inline /*explicit*/ safe_base<Stored, Min, Max, P, E>::safe_base(
+    const safe_literal_impl<T, N, Px, Ex> & t
 ) :
     m_t(validated_cast(t))
-{}
-
-template<class Stored, Stored Min, Stored Max, class P, class E>
-template<class T, T value>
-constexpr /*explicit*/ safe_base<Stored, Min, Max, P, E>::safe_base(
-
-    const std::integral_constant<T, value> &
-) :
-    m_t(validated_cast(value))
 {}
 
 /////////////////////////////////////////////////////////////////
@@ -167,34 +142,21 @@ template<
         int
     >::type
 >
-constexpr safe_base<Stored, Min, Max, P, E>::
+constexpr inline safe_base<Stored, Min, Max, P, E>::
 operator R () const {
-
     // if static values don't overlap, the program can never function
-    #if 0
     constexpr const interval<R> r_interval;
     constexpr const interval<Stored> this_interval(Min, Max);
     static_assert(
         ! r_interval.excludes(this_interval),
         "safe type cannot be constructed with this type"
     );
-    #endif
-    
     return validate_detail<
         R,
         std::numeric_limits<R>::min(),
         std::numeric_limits<R>::max(),
-        Stored,
         E
     >::return_value(m_t);
-
-}
-
-// cast to the underlying builtin type from a safe type
-template< class Stored, Stored Min, Stored Max, class P, class E>
-constexpr safe_base<Stored, Min, Max, P, E>::
-operator Stored () const {
-    return m_t;
 }
 
 /////////////////////////////////////////////////////////////////
@@ -280,32 +242,34 @@ struct common_promotion_policy {
 // type will be.  Note we currently need this because we support
 // return of only safe integer types. Someday ..., we'll support
 // all other safe types including float and user defined ones.
-//
 
 // helper - cast arguments to binary operators to a specified
 // result type
 
 template<class EP, class R, class T, class U>
-std::pair<R, R>
-constexpr static casting_helper(const T & t, const U & u){
+constexpr inline static std::pair<R, R> casting_helper(const T & t, const U & u){
     using r_type = checked_result<R>;
     const r_type tx = heterogeneous_checked_operation<
         R,
+        std::numeric_limits<R>::min(),
+        std::numeric_limits<R>::max(),
         typename base_type<T>::type,
         dispatch_and_return<EP, R>
     >::cast(base_value(t));
     const R tr = tx.exception()
         ? static_cast<R>(t)
-        : tx.m_r;
+        : tx.m_contents.m_r;
 
     const r_type ux = heterogeneous_checked_operation<
         R,
+        std::numeric_limits<R>::min(),
+        std::numeric_limits<R>::max(),
         typename base_type<U>::type,
         dispatch_and_return<EP, R>
     >::cast(base_value(u));
     const R ur = ux.exception()
         ? static_cast<R>(u)
-        : ux.m_r;
+        : ux.m_contents.m_r;
     return std::pair<R, R>(tr, ur);
 }
 
@@ -350,7 +314,7 @@ private:
         return
             rx.exception()
             ? r.first + r.second
-            : rx.m_r;
+            : rx.m_contents.m_r;
     }
 
     using r_type_interval_t = interval<r_type>;
@@ -417,7 +381,7 @@ typename boost::lazy_enable_if_c<
     is_safe<T>::value || is_safe<U>::value,
     addition_result<T, U>
 >::type
-constexpr operator+(const T & t, const U & u){
+constexpr inline operator+(const T & t, const U & u){
     return addition_result<T, U>::return_value(t, u);
 }
 
@@ -426,7 +390,7 @@ typename std::enable_if<
     is_safe<T>::value || is_safe<U>::value,
     T
 >::type
-constexpr operator+=(T & t, const U & u){
+constexpr inline operator+=(T & t, const U & u){
     t = static_cast<T>(t + u);
     return t;
 }
@@ -469,7 +433,7 @@ private:
         return
             rx.exception()
             ? r.first + r.second
-            : rx.m_r;
+            : rx.m_contents.m_r;
     }
     using r_type_interval_t = interval<r_type>;
 
@@ -486,7 +450,7 @@ private:
 
         return t_interval - u_interval;
     }
-    static constexpr const r_type_interval_t r_type_interval = get_r_type_interval();
+    constexpr static const r_type_interval_t r_type_interval = get_r_type_interval();
 
     constexpr static const interval<result_base_type> return_interval{
         r_type_interval.l.exception()
@@ -537,7 +501,7 @@ typename boost::lazy_enable_if_c<
     is_safe<T>::value || is_safe<U>::value,
     subtraction_result<T, U>
 >::type
-constexpr operator-(const T & t, const U & u){
+constexpr inline operator-(const T & t, const U & u){
     return subtraction_result<T, U>::return_value(t, u);
 }
 
@@ -546,7 +510,7 @@ typename std::enable_if<
     is_safe<T>::value || is_safe<U>::value,
     T
 >::type
-constexpr operator-=(T & t, const U & u){
+constexpr inline operator-=(T & t, const U & u){
     t = static_cast<T>(t - u);
     return t;
 }
@@ -589,7 +553,7 @@ private:
         return
             rx.exception()
             ? r.first * r.second
-            : rx.m_r;
+            : rx.m_contents.m_r;
     }
 
     using r_type_interval_t = interval<r_type>;
@@ -608,7 +572,7 @@ private:
         return t_interval * u_interval;
     }
 
-    static constexpr const r_type_interval_t r_type_interval = get_r_type_interval();
+    constexpr static const r_type_interval_t r_type_interval = get_r_type_interval();
 
     constexpr static const interval<result_base_type> return_interval{
         r_type_interval.l.exception()
@@ -659,7 +623,7 @@ typename boost::lazy_enable_if_c<
     is_safe<T>::value || is_safe<U>::value,
     multiplication_result<T, U>
 >::type
-constexpr operator*(const T & t, const U & u){
+constexpr inline operator*(const T & t, const U & u){
     // argument dependent lookup should guarentee that we only get here
     return multiplication_result<T, U>::return_value(t, u);
 }
@@ -669,7 +633,7 @@ typename std::enable_if<
     is_safe<T>::value || is_safe<U>::value,
     T
 >::type
-constexpr operator*=(T & t, const U & u){
+constexpr inline operator*=(T & t, const U & u){
     t = static_cast<T>(t * u);
     return t;
 }
@@ -696,7 +660,7 @@ private:
     // if exception possible
     using exception_policy = typename common_exception_policy<T, U>::type;
 
-    constexpr static int bits = std::min(
+    constexpr static const int bits = std::min(
         std::numeric_limits<std::uintmax_t>::digits,
         std::max(std::initializer_list<int>{
             std::numeric_limits<result_base_type>::digits,
@@ -767,7 +731,7 @@ private:
         );
     }
 
-    static constexpr const r_type_interval_t r_type_interval = get_r_type_interval();
+    constexpr static const r_type_interval_t r_type_interval = get_r_type_interval();
 
     constexpr static const interval<result_base_type> return_interval{
         r_type_interval.l.exception()
@@ -817,7 +781,7 @@ typename boost::lazy_enable_if_c<
     is_safe<T>::value || is_safe<U>::value,
     division_result<T, U>
 >::type
-constexpr operator/(const T & t, const U & u){
+constexpr inline operator/(const T & t, const U & u){
     return division_result<T, U>::return_value(t, u);
 }
 
@@ -826,7 +790,7 @@ typename std::enable_if<
     is_safe<T>::value || is_safe<U>::value,
     T
 >::type
-constexpr operator/=(T & t, const U & u){
+constexpr inline operator/=(T & t, const U & u){
     t = static_cast<T>(t / u);
     return t;
 }
@@ -851,7 +815,7 @@ private:
     // if exception possible
     using exception_policy = typename common_exception_policy<T, U>::type;
 
-    constexpr static int bits = std::min(
+    constexpr static const int bits = std::min(
         std::numeric_limits<std::uintmax_t>::digits,
         std::max(std::initializer_list<int>{
             std::numeric_limits<result_base_type>::digits,
@@ -924,7 +888,7 @@ private:
         );
     }
 
-    static constexpr const r_type_interval_t r_type_interval = get_r_type_interval();
+    constexpr static const r_type_interval_t r_type_interval = get_r_type_interval();
 
     constexpr static const interval<result_base_type> return_interval{
         r_type_interval.l.exception()
@@ -974,7 +938,7 @@ typename boost::lazy_enable_if_c<
    is_safe<T>::value || is_safe<U>::value,
     modulus_result<T, U>
 >::type
-constexpr operator%(const T & t, const U & u){
+constexpr inline operator%(const T & t, const U & u){
     // see https://en.wikipedia.org/wiki/Modulo_operation
     return modulus_result<T, U>::return_value(t, u);
 }
@@ -984,7 +948,7 @@ typename std::enable_if<
     is_safe<T>::value || is_safe<U>::value,
     T
 >::type
-constexpr operator%=(T & t, const U & u){
+constexpr inline operator%=(T & t, const U & u){
     t = static_cast<T>(t % u);
     return t;
 }
@@ -1064,7 +1028,7 @@ typename std::enable_if<
     is_safe<T>::value || is_safe<U>::value,
     bool
 >::type
-constexpr operator<(const T & lhs, const U & rhs) {
+constexpr inline operator<(const T & lhs, const U & rhs) {
     return less_than_result<T, U>::return_value(lhs, rhs);
 }
 
@@ -1073,7 +1037,7 @@ typename std::enable_if<
     is_safe<T>::value || is_safe<U>::value,
     bool
 >::type
-constexpr operator>(const T & lhs, const U & rhs) {
+constexpr inline operator>(const T & lhs, const U & rhs) {
     return rhs < lhs;
 }
 
@@ -1082,7 +1046,7 @@ typename std::enable_if<
     is_safe<T>::value || is_safe<U>::value,
     bool
 >::type
-constexpr operator>=(const T & lhs, const U & rhs) {
+constexpr inline operator>=(const T & lhs, const U & rhs) {
     return ! ( lhs < rhs );
 }
 
@@ -1091,7 +1055,7 @@ typename std::enable_if<
     is_safe<T>::value || is_safe<U>::value,
     bool
 >::type
-constexpr operator<=(const T & lhs, const U & rhs) {
+constexpr inline operator<=(const T & lhs, const U & rhs) {
     return ! ( lhs > rhs );
 }
 
@@ -1166,7 +1130,7 @@ typename std::enable_if<
     is_safe<T>::value || is_safe<U>::value,
     bool
 >::type
-constexpr operator==(const T & lhs, const U & rhs) {
+constexpr inline operator==(const T & lhs, const U & rhs) {
     return equal_result<T, U>::return_value(lhs, rhs);
 }
 
@@ -1175,11 +1139,15 @@ typename std::enable_if<
     is_safe<T>::value || is_safe<U>::value,
     bool
 >::type
-constexpr operator!=(const T & lhs, const U & rhs) {
+constexpr inline operator!=(const T & lhs, const U & rhs) {
     return ! (lhs == rhs);
 }
 
-/////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////
+// The following operators only make sense when applied to integet types
+
+/////////////////////////////////////////////////////////////////////////
 // shift operators
 
 // left shift
@@ -1218,7 +1186,7 @@ private:
         return
             rx.exception()
             ? r.first << r.second
-            : rx.m_r;
+            : rx.m_contents.m_r;
     }
 
     using r_type_interval_t = interval<r_type>;
@@ -1236,7 +1204,7 @@ private:
         return (t_interval << u_interval);
     }
 
-    static constexpr const r_type_interval_t r_type_interval = get_r_type_interval();
+    constexpr static const r_type_interval_t r_type_interval = get_r_type_interval();
 
     constexpr static const interval<result_base_type> return_interval{
         r_type_interval.l.exception()
@@ -1257,8 +1225,8 @@ private:
         return false;
     }
 
-    constexpr static auto rl = return_interval.l;
-    constexpr static auto ru = return_interval.u;
+    constexpr static const auto rl = return_interval.l;
+    constexpr static const auto ru = return_interval.u;
 
 public:
     using type =
@@ -1290,14 +1258,16 @@ typename boost::lazy_enable_if_c<
     && (is_safe<T>::value || is_safe<U>::value),
     left_shift_result<T, U>
 >::type
-constexpr operator<<(const T & t, const U & u){
+constexpr inline operator<<(const T & t, const U & u){
     // INT13-CPP
     // C++ standards document N4618 & 5.8.2
     static_assert(
-        std::numeric_limits<T>::is_integer, "shifted value must be an integer"
+        boost::safe_numerics::Integer<T>::value,
+        "shifted value must be an integer"
     );
     static_assert(
-        std::numeric_limits<U>::is_integer, "shift amount must be an integer"
+        boost::safe_numerics::Integer<U>::value,
+        "bit shift count must be an integer"
     );
     return left_shift_result<T, U>::return_value(t, u);
 }
@@ -1307,7 +1277,7 @@ typename std::enable_if<
     is_safe<T>::value || is_safe<U>::value,
     T
 >::type
-constexpr operator<<=(T & t, const U & u){
+constexpr inline operator<<=(T & t, const U & u){
     t = static_cast<T>(t << u);
     return t;
 }
@@ -1347,7 +1317,7 @@ struct right_shift_result {
         return
             rx.exception()
             ? r.first >> r.second
-            : rx.m_r;
+            : rx.m_contents.m_r;
     }
 
     using r_type_interval_t = interval<r_type>;
@@ -1369,7 +1339,7 @@ struct right_shift_result {
         return (t_interval() >> u_interval());
     }
 
-    static constexpr const r_type_interval_t r_type_interval = get_r_type_interval();
+    constexpr static const r_type_interval_t r_type_interval = get_r_type_interval();
 
     constexpr static const interval<result_base_type> return_interval{
         r_type_interval.l.exception()
@@ -1427,13 +1397,15 @@ typename boost::lazy_enable_if_c<
     && (is_safe<T>::value || is_safe<U>::value),
     right_shift_result<T, U>
 >::type
-constexpr operator>>(const T & t, const U & u){
+constexpr inline operator>>(const T & t, const U & u){
     // INT13-CPP
     static_assert(
-        std::numeric_limits<T>::is_integer, "shifted value must be an integer"
+        boost::safe_numerics::Integer<T>::value,
+        "shifted value must be an integer"
     );
     static_assert(
-        std::numeric_limits<U>::is_integer, "shift amount must be an integer"
+        boost::safe_numerics::Integer<U>::value,
+        "bit shift count must be an integer"
     );
     return right_shift_result<T, U>::return_value(t, u);
 }
@@ -1443,7 +1415,7 @@ typename std::enable_if<
     is_safe<T>::value || is_safe<U>::value,
     T
 >::type
-constexpr operator>>=(T & t, const U & u){
+constexpr inline operator>>=(T & t, const U & u){
     t = static_cast<T>(t >> u);
     return t;
 }
@@ -1465,20 +1437,6 @@ private:
 
     using r_type = typename std::make_unsigned<result_base_type>::type;
     using r_type_interval_t = interval<r_type>;
-
-    #if 0
-    // breaks compilation for earlier versions of clant
-    constexpr static const r_type_interval_t r_interval{
-        r_type(0),
-        utility::round_out(
-            std::max(
-                static_cast<r_type>(base_value(std::numeric_limits<T>::max())),
-                static_cast<r_type>(base_value(std::numeric_limits<U>::max()))
-            )
-        )
-    };
-    #endif
-
     using exception_policy = typename common_exception_policy<T, U>::type;
 
 public:
@@ -1512,7 +1470,15 @@ typename boost::lazy_enable_if_c<
     is_safe<T>::value || is_safe<U>::value,
     bitwise_or_result<T, U>
 >::type
-constexpr operator|(const T & t, const U & u){
+constexpr inline operator|(const T & t, const U & u){
+    static_assert(
+        boost::safe_numerics::Integer<T>::value,
+        "bitwise or arguments must be an integers"
+    );
+    static_assert(
+        boost::safe_numerics::Integer<U>::value,
+        "bitwise or arguments must be an integers"
+    );
     return bitwise_or_result<T, U>::return_value(t, u);
 }
 
@@ -1521,7 +1487,7 @@ typename std::enable_if<
     is_safe<T>::value || is_safe<U>::value,
     T
 >::type
-constexpr operator|=(T & t, const U & u){
+constexpr inline operator|=(T & t, const U & u){
     t = static_cast<T>(t | u);
     return t;
 }
@@ -1540,19 +1506,6 @@ private:
 
     using r_type = typename std::make_unsigned<result_base_type>::type;
     using r_type_interval_t = interval<r_type>;
-
-    #if 0
-    // breaks compilation for earlier versions of clant
-    constexpr static const r_type_interval_t r_interval{
-        r_type(0),
-        utility::round_out(
-            std::min(
-                static_cast<r_type>(base_value(std::numeric_limits<T>::max())),
-                static_cast<r_type>(base_value(std::numeric_limits<U>::max()))
-            )
-        )
-    };
-    #endif
     using exception_policy = typename common_exception_policy<T, U>::type;
 
 public:
@@ -1586,7 +1539,15 @@ typename boost::lazy_enable_if_c<
     is_safe<T>::value || is_safe<U>::value,
     bitwise_and_result<T, U>
 >::type
-constexpr operator&(const T & t, const U & u){
+constexpr inline operator&(const T & t, const U & u){
+    static_assert(
+        boost::safe_numerics::Integer<T>::value,
+        "bitwise and arguments must be an integers"
+    );
+    static_assert(
+        boost::safe_numerics::Integer<U>::value,
+        "bitwise and arguments must be an integers"
+    );
     return bitwise_and_result<T, U>::return_value(t, u);
 }
 
@@ -1595,7 +1556,7 @@ typename std::enable_if<
     is_safe<T>::value || is_safe<U>::value,
     T
 >::type
-constexpr operator&=(T & t, const U & u){
+constexpr inline operator&=(T & t, const U & u){
     t = static_cast<T>(t & u);
     return t;
 }
@@ -1613,20 +1574,6 @@ struct bitwise_xor_result {
 
     using r_type = typename std::make_unsigned<result_base_type>::type;
     using r_type_interval_t = interval<r_type>;
-
-    #if 0
-    // breaks compilation for earlier versions of clant
-    constexpr static const r_type_interval_t r_interval{
-        r_type(0),
-        utility::round_out(
-            std::max(
-                static_cast<r_type>(base_value(std::numeric_limits<T>::max())),
-                static_cast<r_type>(base_value(std::numeric_limits<U>::max()))
-            )
-        )
-    };
-    #endif
-
     using exception_policy = typename common_exception_policy<T, U>::type;
 
 public:
@@ -1660,7 +1607,15 @@ typename boost::lazy_enable_if_c<
     is_safe<T>::value || is_safe<U>::value,
     bitwise_xor_result<T, U>
 >::type
-constexpr operator^(const T & t, const U & u){
+constexpr inline operator^(const T & t, const U & u){
+    static_assert(
+        boost::safe_numerics::Integer<T>::value,
+        "bitwise xor arguments must be an integers"
+    );
+    static_assert(
+        boost::safe_numerics::Integer<U>::value,
+        "bitwise xor arguments must be an integers"
+    );
     return bitwise_xor_result<T, U>::return_value(t, u);
 }
 
@@ -1669,7 +1624,7 @@ typename std::enable_if<
     is_safe<T>::value || is_safe<U>::value,
     T
 >::type
-constexpr operator^=(T & t, const U & u){
+constexpr inline operator^=(T & t, const U & u){
     t = static_cast<T>(t ^ u);
     return t;
 }
@@ -1688,7 +1643,7 @@ template<
     class CharT,
     class Traits
 >
-void safe_base<T, Min, Max, P, E>::output(
+inline void safe_base<T, Min, Max, P, E>::output(
     std::basic_ostream<CharT, Traits> & os
 ) const {
     os << (
@@ -1713,7 +1668,7 @@ template<
     class CharT,
     class Traits
 >
-void safe_base<T, Min, Max, P, E>::input(
+inline void safe_base<T, Min, Max, P, E>::input(
     std::basic_istream<CharT, Traits> & is
 ){
     if(std::is_same<T, signed char>::value
@@ -1725,16 +1680,30 @@ void safe_base<T, Min, Max, P, E>::input(
         m_t = validated_cast(x);
     }
     else{
+        if(std::is_unsigned<T>::value){
+            // reading a negative number into an unsigned variable cannot result in
+            // a correct result.  But, C++ reads the absolute value, multiplies
+            // it by -1 and stores the resulting value.  This is crazy - but there
+            // it is!  Oh, and it doesn't set the failbit. We fix this behavior here
+            is >> std::ws;
+            int x = is.peek();
+            // if the input string starts with a '-', we know its an error
+            if(x == '-'){
+                // set fail bit
+                is.setstate(std::ios_base::failbit);
+            }
+        }
         is >> m_t;
-        validated_cast(m_t);
-    }
-    if(is.fail()){
-        boost::safe_numerics::dispatch<
-            E,
-            boost::safe_numerics::safe_numerics_error::domain_error
-        >(
-            "error in file input"
-        );
+        if(is.fail()){
+            boost::safe_numerics::dispatch<
+                E,
+                boost::safe_numerics::safe_numerics_error::domain_error
+            >(
+                "error in file input"
+            );
+        }
+        else
+            validated_cast(m_t);
     }
 }
 

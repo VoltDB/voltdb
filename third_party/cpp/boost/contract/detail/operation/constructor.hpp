@@ -11,6 +11,7 @@
 #include <boost/contract/core/config.hpp>
 #include <boost/contract/detail/condition/cond_inv.hpp>
 #include <boost/contract/detail/none.hpp>
+#include <boost/contract/detail/exception.hpp>
 #if     !defined(BOOST_CONTRACT_ALL_DISABLE_NO_ASSERTION) && ( \
         !defined(BOOST_CONTRACT_NO_INVARIANTS) || \
         !defined(BOOST_CONTRACT_NO_POSTCONDITIONS) || \
@@ -70,7 +71,7 @@ public:
 
             // If ctor body threw, no obj so check only static inv. Otherwise,
             // obj constructed so check static inv, non-static inv, and post.
-            if(std::uncaught_exception()) {
+            if(uncaught_exception()) {
                 #ifndef BOOST_CONTRACT_NO_EXIT_INVARIANTS
                     this->check_exit_static_inv();
                 #endif

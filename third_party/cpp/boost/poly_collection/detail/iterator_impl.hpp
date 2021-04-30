@@ -1,4 +1,4 @@
-/* Copyright 2016-2017 Joaquin M Lopez Munoz.
+/* Copyright 2016-2021 Joaquin M Lopez Munoz.
  * Distributed under the Boost Software License, Version 1.0.
  * (See accompanying file LICENSE_1_0.txt or copy at
  * http://www.boost.org/LICENSE_1_0.txt)
@@ -13,6 +13,7 @@
 #pragma once
 #endif
 
+#include <boost/detail/workaround.hpp>
 #include <boost/iterator/iterator_adaptor.hpp>
 #include <boost/iterator/iterator_facade.hpp>
 #include <boost/poly_collection/detail/is_constructible.hpp>
@@ -143,6 +144,15 @@ class local_iterator_impl:
   using const_segment_map_iterator=
     typename PolyCollection::const_segment_map_iterator;
 
+#if BOOST_WORKAROUND(BOOST_GCC_VERSION,>=90300)&&\
+    BOOST_WORKAROUND(BOOST_GCC_VERSION,<100300)
+/* https://gcc.gnu.org/bugzilla/show_bug.cgi?id=95888 */
+
+public:
+#else
+private:
+#endif
+
   template<typename Iterator>
   local_iterator_impl(
     const_segment_map_iterator mapit,
@@ -231,7 +241,6 @@ struct poly_collection_of<local_iterator_impl<PolyCollection,BaseIterator>>
 {
   using type=PolyCollection;
 };
-
 
 } /* namespace poly_collection::detail */
 

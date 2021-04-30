@@ -20,7 +20,7 @@ namespace boost { namespace process { namespace detail { namespace posix {
 
 class sigchld_service : public boost::asio::detail::service_base<sigchld_service>
 {
-    boost::asio::io_context::strand _strand{get_io_context()};
+    boost::asio::strand<boost::asio::io_context::executor_type> _strand{get_io_context().get_executor()};
     boost::asio::signal_set _signal_set{get_io_context(), SIGCHLD};
 
     std::vector<std::pair<::pid_t, std::function<void(int, std::error_code)>>> _receivers;

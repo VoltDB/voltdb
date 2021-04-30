@@ -15,16 +15,17 @@
 #include <boost/gil/concepts/detail/type_traits.hpp>
 
 #include <boost/concept_check.hpp>
-#include <boost/type_traits.hpp>
 
 #include <cstddef>
+#include <type_traits>
 
 #if defined(BOOST_CLANG)
 #pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunknown-pragmas"
 #pragma clang diagnostic ignored "-Wunused-local-typedefs"
 #endif
 
-#if defined(BOOST_GCC) && (BOOST_GCC >= 40600)
+#if defined(BOOST_GCC) && (BOOST_GCC >= 40900)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-local-typedefs"
 #endif
@@ -93,8 +94,8 @@ struct PixelDereferenceAdaptorArchetype
     using argument_type = P;
     using result_type = P;
     using const_t = PixelDereferenceAdaptorArchetype;
-    using value_type = typename remove_reference<P>::type;
-    using reference = typename add_reference<P>::type;
+    using value_type = typename std::remove_reference<P>::type;
+    using reference = typename std::add_lvalue_reference<P>::type;
     using const_reference = reference;
 
     static const bool is_mutable = false;
@@ -107,7 +108,7 @@ struct PixelDereferenceAdaptorArchetype
 #pragma clang diagnostic pop
 #endif
 
-#if defined(BOOST_GCC) && (BOOST_GCC >= 40600)
+#if defined(BOOST_GCC) && (BOOST_GCC >= 40900)
 #pragma GCC diagnostic pop
 #endif
 

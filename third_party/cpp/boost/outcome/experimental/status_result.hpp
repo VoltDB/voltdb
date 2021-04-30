@@ -1,5 +1,5 @@
 /* A very simple result type
-(C) 2018-2019 Niall Douglas <http://www.nedproductions.biz/> (59 commits)
+(C) 2018-2021 Niall Douglas <http://www.nedproductions.biz/> (11 commits)
 File Created: Apr 2018
 
 
@@ -38,27 +38,81 @@ DEALINGS IN THE SOFTWARE.
 
 BOOST_OUTCOME_V2_NAMESPACE_EXPORT_BEGIN
 
+namespace trait
+{
+  namespace detail
+  {
+    // Shortcut this for lower build impact. Used to tell outcome's converting constructors
+    // that they can do E => EC or E => EP as necessary.
+    template <class DomainType> struct _is_error_code_available<BOOST_OUTCOME_SYSTEM_ERROR2_NAMESPACE::status_code<DomainType>>
+    {
+      static constexpr bool value = true;
+      using type = BOOST_OUTCOME_SYSTEM_ERROR2_NAMESPACE::status_code<DomainType>;
+    };
+    template <class DomainType> struct _is_error_code_available<BOOST_OUTCOME_SYSTEM_ERROR2_NAMESPACE::errored_status_code<DomainType>>
+    {
+      static constexpr bool value = true;
+      using type = BOOST_OUTCOME_SYSTEM_ERROR2_NAMESPACE::errored_status_code<DomainType>;
+    };
+  }    // namespace detail
+#if 0  // Do NOT enable weakened implicit construction for these types
+  template <class DomainType> struct is_error_type<BOOST_OUTCOME_SYSTEM_ERROR2_NAMESPACE::status_code<DomainType>>
+  {
+    static constexpr bool value = true;
+  };
+  template <> struct is_error_type<BOOST_OUTCOME_SYSTEM_ERROR2_NAMESPACE::errc>
+  {
+    static constexpr bool value = true;
+  };
+  template <class DomainType, class Enum> struct is_error_type_enum<BOOST_OUTCOME_SYSTEM_ERROR2_NAMESPACE::status_code<DomainType>, Enum>
+  {
+    static constexpr bool value = boost::system::is_error_condition_enum<Enum>::value;
+  };
+#endif
+
+  template <class DomainType> struct is_move_bitcopying<BOOST_OUTCOME_SYSTEM_ERROR2_NAMESPACE::status_code<DomainType>>
+  {
+    static constexpr bool value = BOOST_OUTCOME_SYSTEM_ERROR2_NAMESPACE::traits::is_move_bitcopying<BOOST_OUTCOME_SYSTEM_ERROR2_NAMESPACE::status_code<DomainType>>::value;
+  };
+  template <class DomainType> struct is_move_bitcopying<BOOST_OUTCOME_SYSTEM_ERROR2_NAMESPACE::errored_status_code<DomainType>>
+  {
+    static constexpr bool value = BOOST_OUTCOME_SYSTEM_ERROR2_NAMESPACE::traits::is_move_bitcopying<BOOST_OUTCOME_SYSTEM_ERROR2_NAMESPACE::errored_status_code<DomainType>>::value;
+  };
+}  // namespace trait
+
 namespace detail
 {
   // Customise _set_error_is_errno
-  template <class State> constexpr inline void _set_error_is_errno(State &state, const BOOST_OUTCOME_SYSTEM_ERROR2_NAMESPACE::generic_code & /*unused*/) { state._status |= status_error_is_errno; }
-  template <class State> constexpr inline void _set_error_is_errno(State &state, const BOOST_OUTCOME_SYSTEM_ERROR2_NAMESPACE::posix_code & /*unused*/) { state._status |= status_error_is_errno; }
-  template <class State> constexpr inline void _set_error_is_errno(State &state, const BOOST_OUTCOME_SYSTEM_ERROR2_NAMESPACE::errc & /*unused*/) { state._status |= status_error_is_errno; }
+  template <class State> constexpr inline void _set_error_is_errno(State &state, const BOOST_OUTCOME_SYSTEM_ERROR2_NAMESPACE::generic_code & /*unused*/)
+  {
+    state._status.set_have_error_is_errno(true);
+  }
+#ifndef BOOST_OUTCOME_SYSTEM_ERROR2_NOT_POSIX
+  template <class State> constexpr inline void _set_error_is_errno(State &state, const BOOST_OUTCOME_SYSTEM_ERROR2_NAMESPACE::posix_code & /*unused*/)
+  {
+    state._status.set_have_error_is_errno(true);
+  }
+#endif
+  template <class State> constexpr inline void _set_error_is_errno(State &state, const BOOST_OUTCOME_SYSTEM_ERROR2_NAMESPACE::errc & /*unused*/)
+  {
+    state._status.set_have_error_is_errno(true);
+  }
 
 }  // namespace detail
 
 namespace experimental
 {
   using namespace BOOST_OUTCOME_SYSTEM_ERROR2_NAMESPACE;
-  using BOOST_OUTCOME_V2_NAMESPACE::success;
   using BOOST_OUTCOME_V2_NAMESPACE::failure;
+  using BOOST_OUTCOME_V2_NAMESPACE::success;
 
   namespace policy
   {
     using namespace BOOST_OUTCOME_V2_NAMESPACE::policy;
     template <class T, class EC, class E> struct status_code_throw
     {
-      static_assert(!std::is_same<T, T>::value, "policy::status_code_throw not specialised for these types, did you use status_result<T, status_code<DomainType>, E>?");
+      static_assert(!std::is_same<T, T>::value,
+                    "policy::status_code_throw not specialised for these types, did you use status_result<T, status_code<DomainType>, E>?");
     };
     template <class T, class DomainType> struct status_code_throw<T, status_code<DomainType>, void> : base
     {
@@ -79,7 +133,8 @@ namespace experimental
       }
       template <class Impl> static constexpr void wide_error_check(Impl &&self) { _base::narrow_error_check(static_cast<Impl &&>(self)); }
     };
-    template <class T, class DomainType> struct status_code_throw<T, errored_status_code<DomainType>, void> : status_code_throw<T, status_code<DomainType>, void>
+    template <class T, class DomainType>
+    struct status_code_throw<T, errored_status_code<DomainType>, void> : status_code_throw<T, status_code<DomainType>, void>
     {
       status_code_throw() = default;
       using status_code_throw<T, status_code<DomainType>, void>::status_code_throw;
@@ -95,10 +150,11 @@ namespace experimental
                        >>;
   }  // namespace policy
 
-  /*! AWAITING HUGO JSON CONVERSION TOOL 
+  /*! AWAITING HUGO JSON CONVERSION TOOL
 SIGNATURE NOT RECOGNISED
 */
-  template <class R, class S = system_code, class NoValuePolicy = policy::default_status_result_policy<R, S>>  //
+  template <class R, class S = errored_status_code<erased<typename system_code::value_type>>,
+            class NoValuePolicy = policy::default_status_result_policy<R, S>>  //
   using status_result = basic_result<R, S, NoValuePolicy>;
 
 }  // namespace experimental

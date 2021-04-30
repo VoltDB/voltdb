@@ -52,7 +52,7 @@ struct result_display {
 };
 
 template<typename T>
-result_display<T> make_result_display(const T & t){
+inline result_display<T> make_result_display(const T & t){
     return result_display<T>(t);
 }
 

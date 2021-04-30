@@ -517,6 +517,13 @@ namespace boost{ namespace math
     // Assuming mathworld really means kurtosis excess?  Wikipedia now corrected to match this.
   }
 
+  template <class RealType, class Policy>
+  inline RealType entropy(const triangular_distribution<RealType, Policy>& dist)
+  {
+    using std::log;
+    return constants::half<RealType>() + log((dist.upper() - dist.lower())/2);
+  }
+
 } // namespace math
 } // namespace boost
 

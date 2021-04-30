@@ -5,9 +5,10 @@
 // Copyright (c) 2009-2014 Mateusz Loskot, London, UK.
 // Copyright (c) 2013-2014 Adam Wulkiewicz, Lodz, Poland.
 
-// This file was modified by Oracle on 2014.
-// Modifications copyright (c) 2014, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2014, 2020.
+// Modifications copyright (c) 2014-2020 Oracle and/or its affiliates.
 
+// Contributed and/or modified by Vissarion Fysikopoulos, on behalf of Oracle
 // Contributed and/or modified by Menelaos Karavelas, on behalf of Oracle
 
 // Parts of Boost.Geometry are redesigned from Geodan's Geographic Library
@@ -110,26 +111,45 @@ struct default_strategy<Box1, Box2, box_tag, box_tag, false>
           >
 {};
 
+template <typename PolygonalOrLinear, typename Box>
+struct default_strategy_polygonal_or_linear
+    : strategy::distance::services::default_strategy
+        <
+            segment_tag, box_tag,
+            typename point_type<PolygonalOrLinear>::type,
+            typename point_type<Box>::type
+        >
+{};
+
 template <typename Linear, typename Box>
 struct default_strategy<Linear, Box, segment_tag, box_tag, false>
-    : strategy::distance::services::default_strategy
-          <
-              segment_tag, box_tag,
-              typename point_type<Linear>::type,
-              typename point_type<Box>::type
-          >
+    : default_strategy_polygonal_or_linear<Linear, Box>
 {};
 
 template <typename Linear, typename Box>
-struct default_strategy<Linear, Box, linear_tag, box_tag, false>
-    : strategy::distance::services::default_strategy
-          <
-              segment_tag, box_tag,
-              typename point_type<Linear>::type,
-              typename point_type<Box>::type
-          >
+struct default_strategy<Linear, Box, linestring_tag, box_tag, false>
+    : default_strategy_polygonal_or_linear<Linear, Box>
 {};
 
+template <typename Linear, typename Box>
+struct default_strategy<Linear, Box, multi_linestring_tag, box_tag, false>
+    : default_strategy_polygonal_or_linear<Linear, Box>
+{};
+
+template <typename Polygonal, typename Box>
+struct default_strategy<Polygonal, Box, polygon_tag, box_tag, false>
+    : default_strategy_polygonal_or_linear<Polygonal, Box>
+{};
+
+template <typename Polygonal, typename Box>
+struct default_strategy<Polygonal, Box, ring_tag, box_tag, false>
+    : default_strategy_polygonal_or_linear<Polygonal, Box>
+{};
+
+template <typename Polygonal, typename Box>
+struct default_strategy<Polygonal, Box, multi_polygon_tag, box_tag, false>
+    : default_strategy_polygonal_or_linear<Polygonal, Box>
+{};
 
 
 // Helper metafunction for default point-segment strategy retrieval

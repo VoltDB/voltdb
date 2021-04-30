@@ -38,7 +38,7 @@ struct apply_to_value_type
 \endcode
 
 This higher order metafunctions is very useful, and it can be used with lambda
-expresions.
+expressions.
 
 See also tagged.
                                                                                 **/

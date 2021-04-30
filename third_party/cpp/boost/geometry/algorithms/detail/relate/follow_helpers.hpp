@@ -341,9 +341,9 @@ private:
     std::vector<point_info> m_other_entry_points; // TODO: use map here or sorted vector?
 };
 
-template <std::size_t OpId, typename Turn, typename EqPPStrategy>
+template <std::size_t OpId, typename Turn, typename Strategy>
 inline bool turn_on_the_same_ip(Turn const& prev_turn, Turn const& curr_turn,
-                                EqPPStrategy const& strategy)
+                                Strategy const& strategy)
 {
     segment_identifier const& prev_seg_id = prev_turn.operations[OpId].seg_id;
     segment_identifier const& curr_seg_id = curr_turn.operations[OpId].seg_id;

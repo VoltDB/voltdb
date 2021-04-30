@@ -52,14 +52,18 @@ namespace boost { namespace fusion
         {}
 
         BOOST_CONSTEXPR BOOST_FUSION_GPU_ENABLED
+        filter_view(filter_view const& rhs)
+            : seq(rhs.seq)
+        {}
+
+        BOOST_CONSTEXPR BOOST_FUSION_GPU_ENABLED
         first_type first() const { return fusion::begin(seq); }
         BOOST_CONSTEXPR BOOST_FUSION_GPU_ENABLED
         last_type last() const { return fusion::end(seq); }
         typename mpl::if_<traits::is_view<Sequence>, Sequence, Sequence&>::type seq;
 
-    private:
         // silence MSVC warning C4512: assignment operator could not be generated
-        filter_view& operator= (filter_view const&);
+        BOOST_DELETED_FUNCTION(filter_view& operator= (filter_view const&))
     };
 }}
 

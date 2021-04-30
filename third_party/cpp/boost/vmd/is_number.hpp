@@ -27,11 +27,11 @@
     \brief Tests whether a sequence is a Boost PP number.
 
     The macro checks to see if a sequence is a Boost PP number.
-    A Boost PP number is a value from 0 to 256.
+    A Boost PP number is a value from 0 to BOOST_PP_LIMIT_MAG.
     
     sequence = a possible number
 
-    returns = 1 if the sequence is a Boost PP number, 
+    returns = 1 if the sequence is a Boost PP number,
               0 if it is not.
               
     If the input is not a VMD data type this macro could lead to

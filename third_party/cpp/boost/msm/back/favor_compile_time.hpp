@@ -24,7 +24,7 @@
 #include <boost/msm/back/common_types.hpp>
 #include <boost/msm/back/dispatch_table.hpp>
 
-namespace boost { namespace msm { namespace back 
+namespace boost { namespace msm { namespace back
 {
 
 template <class Fsm>
@@ -38,8 +38,7 @@ struct process_any_event_helper
         if ( ! finished && ::boost::any_cast<Event>(&any_event)!=0)
         {
             finished = true;
-            res = self->process_event_internal(::boost::any_cast<Event>(any_event),false);
- 
+            res = self->process_event_internal(::boost::any_cast<Event>(any_event));
         }
     }
 private:
@@ -66,7 +65,7 @@ private:
     }                                                                                               \
     }}}
 
-struct favor_compile_time 
+struct favor_compile_time
 {
     typedef int compile_policy;
     typedef ::boost::mpl::false_ add_forwarding_rows;
@@ -88,7 +87,7 @@ struct dispatch_table < Fsm, Stt, Event, ::boost::msm::back::favor_compile_time>
     typedef typename generate_state_set<Stt>::type state_list;
     BOOST_STATIC_CONSTANT(int, max_state = ( ::boost::mpl::size<state_list>::value));
 
-    struct chain_row 
+    struct chain_row
     {
         HandledEnum operator()(Fsm& fsm, int region,int state,Event const& evt) const
         {
@@ -127,8 +126,8 @@ struct dispatch_table < Fsm, Stt, Event, ::boost::msm::back::favor_compile_time>
         ,void>::type
         init_event_base_case(Transition const&, ::boost::mpl::true_ const &) const
         {
-            typedef typename create_stt<Fsm>::type stt; 
-            BOOST_STATIC_CONSTANT(int, state_id = 
+            typedef typename create_stt<Fsm>::type stt;
+            BOOST_STATIC_CONSTANT(int, state_id =
                 (get_state_id<stt,typename Transition::current_state_type>::value));
             self->entries[state_id+1].one_state.push_front(reinterpret_cast<cell>(&Transition::execute));
         }
@@ -148,8 +147,8 @@ struct dispatch_table < Fsm, Stt, Event, ::boost::msm::back::favor_compile_time>
         ,void>::type
         init_event_base_case(Transition const&, ::boost::mpl::false_ const &) const
         {
-            typedef typename create_stt<Fsm>::type stt; 
-            BOOST_STATIC_CONSTANT(int, state_id = 
+            typedef typename create_stt<Fsm>::type stt;
+            BOOST_STATIC_CONSTANT(int, state_id =
                 (get_state_id<stt,typename Transition::current_state_type>::value));
             self->entries[state_id+1].one_state.push_front(&Transition::execute);
         }
@@ -174,10 +173,10 @@ struct dispatch_table < Fsm, Stt, Event, ::boost::msm::back::favor_compile_time>
         {
             //only if the transition event is a base of our event is the reinterpret_case safe
             init_event_base_case(tr,
-                ::boost::mpl::bool_< 
+                ::boost::mpl::bool_<
                     ::boost::is_base_of<typename Transition::transition_event,Event>::type::value>() );
         }
-    
+
         dispatch_table* self;
     };
 
@@ -193,29 +192,29 @@ struct dispatch_table < Fsm, Stt, Event, ::boost::msm::back::favor_compile_time>
         template <bool deferred,bool composite, int some_dummy=0>
         struct helper
         {};
-        template <int some_dummy> struct helper<true,false,some_dummy> 
+        template <int some_dummy> struct helper<true,false,some_dummy>
         {
             template <class State>
             static void execute(boost::msm::wrap<State> const&,chain_row* tofill)
             {
-                typedef typename create_stt<Fsm>::type stt; 
+                typedef typename create_stt<Fsm>::type stt;
                 BOOST_STATIC_CONSTANT(int, state_id = (get_state_id<stt,State>::value));
                 cell call_no_transition = &Fsm::defer_transition;
                 tofill[state_id+1].one_state.push_back(call_no_transition);
             }
         };
-        template <int some_dummy> struct helper<true,true,some_dummy> 
+        template <int some_dummy> struct helper<true,true,some_dummy>
         {
             template <class State>
             static void execute(boost::msm::wrap<State> const&,chain_row* tofill)
             {
-                typedef typename create_stt<Fsm>::type stt; 
+                typedef typename create_stt<Fsm>::type stt;
                 BOOST_STATIC_CONSTANT(int, state_id = (get_state_id<stt,State>::value));
                 cell call_no_transition = &Fsm::defer_transition;
                 tofill[state_id+1].one_state.push_back(call_no_transition);
             }
         };
-        template <int some_dummy> struct helper<false,true,some_dummy> 
+        template <int some_dummy> struct helper<false,true,some_dummy>
         {
             template <class State>
             static
@@ -235,18 +234,18 @@ struct dispatch_table < Fsm, Stt, Event, ::boost::msm::back::favor_compile_time>
             ,void>::type
             execute(boost::msm::wrap<State> const&,chain_row* tofill,boost::msm::back::dummy<1> = 0)
             {
-                typedef typename create_stt<Fsm>::type stt; 
+                typedef typename create_stt<Fsm>::type stt;
                 BOOST_STATIC_CONSTANT(int, state_id = (get_state_id<stt,State>::value));
                 cell call_no_transition = &call_submachine< State >;
                 tofill[state_id+1].one_state.push_front(call_no_transition);
             }
         };
-        template <int some_dummy> struct helper<false,false,some_dummy> 
+        template <int some_dummy> struct helper<false,false,some_dummy>
         {
             template <class State>
             static void execute(boost::msm::wrap<State> const&,chain_row* tofill)
             {
-                typedef typename create_stt<Fsm>::type stt; 
+                typedef typename create_stt<Fsm>::type stt;
                 BOOST_STATIC_CONSTANT(int, state_id = (get_state_id<stt,State>::value));
                 cell call_no_transition = &Fsm::call_no_transition;
                 tofill[state_id+1].one_state.push_back(call_no_transition);
@@ -277,7 +276,7 @@ struct dispatch_table < Fsm, Stt, Event, ::boost::msm::back::favor_compile_time>
         template <class State>
         void operator()(boost::msm::wrap<State> const&)
         {
-            typedef typename create_stt<Fsm>::type stt; 
+            typedef typename create_stt<Fsm>::type stt;
             BOOST_STATIC_CONSTANT(int, state_id = (get_state_id<stt,State>::value));
             cell call_no_transition = &Fsm::default_eventless_transition;
             tofill_entries[state_id+1].one_state.push_back(call_no_transition);
@@ -298,7 +297,7 @@ struct dispatch_table < Fsm, Stt, Event, ::boost::msm::back::favor_compile_time>
         (init_cell(this));
 
         ::boost::mpl::for_each<
-            typename generate_state_set<Stt>::type, 
+            typename generate_state_set<Stt>::type,
             boost::msm::wrap< ::boost::mpl::placeholders::_1> >
          (default_init_cell<Event>(this,entries));
 

@@ -4,7 +4,7 @@
 //-----------------------------------------------------------------------------
 //
 // Copyright (c) 2002-2003 Eric Friedman
-// Copyright (c) 2014-2019 Antony Polukhin
+// Copyright (c) 2014-2021 Antony Polukhin
 //
 // Distributed under the Boost Software License, Version 1.0. (See
 // accompanying file LICENSE_1_0.txt or copy at
@@ -23,6 +23,7 @@
 #   include <boost/mpl/size.hpp>
 #   include <boost/utility/declval.hpp>
 #   include <boost/core/enable_if.hpp>
+#   include <boost/type_traits/copy_cv_ref.hpp>
 #   include <boost/type_traits/remove_reference.hpp>
 #   include <boost/variant/detail/has_result_type.hpp>
 #endif
@@ -85,7 +86,7 @@ namespace detail { namespace variant {
 // This class serves only metaprogramming purposes. none of its methods must be called at runtime!
 template <class Visitor, class Variant>
 struct result_multideduce1 {
-    typedef typename Variant::types                 types;
+    typedef typename remove_reference<Variant>::type::types types;
     typedef typename boost::mpl::begin<types>::type begin_it;
     typedef typename boost::mpl::advance<
         begin_it, boost::mpl::int_<boost::mpl::size<types>::type::value - 1>
@@ -95,14 +96,14 @@ struct result_multideduce1 {
     struct deduce_impl {
         typedef typename boost::mpl::next<It>::type next_t;
         typedef typename boost::mpl::deref<It>::type value_t;
-        typedef decltype(true ? boost::declval< Visitor& >()( boost::declval< value_t >() )
+        typedef decltype(true ? boost::declval< Visitor& >()( boost::declval< copy_cv_ref_t< value_t, Variant > >() )
                               : boost::declval< typename deduce_impl<next_t>::type >()) type;
     };
 
     template <class Dummy>
     struct deduce_impl<last_it, Dummy> {
         typedef typename boost::mpl::deref<last_it>::type value_t;
-        typedef decltype(boost::declval< Visitor& >()( boost::declval< value_t >() )) type;
+        typedef decltype(boost::declval< Visitor& >()( boost::declval< copy_cv_ref_t< value_t, Variant > >() )) type;
     };
 
     typedef typename deduce_impl<begin_it>::type type;
@@ -129,10 +130,11 @@ struct result_wrapper1
 template <typename Visitor, typename Visitable>
 inline decltype(auto) apply_visitor(Visitor&& visitor, Visitable&& visitable,
     typename boost::disable_if<
-        boost::detail::variant::has_result_type<Visitor>
-    >::type* = 0)
+        boost::detail::variant::has_result_type<Visitor>,
+        bool
+    >::type = true)
 {
-    boost::detail::variant::result_wrapper1<Visitor, typename remove_reference<Visitable>::type> cpp14_vis(::boost::forward<Visitor>(visitor));
+    boost::detail::variant::result_wrapper1<Visitor, Visitable> cpp14_vis(::boost::forward<Visitor>(visitor));
     return ::boost::forward<Visitable>(visitable).apply_visitor(cpp14_vis);
 }
 

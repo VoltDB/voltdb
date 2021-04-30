@@ -2,8 +2,8 @@
 
 // Copyright (c) 2007-2012 Barend Gehrels, Amsterdam, the Netherlands.
 
-// This file was modified by Oracle on 2017, 2018.
-// Modifications copyright (c) 2017-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2017-2020.
+// Modifications copyright (c) 2017-2020, Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
 // Use, modification and distribution is subject to the Boost Software License,
@@ -21,12 +21,12 @@
 
 #include <string>
 
+#include <boost/geometry/core/assert.hpp>
+#include <boost/geometry/core/static_assert.hpp>
 #include <boost/geometry/core/tags.hpp>
 
 #include <boost/geometry/srs/projections/impl/pj_fwd.hpp>
 #include <boost/geometry/srs/projections/impl/pj_inv.hpp>
-
-#include <boost/mpl/assert.hpp>
 
 
 namespace boost { namespace geometry { namespace projections
@@ -40,78 +40,110 @@ namespace detail
 template <typename Prj, typename CSTag, typename SP, typename CT, typename P>
 struct static_projection_type
 {
-    BOOST_MPL_ASSERT_MSG((false),
-        NOT_IMPLEMENTED_FOR_THIS_PROJECTION_OR_CSTAG,
-        (Prj, CSTag));
+    BOOST_GEOMETRY_STATIC_ASSERT_FALSE(
+        "Not implemented for this projection or coordinate system.",
+        Prj, CSTag, SP, CT, P);
 };
 
-#define BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(PROJ, P_SPHERE, P_SPHEROID) \
+#define BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_F(PROJ, P_SPHXXX) \
 template <typename SP, typename CT, typename P> \
 struct static_projection_type<PROJ, srs_sphere_tag, SP, CT, P> \
 { \
-    typedef P_SPHERE<CT, P> type; \
+    typedef projections::detail::static_wrapper_f<P_SPHXXX<CT, P>, P> type; \
 }; \
 template <typename SP, typename CT, typename P> \
 struct static_projection_type<PROJ, srs_spheroid_tag, SP, CT, P> \
 { \
-    typedef P_SPHEROID<CT, P> type; \
+    typedef projections::detail::static_wrapper_f<P_SPHXXX<CT, P>, P> type; \
 }; \
 
-// Base-template-forward
-template <typename Prj, typename CT, typename P>
-struct base_t_f
-{
-public:
+#define BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI(PROJ, P_SPHXXX) \
+template <typename SP, typename CT, typename P> \
+struct static_projection_type<PROJ, srs_sphere_tag, SP, CT, P> \
+{ \
+    typedef projections::detail::static_wrapper_fi<P_SPHXXX<CT, P>, P> type; \
+}; \
+template <typename SP, typename CT, typename P> \
+struct static_projection_type<PROJ, srs_spheroid_tag, SP, CT, P> \
+{ \
+    typedef projections::detail::static_wrapper_fi<P_SPHXXX<CT, P>, P> type; \
+}; \
 
-    inline base_t_f(Prj const& prj, P const& params)
-        : m_par(params), m_prj(prj)
+#define BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI2(PROJ, P_SPHERE, P_SPHEROID) \
+template <typename SP, typename CT, typename P> \
+struct static_projection_type<PROJ, srs_sphere_tag, SP, CT, P> \
+{ \
+    typedef projections::detail::static_wrapper_fi<P_SPHERE<CT, P>, P> type; \
+}; \
+template <typename SP, typename CT, typename P> \
+struct static_projection_type<PROJ, srs_spheroid_tag, SP, CT, P> \
+{ \
+    typedef projections::detail::static_wrapper_fi<P_SPHEROID<CT, P>, P> type; \
+}; \
+
+template <typename P>
+struct static_wrapper_b
+{
+    inline explicit static_wrapper_b(P const& par)
+        : m_par(par)
     {}
 
-    inline P const& params() const { return m_par; }
+    std::string name() const { return m_par.id.name; }
 
-    inline P& mutable_params() { return m_par; }
+    P const& params() const { return m_par; }
+
+    P& mutable_params() { return m_par; }
+
+protected:
+    P m_par;
+};
+
+// Forward
+template <typename Prj, typename P>
+struct static_wrapper_f
+    : public static_wrapper_b<P>
+    , public Prj
+{
+public:
+    template <typename Params>
+    inline static_wrapper_f(Params const& params, P const& par)
+        : static_wrapper_b<P>(par)
+        , Prj(params, this->m_par) // prj can modify parameters
+    {}
 
     template <typename LL, typename XY>
     inline bool forward(LL const& lp, XY& xy) const
     {
         try
         {
-            pj_fwd(m_prj, m_par, lp, xy);
+            pj_fwd(*this, this->m_par, lp, xy);
             return true;
         }
-        catch(...)
+        catch (...)
         {
             return false;
         }
     }
 
     template <typename XY, typename LL>
-    inline bool inverse(XY const& , LL& ) const
+    inline bool inverse(XY const&, LL&) const
     {
-        BOOST_MPL_ASSERT_MSG((false),
-                             PROJECTION_IS_NOT_INVERTABLE,
-                             (Prj));
+        BOOST_GEOMETRY_STATIC_ASSERT_FALSE(
+            "This projection is not invertable.",
+            Prj);
         return false;
     }
-
-    inline std::string name() const
-    {
-        return this->m_par.id.name;
-    }
-
-protected:
-
-    P m_par;
-    const Prj& m_prj;
 };
 
-// Base-template-forward/inverse
-template <typename Prj, typename CT, typename P>
-struct base_t_fi : public base_t_f<Prj, CT, P>
+// Forward/inverse
+template <typename Prj, typename P>
+struct static_wrapper_fi
+    : public static_wrapper_f<Prj, P>
 {
-public :
-    inline base_t_fi(Prj const& prj, P const& params)
-        : base_t_f<Prj, CT, P>(prj, params)
+public:
+    template <typename Params>
+    inline static_wrapper_fi(Params const& params, P const& par)
+        : static_wrapper_f<Prj, P>(params, par)
     {}
 
     template <typename XY, typename LL>
@@ -119,10 +151,10 @@ public :
     {
         try
         {
-            pj_inv(this->m_prj, this->m_par, xy, lp);
+            pj_inv(*this, this->m_par, xy, lp);
             return true;
         }
-        catch(...)
+        catch (...)
         {
             return false;
         }

@@ -12,9 +12,11 @@
 
 #include <boost/beast/core/buffers_cat.hpp>
 #include <boost/beast/core/string.hpp>
-#include <boost/beast/core/static_string.hpp>
 #include <boost/beast/core/detail/buffers_ref.hpp>
 #include <boost/beast/core/detail/clamp.hpp>
+#include <boost/beast/core/detail/static_string.hpp>
+#include <boost/beast/core/detail/temporary_buffer.hpp>
+#include <boost/beast/core/static_string.hpp>
 #include <boost/beast/http/verb.hpp>
 #include <boost/beast/http/rfc7230.hpp>
 #include <boost/beast/http/status.hpp>
@@ -23,13 +25,6 @@
 #include <boost/throw_exception.hpp>
 #include <stdexcept>
 #include <string>
-
-#if defined(BOOST_LIBSTDCXX_VERSION) && BOOST_LIBSTDCXX_VERSION < 60000
-    // Workaround for https://gcc.gnu.org/bugzilla/show_bug.cgi?id=56437
-#ifndef BOOST_BEAST_HTTP_NO_FIELDS_BASIC_STRING_ALLOCATOR
-#define BOOST_BEAST_HTTP_NO_FIELDS_BASIC_STRING_ALLOCATOR
-#endif
-#endif
 
 namespace boost {
 namespace beast {
@@ -389,7 +384,6 @@ basic_fields(basic_fields&& other, Allocator const& alloc)
     if(this->get() != other.get())
     {
         copy_all(other);
-        other.clear_all();
     }
     else
     {
@@ -549,7 +543,7 @@ template<class Allocator>
 inline
 void
 basic_fields<Allocator>::
-insert(field name, string_param const& value)
+insert(field name, string_view const& value)
 {
     BOOST_ASSERT(name != field::unknown);
     insert(name, to_string(name), value);
@@ -558,7 +552,7 @@ insert(field name, string_param const& value)
 template<class Allocator>
 void
 basic_fields<Allocator>::
-insert(string_view sname, string_param const& value)
+insert(string_view sname, string_view const& value)
 {
     auto const name =
         string_to_field(sname);
@@ -569,7 +563,7 @@ template<class Allocator>
 void
 basic_fields<Allocator>::
 insert(field name,
-    string_view sname, string_param const& value)
+    string_view sname, string_view const& value)
 {
     auto& e = new_element(name, sname,
         static_cast<string_view>(value));
@@ -584,7 +578,7 @@ insert(field name,
     }
     auto const last = std::prev(before);
     // VFALCO is it worth comparing `field name` first?
-    if(! iequals(sname, last->name_string()))
+    if(! beast::iequals(sname, last->name_string()))
     {
         BOOST_ASSERT(count(sname) == 0);
         set_.insert_before(before, e);
@@ -599,7 +593,7 @@ insert(field name,
 template<class Allocator>
 void
 basic_fields<Allocator>::
-set(field name, string_param const& value)
+set(field name, string_view const& value)
 {
     BOOST_ASSERT(name != field::unknown);
     set_element(new_element(name, to_string(name),
@@ -609,11 +603,10 @@ set(field name, string_param const& value)
 template<class Allocator>
 void
 basic_fields<Allocator>::
-set(string_view sname, string_param const& value)
+set(string_view sname, string_view const& value)
 {
     set_element(new_element(
-        string_to_field(sname), sname,
-            static_cast<string_view>(value)));
+        string_to_field(sname), sname, value));
 }
 
 template<class Allocator>
@@ -624,7 +617,7 @@ erase(const_iterator pos) ->
 {
     auto next = pos;
     auto& e = *next++;
-    set_.erase(e);
+    set_.erase(set_.iterator_to(e));
     list_.erase(pos);
     delete_element(const_cast<element&>(e));
     return next;
@@ -751,136 +744,31 @@ equal_range(string_view name) const ->
 
 namespace detail {
 
-// Filter a token list
-//
-template<class String, class Pred>
-void
-filter_token_list(
-    String& s,
-    string_view value,
-    Pred&& pred)
+struct iequals_predicate
 {
-    token_list te{value};
-    auto it = te.begin();
-    auto last = te.end();
-    if(it == last)
-        return;
-    while(pred(*it))
-        if(++it == last)
-            return;
-    s.append(it->data(), it->size());
-    while(++it != last)
+    bool
+    operator()(string_view s) const
     {
-        if(! pred(*it))
-        {
-            s.append(", ");
-            s.append(it->data(), it->size());
-        }
+        return beast::iequals(s, sv1) || beast::iequals(s, sv2);
     }
-}
+
+    string_view sv1;
+    string_view sv2;
+};
 
 // Filter the last item in a token list
-template<class String, class Pred>
+BOOST_BEAST_DECL
 void
 filter_token_list_last(
-    String& s,
+    beast::detail::temporary_buffer& s,
     string_view value,
-    Pred&& pred)
-{
-    token_list te{value};
-    if(te.begin() != te.end())
-    {
-        auto it = te.begin();
-        auto next = std::next(it);
-        if(next == te.end())
-        {
-            if(! pred(*it))
-                s.append(it->data(), it->size());
-            return;
-        }
-        s.append(it->data(), it->size());
-        for(;;)
-        {
-            it = next;
-            next = std::next(it);
-            if(next == te.end())
-            {
-                if(! pred(*it))
-                {
-                    s.append(", ");
-                    s.append(it->data(), it->size());
-                }
-                return;
-            }
-            s.append(", ");
-            s.append(it->data(), it->size());
-        }
-    }
-}
+    iequals_predicate const& pred);
 
-template<class String>
+BOOST_BEAST_DECL
 void
 keep_alive_impl(
-    String& s, string_view value,
-    unsigned version, bool keep_alive)
-{
-    if(version < 11)
-    {
-        if(keep_alive)
-        {
-            // remove close
-            filter_token_list(s, value,
-                [](string_view s)
-                {
-                    return iequals(s, "close");
-                });
-            // add keep-alive
-            if(s.empty())
-                s.append("keep-alive");
-            else if(! token_list{value}.exists("keep-alive"))
-                s.append(", keep-alive");
-        }
-        else
-        {
-            // remove close and keep-alive
-            filter_token_list(s, value,
-                [](string_view s)
-                {
-                    return
-                        iequals(s, "close") ||
-                        iequals(s, "keep-alive");
-                });
-        }
-    }
-    else
-    {
-        if(keep_alive)
-        {
-            // remove close and keep-alive
-            filter_token_list(s, value,
-                [](string_view s)
-                {
-                    return
-                        iequals(s, "close") ||
-                        iequals(s, "keep-alive");
-                });
-        }
-        else
-        {
-            // remove keep-alive
-            filter_token_list(s, value,
-                [](string_view s)
-                {
-                    return iequals(s, "keep-alive");
-                });
-            // add close
-            if(s.empty())
-                s.append("close");
-            else if(! token_list{value}.exists("close"))
-                s.append(", close");
-        }
-    }
-}
+    beast::detail::temporary_buffer& s, string_view value,
+    unsigned version, bool keep_alive);
 
 } // detail
 
@@ -930,7 +818,7 @@ get_chunked_impl() const
     {
         auto const next = std::next(it);
         if(next == te.end())
-            return iequals(*it, "chunked");
+            return beast::iequals(*it, "chunked");
         it = next;
     }
     return false;
@@ -997,6 +885,7 @@ void
 basic_fields<Allocator>::
 set_chunked_impl(bool value)
 {
+    beast::detail::temporary_buffer buf;
     auto it = find(field::transfer_encoding);
     if(value)
     {
@@ -1012,84 +901,26 @@ set_chunked_impl(bool value)
             auto const next = std::next(itt);
             if(next == te.end())
             {
-                if(iequals(*itt, "chunked"))
+                if(beast::iequals(*itt, "chunked"))
                     return; // already set
                 break;
             }
             itt = next;
         }
-        static_string<max_static_buffer> buf;
-        if(! beast::detail::sum_exceeds(
-            it->value().size(), 9u, buf.max_size()))
-        {
-            buf.append(it->value().data(), it->value().size());
-            buf.append(", chunked", 9);
-            set(field::transfer_encoding, buf);
-        }
-        else
-        {
-        #ifdef BOOST_BEAST_HTTP_NO_FIELDS_BASIC_STRING_ALLOCATOR
-            // Workaround for https://gcc.gnu.org/bugzilla/show_bug.cgi?id=56437
-            std::string s;
-        #else
-            using A =
-                typename beast::detail::allocator_traits<
-                    Allocator>::template rebind_alloc<char>;
-            std::basic_string<
-                char,
-                std::char_traits<char>,
-                A> s{A{this->get()}};
-        #endif
-            s.reserve(it->value().size() + 9);
-            s.append(it->value().data(), it->value().size());
-            s.append(", chunked", 9);
-            set(field::transfer_encoding, s);
-        }
+
+        buf.append(it->value(), ", chunked");
+        set(field::transfer_encoding, buf.view());
         return;
     }
     // filter "chunked"
     if(it == end())
         return;
-#ifndef BOOST_NO_EXCEPTIONS
-    try
-    {
-        static_string<max_static_buffer> buf;
-        detail::filter_token_list_last(buf, it->value(),
-            [](string_view s)
-            {
-                return iequals(s, "chunked");
-            });
-        if(! buf.empty())
-            set(field::transfer_encoding, buf);
-        else
-            erase(field::transfer_encoding);
-    }
-    catch(std::length_error const&)
-#endif
-    {
-    #ifdef BOOST_BEAST_HTTP_NO_FIELDS_BASIC_STRING_ALLOCATOR
-        // Workaround for https://gcc.gnu.org/bugzilla/show_bug.cgi?id=56437
-        std::string s;
-    #else
-        using A =
-            typename beast::detail::allocator_traits<
-                Allocator>::template rebind_alloc<char>;
-        std::basic_string<
-            char,
-            std::char_traits<char>,
-            A> s{A{this->get()}};
-    #endif
-        s.reserve(it->value().size());
-        detail::filter_token_list_last(s, it->value(),
-            [](string_view s)
-            {
-                return iequals(s, "chunked");
-            });
-        if(! s.empty())
-            set(field::transfer_encoding, s);
-        else
-            erase(field::transfer_encoding);
-    }
+
+    detail::filter_token_list_last(buf, it->value(), {"chunked", {}});
+    if(! buf.empty())
+        set(field::transfer_encoding, buf.view());
+    else
+        erase(field::transfer_encoding);
 }
 
 template<class Allocator>
@@ -1101,7 +932,10 @@ set_content_length_impl(
     if(! value)
         erase(field::content_length);
     else
-        set(field::content_length, *value);
+    {
+        set(field::content_length,
+            to_static_string(*value));
+    }
 }
 
 template<class Allocator>
@@ -1112,40 +946,12 @@ set_keep_alive_impl(
 {
     // VFALCO What about Proxy-Connection ?
     auto const value = (*this)[field::connection];
-#ifndef BOOST_NO_EXCEPTIONS
-    try
-    {
-        static_string<max_static_buffer> buf;
-        detail::keep_alive_impl(
-            buf, value, version, keep_alive);
-        if(buf.empty())
-            erase(field::connection);
-        else
-            set(field::connection, buf);
-    }
-    catch(std::length_error const&)
-#endif
-    {
-    #ifdef BOOST_BEAST_HTTP_NO_FIELDS_BASIC_STRING_ALLOCATOR
-        // Workaround for https://gcc.gnu.org/bugzilla/show_bug.cgi?id=56437
-        std::string s;
-    #else
-        using A =
-            typename beast::detail::allocator_traits<
-                Allocator>::template rebind_alloc<char>;
-        std::basic_string<
-            char,
-            std::char_traits<char>,
-            A> s{A{this->get()}};
-    #endif
-        s.reserve(value.size());
-        detail::keep_alive_impl(
-            s, value, version, keep_alive);
-        if(s.empty())
-            erase(field::connection);
-        else
-            set(field::connection, s);
-    }
+    beast::detail::temporary_buffer buf;
+    detail::keep_alive_impl(buf, value, version, keep_alive);
+    if(buf.empty())
+        erase(field::connection);
+    else
+        set(field::connection, buf.view());
 }
 
 //------------------------------------------------------------------------------
@@ -1187,8 +993,8 @@ delete_element(element& e)
         (sizeof(element) + e.off_ + e.len_ + 2 + sizeof(align_type) - 1) /
             sizeof(align_type);
     e.~element();
-    alloc_traits::deallocate(a, &e, n);
-        //reinterpret_cast<align_type*>(&e), n);
+    alloc_traits::deallocate(a,
+        reinterpret_cast<align_type*>(&e), n);
 }
 
 template<class Allocator>
@@ -1198,7 +1004,7 @@ set_element(element& e)
 {
     auto it = set_.lower_bound(
         e.name_string(), key_compare{});
-    if(it == set_.end() || ! iequals(
+    if(it == set_.end() || ! beast::iequals(
         e.name_string(), it->name_string()))
     {
         set_.insert_before(it, e);
@@ -1214,7 +1020,7 @@ set_element(element& e)
         delete_element(*it);
         it = next;
         if(it == set_.end() ||
-            ! iequals(e.name_string(), it->name_string()))
+            ! beast::iequals(e.name_string(), it->name_string()))
             break;
     }
     set_.insert_before(it, e);
@@ -1336,7 +1142,6 @@ move_assign(basic_fields& other, std::false_type)
     if(this->get() != other.get())
     {
         copy_all(other);
-        other.clear_all();
     }
     else
     {
@@ -1401,5 +1206,9 @@ swap(basic_fields& other, std::false_type)
 } // http
 } // beast
 } // boost
+
+#ifdef BOOST_BEAST_HEADER_ONLY
+#include <boost/beast/http/impl/fields.ipp>
+#endif
 
 #endif

@@ -22,6 +22,11 @@
 # undef BOOST_SYSTEM_HAS_SYSTEM_ERROR
 #endif
 
+#if defined(BOOST_NO_CXX11_HDR_MUTEX)
+// Required for thread-safe map manipulation
+# undef BOOST_SYSTEM_HAS_SYSTEM_ERROR
+#endif
+
 // BOOST_SYSTEM_NOEXCEPT
 // Retained for backward compatibility
 
@@ -43,15 +48,20 @@
 # define BOOST_SYSTEM_CONSTEXPR
 #endif
 
-// BOOST_SYSTEM_REQUIRE_CONST_INIT
+// BOOST_SYSTEM_DEPRECATED
 
-#define BOOST_SYSTEM_REQUIRE_CONST_INIT
-
-#if defined(__has_cpp_attribute)
-#if __has_cpp_attribute(clang::require_constant_initialization)
-# undef BOOST_SYSTEM_REQUIRE_CONST_INIT
-# define BOOST_SYSTEM_REQUIRE_CONST_INIT [[clang::require_constant_initialization]]
-#endif
+#if defined(__clang__)
+# define BOOST_SYSTEM_DEPRECATED(msg) __attribute__((deprecated(msg)))
+#elif defined(__GNUC__)
+# if __GNUC__ * 100 + __GNUC_MINOR__ >= 405
+#  define BOOST_SYSTEM_DEPRECATED(msg) __attribute__((deprecated(msg)))
+# else
+#  define BOOST_SYSTEM_DEPRECATED(msg) __attribute__((deprecated))
+# endif
+#elif defined(_MSC_VER)
+#  define BOOST_SYSTEM_DEPRECATED(msg) __declspec(deprecated(msg))
+#else
+# define BOOST_SYSTEM_DEPRECATED(msg)
 #endif
 
 #endif // BOOST_SYSTEM_DETAIL_CONFIG_HPP_INCLUDED

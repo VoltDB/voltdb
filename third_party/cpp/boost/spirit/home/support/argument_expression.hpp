@@ -9,7 +9,9 @@
 #if !defined(BOOST_SPIRIT_ARGUMENT_MARCH_22_2011_0939PM)
 #define BOOST_SPIRIT_ARGUMENT_MARCH_22_2011_0939PM
 
-#include <boost/spirit/include/phoenix_core.hpp>
+#include <boost/phoenix/core/terminal.hpp>
+#include <boost/phoenix/core/v2_eval.hpp>
+#include <boost/proto/proto_fwd.hpp> // for transform placeholders
 
 namespace boost { namespace spirit
 {

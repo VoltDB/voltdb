@@ -64,7 +64,7 @@
 
     \brief Converts a sequence to comma-separated elements which are the elements of the sequence. Re-entrant version.
 
-    d         = The next available BOOST_PP_WHILE iteration. 
+    d         = The next available BOOST_PP_WHILE iteration. <br/>
     ...       = Variadic parameters.
     
     The first variadic parameter is required and is the sequence to convert.

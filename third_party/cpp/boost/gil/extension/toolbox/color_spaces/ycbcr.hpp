@@ -12,16 +12,14 @@
 
 #include <boost/gil/color_convert.hpp>
 #include <boost/gil.hpp> // FIXME: Include what you use!
+#include <boost/gil/detail/mp11.hpp>
 
 #include <boost/config.hpp>
-#include <boost/mpl/identity.hpp>
-#include <boost/mpl/range_c.hpp>
-#include <boost/mpl/vector_c.hpp>
 
 #include <cstdint>
 #include <type_traits>
 
-namespace boost{ namespace gil {
+namespace boost { namespace gil {
 
 /// \addtogroup ColorNameModel
 /// \{
@@ -47,36 +45,38 @@ struct cr_t {};
 /// \}
 
 /// \ingroup ColorSpaceModel
-using ycbcr_601__t = boost::mpl::vector3
-    <
-        ycbcr_601_color_space::y_t,
-        ycbcr_601_color_space::cb_t,
-        ycbcr_601_color_space::cr_t>
-    ;
+using ycbcr_601__t = mp11::mp_list
+<
+    ycbcr_601_color_space::y_t,
+    ycbcr_601_color_space::cb_t,
+    ycbcr_601_color_space::cr_t
+>;
 
 /// \ingroup ColorSpaceModel
-using ycbcr_709__t = boost::mpl::vector3
-    <
-        ycbcr_709_color_space::y_t,
-        ycbcr_709_color_space::cb_t,
-        ycbcr_709_color_space::cr_t
-    >;
+using ycbcr_709__t = mp11::mp_list
+<
+    ycbcr_709_color_space::y_t,
+    ycbcr_709_color_space::cb_t,
+    ycbcr_709_color_space::cr_t
+>;
 
 /// \ingroup LayoutModel
 using ycbcr_601__layout_t = boost::gil::layout<ycbcr_601__t>;
 using ycbcr_709__layout_t = boost::gil::layout<ycbcr_709__t>;
 
 //The channel depth is ALWAYS 8bits ofr YCbCr!
-GIL_DEFINE_ALL_TYPEDEFS(8, uint8_t, ycbcr_601_)
-GIL_DEFINE_ALL_TYPEDEFS(8, uint8_t, ycbcr_709_)
+BOOST_GIL_DEFINE_ALL_TYPEDEFS(8, uint8_t, ycbcr_601_)
+BOOST_GIL_DEFINE_ALL_TYPEDEFS(8, uint8_t, ycbcr_709_)
 
 namespace detail {
 
 // Source:boost/algorithm/clamp.hpp
 template<typename T>
-BOOST_CXX14_CONSTEXPR T const& clamp(T const& val,
-    typename boost::mpl::identity<T>::type const & lo,
-    typename boost::mpl::identity<T>::type const & hi)
+BOOST_CXX14_CONSTEXPR
+T const& clamp(
+    T const& val,
+    typename boost::mp11::mp_identity<T>::type const & lo,
+    typename boost::mp11::mp_identity<T>::type const & hi)
 {
     // assert ( !p ( hi, lo )); // Can't assert p ( lo, hi ) b/c they might be equal
     auto const p = std::less<T>();
@@ -105,8 +105,8 @@ struct default_color_converter_impl<ycbcr_601__t, rgb_t>
         using dst_channel_t = typename channel_type<DSTP>::type;
         convert(src, dst, typename std::is_same
             <
-                typename mpl::int_<sizeof(dst_channel_t)>::type,
-                typename mpl::int_<1>::type
+                std::integral_constant<int, sizeof(dst_channel_t)>,
+                std::integral_constant<int, 1>
             >::type());
 	}
 
@@ -118,7 +118,7 @@ private:
             >
     void convert( const Src_Pixel& src
                 ,       Dst_Pixel& dst
-                , mpl::true_ // is 8 bit channel
+                , std::true_type // is 8 bit channel
                 ) const
     {
         using namespace ycbcr_601_color_space;
@@ -149,7 +149,7 @@ private:
             >
     void convert( const Src_Pixel& src
                 ,       Dst_Pixel& dst
-                , mpl::false_ // is 8 bit channel
+                , std::false_type // is 8 bit channel
                 ) const
     {
         using namespace ycbcr_601_color_space;

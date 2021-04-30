@@ -23,6 +23,7 @@ class async_pipe
 public:
     typedef int native_handle_type;
     typedef ::boost::asio::posix::stream_descriptor handle_type;
+    typedef typename handle_type::executor_type executor_type;
 
     inline async_pipe(boost::asio::io_context & ios) : async_pipe(ios, ios) {}
 
@@ -70,10 +71,8 @@ public:
 
     ~async_pipe()
     {
-        if (_sink .native_handle()  != -1)
-            ::close(_sink.native_handle());
-        if (_source.native_handle() != -1)
-            ::close(_source.native_handle());
+        boost::system::error_code ec;
+        close(ec);
     }
 
     template<class CharT, class Traits = std::char_traits<CharT>>

@@ -11,8 +11,8 @@
 // specified widths, as described in N3626 (proposed for C++14).
 // See: http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2013/n3626.pdf
 
-#ifndef _BOOST_CSTDFLOAT_2014_01_09_HPP_
-  #define _BOOST_CSTDFLOAT_2014_01_09_HPP_
+#ifndef BOOST_MATH_CSTDFLOAT_2014_01_09_HPP_
+  #define BOOST_MATH_CSTDFLOAT_2014_01_09_HPP_
 
   // Include the floating-point type definitions.
   #include <boost/math/cstdfloat/cstdfloat_types.hpp>
@@ -55,4 +55,4 @@
   #undef BOOST_CSTDFLOAT_HAS_INTERNAL_FLOAT128_T
   #endif
 
-#endif // _BOOST_CSTDFLOAT_2014_01_09_HPP_
+#endif // BOOST_MATH_CSTDFLOAT_2014_01_09_HPP_

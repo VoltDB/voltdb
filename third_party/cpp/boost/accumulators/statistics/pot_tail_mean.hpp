@@ -90,6 +90,14 @@ namespace impl
                 is_same<LeftRight, left>::value ? args[quantile_probability] : 1. - args[quantile_probability]
               , -xi_hat);
         }
+    
+        // make this accumulator serializeable
+        template<class Archive>
+        void serialize(Archive & ar, const unsigned int file_version)
+        { 
+            ar & sign_;
+        }
+
     private:
         short sign_; // if the fit parameters from the mirrored left tail extreme values are used, mirror back the result
     };

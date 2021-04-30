@@ -20,18 +20,18 @@
 #include <boost/type_traits/is_enum.hpp>
 #include <boost/type_traits/is_floating_point.hpp>
 #include <boost/config.hpp>
+#include <climits>
 
 namespace boost { namespace spirit { namespace x3
 {
-    template <typename V, typename T
-      , boost::endian::order endian, std::size_t bits>
+    template <typename T, boost::endian::order endian, std::size_t bits>
     struct binary_lit_parser
-      : parser<binary_lit_parser<V, T, endian, bits> >
+      : parser<binary_lit_parser<T, endian, bits> >
     {
         static bool const has_attribute = false;
         typedef unused_type attribute_type;
 
-        binary_lit_parser(V n_)
+        constexpr binary_lit_parser(T n_)
           : n(n_) {}
 
         template <typename Iterator, typename Context, typename Attribute>
@@ -40,7 +40,7 @@ namespace boost { namespace spirit { namespace x3
         {
             x3::skip_over(first, last, context);
 
-            auto bytes = reinterpret_cast<const unsigned char*>(&n);
+            unsigned char const* bytes = n.data();
 
             Iterator it = first;
             for (unsigned int i = 0; i < sizeof(n); ++i)
@@ -72,11 +72,12 @@ namespace boost { namespace spirit { namespace x3
         {
             x3::skip_over(first, last, context);
 
-            attribute_type attr_;
-            auto bytes = reinterpret_cast<unsigned char*>(&attr_);
+            // Properly align the buffer for performance reasons
+            alignas(T) unsigned char buf[sizeof(T)];
+            unsigned char * bytes = buf;
 
             Iterator it = first;
-            for (unsigned int i = 0; i < sizeof(attr_); ++i)
+            for (unsigned int i = 0; i < sizeof(T); ++i)
             {
                 if (it == last)
                     return false;
@@ -84,14 +85,16 @@ namespace boost { namespace spirit { namespace x3
             }
 
             first = it;
+
+            static_assert(bits % CHAR_BIT == 0,
+                          "Boost.Endian supports only multiples of CHAR_BIT");
             x3::traits::move_to(
-                    endian::conditional_reverse<endian, endian::order::native>(attr_)
-                    , attr_param );
+                endian::endian_load<T, bits / CHAR_BIT, endian>(buf),
+                attr_param);
             return true;
         }
 
-        template <typename V>
-        binary_lit_parser< V, T, endian, bits> operator()(V n) const
+        constexpr binary_lit_parser<T, endian, bits> operator()(T n) const
         {
             return {n};
         }
@@ -99,7 +102,7 @@ namespace boost { namespace spirit { namespace x3
 
 #define BOOST_SPIRIT_MAKE_BINARY_PRIMITIVE(name, endiantype, attrtype, bits)                  \
     typedef any_binary_parser< attrtype, boost::endian::order::endiantype, bits > name##type; \
-    name##type const name = name##type();
+    constexpr name##type name = name##type();
 
 
     BOOST_SPIRIT_MAKE_BINARY_PRIMITIVE(byte_, native, uint_least8_t, 8)
@@ -114,18 +117,12 @@ namespace boost { namespace spirit { namespace x3
     BOOST_SPIRIT_MAKE_BINARY_PRIMITIVE(big_qword, big, uint_least64_t, 64)
     BOOST_SPIRIT_MAKE_BINARY_PRIMITIVE(little_qword, little, uint_least64_t, 64)
 #endif
-
-    // Use a pseudo configuration macro to make clear that endian libray support
-    // for floating point types is required. Must be removed as soon as the endian library
-    // properly supports floating point types.
-#ifdef BOOST_ENDIAN_HAS_FLOATING_POINT
-    BOOST_SPIRIT_MAKE_BINARY_PRIMITIVE(bin_float, native, float, 32)
-    BOOST_SPIRIT_MAKE_BINARY_PRIMITIVE(big_bin_float, big, float, 32)
-    BOOST_SPIRIT_MAKE_BINARY_PRIMITIVE(little_bin_float, little, float, 32)
-    BOOST_SPIRIT_MAKE_BINARY_PRIMITIVE(bin_double, native, double, 64)
-    BOOST_SPIRIT_MAKE_BINARY_PRIMITIVE(big_bin_double, big, double, 64)
-    BOOST_SPIRIT_MAKE_BINARY_PRIMITIVE(little_bin_double, little, double, 64)
-#endif
+    BOOST_SPIRIT_MAKE_BINARY_PRIMITIVE(bin_float, native, float, sizeof(float) * CHAR_BIT)
+    BOOST_SPIRIT_MAKE_BINARY_PRIMITIVE(big_bin_float, big, float, sizeof(float) * CHAR_BIT)
+    BOOST_SPIRIT_MAKE_BINARY_PRIMITIVE(little_bin_float, little, float, sizeof(float) * CHAR_BIT)
+    BOOST_SPIRIT_MAKE_BINARY_PRIMITIVE(bin_double, native, double, sizeof(double) * CHAR_BIT)
+    BOOST_SPIRIT_MAKE_BINARY_PRIMITIVE(big_bin_double, big, double, sizeof(double) * CHAR_BIT)
+    BOOST_SPIRIT_MAKE_BINARY_PRIMITIVE(little_bin_double, little, double, sizeof(double) * CHAR_BIT)
 
 #undef BOOST_SPIRIT_MAKE_BINARY_PRIMITIVE
 
@@ -134,7 +131,7 @@ namespace boost { namespace spirit { namespace x3
     struct get_info<any_binary_parser<T, endian::order::little, bits>>
     {
         typedef std::string result_type;
-        std::string operator()(any_binary_parser<T, endian::order::little, bits> const& p) const
+        std::string operator()(any_binary_parser<T, endian::order::little, bits> const&) const
         {
             return "little-endian binary";
         }
@@ -144,27 +141,27 @@ namespace boost { namespace spirit { namespace x3
     struct get_info<any_binary_parser<T, endian::order::big, bits>>
     {
         typedef std::string result_type;
-        std::string operator()(any_binary_parser<T, endian::order::big, bits> const& p) const
+        std::string operator()(any_binary_parser<T, endian::order::big, bits> const&) const
         {
             return "big-endian binary";
         }
     };
 
-    template <typename V, typename T, std::size_t bits>
-    struct get_info<binary_lit_parser<V, T, endian::order::little, bits>>
+    template <typename T, std::size_t bits>
+    struct get_info<binary_lit_parser<T, endian::order::little, bits>>
     {
         typedef std::string result_type;
-        std::string operator()(binary_lit_parser<V, T, endian::order::little, bits> const& p) const
+        std::string operator()(binary_lit_parser<T, endian::order::little, bits> const&) const
         {
             return "little-endian binary";
         }
     };
 
-    template <typename V, typename T, std::size_t bits>
-    struct get_info<binary_lit_parser<V, T, endian::order::big, bits>>
+    template <typename T, std::size_t bits>
+    struct get_info<binary_lit_parser<T, endian::order::big, bits>>
     {
         typedef std::string result_type;
-        std::string operator()(binary_lit_parser<V, T, endian::order::big, bits> const& p) const
+        std::string operator()(binary_lit_parser<T, endian::order::big, bits> const&) const
         {
             return "big-endian binary";
         }

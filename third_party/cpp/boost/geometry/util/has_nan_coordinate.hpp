@@ -1,6 +1,6 @@
 // Boost.Geometry
 
-// Copyright (c) 2015 Oracle and/or its affiliates.
+// Copyright (c) 2015-2020 Oracle and/or its affiliates.
 
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 // Contributed and/or modified by Menelaos Karavelas, on behalf of Oracle
@@ -13,8 +13,7 @@
 #define BOOST_GEOMETRY_UTIL_HAS_NAN_COORDINATE_HPP
 
 #include <cstddef>
-
-#include <boost/type_traits/is_floating_point.hpp>
+#include <type_traits>
 
 #include <boost/geometry/core/access.hpp>
 #include <boost/geometry/core/coordinate_dimension.hpp>
@@ -87,7 +86,7 @@ bool has_nan_coordinate(Point const& point)
         <
             Point,
             detail::isnan,
-            boost::is_floating_point
+            std::is_floating_point
                 <
                     typename coordinate_type<Point>::type
                 >::value

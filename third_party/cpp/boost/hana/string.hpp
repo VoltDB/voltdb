@@ -117,7 +117,7 @@ BOOST_HANA_NAMESPACE_BEGIN
         constexpr auto operator"" _s() {
             static_assert(std::is_same<CharT, char>::value,
             "hana::string: Only narrow string literals are supported with "
-            "the _s string literal right now. See https://goo.gl/fBbKD7 "
+            "the _s string literal right now. See https://github.com/boostorg/hana/issues/80 "
             "if you need support for fancier types of compile-time strings.");
             return hana::string_c<s...>;
         }
@@ -271,7 +271,7 @@ BOOST_HANA_NAMESPACE_BEGIN
         template <char ...xs, typename N>
         static constexpr auto apply(string<xs...> const& s, N const&) {
             return helper<N::value>(s, std::make_index_sequence<
-                N::value < sizeof...(xs) ? sizeof...(xs) - N::value : 0
+                (N::value < sizeof...(xs)) ? sizeof...(xs) - N::value : 0
             >{});
         }
 

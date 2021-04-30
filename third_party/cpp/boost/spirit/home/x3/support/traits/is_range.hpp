@@ -8,7 +8,7 @@
 #if !defined(BOOST_SPIRIT_X3_IS_RANGE_DEC_06_2017_1900PM)
 #define BOOST_SPIRIT_X3_IS_RANGE_DEC_06_2017_1900PM
 
-#include <boost/range/iterator_range.hpp>
+#include <boost/range/range_fwd.hpp>
 #include <boost/mpl/bool.hpp>
 
 namespace boost { namespace spirit { namespace x3 { namespace traits

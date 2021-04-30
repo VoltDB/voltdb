@@ -4,6 +4,9 @@
 // Copyright (c) 2008-2012 Bruno Lalande, Paris, France.
 // Copyright (c) 2009-2012 Mateusz Loskot, London, UK.
 
+// Copyright (c) 2020 Oracle and/or its affiliates.
+// Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
+
 // Parts of Boost.Geometry are redesigned from Geodan's Geographic Library
 // (geolib/GGL), copyright (c) 1995-2010 Geodan, Amsterdam, the Netherlands.
 
@@ -15,13 +18,13 @@
 #define BOOST_GEOMETRY_UTIL_PARAMETER_TYPE_OF_HPP
 
 
+#include <type_traits>
+
 #include <boost/function_types/function_arity.hpp>
 #include <boost/function_types/is_member_function_pointer.hpp>
 #include <boost/function_types/parameter_types.hpp>
+
 #include <boost/mpl/at.hpp>
-#include <boost/mpl/int.hpp>
-#include <boost/mpl/plus.hpp>
-#include <boost/type_traits/remove_reference.hpp>
 
 
 namespace boost { namespace geometry
@@ -40,25 +43,25 @@ struct parameter_type_of
             Method
         >::type parameter_types;
 
-    typedef typename boost::mpl::if_
+    typedef std::conditional_t
         <
-            boost::function_types::is_member_function_pointer<Method>,
-            boost::mpl::int_<1>,
-            boost::mpl::int_<0>
-        >::type base_index_type;
+            boost::function_types::is_member_function_pointer<Method>::value,
+            std::integral_constant<int, 1>,
+            std::integral_constant<int, 0>
+        > base_index_type;
 
-    typedef typename boost::mpl::if_c
+    typedef std::conditional_t
         <
             Index == 0,
             base_index_type,
-            typename boost::mpl::plus
+            std::integral_constant
                 <
-                    base_index_type,
-                    boost::mpl::int_<Index>
-                >::type
-        >::type indexed_type;
+                    int,
+                    (base_index_type::value + Index)
+                >            
+        > indexed_type;
 
-    typedef typename boost::remove_reference
+    typedef typename std::remove_reference
         <
             typename boost::mpl::at
                 <

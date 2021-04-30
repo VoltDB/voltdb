@@ -9,8 +9,8 @@
 
 // Implement the types for floating-point typedefs having specified widths.
 
-#ifndef _BOOST_CSTDFLOAT_TYPES_2014_01_09_HPP_
-  #define _BOOST_CSTDFLOAT_TYPES_2014_01_09_HPP_
+#ifndef BOOST_MATH_CSTDFLOAT_TYPES_2014_01_09_HPP_
+  #define BOOST_MATH_CSTDFLOAT_TYPES_2014_01_09_HPP_
 
   #include <float.h>
   #include <limits>
@@ -229,7 +229,7 @@
     #define BOOST_CSTDFLOAT_FLOAT128_MIN  3.36210314311209350626267781732175260e-4932Q
     #define BOOST_CSTDFLOAT_FLOAT128_MAX  1.18973149535723176508575932662800702e+4932Q
     #define BOOST_CSTDFLOAT_FLOAT128_EPS  1.92592994438723585305597794258492732e-0034Q
-	#define BOOST_CSTDFLOAT_FLOAT128_DENORM_MIN  6.475175119438025110924438958227646552e-4966Q
+    #define BOOST_CSTDFLOAT_FLOAT128_DENORM_MIN  6.475175119438025110924438958227646552e-4966Q
 
   #endif // Not BOOST_CSTDFLOAT_NO_LIBQUADMATH_SUPPORT (i.e., the user would like to have libquadmath support)
 
@@ -324,7 +324,7 @@
   // as the corresponding fixed-width type. This behavior may, however,
   // be modified when being optimized for a given compiler implementation.
 
-  // In addition, a clear assessment of IEEE-754 comformance is carried out
+  // In addition, a clear assessment of IEEE-754 conformance is carried out
   // using compile-time assertion.
 
   namespace boost
@@ -438,5 +438,5 @@
   }
   // namespace boost
 
-#endif // _BOOST_CSTDFLOAT_BASE_TYPES_2014_01_09_HPP_
+#endif // BOOST_MATH_CSTDFLOAT_BASE_TYPES_2014_01_09_HPP_
 

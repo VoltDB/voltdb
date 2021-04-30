@@ -214,8 +214,8 @@ namespace boost { namespace numeric { namespace ublas {
     class map_array {
     public:
         typedef ALLOC allocator_type;
-        typedef typename ALLOC::size_type size_type;
-        typedef typename ALLOC::difference_type difference_type;
+        typedef typename boost::allocator_size_type<ALLOC>::type size_type;
+        typedef typename boost::allocator_difference_type<ALLOC>::type difference_type;
         typedef std::pair<I,T> value_type;
         typedef I key_type;
         typedef T mapped_type;

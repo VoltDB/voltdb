@@ -60,7 +60,7 @@ namespace boost { namespace fusion { namespace detail
 
     template <typename PtrOrSmartPtr> struct non_const_pointee;
 
-#if defined(BOOST_MSVC) || (defined(__BORLANDC__) && !defined(BOOST_DISABLE_WIN32))
+#if defined(BOOST_MSVC) || (defined(BOOST_BORLANDC) && !defined(BOOST_DISABLE_WIN32))
 #   define BOOST_FUSION_TRAIT_DECL __cdecl
 #else
 #   define BOOST_FUSION_TRAIT_DECL /**/

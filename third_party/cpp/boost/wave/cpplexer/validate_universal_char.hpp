@@ -9,8 +9,8 @@
     Software License, Version 1.0. (See accompanying file
     LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 =============================================================================*/
-#if !defined(VALIDATE_UNIVERSAL_CHAR_HPP_55F1B811_CD76_4C72_8344_CBC69CF3B339_INCLUDED)
-#define VALIDATE_UNIVERSAL_CHAR_HPP_55F1B811_CD76_4C72_8344_CBC69CF3B339_INCLUDED
+#if !defined(BOOST_VALIDATE_UNIVERSAL_CHAR_HPP_55F1B811_CD76_4C72_8344_CBC69CF3B339_INCLUDED)
+#define BOOST_VALIDATE_UNIVERSAL_CHAR_HPP_55F1B811_CD76_4C72_8344_CBC69CF3B339_INCLUDED
 
 #include <boost/assert.hpp>
 
@@ -72,15 +72,15 @@ in_range(unsigned long ch, unsigned long l, unsigned long u)
 inline universal_char_type
 classify_universal_char (unsigned long ch)
 {
-// test for invalid characters
+    // test for invalid characters
     if (ch <= 0x0020 || in_range(ch, 0x007f, 0x009f))
         return universal_char_type_invalid;
 
-// test for characters in the range of the base character set
+    // test for characters in the range of the base character set
     if (in_range(ch, 0x0021, 0x005f) || in_range(ch, 0x0061, 0x007e))
         return universal_char_type_base_charset;
 
-// test for additional valid character values (see C++ Standard: Annex E)
+    // test for additional valid character values (see C++ Standard: Annex E)
     if (in_range(ch, 0x00c0, 0x00d6) || in_range(ch, 0x00d8, 0x00f6) ||
         in_range(ch, 0x00f8, 0x01f5) || in_range(ch, 0x01fa, 0x0217) ||
         in_range(ch, 0x0250, 0x02a8) || in_range(ch, 0x1e00, 0x1e9a) ||
@@ -227,16 +227,16 @@ validate_identifier_name (StringT const &name, std::size_t line,
 typename StringT::size_type pos = name.find_first_of('\\');
 
     while (StringT::npos != pos) {
-    // the identifier name contains a backslash (must be universal char)
+        // the identifier name contains a backslash (must be universal char)
         BOOST_ASSERT('u' == name[pos+1] || 'U' == name[pos+1]);
 
-    StringT uchar_val(name.substr(pos+2, ('u' == name[pos+1]) ? 4 : 8));
-    universal_char_type type =
-        classify_universal_char(strtoul(uchar_val.c_str(), 0, 16));
+        StringT uchar_val(name.substr(pos + 2, ('u' == name[pos + 1]) ? 4 : 8));
+        universal_char_type type =
+            classify_universal_char(strtoul(uchar_val.c_str(), 0, 16));
 
         if (universal_char_type_valid != type) {
-        // an invalid char was found, so throw an exception
-        StringT error_uchar(name.substr(pos, ('u' == name[pos+1]) ? 6 : 10));
+            // an invalid char was found, so throw an exception
+            StringT error_uchar(name.substr(pos, ('u' == name[pos + 1]) ? 6 : 10));
 
             if (universal_char_type_invalid == type) {
                 BOOST_WAVE_LEXER_THROW(lexing_exception, universal_char_invalid,
@@ -252,7 +252,7 @@ typename StringT::size_type pos = name.find_first_of('\\');
             }
         }
 
-    // find next universal char (if appropriate)
+        // find next universal char (if appropriate)
         pos = name.find_first_of('\\', pos+2);
     }
 }
@@ -277,20 +277,20 @@ validate_literal (StringT const &name, std::size_t line, std::size_t column,
 {
     using namespace std;    // some systems have strtoul in namespace std::
 
-typename StringT::size_type pos = name.find_first_of('\\');
+    typename StringT::size_type pos = name.find_first_of('\\');
 
     while (StringT::npos != pos) {
-    // the literal contains a backslash (may be universal char)
+        // the literal contains a backslash (may be universal char)
         if ('u' == name[pos+1] || 'U' == name[pos+1]) {
-        StringT uchar_val(name.substr(pos+2, ('u' == name[pos+1]) ? 4 : 8));
-        universal_char_type type =
-            classify_universal_char(strtoul(uchar_val.c_str(), 0, 16));
+            StringT uchar_val(name.substr(pos + 2, ('u' == name[pos + 1]) ? 4 : 8));
+            universal_char_type type =
+                classify_universal_char(strtoul(uchar_val.c_str(), 0, 16));
 
             if (universal_char_type_valid != type &&
                 universal_char_type_not_allowed_for_identifiers != type)
             {
-            // an invalid char was found, so throw an exception
-            StringT error_uchar(name.substr(pos, ('u' == name[pos+1]) ? 6 : 10));
+                // an invalid char was found, so throw an exception
+                StringT error_uchar(name.substr(pos, ('u' == name[pos + 1]) ? 6 : 10));
 
                 if (universal_char_type_invalid == type) {
                     BOOST_WAVE_LEXER_THROW(lexing_exception, universal_char_invalid,
@@ -303,7 +303,7 @@ typename StringT::size_type pos = name.find_first_of('\\');
             }
         }
 
-    // find next universal char (if appropriate)
+        // find next universal char (if appropriate)
         pos = name.find_first_of('\\', pos+2);
     }
 }
@@ -319,4 +319,4 @@ typename StringT::size_type pos = name.find_first_of('\\');
 #include BOOST_ABI_SUFFIX
 #endif
 
-#endif // !defined(VALIDATE_UNIVERSAL_CHAR_HPP_55F1B811_CD76_4C72_8344_CBC69CF3B339_INCLUDED)
+#endif // !defined(BOOST_VALIDATE_UNIVERSAL_CHAR_HPP_55F1B811_CD76_4C72_8344_CBC69CF3B339_INCLUDED)

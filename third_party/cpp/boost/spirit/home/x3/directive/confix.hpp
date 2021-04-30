@@ -22,7 +22,7 @@ namespace boost { namespace spirit { namespace x3
         static bool const is_pass_through_unary = true;
         static bool const handles_container = Subject::handles_container;
 
-        confix_directive(Prefix const& prefix
+        constexpr confix_directive(Prefix const& prefix
                          , Subject const& subject
                          , Postfix const& postfix) :
             base_type(subject),
@@ -58,7 +58,7 @@ namespace boost { namespace spirit { namespace x3
     struct confix_gen
     {
         template<typename Subject>
-        confix_directive<
+        constexpr confix_directive<
             Prefix, typename extension::as_parser<Subject>::value_type, Postfix>
         operator[](Subject const& subject) const
         {
@@ -71,7 +71,7 @@ namespace boost { namespace spirit { namespace x3
 
 
     template<typename Prefix, typename Postfix>
-    confix_gen<typename extension::as_parser<Prefix>::value_type,
+    constexpr confix_gen<typename extension::as_parser<Prefix>::value_type,
                typename extension::as_parser<Postfix>::value_type>
     confix(Prefix const& prefix, Postfix const& postfix)
     {

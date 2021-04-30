@@ -28,7 +28,7 @@ namespace histogram {
   @param axis First axis instance.
   @param axes Other axis instances.
 */
-template <typename Axis, typename... Axes, typename = detail::requires_axis<Axis>>
+template <class Axis, class... Axes, class = detail::requires_axis<Axis>>
 auto make_profile(Axis&& axis, Axes&&... axes) {
   return make_histogram_with(profile_storage(), std::forward<Axis>(axis),
                              std::forward<Axes>(axes)...);
@@ -39,7 +39,7 @@ auto make_profile(Axis&& axis, Axes&&... axes) {
   @param axis First axis instance.
   @param axes Other axis instances.
 */
-template <typename Axis, typename... Axes, typename = detail::requires_axis<Axis>>
+template <class Axis, class... Axes, class = detail::requires_axis<Axis>>
 auto make_weighted_profile(Axis&& axis, Axes&&... axes) {
   return make_histogram_with(weighted_profile_storage(), std::forward<Axis>(axis),
                              std::forward<Axes>(axes)...);
@@ -49,7 +49,7 @@ auto make_weighted_profile(Axis&& axis, Axes&&... axes) {
   Make profile from iterable range.
   @param iterable Iterable range of axis objects.
 */
-template <typename Iterable, typename = detail::requires_sequence_of_any_axis<Iterable>>
+template <class Iterable, class = detail::requires_sequence_of_any_axis<Iterable>>
 auto make_profile(Iterable&& iterable) {
   return make_histogram_with(profile_storage(), std::forward<Iterable>(iterable));
 }
@@ -58,7 +58,7 @@ auto make_profile(Iterable&& iterable) {
   Make profile from iterable range which accepts weights.
   @param iterable Iterable range of axis objects.
 */
-template <typename Iterable, typename = detail::requires_sequence_of_any_axis<Iterable>>
+template <class Iterable, class = detail::requires_sequence_of_any_axis<Iterable>>
 auto make_weighted_profile(Iterable&& iterable) {
   return make_histogram_with(weighted_profile_storage(),
                              std::forward<Iterable>(iterable));
@@ -69,7 +69,7 @@ auto make_weighted_profile(Iterable&& iterable) {
   @param begin Iterator to range of axis objects.
   @param end   Iterator to range of axis objects.
 */
-template <typename Iterator, typename = detail::requires_iterator<Iterator>>
+template <class Iterator, class = detail::requires_iterator<Iterator>>
 auto make_profile(Iterator begin, Iterator end) {
   return make_histogram_with(profile_storage(), begin, end);
 }
@@ -79,7 +79,7 @@ auto make_profile(Iterator begin, Iterator end) {
   @param begin Iterator to range of axis objects.
   @param end   Iterator to range of axis objects.
 */
-template <typename Iterator, typename = detail::requires_iterator<Iterator>>
+template <class Iterator, class = detail::requires_iterator<Iterator>>
 auto make_weighted_profile(Iterator begin, Iterator end) {
   return make_histogram_with(weighted_profile_storage(), begin, end);
 }

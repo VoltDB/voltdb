@@ -18,6 +18,7 @@
 
 #include <boost/test/detail/config.hpp>
 
+
 namespace boost {
 
 namespace unit_test {
@@ -31,6 +32,12 @@ typedef const_string const          literal_string;
 #endif
 
 typedef char const* const           c_literal_string;
+
+#if defined(BOOST_TEST_STRING_VIEW)
+template <class CharT, class string_view_t>
+class BOOST_SYMBOL_VISIBLE stringview_cstring_helper;
+#endif
+
 
 } // namespace unit_test
 

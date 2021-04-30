@@ -21,10 +21,10 @@
 
 #include <boost/cstdint.hpp>
 #include <boost/variant.hpp>
-#include <boost/range/iterator_range.hpp>
 #include <boost/mpl/bool.hpp>
 #include <boost/mpl/identity.hpp>
 #include <boost/mpl/or.hpp>
+#include <boost/range/iterator_range_core.hpp>
 #include <boost/type_traits/is_same.hpp>
 #include <boost/utility/enable_if.hpp>
 
@@ -1253,7 +1253,7 @@ namespace boost { namespace spirit { namespace traits
         static type pre(iterator_range<Iterator> const& t)
         {
             // return utree the begin iterator points to
-            Iterator it = boost::begin(t);
+            Iterator it = t.begin();
             utree result(boost::ref(*it));
             ++it;
             return result;

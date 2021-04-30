@@ -11,9 +11,6 @@
 #include <boost/gil/bit_aligned_pixel_reference.hpp>
 #include <boost/gil/packed_pixel.hpp>
 
-#include <boost/mpl/accumulate.hpp>
-#include <boost/mpl/int.hpp>
-
 namespace boost{ namespace gil {
 
 /// pixel_bit_size metafunctions
@@ -23,22 +20,50 @@ namespace boost{ namespace gil {
 /// using image_t = bit_aligned_image5_type<16, 16, 16, 8, 8, devicen_layout_t<5>>::type;
 /// const int size = pixel_bit_size<image_t::view_t::reference>::value;
 /// \endcode
-template< typename PixelRef >
-struct pixel_bit_size : mpl::int_<0> {};
+template< typename PixelRef>
+struct pixel_bit_size : std::integral_constant<int, 0> {};
 
 template <typename B, typename C, typename L, bool M>
-struct pixel_bit_size<bit_aligned_pixel_reference<B,C,L,M> > : mpl::int_< mpl::accumulate< C, mpl::int_<0>, mpl::plus<mpl::_1, mpl::_2> >::type::value >{};
+struct pixel_bit_size<bit_aligned_pixel_reference<B, C, L, M>>
+    : mp11::mp_fold
+    <
+        C,
+        std::integral_constant<int, 0>,
+        mp11::mp_plus
+    >
+{};
 
 template <typename B, typename C, typename L, bool M>
-struct pixel_bit_size<const bit_aligned_pixel_reference<B,C,L,M> > : mpl::int_< mpl::accumulate< C, mpl::int_<0>, mpl::plus<mpl::_1, mpl::_2> >::type::value >{};
+struct pixel_bit_size<bit_aligned_pixel_reference<B, C, L, M> const>
+    : mp11::mp_fold
+    <
+        C,
+        std::integral_constant<int, 0>,
+        mp11::mp_plus
+    >
+{};
 
 template <typename B, typename C, typename L>
-struct pixel_bit_size<packed_pixel<B,C,L> > : mpl::int_< mpl::accumulate< C, mpl::int_<0>, mpl::plus<mpl::_1, mpl::_2> >::type::value >{};
+struct pixel_bit_size<packed_pixel<B, C, L>>
+    : mp11::mp_fold
+    <
+        C,
+        std::integral_constant<int, 0>,
+        mp11::mp_plus
+    >
+
+{};
 
 template <typename B, typename C, typename L>
-struct pixel_bit_size<const packed_pixel<B,C,L> > : mpl::int_< mpl::accumulate< C, mpl::int_<0>, mpl::plus<mpl::_1, mpl::_2> >::type::value >{};
+struct pixel_bit_size<const packed_pixel<B,C,L> >
+    : mp11::mp_fold
+    <
+        C,
+        std::integral_constant<int, 0>,
+        mp11::mp_plus
+    >
+{};
 
-} // namespace gil
-} // namespace boost
+}} // namespace boost::gil
 
 #endif

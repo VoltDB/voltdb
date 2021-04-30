@@ -10,6 +10,10 @@
 #ifndef BOOST_DETAIL_WINAPI_APC_HPP
 #define BOOST_DETAIL_WINAPI_APC_HPP
 
+#include <boost/config/header_deprecated.hpp>
+
+BOOST_HEADER_DEPRECATED("<boost/winapi/apc.hpp>")
+
 #include <boost/winapi/apc.hpp>
 #include <boost/detail/winapi/detail/deprecated_namespace.hpp>
 

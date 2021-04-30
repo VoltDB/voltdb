@@ -1,6 +1,6 @@
 // Boost.Geometry (aka GGL, Generic Geometry Library)
 
-// Copyright (c) 2017-2018, Oracle and/or its affiliates.
+// Copyright (c) 2017-2020, Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
 // Use, modification and distribution is subject to the Boost Software License,
@@ -12,10 +12,14 @@
 
 
 #include <string>
+#include <type_traits>
+
+#include <boost/throw_exception.hpp>
 
 #include <boost/geometry/algorithms/convert.hpp>
 
 #include <boost/geometry/core/coordinate_dimension.hpp>
+#include <boost/geometry/core/static_assert.hpp>
 
 #include <boost/geometry/geometries/point.hpp>
 #include <boost/geometry/geometries/multi_point.hpp>
@@ -28,13 +32,6 @@
 #include <boost/geometry/srs/projections/impl/pj_transform.hpp>
 
 #include <boost/geometry/views/detail/indexed_point_view.hpp>
-
-#include <boost/mpl/assert.hpp>
-#include <boost/mpl/if.hpp>
-#include <boost/smart_ptr/shared_ptr.hpp>
-#include <boost/throw_exception.hpp>
-#include <boost/type_traits/is_integral.hpp>
-#include <boost/type_traits/is_same.hpp>
 
 
 namespace boost { namespace geometry
@@ -59,7 +56,7 @@ template
 <
     typename PtIn,
     typename PtOut,
-    bool SameUnits = boost::is_same
+    bool SameUnits = std::is_same
                         <
                             typename geometry::detail::cs_angular_units<PtIn>::type,
                             typename geometry::detail::cs_angular_units<PtOut>::type
@@ -227,7 +224,7 @@ template
 <
     typename OutGeometry,
     typename CT,
-    bool EnableTemporary = ! boost::is_same
+    bool EnableTemporary = ! std::is_same
                                 <
                                     typename select_most_precise
                                         <
@@ -235,7 +232,7 @@ template
                                             CT
                                         >::type,
                                     typename geometry::coordinate_type<OutGeometry>::type
-                                >::type::value
+                                >::value
 >
 struct transform_geometry_wrapper
 {
@@ -584,13 +581,17 @@ public:
     {}
 
     // First dynamic, second static and default constructed
-    template <typename Parameters1>
-    explicit transformation(Parameters1 const& parameters1,
-                            typename boost::enable_if_c
-                                <
-                                    boost::is_same<Proj1, srs::dynamic>::value
-                                 && projections::dynamic_parameters<Parameters1>::is_specialized
-                                >::type * = 0)
+    template
+    <
+        typename Parameters1,
+        std::enable_if_t
+            <
+                std::is_same<Proj1, srs::dynamic>::value
+             && projections::dynamic_parameters<Parameters1>::is_specialized,
+                int
+            > = 0
+    >
+    explicit transformation(Parameters1 const& parameters1)
         : m_proj1(parameters1)
     {}
 
@@ -600,42 +601,54 @@ public:
     {}
 
     // Both dynamic
-    template <typename Parameters1, typename Parameters2>
+    template
+    <
+        typename Parameters1, typename Parameters2,
+        std::enable_if_t
+            <
+                std::is_same<Proj1, srs::dynamic>::value
+             && std::is_same<Proj2, srs::dynamic>::value
+             && projections::dynamic_parameters<Parameters1>::is_specialized
+             && projections::dynamic_parameters<Parameters2>::is_specialized,
+                int
+            > = 0
+    >
     transformation(Parameters1 const& parameters1,
-                   Parameters2 const& parameters2,
-                   typename boost::enable_if_c
-                        <
-                            boost::is_same<Proj1, srs::dynamic>::value
-                         && boost::is_same<Proj2, srs::dynamic>::value
-                         && projections::dynamic_parameters<Parameters1>::is_specialized
-                         && projections::dynamic_parameters<Parameters2>::is_specialized
-                        > * = 0)
+                   Parameters2 const& parameters2)
         : m_proj1(parameters1)
         , m_proj2(parameters2)
     {}
 
     // First dynamic, second static
-    template <typename Parameters1>
+    template
+    <
+        typename Parameters1,
+        std::enable_if_t
+            <
+                std::is_same<Proj1, srs::dynamic>::value
+             && projections::dynamic_parameters<Parameters1>::is_specialized,
+                int
+            > = 0
+    >
     transformation(Parameters1 const& parameters1,
-                   Proj2 const& parameters2,
-                   typename boost::enable_if_c
-                        <
-                            boost::is_same<Proj1, srs::dynamic>::value
-                         && projections::dynamic_parameters<Parameters1>::is_specialized
-                        > * = 0)
+                   Proj2 const& parameters2)
         : m_proj1(parameters1)
         , m_proj2(parameters2)
     {}
 
     // First static, second dynamic
-    template <typename Parameters2>
+    template
+    <
+        typename Parameters2,
+        std::enable_if_t
+            <
+                std::is_same<Proj2, srs::dynamic>::value
+             && projections::dynamic_parameters<Parameters2>::is_specialized,
+                int
+            > = 0
+    >
     transformation(Proj1 const& parameters1,
-                   Parameters2 const& parameters2,
-                   typename boost::enable_if_c
-                        <
-                            boost::is_same<Proj2, srs::dynamic>::value
-                         && projections::dynamic_parameters<Parameters2>::is_specialized
-                        > * = 0)
+                   Parameters2 const& parameters2)
         : m_proj1(parameters1)
         , m_proj2(parameters2)
     {}
@@ -663,9 +676,10 @@ public:
     bool forward(GeometryIn const& in, GeometryOut & out,
                  transformation_grids<GridsStorage> const& grids) const
     {
-        BOOST_MPL_ASSERT_MSG((projections::detail::same_tags<GeometryIn, GeometryOut>::value),
-                             NOT_SUPPORTED_COMBINATION_OF_GEOMETRIES,
-                             (GeometryIn, GeometryOut));
+        BOOST_GEOMETRY_STATIC_ASSERT(
+            (projections::detail::same_tags<GeometryIn, GeometryOut>::value),
+            "Not supported combination of Geometries.",
+            GeometryIn, GeometryOut);
 
         return projections::detail::transform
                 <
@@ -682,9 +696,10 @@ public:
     bool inverse(GeometryIn const& in, GeometryOut & out,
                  transformation_grids<GridsStorage> const& grids) const
     {
-        BOOST_MPL_ASSERT_MSG((projections::detail::same_tags<GeometryIn, GeometryOut>::value),
-                             NOT_SUPPORTED_COMBINATION_OF_GEOMETRIES,
-                             (GeometryIn, GeometryOut));
+        BOOST_GEOMETRY_STATIC_ASSERT(
+            (projections::detail::same_tags<GeometryIn, GeometryOut>::value),
+            "Not supported combination of Geometries.",
+            GeometryIn, GeometryOut);
 
         return projections::detail::transform
                 <

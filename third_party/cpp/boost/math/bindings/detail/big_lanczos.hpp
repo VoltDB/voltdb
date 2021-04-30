@@ -12,17 +12,17 @@ namespace boost{ namespace math{ namespace lanczos{
 
 //
 // Lanczos Coefficients for N=13 G=13.144565
-// Max experimental error (with arbitary precision arithmetic) 9.2213e-23
+// Max experimental error (with arbitrary precision arithmetic) 9.2213e-23
 // Generated with compiler: Microsoft Visual C++ version 8.0 on Win32 at Mar 23 2006
 //
 typedef lanczos13 lanczos13UDT;
 
 //
 // Lanczos Coefficients for N=22 G=22.61891
-// Max experimental error (with arbitary precision arithmetic) 2.9524e-38
+// Max experimental error (with arbitrary precision arithmetic) 2.9524e-38
 // Generated with compiler: Microsoft Visual C++ version 8.0 on Win32 at Mar 23 2006
 //
-struct lanczos22UDT : public mpl::int_<120>
+struct lanczos22UDT : public std::integral_constant<int, 120>
 {
    //
    // Produces slightly better than 128-bit long-double precision when 
@@ -213,7 +213,7 @@ struct lanczos22UDT : public mpl::int_<120>
 };
 //
 // Lanczos Coefficients for N=31 G=32.08067
-// Max experimental error (with arbitary precision arithmetic) 0.162e-52
+// Max experimental error (with arbitrary precision arithmetic) 0.162e-52
 // Generated with compiler: Microsoft Visual C++ version 8.0 on Win32 at May 9 2006
 //
 struct lanczos31UDT

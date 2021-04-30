@@ -11,11 +11,11 @@
 #ifndef BOOST_NUMERIC_INTERVAL_DETAIL_X86GCC_ROUNDING_CONTROL_HPP
 #define BOOST_NUMERIC_INTERVAL_DETAIL_X86GCC_ROUNDING_CONTROL_HPP
 
-#ifndef __GNUC__
+#if !defined(__GNUC__) && !(defined(__BORLANDC__) && defined(__clang__))
 #  error This header only works with GNU CC.
 #endif
 
-#ifndef __i386__
+#if !defined(__i386__) && !defined(__x86_64__)
 #  error This header only works on x86 CPUs.
 #endif
 

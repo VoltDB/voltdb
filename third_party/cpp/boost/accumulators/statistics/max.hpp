@@ -48,6 +48,13 @@ namespace impl
             return this->max_;
         }
 
+        // make this accumulator serializeable
+        template<class Archive>
+        void serialize(Archive & ar, const unsigned int file_version)
+        { 
+            ar & max_;
+        }
+
     private:
         Sample max_;
     };

@@ -84,7 +84,7 @@ namespace std { using ::memset; using ::sprintf; }
 
 #    include <procfs.h>
 
-#  elif defined(linux) || defined(__linux)
+#  elif defined(linux) || defined(__linux__)
 
 #    define BOOST_LINUX_BASED_DEBUG
 
@@ -95,13 +95,22 @@ namespace std { using ::memset; using ::sprintf; }
 #    endif
 
 #    ifndef BOOST_TEST_DBG_LIST
-#      define BOOST_TEST_DBG_LIST gdb
+#      define BOOST_TEST_DBG_LIST gdb;lldb
 #    endif
 
 #    define BOOST_TEST_CNL_DBG  gdb
 #    define BOOST_TEST_GUI_DBG  gdb-xterm
 
 #  endif
+
+#elif defined(__APPLE__) // ********************* APPLE
+
+#  define BOOST_APPLE_BASED_DEBUG
+
+#  include <assert.h>
+#  include <sys/types.h>
+#  include <unistd.h>
+#  include <sys/sysctl.h>
 
 #endif
 
@@ -422,7 +431,9 @@ prepare_gdb_cmnd_file( dbg_startup_info const& dsi )
     static char cmd_file_name[] = "/tmp/btl_gdb_cmd_XXXXXX"; // !! ??
 
     // prepare commands
+    const mode_t cur_umask = ::umask( S_IRWXO | S_IRWXG );
     fd_holder cmd_fd( ::mkstemp( cmd_file_name ) );
+    ::umask( cur_umask );
 
     if( cmd_fd == -1 )
         return 0;
@@ -657,6 +668,33 @@ under_debugger()
 
     return false;
 
+#elif defined(BOOST_APPLE_BASED_DEBUG) // ********************** APPLE
+
+    // See https://developer.apple.com/library/mac/qa/qa1361/_index.html
+    int                 junk;
+    int                 mib[4];
+    struct kinfo_proc   info;
+    size_t              size;
+
+    // Initialize the flags so that, if sysctl fails for some bizarre
+    // reason, we get a predictable result.
+    info.kp_proc.p_flag = 0;
+
+    // Initialize mib, which tells sysctl the info we want, in this case
+    // we're looking for information about a specific process ID.
+    mib[0] = CTL_KERN;
+    mib[1] = KERN_PROC;
+    mib[2] = KERN_PROC_PID;
+    mib[3] = getpid();
+
+    // Call sysctl.
+    size = sizeof(info);
+    junk = sysctl(mib, sizeof(mib) / sizeof(*mib), &info, &size, NULL, 0);
+    assert(junk == 0);
+
+    // We're being debugged if the P_TRACED flag is set.
+    return ( (info.kp_proc.p_flag & P_TRACED) != 0 );
+
 #else // ****************************************************** default
 
     return false;
@@ -679,7 +717,7 @@ debugger_break()
 #if defined(BOOST_WIN32_BASED_DEBUG) // *********************** WIN32
 
 #if defined(__GNUC__) && !defined(__MINGW32__)   ||  \
-    defined(__INTEL_COMPILER)
+    defined(__INTEL_COMPILER) || defined(BOOST_EMBTC)
 #   define BOOST_DEBUG_BREAK    __debugbreak
 #else
 #   define BOOST_DEBUG_BREAK    DebugBreak
@@ -890,7 +928,9 @@ attach_debugger( bool break_or_continue )
 #elif defined(BOOST_UNIX_BASED_DEBUG) // ********************** UNIX
 
     char init_done_lock_fn[] = "/tmp/btl_dbg_init_done_XXXXXX";
+    const mode_t cur_umask = ::umask( S_IRWXO | S_IRWXG );
     fd_holder init_done_lock_fd( ::mkstemp( init_done_lock_fn ) );
+    ::umask( cur_umask );
 
     if( init_done_lock_fd == -1 )
         return false;

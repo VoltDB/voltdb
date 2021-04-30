@@ -498,7 +498,7 @@ protected:
     void set_chain(chain_type* c)
     { chain_ = c; chain_->register_client(this); }
 #if !defined(BOOST_NO_MEMBER_TEMPLATE_FRIENDS) && \
-    (!BOOST_WORKAROUND(__BORLANDC__, < 0x600))
+    (!BOOST_WORKAROUND(BOOST_BORLANDC, < 0x600))
     template<typename S, typename C, typename T, typename A, typename M>
     friend class chain_base;
 #else

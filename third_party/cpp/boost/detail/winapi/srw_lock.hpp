@@ -10,6 +10,10 @@
 #ifndef BOOST_DETAIL_WINAPI_SRW_LOCK_HPP
 #define BOOST_DETAIL_WINAPI_SRW_LOCK_HPP
 
+#include <boost/config/header_deprecated.hpp>
+
+BOOST_HEADER_DEPRECATED("<boost/winapi/srw_lock.hpp>")
+
 #include <boost/winapi/srw_lock.hpp>
 #include <boost/detail/winapi/detail/deprecated_namespace.hpp>
 

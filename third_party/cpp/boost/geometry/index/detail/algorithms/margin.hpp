@@ -4,12 +4,18 @@
 //
 // Copyright (c) 2011-2014 Adam Wulkiewicz, Lodz, Poland.
 //
+// This file was modified by Oracle on 2020.
+// Modifications copyright (c) 2020 Oracle and/or its affiliates.
+// Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
+//
 // Use, modification and distribution is subject to the Boost Software License,
 // Version 1.0. (See accompanying file LICENSE_1_0.txt or copy at
 // http://www.boost.org/LICENSE_1_0.txt)
 
 #ifndef BOOST_GEOMETRY_INDEX_DETAIL_ALGORITHMS_MARGIN_HPP
 #define BOOST_GEOMETRY_INDEX_DETAIL_ALGORITHMS_MARGIN_HPP
+
+#include <boost/geometry/core/static_assert.hpp>
 
 // WARNING! comparable_margin() will work only if the same Geometries are compared
 // so it shouldn't be used in the case of Variants!
@@ -124,7 +130,9 @@ namespace dispatch {
 template <typename Geometry, typename Tag>
 struct comparable_margin
 {
-    BOOST_MPL_ASSERT_MSG(false, NOT_IMPLEMENTED_FOR_THIS_GEOMETRY, (Geometry, Tag));
+    BOOST_GEOMETRY_STATIC_ASSERT_FALSE(
+        "Not implemented for this Geometry type.",
+        Geometry, Tag);
 };
 
 template <typename Geometry>

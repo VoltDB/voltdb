@@ -8,8 +8,8 @@
     LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 =============================================================================*/
 
-#if !defined(CPP_INTLIT_GRAMMAR_HPP_2E1E70B1_F15C_4132_8554_10A231B0D91C_INCLUDED)
-#define CPP_INTLIT_GRAMMAR_HPP_2E1E70B1_F15C_4132_8554_10A231B0D91C_INCLUDED
+#if !defined(BOOST_CPP_INTLIT_GRAMMAR_HPP_2E1E70B1_F15C_4132_8554_10A231B0D91C_INCLUDED)
+#define BOOST_CPP_INTLIT_GRAMMAR_HPP_2E1E70B1_F15C_4132_8554_10A231B0D91C_INCLUDED
 
 #include <boost/wave/wave_config.hpp>
 
@@ -129,7 +129,7 @@ struct intlit_grammar :
             BOOST_SPIRIT_DEBUG_TRACE_RULE(dec_lit, TRACE_INTLIT_GRAMMAR);
         }
 
-    // start rule of this grammar
+        // start rule of this grammar
         rule_t const& start() const
         { return int_lit; }
     };
@@ -158,13 +158,12 @@ uint_literal_type
 intlit_grammar_gen<TokenT>::evaluate(TokenT const &token,
     bool &is_unsigned)
 {
-    using namespace boost::spirit::classic;
-
-intlit_grammar g(is_unsigned);
-uint_literal_type result = 0;
-typename TokenT::string_type const &token_val = token.get_value();
-parse_info<typename TokenT::string_type::const_iterator> hit =
-    parse(token_val.begin(), token_val.end(), g[spirit_assign_actor(result)]);
+    intlit_grammar g(is_unsigned);
+    uint_literal_type result = 0;
+    typename TokenT::string_type const &token_val = token.get_value();
+    using boost::spirit::classic::parse_info;
+    parse_info<typename TokenT::string_type::const_iterator> hit =
+        parse(token_val.begin(), token_val.end(), g[spirit_assign_actor(result)]);
 
     if (!hit.hit) {
         BOOST_WAVE_THROW(preprocess_exception, ill_formed_integer_literal,
@@ -185,4 +184,4 @@ parse_info<typename TokenT::string_type::const_iterator> hit =
 #include BOOST_ABI_SUFFIX
 #endif
 
-#endif // !defined(CPP_INTLIT_GRAMMAR_HPP_2E1E70B1_F15C_4132_8554_10A231B0D91C_INCLUDED)
+#endif // !defined(BOOST_CPP_INTLIT_GRAMMAR_HPP_2E1E70B1_F15C_4132_8554_10A231B0D91C_INCLUDED)

@@ -18,7 +18,8 @@
  *  A disadvantage of this interpolant is that it does not reproduce rational functions; for example, 1/(1+x^2) is not interpolated exactly.
  *
  *  References:
- *  Floater, Michael S., and Kai Hormann. "Barycentric rational interpolation with no poles and high rates of approximation." Numerische Mathematik 107.2 (2007): 315-331.
+ *  Floater, Michael S., and Kai Hormann. "Barycentric rational interpolation with no poles and high rates of approximation."
+*      Numerische Mathematik 107.2 (2007): 315-331.
  *  Press, William H., et al. "Numerical recipes third edition: the art of scientific computing." Cambridge University Press 32 (2007): 10013-2473.
  */
 

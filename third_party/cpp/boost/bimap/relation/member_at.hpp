@@ -25,7 +25,7 @@ namespace relation {
 /// \brief member_at::side idiom to access relation values and types using metaprogramming. 
 /**
 
-This tags are used to specify which member you want to acces when using a metafunction over
+This tags are used to specify which member you want to access when using a metafunction over
 a symmetrical type. The idea is to be able to write code like:
 
 \code
@@ -44,7 +44,7 @@ namespace member_at {
 
     /// \brief Member at left tag
     /**
-    See also member_at, rigth.
+    See also member_at, right.
                                             **/
 
     struct left  {};

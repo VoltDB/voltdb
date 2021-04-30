@@ -29,6 +29,17 @@ typedef enum
 
 typedef HandledEnum execute_return;
 
+// source of event provided to RTC algorithm
+enum EventSourceEnum
+{
+    EVENT_SOURCE_DEFAULT=0,
+    EVENT_SOURCE_DIRECT=1,
+    EVENT_SOURCE_DEFERRED=2,
+    EVENT_SOURCE_MSG_QUEUE=4
+};
+
+typedef unsigned char EventSource;
+
 }}}
 
 #endif //BOOST_MSM_COMMON_TYPES_H

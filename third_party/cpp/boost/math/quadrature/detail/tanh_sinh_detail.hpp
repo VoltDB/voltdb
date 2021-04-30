@@ -40,7 +40,7 @@ class tanh_sinh_detail
 public:
     tanh_sinh_detail(size_t max_refinements, const Real& min_complement) : m_max_refinements(max_refinements)
     {
-       typedef mpl::int_<initializer_selector> tag_type;
+       typedef std::integral_constant<int, initializer_selector> tag_type;
        init(min_complement, tag_type());
     }
 
@@ -88,12 +88,12 @@ private:
       return m_first_complements[n];
    }
 
-   void init(const Real& min_complement, const mpl::int_<0>&);
-   void init(const Real& min_complement, const mpl::int_<1>&);
-   void init(const Real& min_complement, const mpl::int_<2>&);
-   void init(const Real& min_complement, const mpl::int_<3>&);
+   void init(const Real& min_complement, const std::integral_constant<int, 0>&);
+   void init(const Real& min_complement, const std::integral_constant<int, 1>&);
+   void init(const Real& min_complement, const std::integral_constant<int, 2>&);
+   void init(const Real& min_complement, const std::integral_constant<int, 3>&);
 #ifdef BOOST_HAS_FLOAT128
-   void init(const Real& min_complement, const mpl::int_<4>&);
+   void init(const Real& min_complement, const std::integral_constant<int, 4>&);
 #endif
    void prune_to_min_complement(const Real& m);
    void extend_refinements()const
@@ -161,8 +161,8 @@ private:
    {
       using std::log;
       using std::sqrt;
-      Real l = log(sqrt((2 - x) / x));
-      return log((sqrt(4 * l * l + constants::pi<Real>() * constants::pi<Real>()) + 2 * l) / constants::pi<Real>());
+      Real l = log(2-x) - log(x);
+      return log((sqrt(l * l + constants::pi<Real>() * constants::pi<Real>()) + l) / constants::pi<Real>());
    };
 
 
@@ -201,7 +201,7 @@ decltype(std::declval<F>()(std::declval<Real>(), std::declval<Real>())) tanh_sin
     // indexes in each row, this may actually be one position to the left of max_left_position
     // in the case that is even.  Then, if we only evaluate f(-x_i) for abscissa values
     // i <= max_left_index we will never evaluate f(-x_i) at the left endpoint.
-    // max_right_position and max_right_index are defained similarly for the right boundary
+    // max_right_position and max_right_index are defined similarly for the right boundary
     // and are used to guard evaluation of f(x_i).
     //
     // max_left_position and max_right_position start off as the last element in row zero:
@@ -264,7 +264,7 @@ decltype(std::declval<F>()(std::declval<Real>(), std::declval<Real>())) tanh_sin
     Real err = 0;
     //
     // thrash_count is a heuristic - it counts how many time the error has actually increased
-    // rather than descreased, if this gets too high we abort...
+    // rather than decreased, if this gets too high we abort...
     //
     unsigned thrash_count = 0;
 
@@ -285,7 +285,7 @@ decltype(std::declval<F>()(std::declval<Real>(), std::declval<Real>())) tanh_sin
         // At the start of each new row we need to update the max left/right indexes
         // at which we can evaluate f(x_i).  The new logical position is simply twice
         // the old value.  The new max index is one position to the left of the new
-        // logical value (remmember each row contains only odd numbered positions).
+        // logical value (remember each row contains only odd numbered positions).
         // Then we have to make a single check, to see if one position to the right
         // is also in bounds (this is the new abscissa value in this row which is
         // known to be in between a value known to be in bounds, and one known to be
@@ -399,7 +399,7 @@ decltype(std::declval<F>()(std::declval<Real>(), std::declval<Real>())) tanh_sin
 }
 
 template<class Real, class Policy>
-void tanh_sinh_detail<Real, Policy>::init(const Real& min_complement, const mpl::int_<0>&)
+void tanh_sinh_detail<Real, Policy>::init(const Real& min_complement, const std::integral_constant<int, 0>&)
 {
    using std::tanh;
    using std::sinh;
@@ -409,6 +409,7 @@ void tanh_sinh_detail<Real, Policy>::init(const Real& min_complement, const mpl:
    using boost::math::constants::half_pi;
    using boost::math::constants::pi;
    using boost::math::constants::two_div_pi;
+   using boost::math::lltrunc;
 
    m_committed_refinements = 4;
    //
@@ -417,7 +418,7 @@ void tanh_sinh_detail<Real, Policy>::init(const Real& min_complement, const mpl:
    // to ensure full precision as otherwise we chop off quite a chunk of the
    // range in *subsequent* rows.
    //
-   m_inital_row_length = itrunc(ceil(t_from_abscissa_complement(min_complement)));
+   m_inital_row_length = lltrunc(ceil(t_from_abscissa_complement(min_complement)));
    std::size_t first_complement = 0;
    m_t_max = m_inital_row_length;
    m_t_crossover = t_from_abscissa_complement(Real(0.5f));
@@ -479,7 +480,7 @@ void tanh_sinh_detail<Real, Policy>::init(const Real& min_complement, const mpl:
 #endif
 
 template<class Real, class Policy>
-void tanh_sinh_detail<Real, Policy>::init(const Real& min_complement, const mpl::int_<1>&)
+void tanh_sinh_detail<Real, Policy>::init(const Real& min_complement, const std::integral_constant<int, 1>&)
 {
    m_inital_row_length = 4;
    m_abscissas.reserve(m_max_refinements + 1);
@@ -532,7 +533,7 @@ void tanh_sinh_detail<Real, Policy>::init(const Real& min_complement, const mpl:
 }
 
 template<class Real, class Policy>
-void tanh_sinh_detail<Real, Policy>::init(const Real& min_complement, const mpl::int_<2>&)
+void tanh_sinh_detail<Real, Policy>::init(const Real& min_complement, const std::integral_constant<int, 2>&)
 {
    m_inital_row_length = 5;
    m_abscissas.reserve(m_max_refinements + 1);
@@ -584,7 +585,7 @@ void tanh_sinh_detail<Real, Policy>::init(const Real& min_complement, const mpl:
 }
 
 template<class Real, class Policy>
-void tanh_sinh_detail<Real, Policy>::init(const Real& min_complement, const mpl::int_<3>&)
+void tanh_sinh_detail<Real, Policy>::init(const Real& min_complement, const std::integral_constant<int, 3>&)
 {
    m_inital_row_length = 9;
    m_abscissas.reserve(m_max_refinements + 1);
@@ -638,7 +639,7 @@ void tanh_sinh_detail<Real, Policy>::init(const Real& min_complement, const mpl:
 #ifdef BOOST_HAS_FLOAT128
 
 template<class Real, class Policy>
-void tanh_sinh_detail<Real, Policy>::init(const Real& min_complement, const mpl::int_<4>&)
+void tanh_sinh_detail<Real, Policy>::init(const Real& min_complement, const std::integral_constant<int, 4>&)
 {
    m_inital_row_length = 9;
    m_abscissas.reserve(m_max_refinements + 1);

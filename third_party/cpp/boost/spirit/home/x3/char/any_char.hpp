@@ -24,35 +24,35 @@ namespace boost { namespace spirit { namespace x3
         template <typename Char, typename Context>
         bool test(Char ch_, Context const&) const
         {
-            return ((sizeof(Char) <= sizeof(char_type)) || encoding::ischar(ch_));
+            return encoding::ischar(ch_);
         }
 
         template <typename Char>
-        literal_char<Encoding> operator()(Char ch) const
+        constexpr literal_char<Encoding> operator()(Char ch) const
         {
             return { ch };
         }
 
         template <typename Char>
-        literal_char<Encoding> operator()(const Char (&ch)[2]) const
+        constexpr literal_char<Encoding> operator()(const Char (&ch)[2]) const
         {
             return { ch[0] };
         }
 
         template <typename Char, std::size_t N>
-        char_set<Encoding> operator()(const Char (&ch)[N]) const
+        constexpr char_set<Encoding> operator()(const Char (&ch)[N]) const
         {
             return { ch };
         }
 
         template <typename Char>
-        char_range<Encoding> operator()(Char from, Char to) const
+        constexpr char_range<Encoding> operator()(Char from, Char to) const
         {
             return { from, to };
         }
 
         template <typename Char>
-        char_range<Encoding> operator()(Char (&from)[2], Char (&to)[2]) const
+        constexpr char_range<Encoding> operator()(Char (&from)[2], Char (&to)[2]) const
         {
             return { static_cast<char_type>(from[0]), static_cast<char_type>(to[0]) };
         }

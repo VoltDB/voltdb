@@ -2,8 +2,8 @@
 
 // Copyright (c) 2007-2012 Barend Gehrels, Amsterdam, the Netherlands.
 
-// This file was modified by Oracle on 2013, 2014, 2018.
-// Modifications copyright (c) 2013-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2013-2020.
+// Modifications copyright (c) 2013-2020, Oracle and/or its affiliates.
 
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
@@ -14,8 +14,7 @@
 #ifndef BOOST_GEOMETRY_ALGORITHMS_DETAIL_SUB_RANGE_HPP
 #define BOOST_GEOMETRY_ALGORITHMS_DETAIL_SUB_RANGE_HPP
 
-#include <boost/mpl/if.hpp>
-#include <boost/type_traits/is_base_of.hpp>
+#include <type_traits>
 
 #include <boost/geometry/algorithms/not_implemented.hpp>
 
@@ -36,7 +35,7 @@ namespace detail_dispatch {
 
 template <typename Geometry,
           typename Tag = typename geometry::tag<Geometry>::type,
-          bool IsMulti = boost::is_base_of<multi_tag, Tag>::value>
+          bool IsMulti = std::is_base_of<multi_tag, Tag>::value>
 struct sub_range : not_implemented<Tag>
 {};
 
@@ -80,12 +79,12 @@ template <typename Geometry, typename Tag>
 struct sub_range<Geometry, Tag, true>
 {
     typedef typename boost::range_value<Geometry>::type value_type;
-    typedef typename boost::mpl::if_c
+    typedef std::conditional_t
         <
-            boost::is_const<Geometry>::value,
-            typename boost::add_const<value_type>::type,
+            std::is_const<Geometry>::value,
+            typename std::add_const<value_type>::type,
             value_type
-        >::type sub_type;
+        > sub_type;
 
     typedef detail_dispatch::sub_range<sub_type> sub_sub_range;
 

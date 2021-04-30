@@ -97,12 +97,6 @@ class robust_fpt {
   relative_error_type re() const { return re_; }
   relative_error_type ulp() const { return re_; }
 
-  robust_fpt& operator=(const robust_fpt& that) {
-    this->fpv_ = that.fpv_;
-    this->re_ = that.re_;
-    return *this;
-  }
-
   bool has_pos_value() const {
     return is_pos(fpv_);
   }

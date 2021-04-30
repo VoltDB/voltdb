@@ -19,28 +19,28 @@ namespace boost{ namespace math{ namespace tools{
    template <class T>
    struct convert_from_string_result
    {
-      typedef typename boost::conditional<boost::is_constructible<T, const char*>::value, const char*, T>::type type;
+      typedef typename boost::conditional<std::is_constructible<T, const char*>::value, const char*, T>::type type;
    };
 
    template <class Real>
-   Real convert_from_string(const char* p, const mpl::false_&)
+   Real convert_from_string(const char* p, const std::false_type&)
    {
 #ifdef BOOST_MATH_NO_LEXICAL_CAST
-      // This function should not compile, we don't have the necesary functionality to support it:
+      // This function should not compile, we don't have the necessary functionality to support it:
       BOOST_STATIC_ASSERT(sizeof(Real) == 0);
 #else
       return boost::lexical_cast<Real>(p);
 #endif
    }
    template <class Real>
-   BOOST_CONSTEXPR const char* convert_from_string(const char* p, const mpl::true_&) BOOST_NOEXCEPT
+   BOOST_CONSTEXPR const char* convert_from_string(const char* p, const std::true_type&) BOOST_NOEXCEPT
    {
       return p;
    }
    template <class Real>
-   BOOST_CONSTEXPR typename convert_from_string_result<Real>::type convert_from_string(const char* p) BOOST_NOEXCEPT_IF((boost::is_constructible<Real, const char*>::value))
+   BOOST_CONSTEXPR typename convert_from_string_result<Real>::type convert_from_string(const char* p) BOOST_NOEXCEPT_IF((std::is_constructible<Real, const char*>::value))
    {
-      return convert_from_string<Real>(p, boost::is_constructible<Real, const char*>());
+      return convert_from_string<Real>(p, std::is_constructible<Real, const char*>());
    }
 
 } // namespace tools

@@ -4,6 +4,10 @@
 //
 // Copyright (c) 2011-2018 Adam Wulkiewicz, Lodz, Poland.
 //
+// This file was modified by Oracle on 2019-2020.
+// Modifications copyright (c) 2019-2020 Oracle and/or its affiliates.
+// Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
+//
 // Use, modification and distribution is subject to the Boost Software License,
 // Version 1.0. (See accompanying file LICENSE_1_0.txt or copy at
 // http://www.boost.org/LICENSE_1_0.txt)
@@ -12,7 +16,7 @@
 #define BOOST_GEOMETRY_INDEX_PREDICATES_HPP
 
 #include <boost/geometry/index/detail/predicates.hpp>
-#include <boost/geometry/index/detail/tuples.hpp>
+#include <boost/geometry/util/tuples.hpp>
 
 /*!
 \defgroup predicates Predicates (boost::geometry::index::)
@@ -392,34 +396,26 @@ operator!(spatial_predicate<Geometry, Tag, Negated> const& p)
 // operator&& generators
 
 template <typename Pred1, typename Pred2> inline
-boost::tuples::cons<
-    Pred1,
-    boost::tuples::cons<Pred2, boost::tuples::null_type>
->
+std::tuple<Pred1, Pred2>
 operator&&(Pred1 const& p1, Pred2 const& p2)
 {
-    /*typedef typename boost::mpl::if_c<is_predicate<Pred1>::value, Pred1, Pred1 const&>::type stored1;
-    typedef typename boost::mpl::if_c<is_predicate<Pred2>::value, Pred2, Pred2 const&>::type stored2;*/
-    namespace bt = boost::tuples;
-
-    return
-    bt::cons< Pred1, bt::cons<Pred2, bt::null_type> >
-        ( p1, bt::cons<Pred2, bt::null_type>(p2, bt::null_type()) );
+    /*typedef std::conditional_t<is_predicate<Pred1>::value, Pred1, Pred1 const&> stored1;
+    typedef std::conditional_t<is_predicate<Pred2>::value, Pred2, Pred2 const&> stored2;*/
+    return std::tuple<Pred1, Pred2>(p1, p2);
 }
 
-template <typename Head, typename Tail, typename Pred> inline
-typename tuples::push_back<
-    boost::tuples::cons<Head, Tail>, Pred
->::type
-operator&&(boost::tuples::cons<Head, Tail> const& t, Pred const& p)
+template <typename ...Preds, typename Pred> inline
+typename geometry::tuples::push_back
+    <
+        std::tuple<Preds...>, Pred
+    >::type
+operator&&(std::tuple<Preds...> const& t, Pred const& p)
 {
-    //typedef typename boost::mpl::if_c<is_predicate<Pred>::value, Pred, Pred const&>::type stored;
-    namespace bt = boost::tuples;
-
-    return
-    tuples::push_back<
-        bt::cons<Head, Tail>, Pred
-    >::apply(t, p);
+    //typedef std::conditional_t<is_predicate<Pred>::value, Pred, Pred const&> stored;
+    return geometry::tuples::push_back
+            <
+                std::tuple<Preds...>, Pred
+            >::apply(t, p);
 }
     
 }} // namespace detail::predicates

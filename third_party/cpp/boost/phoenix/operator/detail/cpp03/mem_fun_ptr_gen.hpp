@@ -44,7 +44,7 @@
 
 #include BOOST_PHOENIX_ITERATE()
 
-            Object const& obj;
+            Object obj;
             MemPtr ptr;
 
         };

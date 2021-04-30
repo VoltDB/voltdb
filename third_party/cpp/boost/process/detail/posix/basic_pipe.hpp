@@ -82,22 +82,30 @@ public:
 
     int_type write(const char_type * data, int_type count)
     {
-        auto write_len = ::write(_sink, data, count * sizeof(char_type));
-        if (write_len == -1)
-            ::boost::process::detail::throw_last_error();
-
+        int_type write_len;
+        while ((write_len = ::write(_sink, data, count * sizeof(char_type))) == -1)
+        {
+            //Try again if interrupted
+            auto err = errno;
+            if (err != EINTR)
+                ::boost::process::detail::throw_last_error();
+        }
         return write_len;
     }
     int_type read(char_type * data, int_type count)
     {
-        auto read_len = ::read(_source, data, count * sizeof(char_type));
-        if (read_len == -1)
-            ::boost::process::detail::throw_last_error();
-
+        int_type read_len;
+        while ((read_len = ::read(_source, data, count * sizeof(char_type))) == -1)
+        {
+            //Try again if interrupted
+            auto err = errno;
+            if (err != EINTR)
+                ::boost::process::detail::throw_last_error();
+        }
         return read_len;
     }
 
-    bool is_open()
+    bool is_open() const
     {
         return (_source != -1) ||
                (_sink   != -1);

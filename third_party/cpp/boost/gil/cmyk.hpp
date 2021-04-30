@@ -9,9 +9,7 @@
 #define BOOST_GIL_CMYK_HPP
 
 #include <boost/gil/metafunctions.hpp>
-
-#include <boost/mpl/range_c.hpp>
-#include <boost/mpl/vector_c.hpp>
+#include <boost/gil/detail/mp11.hpp>
 
 #include <cstddef>
 
@@ -34,7 +32,7 @@ struct black_t {};
 /// \}
 
 /// \ingroup ColorSpaceModel
-using cmyk_t = mpl::vector4<cyan_t,magenta_t,yellow_t,black_t>;
+using cmyk_t = mp11::mp_list<cyan_t, magenta_t, yellow_t, black_t>;
 
 /// \ingroup LayoutModel
 using cmyk_layout_t = layout<cmyk_t>;

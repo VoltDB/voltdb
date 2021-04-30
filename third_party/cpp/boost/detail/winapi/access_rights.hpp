@@ -10,6 +10,10 @@
 #ifndef BOOST_DETAIL_WINAPI_ACCESS_RIGHTS_HPP
 #define BOOST_DETAIL_WINAPI_ACCESS_RIGHTS_HPP
 
+#include <boost/config/header_deprecated.hpp>
+
+BOOST_HEADER_DEPRECATED("<boost/winapi/access_rights.hpp>")
+
 #include <boost/winapi/access_rights.hpp>
 #include <boost/detail/winapi/detail/deprecated_namespace.hpp>
 

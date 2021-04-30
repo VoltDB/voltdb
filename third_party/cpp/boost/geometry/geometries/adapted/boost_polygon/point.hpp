@@ -2,6 +2,10 @@
 
 // Copyright (c) 2010-2012 Barend Gehrels, Amsterdam, the Netherlands.
 
+// This file was modified by Oracle on 2020.
+// Modifications copyright (c) 2020, Oracle and/or its affiliates.
+// Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
+
 // Use, modification and distribution is subject to the Boost Software License,
 // Version 1.0. (See accompanying file LICENSE_1_0.txt or copy at
 // http://www.boost.org/LICENSE_1_0.txt)
@@ -12,6 +16,8 @@
 // Adapts Geometries from Boost.Polygon for usage in Boost.Geometry
 // boost::polygon::point_data -> boost::geometry::point
 
+
+#include <type_traits>
 
 #include <boost/polygon/polygon.hpp>
 
@@ -54,7 +60,7 @@ struct coordinate_system<boost::polygon::point_data<CoordinateType> >
 
 template <typename CoordinateType>
 struct dimension<boost::polygon::point_data<CoordinateType> >
-            : boost::mpl::int_<2>
+    : std::integral_constant<std::size_t, 2>
 {};
 
 

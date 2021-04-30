@@ -2,8 +2,8 @@
 
 // Copyright (c) 2008-2015 Barend Gehrels, Amsterdam, the Netherlands.
 
-// This file was modified by Oracle on 2017, 2018.
-// Modifications copyright (c) 2017-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2017, 2018, 2019.
+// Modifications copyright (c) 2017-2019, Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle.
 
 // Use, modification and distribution is subject to the Boost Software License,
@@ -81,20 +81,14 @@ namespace projections
                 detail::en<T> en;
             };
 
-            // template class, using CRTP to implement forward/inverse
             template <typename T, typename Parameters>
             struct base_cass_ellipsoid
-                : public base_t_fi<base_cass_ellipsoid<T, Parameters>, T, Parameters>
             {
                 par_cass<T> m_proj_parm;
 
-                inline base_cass_ellipsoid(const Parameters& par)
-                    : base_t_fi<base_cass_ellipsoid<T, Parameters>, T, Parameters>(*this, par)
-                {}
-
                 // FORWARD(e_forward)  ellipsoid
                 // Project coordinates from geographic (lon, lat) to cartesian (x, y)
-                inline void fwd(T const& lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
+                inline void fwd(Parameters const& par, T const& lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
                 {
                     static const T C1 = cass::C1<T>();
                     static const T C2 = cass::C2<T>();
@@ -103,11 +97,11 @@ namespace projections
                     T n = sin(lp_lat);
                     T c = cos(lp_lat);
                     xy_y = pj_mlfn(lp_lat, n, c, this->m_proj_parm.en);
-                    n = 1./sqrt(1. - this->m_par.es * n * n);
+                    n = 1./sqrt(1. - par.es * n * n);
                     T tn = tan(lp_lat);
                     T t = tn * tn;
                     T a1 = lp_lon * c;
-                    c *= this->m_par.es * c / (1 - this->m_par.es);
+                    c *= par.es * c / (1 - par.es);
                     T a2 = a1 * a1;
                     xy_x = n * a1 * (1. - a2 * t *
                         (C1 - (8. - t + 8. * c) * a2 * C2));
@@ -117,7 +111,7 @@ namespace projections
 
                 // INVERSE(e_inverse)  ellipsoid
                 // Project coordinates from cartesian (x, y) to geographic (lon, lat)
-                inline void inv(T const& xy_x, T const& xy_y, T& lp_lon, T& lp_lat) const
+                inline void inv(Parameters const& par, T const& xy_x, T const& xy_y, T& lp_lon, T& lp_lat) const
                 {
                     static const T C3 = cass::C3<T>();
                     static const T C4 = cass::C4<T>();
@@ -125,12 +119,12 @@ namespace projections
 
                     T ph1;
 
-                    ph1 = pj_inv_mlfn(this->m_proj_parm.m0 + xy_y, this->m_par.es, this->m_proj_parm.en);
+                    ph1 = pj_inv_mlfn(this->m_proj_parm.m0 + xy_y, par.es, this->m_proj_parm.en);
                     T tn = tan(ph1); T t = tn * tn;
                     T n = sin(ph1);
-                    T r = 1. / (1. - this->m_par.es * n * n);
+                    T r = 1. / (1. - par.es * n * n);
                     n = sqrt(r);
-                    r *= (1. - this->m_par.es) * n;
+                    r *= (1. - par.es) * n;
                     T dd = xy_x / n;
                     T d2 = dd * dd;
                     lp_lat = ph1 - (n * tn / r) * d2 *
@@ -146,30 +140,24 @@ namespace projections
 
             };
 
-            // template class, using CRTP to implement forward/inverse
             template <typename T, typename Parameters>
             struct base_cass_spheroid
-                : public base_t_fi<base_cass_spheroid<T, Parameters>, T, Parameters>
             {
                 par_cass<T> m_proj_parm;
 
-                inline base_cass_spheroid(const Parameters& par)
-                    : base_t_fi<base_cass_spheroid<T, Parameters>, T, Parameters>(*this, par)
-                {}
-
                 // FORWARD(s_forward)  spheroid
                 // Project coordinates from geographic (lon, lat) to cartesian (x, y)
-                inline void fwd(T const& lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
+                inline void fwd(Parameters const& par, T const& lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
                 {
                     xy_x = asin(cos(lp_lat) * sin(lp_lon));
-                    xy_y = atan2(tan(lp_lat) , cos(lp_lon)) - this->m_par.phi0;
+                    xy_y = atan2(tan(lp_lat) , cos(lp_lon)) - par.phi0;
                 }
 
                 // INVERSE(s_inverse)  spheroid
                 // Project coordinates from cartesian (x, y) to geographic (lon, lat)
-                inline void inv(T const& xy_x, T const& xy_y, T& lp_lon, T& lp_lat) const
+                inline void inv(Parameters const& par, T const& xy_x, T const& xy_y, T& lp_lon, T& lp_lat) const
                 {
-                    T dd = xy_y + this->m_par.phi0;
+                    T dd = xy_y + par.phi0;
                     lp_lat = asin(sin(dd) * cos(xy_x));
                     lp_lon = atan2(tan(xy_x), cos(dd));
                 }
@@ -213,9 +201,8 @@ namespace projections
     {
         template <typename Params>
         inline cass_ellipsoid(Params const& , Parameters const& par)
-            : detail::cass::base_cass_ellipsoid<T, Parameters>(par)
         {
-            detail::cass::setup_cass(this->m_par, this->m_proj_parm);
+            detail::cass::setup_cass(par, this->m_proj_parm);
         }
     };
 
@@ -237,9 +224,8 @@ namespace projections
     {
         template <typename Params>
         inline cass_spheroid(Params const& , Parameters const& par)
-            : detail::cass::base_cass_spheroid<T, Parameters>(par)
         {
-            detail::cass::setup_cass(this->m_par, this->m_proj_parm);
+            detail::cass::setup_cass(par, this->m_proj_parm);
         }
     };
 
@@ -248,7 +234,7 @@ namespace projections
     {
 
         // Static projection
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_cass, cass_spheroid, cass_ellipsoid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI2(srs::spar::proj_cass, cass_spheroid, cass_ellipsoid)
 
         // Factory entry(s)
         BOOST_GEOMETRY_PROJECTIONS_DETAIL_FACTORY_ENTRY_FI2(cass_entry, cass_spheroid, cass_ellipsoid)

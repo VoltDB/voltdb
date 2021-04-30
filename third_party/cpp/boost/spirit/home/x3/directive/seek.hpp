@@ -19,7 +19,7 @@ namespace boost { namespace spirit { namespace x3
         static bool const is_pass_through_unary = true;
         static bool const handles_container = Subject::handles_container;
 
-        seek_directive(Subject const& subject) :
+        constexpr seek_directive(Subject const& subject) :
             base_type(subject) {}
 
         template<typename Iterator, typename Context
@@ -53,14 +53,14 @@ namespace boost { namespace spirit { namespace x3
     struct seek_gen
     {
         template<typename Subject>
-        seek_directive<typename extension::as_parser<Subject>::value_type>
+        constexpr seek_directive<typename extension::as_parser<Subject>::value_type>
         operator[](Subject const& subject) const
         {
             return { as_parser(subject) };
         }
     };
 
-    auto const seek = seek_gen{};
+    constexpr auto seek = seek_gen{};
 }}}
 
 #endif

@@ -13,16 +13,22 @@
 #include <boost/process/pipe.hpp>
 #include <boost/process/detail/posix/handler.hpp>
 #include <unistd.h>
-
+#include <boost/process/detail/used_handles.hpp>
+#include <array>
 
 namespace boost { namespace process { namespace detail { namespace posix {
 
-struct pipe_in : handler_base_ext
+struct pipe_in : handler_base_ext, ::boost::process::detail::uses_handles
 {
     int source;
     int sink; //opposite end
 
     pipe_in(int sink, int source) : source(source), sink(sink) {}
+
+    std::array<int, 3> get_used_handles()
+    {
+        return {{STDIN_FILENO, source, sink}};
+    }
 
 
     template<typename T>
@@ -48,7 +54,9 @@ struct pipe_in : handler_base_ext
     {
         if (::dup2(source, STDIN_FILENO) == -1)
              e.set_error(::boost::process::detail::get_last_error(), "dup2() failed");
-        ::close(source);
+        if (source != STDIN_FILENO)
+            ::close(source);
+
         ::close(sink);
     }
 

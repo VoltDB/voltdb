@@ -4,9 +4,8 @@
 // Copyright (c) 2008-2012 Bruno Lalande, Paris, France.
 // Copyright (c) 2009-2012 Mateusz Loskot, London, UK.
 
-// This file was modified by Oracle on 2014, 2018.
-// Modifications copyright (c) 2014-2018 Oracle and/or its affiliates.
-
+// This file was modified by Oracle on 2014-2020.
+// Modifications copyright (c) 2014-2020 Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle
 
 // Parts of Boost.Geometry are redesigned from Geodan's Geographic Library
@@ -69,6 +68,9 @@ struct pointlike_tag {};
 /// For linear types (linestring, multi-linestring, segment)
 struct linear_tag {};
 
+// Subset of linear types (polygon, multi_polygon)
+struct polylinear_tag : linear_tag {};
+
 /// For areal types (polygon, multi_polygon, box, ring)
 struct areal_tag {};
 
@@ -89,7 +91,7 @@ struct geometry_not_recognized_tag {};
 struct point_tag : single_tag, pointlike_tag {};
 
 /// OGC Linestring identifying tag
-struct linestring_tag : single_tag, linear_tag {};
+struct linestring_tag : single_tag, polylinear_tag {};
 
 /// OGC Polygon identifying tag
 struct polygon_tag : single_tag, polygonal_tag {};
@@ -108,7 +110,7 @@ struct segment_tag : single_tag, linear_tag {};
 struct multi_point_tag : multi_tag, pointlike_tag  {};
 
 /// OGC Multi linestring identifying tag
-struct multi_linestring_tag : multi_tag, linear_tag {};
+struct multi_linestring_tag : multi_tag, polylinear_tag {};
 
 /// OGC Multi polygon identifying tag
 struct multi_polygon_tag : multi_tag, polygonal_tag {};

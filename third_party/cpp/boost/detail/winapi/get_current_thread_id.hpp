@@ -10,6 +10,10 @@
 #ifndef BOOST_DETAIL_WINAPI_GET_CURRENT_THREAD_ID_HPP
 #define BOOST_DETAIL_WINAPI_GET_CURRENT_THREAD_ID_HPP
 
+#include <boost/config/header_deprecated.hpp>
+
+BOOST_HEADER_DEPRECATED("<boost/winapi/get_current_thread_id.hpp>")
+
 #include <boost/winapi/get_current_thread_id.hpp>
 #include <boost/detail/winapi/detail/deprecated_namespace.hpp>
 

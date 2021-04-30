@@ -9,7 +9,7 @@
 /////////1/////////2/////////3/////////4/////////5/////////6/////////7/////////8
 // archive_input_unordered_set.hpp
 
-// (C) Copyright 2002 Robert Ramey - http://www.rrsd.com . 
+// (C) Copyright 2002 Robert Ramey - http://www.rrsd.com .
 // (C) Copyright 2014 Jim Bell
 // Use, modification and distribution is subject to the Boost Software
 // License, Version 1.0. (See accompanying file LICENSE_1_0.txt or copy at
@@ -32,15 +32,15 @@ template<class Archive, class Container>
 struct archive_input_unordered_set
 {
     inline void operator()(
-        Archive &ar, 
-        Container &s, 
+        Archive &ar,
+        Container &s,
         const unsigned int v
     ){
         typedef typename Container::value_type type;
         detail::stack_construct<Archive, type> t(ar, v);
         // borland fails silently w/o full namespace
         ar >> boost::serialization::make_nvp("item", t.reference());
-        std::pair<typename Container::const_iterator, bool> result = 
+        std::pair<typename Container::const_iterator, bool> result =
             s.insert(boost::move(t.reference()));
         if(result.second)
             ar.reset_object_address(& (* result.first), & t.reference());
@@ -52,8 +52,8 @@ template<class Archive, class Container>
 struct archive_input_unordered_multiset
 {
     inline void operator()(
-        Archive &ar, 
-        Container &s, 
+        Archive &ar,
+        Container &s,
         const unsigned int v
     ){
         typedef typename Container::value_type type;

@@ -17,6 +17,12 @@
 #include <boost/spirit/home/lex/lexer.hpp>
 #include <boost/mpl/assert.hpp>
 
+namespace boost { namespace phoenix
+{
+    template <typename Expr>
+    struct actor;
+}}
+
 namespace boost { namespace spirit { namespace lex
 {
     ///////////////////////////////////////////////////////////////////////////

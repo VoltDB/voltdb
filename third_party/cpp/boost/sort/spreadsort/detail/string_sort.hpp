@@ -20,7 +20,6 @@ Phil Endecott and Frank Gennari
 #include <limits>
 #include <functional>
 #include <boost/static_assert.hpp>
-#include <boost/serialization/static_warning.hpp>
 #include <boost/utility/enable_if.hpp>
 #include <boost/sort/spreadsort/detail/constants.hpp>
 #include <boost/sort/spreadsort/detail/spreadsort_common.hpp>
@@ -701,7 +700,7 @@ namespace spreadsort {
                 Unsigned_char_type)
     {
       //Warning that we're using boost::sort::pdqsort, even though string_sort was called
-      BOOST_STATIC_WARNING( sizeof(Unsigned_char_type) <= 2 );
+      BOOST_STATIC_ASSERT( sizeof(Unsigned_char_type) <= 2 );
       boost::sort::pdqsort(first, last);
     }
 
@@ -727,7 +726,7 @@ namespace spreadsort {
       typedef typename std::iterator_traits<RandomAccessIter>::value_type
         Data_type;
       //Warning that we're using boost::sort::pdqsort, even though string_sort was called
-      BOOST_STATIC_WARNING( sizeof(Unsigned_char_type) <= 2 );
+      BOOST_STATIC_ASSERT( sizeof(Unsigned_char_type) <= 2 );
       boost::sort::pdqsort(first, last, std::greater<Data_type>());
     }
 
@@ -753,7 +752,7 @@ namespace spreadsort {
                 Get_char get_character, Get_length length, Unsigned_char_type)
     {
       //Warning that we're using boost::sort::pdqsort, even though string_sort was called
-      BOOST_STATIC_WARNING( sizeof(Unsigned_char_type) <= 2 );
+      BOOST_STATIC_ASSERT( sizeof(Unsigned_char_type) <= 2 );
       boost::sort::pdqsort(first, last);
     }
 
@@ -781,7 +780,7 @@ namespace spreadsort {
         Get_char get_character, Get_length length, Compare comp, Unsigned_char_type)
     {
       //Warning that we're using boost::sort::pdqsort, even though string_sort was called
-      BOOST_STATIC_WARNING( sizeof(Unsigned_char_type) <= 2 );
+      BOOST_STATIC_ASSERT( sizeof(Unsigned_char_type) <= 2 );
       boost::sort::pdqsort(first, last, comp);
     }
 
@@ -808,7 +807,7 @@ namespace spreadsort {
         Get_char get_character, Get_length length, Compare comp, Unsigned_char_type)
     {
       //Warning that we're using boost::sort::pdqsort, even though string_sort was called
-      BOOST_STATIC_WARNING( sizeof(Unsigned_char_type) <= 2 );
+      BOOST_STATIC_ASSERT( sizeof(Unsigned_char_type) <= 2 );
       boost::sort::pdqsort(first, last, comp);
     }
   }

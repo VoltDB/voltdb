@@ -18,8 +18,8 @@ BOOST_HANA_NAMESPACE_BEGIN namespace detail { namespace variadic {
     BOOST_HANA_CONSTEXPR_LAMBDA auto reverse_apply =
         [](auto&& f, auto&& ...x) -> decltype(auto) {
             return detail::variadic::reverse_apply_unrolled(
-                static_cast<decltype(f)&&>(f),
-                static_cast<decltype(x)&&>(x)...
+                static_cast<decltype(f)>(f),
+                static_cast<decltype(x)>(x)...
             );
         };
 }} BOOST_HANA_NAMESPACE_END

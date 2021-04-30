@@ -2,8 +2,8 @@
 
 // Copyright (c) 2008-2015 Barend Gehrels, Amsterdam, the Netherlands.
 
-// This file was modified by Oracle on 2017, 2018.
-// Modifications copyright (c) 2017-2018, Oracle and/or its affiliates.
+// This file was modified by Oracle on 2017, 2018, 2019.
+// Modifications copyright (c) 2017-2019, Oracle and/or its affiliates.
 // Contributed and/or modified by Adam Wulkiewicz, on behalf of Oracle.
 
 // Use, modification and distribution is subject to the Boost Software License,
@@ -162,29 +162,23 @@ namespace projections
                 *x = *R * sin(F);
             }
 
-            // template class, using CRTP to implement forward/inverse
             template <typename T, typename Parameters>
             struct base_imw_p_ellipsoid
-                : public base_t_fi<base_imw_p_ellipsoid<T, Parameters>, T, Parameters>
             {
                 par_imw_p<T> m_proj_parm;
 
-                inline base_imw_p_ellipsoid(const Parameters& par)
-                    : base_t_fi<base_imw_p_ellipsoid<T, Parameters>, T, Parameters>(*this, par)
-                {}
-
                 // FORWARD(e_forward)  ellipsoid
                 // Project coordinates from geographic (lon, lat) to cartesian (x, y)
-                inline void fwd(T const& lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
+                inline void fwd(Parameters const& par, T const& lp_lon, T const& lp_lat, T& xy_x, T& xy_y) const
                 {
                     T yc = 0;
-                    point_xy<T> xy = loc_for(lp_lon, lp_lat, this->m_par, m_proj_parm, &yc);
+                    point_xy<T> xy = loc_for(lp_lon, lp_lat, par, m_proj_parm, &yc);
                     xy_x = xy.x; xy_y = xy.y;
                 }
 
                 // INVERSE(e_inverse)  ellipsoid
                 // Project coordinates from cartesian (x, y) to geographic (lon, lat)
-                inline void inv(T const& xy_x, T const& xy_y, T& lp_lon, T& lp_lat) const
+                inline void inv(Parameters const& par, T const& xy_x, T const& xy_y, T& lp_lon, T& lp_lat) const
                 {
                     point_xy<T> t;
                     T yc = 0.0;
@@ -194,7 +188,7 @@ namespace projections
                     lp_lat = this->m_proj_parm.phi_2;
                     lp_lon = xy_x / cos(lp_lat);
                     do {
-                        t = loc_for(lp_lon, lp_lat, this->m_par, m_proj_parm, &yc);
+                        t = loc_for(lp_lon, lp_lat, par, m_proj_parm, &yc);
                         lp_lat = ((lp_lat - this->m_proj_parm.phi_1) * (xy_y - yc) / (t.y - yc)) + this->m_proj_parm.phi_1;
                         lp_lon = lp_lon * xy_x / t.x;
                         i++;
@@ -290,9 +284,8 @@ namespace projections
     {
         template <typename Params>
         inline imw_p_ellipsoid(Params const& params, Parameters const& par)
-            : detail::imw_p::base_imw_p_ellipsoid<T, Parameters>(par)
         {
-            detail::imw_p::setup_imw_p(params, this->m_par, this->m_proj_parm);
+            detail::imw_p::setup_imw_p(params, par, this->m_proj_parm);
         }
     };
 
@@ -301,7 +294,7 @@ namespace projections
     {
 
         // Static projection
-        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION(srs::spar::proj_imw_p, imw_p_ellipsoid, imw_p_ellipsoid)
+        BOOST_GEOMETRY_PROJECTIONS_DETAIL_STATIC_PROJECTION_FI(srs::spar::proj_imw_p, imw_p_ellipsoid)
 
         // Factory entry(s)
         BOOST_GEOMETRY_PROJECTIONS_DETAIL_FACTORY_ENTRY_FI(imw_p_entry, imw_p_ellipsoid)

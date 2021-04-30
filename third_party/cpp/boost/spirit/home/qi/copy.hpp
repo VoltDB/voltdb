@@ -8,13 +8,13 @@
 #define BOOST_SPIRIT_COPY_FEBRUARY_7_2012_0159PM
 
 #include <boost/config.hpp>
-#include <boost/proto/proto.hpp>
 
 #if defined(_MSC_VER)
 #pragma once
 #endif
 
 #if !defined(BOOST_NO_CXX11_AUTO_DECLARATIONS)
+#include <boost/proto/deep_copy.hpp>
 
 namespace boost { namespace spirit { namespace qi
 {

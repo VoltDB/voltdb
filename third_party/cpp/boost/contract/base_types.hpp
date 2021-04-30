@@ -18,27 +18,27 @@ Specify inheritance form base classes (for subcontracting).
 #ifdef BOOST_CONTRACT_DETAIL_DOXYGEN
 
 /**
-Used to program a @c typedef listing the bases of a derived class.
+Used to program the @c typedef that lists the bases of a derived class.
 
 In order to support subcontracting, a derived class that specifies contracts for
-one or more overriding public function must declare a @c typedef named
-@c base_types (or @RefMacro{BOOST_CONTRACT_BASES_TYPEDEF}) using this macro.
+one or more overriding public functions must declare a @c typedef named
+@c base_types (or @RefMacro{BOOST_CONTRACT_BASES_TYPEDEF}) using this macro:
 
     @code
-        class u :
+        class u
             #define BASES public b, protected virtual w1, private w2
-            BASES
+            : BASES
         {
             friend class boost::contract:access;
 
-            typedef BOOST_CONTRACT_BASES(BASES) base_types;
+            typedef BOOST_CONTRACT_BASE_TYPES(BASES) base_types;
             #undef BASES
 
             ...
         };
     @endcode
 
-This @c typedef must be @c public if @RefClass{boost::contract::access} is not
+This @c typedef must be @c public unless @RefClass{boost::contract::access} is
 used.
 
 @see @RefSect{tutorial.base_classes__subcontracting_, Base Classes}
@@ -52,7 +52,9 @@ used.
             library).
             This is a variadic macro parameter, on compilers that do not support
             variadic macros, the @c typedef for base classes can be programmed
-            manually without using this macro.
+            manually without using this macro (see
+            @RefSect{extras.no_macros__and_no_variadic_macros_, No Macros}).
+            
 */
 #define BOOST_CONTRACT_BASE_TYPES(...)
 
