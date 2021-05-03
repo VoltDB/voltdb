@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -42,10 +42,12 @@ public class ClientStatusListenerExt {
     public static enum AutoConnectionStatus {
         /**creation success*/
         SUCCESS,
-        /**fail to creat */
+        /**fail to create */
         UNABLE_TO_CONNECT,
         /**could not get topology*/
-        UNABLE_TO_QUERY_TOPOLOGY;
+        UNABLE_TO_QUERY_TOPOLOGY,
+        /**topo-change-aware mode, no known servers to try*/
+        NO_KNOWN_SERVERS;
     }
 
     /**
@@ -59,7 +61,7 @@ public class ClientStatusListenerExt {
 
     /**
      * Notify listeners that the client tried to create connection to unconnected nodes upon topology change.
-     * When both client affinity and topology aware are enabled, connections to newly joined nodes or other unconnected nodes
+     * When topology-change awareness is enabled, connections to newly joined nodes or other unconnected nodes
      * within the cluster will be created. This method will be invoked to notify the client upon a new connection is created.
      * Client can override this method to keep track of the connections
      * @param hostname Name of the host the connection was created.

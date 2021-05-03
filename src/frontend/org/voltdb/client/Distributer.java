@@ -82,16 +82,18 @@ import io.netty.handler.ssl.SslContext;
 import jsr166y.ThreadLocalRandom;
 
 /**
- *   De/multiplexes transactions across a cluster
+ * De/multiplexes transactions across a cluster
  *
- *   It is safe to synchronized on an individual connection and then the distributer, but it is always unsafe
- *   to synchronized on the distributer and then an individual connection.
+ * It is safe to synchronize on an individual connection and then the distributer,
+ * but it is always unsafe to synchronize on the distributer and then an
+ * individual connection.
  */
 class Distributer {
 
     private static final long PING_HANDLE = Long.MAX_VALUE;
     private static final Long ASYNC_TOPO_HANDLE = PING_HANDLE - 1;
     private static final Long ASYNC_PROC_HANDLE = PING_HANDLE - 2;
+    private static final long MINIMUM_LONG_RUNNING_SYSTEM_CALL_TIMEOUT_MS = 30 * 60 * 1000;
 
     // Would be private and final except: unit tests
     static int RESUBSCRIPTION_DELAY_MS = Integer.getInteger("RESUBSCRIPTION_DELAY_MS", 10000);
@@ -99,24 +101,60 @@ class Distributer {
     // Package access: used by client implementation
     static final long USE_DEFAULT_CLIENT_TIMEOUT = 0;
 
-    // handles used internally are negative and decrement for each call
+    // Parameters from constructor
+    private final SslContext m_sslContext;
+    private final boolean m_useMultipleThreads;
+    private final long m_procedureCallTimeoutNanos;
+    private final long m_connectionResponseTimeoutNanos;
+    private final Subject m_subject; // JAAS authentication subject
+
+    // Status listeners (from application and ClientImpl)
+    private final ArrayList<ClientStatusListenerExt> m_listeners = new ArrayList<>();
+
+    // Handles used internally are negative and decrement for each call
     public final AtomicLong m_sysHandle = new AtomicLong(-1);
 
-    // collection of connections to the cluster
+    // Collection of connections to the cluster
     private final CopyOnWriteArrayList<NodeConnection> m_connections =
             new CopyOnWriteArrayList<>();
 
-    private final ArrayList<ClientStatusListenerExt> m_listeners = new ArrayList<>();
+    // And connections by host id
+    private final Map<Integer, NodeConnection> m_hostIdToConnection = new HashMap<>();
 
-    //Selector and connection handling, does all work in blocking selection thread
+    // Selector and connection handling, does all work in blocking selection thread
     private final VoltNetworkPool m_network;
 
-    private final SslContext m_sslContext;
-
-    // Temporary until a distribution/affinity algorithm is written
+    // For round-robin connection set up when correct target is not connected
     private int m_nextConnection = 0;
 
-    private final boolean m_useMultipleThreads;
+    // Outgoing transaction rate limiter; package access for client implementation
+    final RateLimiter m_rateLimiter = new RateLimiter();
+
+    // Data for topology-aware client operation, The 'unconnected hosts' list
+    // contains all nodes from the latest topo update for which we do not
+    // have connections. It's not directly adjusted on connection failure.
+    private boolean m_topologyChangeAware;
+    private boolean m_topoAwareReconnect;
+    private final AtomicReference<ImmutableSet<Integer>> m_unconnectedHosts = new AtomicReference<>();
+    private final AtomicBoolean m_createConnectionUponTopoChangeInProgress = new AtomicBoolean(false);
+
+    // The connection we have issued our subscriptions to. If the connection is lost
+    // we will need to request subscription from a different node.
+    private NodeConnection m_subscribedConnection;
+    private boolean m_subscriptionRequestPending;
+
+    // Data for client affinity operation
+    private HashinatorLite m_hashinator;
+    private final Map<Integer, NodeConnection> m_partitionMasters = new HashMap<>();
+    private final Map<Integer, ClientAffinityStats> m_clientAffinityStats = new HashMap<>();
+
+    // Partitioning data, used for client affinity and topo-aware purposes
+    private final AtomicReference<ImmutableMap<Integer, Integer>> m_partitionKeys = new AtomicReference<>();
+    private final AtomicReference<ClientResponse> m_partitionUpdateStatus = new AtomicReference<>();
+    private final AtomicLong m_lastPartitionKeyFetched = new AtomicLong(0); // timestamp
+
+    // Procedure data
+    private final AtomicReference<ImmutableSortedMap<String, Procedure>> m_procedureInfo = new AtomicReference<>();
 
     private static final class Procedure {
         final static int PARAMETER_NONE = -1;
@@ -125,9 +163,9 @@ class Distributer {
         private final int partitionParameter;
         private final int partitionParameterType;
         private Procedure(boolean multiPart,
-                boolean readOnly,
-                int partitionParameter,
-                int partitionParameterType) {
+                          boolean readOnly,
+                          int partitionParameter,
+                          int partitionParameterType) {
             this.multiPart = multiPart;
             this.readOnly = readOnly;
             this.partitionParameter = multiPart? PARAMETER_NONE : partitionParameter;
@@ -135,61 +173,20 @@ class Distributer {
         }
     }
 
-    private final Map<Integer, NodeConnection> m_partitionMasters = new HashMap<>();
-    private final Map<Integer, NodeConnection[]> m_partitionReplicas = new HashMap<>(); // we may not need this
-    private final Map<Integer, NodeConnection> m_hostIdToConnection = new HashMap<>();
-    private final AtomicReference<ImmutableSortedMap<String, Procedure>> m_procedureInfo =
-                                new AtomicReference<ImmutableSortedMap<String, Procedure>>();
-    private final AtomicReference<ImmutableMap<Integer, Integer>> m_partitionKeys = new AtomicReference<>();
+    // Until catalog subscription is implemented, only fetch it once
+    private boolean m_fetchedCatalog;
 
-    private final AtomicLong m_lastPartitionKeyFetched = new AtomicLong(0);
-    private final AtomicReference<ClientResponse> m_partitionUpdateStatus = new AtomicReference<ClientResponse>();
-
-    //This is the instance of the Hashinator we picked from TOPO used only for client affinity.
-    private HashinatorLite m_hashinator = null;
-    //This is a global timeout that will be used if a per-procedure timeout is not provided with the procedure call.
-    private final long m_procedureCallTimeoutNanos;
-    private static final long MINIMUM_LONG_RUNNING_SYSTEM_CALL_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
-    private final long m_connectionResponseTimeoutNanos;
-    private final Map<Integer, ClientAffinityStats> m_clientAffinityStats = new HashMap<>();
-
-    // Package access for client implementation
-    final RateLimiter m_rateLimiter = new RateLimiter();
-
-    private final AtomicReference<ImmutableSet<Integer>> m_unconnectedHosts = new AtomicReference<ImmutableSet<Integer>>();
-    private AtomicBoolean m_createConnectionUponTopoChangeInProgress = new AtomicBoolean(false);
-    private boolean m_topologyChangeAware;
-
+    // General background executor (despite the name)
     private final ScheduledExecutorService m_ex =
-        Executors.newSingleThreadScheduledExecutor(
-                CoreUtils.getThreadFactory("VoltDB Client Reaper Thread"));
+        Executors.newSingleThreadScheduledExecutor(CoreUtils.getThreadFactory("VoltDB Client Reaper Thread"));
     private ScheduledFuture<?> m_timeoutReaperHandle;
 
-    /**
-     * Server's instances id. Unique for the cluster
-     */
-    private Object m_clusterInstanceId[];
-
-    private String m_buildString;
-
-    /*
-     * The connection we have issued our subscriptions to. If the connection is lost
-     * we will need to request subscription from a different node
-     */
-    private NodeConnection m_subscribedConnection = null;
-    //Track if a request is pending so we don't accidentally handle a failed node twice
-    private boolean m_subscriptionRequestPending = false;
-
-    //Until catalog subscription is implemented, only fetch it once
-    private boolean m_fetchedCatalog = false;
-
-    /**
-     * JAAS Authentication Subject
-     */
-    private final Subject m_subject;
-
-    // executor service for ssl encryption/decryption, if ssl is enabled.
+    // Executor service for ssl encryption/decryption, if ssl is enabled.
     private CipherExecutor m_cipherService;
+
+    // Instance id and build string from cluster
+    private Object[] m_clusterInstanceId;
+    private String m_buildString;
 
     // Indicate shutting down if it is true
     private AtomicBoolean m_shutdown = new AtomicBoolean(false);
@@ -206,7 +203,7 @@ class Distributer {
             }
             try {
                 synchronized (Distributer.this) {
-                    VoltTable results[] = clientResponse.getResults();
+                    VoltTable[] results = clientResponse.getResults();
                     if (results != null && results.length > 1) {
                         updateAffinityTopology(results);
                     }
@@ -232,7 +229,7 @@ class Distributer {
         @Override
         public void clientCallback(ClientResponse clientResponse) throws Exception {
             if (clientResponse.getStatus() == ClientResponse.SUCCESS) {
-                VoltTable results[] = clientResponse.getResults();
+                VoltTable[] results = clientResponse.getResults();
                 if (results != null && results.length > 0) {
                     updatePartitioning(results[0]);
                 }
@@ -310,7 +307,7 @@ class Distributer {
             }
             try {
                 synchronized (Distributer.this) {
-                    VoltTable results[] = clientResponse.getResults();
+                    VoltTable[] results = clientResponse.getResults();
                     if (results != null && results.length == 1) {
                         VoltTable vt = results[0];
                         updateProcedurePartitioning(vt);
@@ -447,7 +444,7 @@ class Distributer {
         boolean m_outstandingPing = false;
         ClientStatusListenerExt.DisconnectCause m_closeCause = DisconnectCause.CONNECTION_CLOSED;
 
-        public NodeConnection(long ids[]) {}
+        public NodeConnection(long[] ids) {}
 
         /*
          * Create work, possibly blocking in rate limiter.
@@ -818,40 +815,14 @@ class Distributer {
                     }
                 }
 
-                Iterator<Map.Entry<Integer, NodeConnection[]>> i2 = m_partitionReplicas.entrySet().iterator();
-                List<Pair<Integer, NodeConnection[]>> entriesToRewrite = new ArrayList<>();
-                while (i2.hasNext()) {
-                    Map.Entry<Integer, NodeConnection[]> entry = i2.next();
-                    for (NodeConnection nc : entry.getValue()) {
-                        if (nc == this) {
-                            entriesToRewrite.add(Pair.of(entry.getKey(), entry.getValue()));
-                        }
-                    }
-                }
-
-                for (Pair<Integer, NodeConnection[]> entry : entriesToRewrite) {
-                    m_partitionReplicas.remove(entry.getFirst());
-                    NodeConnection survivors[] = new NodeConnection[entry.getSecond().length - 1];
-                    if (survivors.length == 0) {
-                        break;
-                    }
-                    int zz = 0;
-                    for (int ii = 0; ii < entry.getSecond().length; ii++) {
-                        if (entry.getSecond()[ii] != this) {
-                            survivors[zz++] = entry.getSecond()[ii];
-                        }
-                    }
-                    m_partitionReplicas.put(entry.getFirst(), survivors);
-                }
-
                 m_connections.remove(this);
+
                 //Notify listeners that a connection has been lost
                 for (ClientStatusListenerExt s : m_listeners) {
-                    s.connectionLost(
-                            m_connection.getHostnameOrIP(),
-                            m_connection.getRemotePort(),
-                            m_connections.size(),
-                            m_closeCause);
+                    s.connectionLost(m_connection.getHostnameOrIP(),
+                                     m_connection.getRemotePort(),
+                                     m_connections.size(),
+                                     m_closeCause);
                 }
 
                 /*
@@ -951,6 +922,7 @@ class Distributer {
             return this;
         }
 
+        // TODO: expose magic numbers
         private int m_queuedBytes = 0;
         private final int m_maxQueuedBytes = 262144;
 
@@ -1037,18 +1009,19 @@ class Distributer {
 
     /*
      * Add new connection with plaintext password
+     * TODO is this used?
      */
-    void createConnection(String host, String program, String password, int port, ClientAuthScheme scheme)
+    void createConnection(String host, String username, String password, int port, ClientAuthScheme scheme)
     throws UnknownHostException, IOException
     {
-        byte hashedPassword[] = ConnectionUtil.getHashedPassword(scheme, password);
-        createConnectionWithHashedCredentials(host, program, hashedPassword, port, scheme);
+        byte[] hashedPassword = ConnectionUtil.getHashedPassword(scheme, password);
+        createConnectionWithHashedCredentials(host, username, hashedPassword, port, scheme);
     }
 
     /*
      * Add new connection with hashed password
      */
-    void createConnectionWithHashedCredentials(String host, String program, byte[] hashedPassword, int port, ClientAuthScheme scheme)
+    void createConnectionWithHashedCredentials(String host, String username, byte[] hashedPassword, int port, ClientAuthScheme scheme)
     throws UnknownHostException, IOException
     {
         SSLEngine sslEngine = null;
@@ -1057,11 +1030,11 @@ class Distributer {
             sslEngine = m_sslContext.newEngine(ByteBufAllocator.DEFAULT, host, port);
         }
 
-        final Object socketChannelAndInstanceIdAndBuildString[] =
-            ConnectionUtil.getAuthenticatedConnection(host, program, hashedPassword, port, m_subject, scheme, sslEngine,
+        final Object[] socketChannelAndInstanceIdAndBuildString =
+            ConnectionUtil.getAuthenticatedConnection(host, username, hashedPassword, port, m_subject, scheme, sslEngine,
                                                       TimeUnit.NANOSECONDS.toMillis(m_connectionResponseTimeoutNanos));
         final SocketChannel aChannel = (SocketChannel)socketChannelAndInstanceIdAndBuildString[0];
-        final long instanceIdWhichIsTimestampAndLeaderIp[] = (long[])socketChannelAndInstanceIdAndBuildString[1];
+        final long[] instanceIdWhichIsTimestampAndLeaderIp = (long[])socketChannelAndInstanceIdAndBuildString[1];
         final int hostId = (int)instanceIdWhichIsTimestampAndLeaderIp[0];
 
         NodeConnection cxn = new NodeConnection(instanceIdWhichIsTimestampAndLeaderIp);
@@ -1080,6 +1053,9 @@ class Distributer {
             }
             Throwables.propagate(e);
         }
+
+        // Save Connection in NodeConnection
+        // Also executes connectionCreated methods in all listeners
         cxn.setConnection(c);
 
         synchronized (this) {
@@ -1146,35 +1122,35 @@ class Distributer {
             //so there isn't potential for lost updates
             ProcedureInvocation spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@Subscribe", "TOPOLOGY");
             cxn.createWork(System.nanoTime(),
-                    spi.getHandle(),
-                    spi.getProcName(),
-                    serializeSPI(spi),
-                    new SubscribeCallback(),
-                    true,
-                    USE_DEFAULT_CLIENT_TIMEOUT);
+                           spi.getHandle(),
+                           spi.getProcName(),
+                           serializeSPI(spi),
+                           new SubscribeCallback(),
+                           true,
+                           USE_DEFAULT_CLIENT_TIMEOUT);
 
             spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@Statistics", "TOPO", 0);
-            //The handle is specific to topology updates and has special cased handling
+            //The handle is specific to topology updates and has special-cased handling
             cxn.createWork(System.nanoTime(),
-                    spi.getHandle(),
-                    spi.getProcName(),
-                    serializeSPI(spi),
-                    new TopoUpdateCallback(),
-                    true,
-                    USE_DEFAULT_CLIENT_TIMEOUT);
+                           spi.getHandle(),
+                           spi.getProcName(),
+                           serializeSPI(spi),
+                           new TopoUpdateCallback(),
+                           true,
+                           USE_DEFAULT_CLIENT_TIMEOUT);
 
             //Don't need to retrieve procedure updates every time we do a new subscription
             //since catalog changes aren't correlated with node failure the same way topo is
             if (!m_fetchedCatalog) {
                 spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@SystemCatalog", "PROCEDURES");
-                //The handle is specific to procedure updates and has special cased handling
+                //The handle is specific to procedure updates and has special-cased handling
                 cxn.createWork(System.nanoTime(),
-                        spi.getHandle(),
-                        spi.getProcName(),
-                        serializeSPI(spi),
-                        new ProcUpdateCallback(),
-                        true,
-                        USE_DEFAULT_CLIENT_TIMEOUT);
+                               spi.getHandle(),
+                               spi.getProcName(),
+                               serializeSPI(spi),
+                               new ProcUpdateCallback(),
+                               true,
+                               USE_DEFAULT_CLIENT_TIMEOUT);
             }
 
             //Partition key update
@@ -1188,7 +1164,15 @@ class Distributer {
      * Queue invocation on first node connection without backpressure. If there is none with
      * without backpressure, then return false and don't queue the invocation.
      *
-     * The 'ignoreBackpressure' option allows bypassing backpressure restrictions.
+     * The 'ignoreBackpressure' option allows bypassing backpressure restrictions. It
+     * is used by ClientImpl to avoid deadlocking on executing a procedure call on a
+     * callback thread, which you're not supposed to do. TODO: why do we allow it?
+     *
+     * If there are no connections available (not just no unbackpressured connections)
+     * then a NoConnectionsException will be thrown. There is one exception to this,
+     * however, and that is when topology-change-awareness is enabled and automatic
+     * reconnection is in effect. This case is handled via backpressure, identically
+     * to all connections being backpressured.
      *
      * @param invocation
      * @param cb
@@ -1196,7 +1180,7 @@ class Distributer {
      * @param nowNanos Current time in nanoseconds using System.nanoTime
      * @param timeoutNanos nanoseconds from nowNanos where timeout should fire
      * @return True if the message was queued and false if the message was not queued due to backpressure
-     * @throws NoConnectionsException
+     * @throws NoConnectionsException (see above)
      */
     boolean queue(ProcedureInvocation invocation,
                   ProcedureCallback cb,
@@ -1237,19 +1221,40 @@ class Distributer {
         return true;
     }
 
-    /*
+    /**
      * Locates an un-backpressured connection for the above 'queue'
      * methods. Null return implies backpressure (and not ignored)
      *
      * Synchronization is necessary to ensure that m_connections is not modified
-     * as well as to ensure that backpressure is reported correctly
+     * as well as to ensure that backpressure is reported correctly.
+     *
+     * Ordinarily, if there are no connections at all, an exception
+     * will be thrown. If we are running topology-aware with automatic
+     * reconnection, then we suppress the exception, and instead treat
+     * it identically to there being no unbackpressured connections.
+     * Backpressure will be removed on reconnect.
+     *
+     * The above does not apply if ignoreBackpressure is true; it
+     * makes no sense to use backpressure in such a case. However,
+     * we only expect to see ignoreBackpressure true on calls made
+     * by the user app on network  threads: you're not supposed to
+     * do that.
      */
     private synchronized NodeConnection findCxnForQueue(ProcedureInvocation invocation,
                                                         boolean ignoreBackpressure,
                                                         CxnStatsData statsData) throws NoConnectionsException {
         final int totalConnections = m_connections.size();
         if (totalConnections == 0) {
-            throw new NoConnectionsException("No connections.");
+            if (!m_topoAwareReconnect) {
+                throw new NoConnectionsException("No connections.");
+            }
+            if (ignoreBackpressure) {
+                throw new NoConnectionsException("No connections (and ignoreBackpressure set).");
+            }
+            for (ClientStatusListenerExt s : m_listeners) {
+                s.backpressure(true);
+            }
+            return null;
         }
 
         NodeConnection cxn = null;
@@ -1492,11 +1497,12 @@ class Distributer {
         return Collections.unmodifiableMap(connectedHostIPAndPortMap);
     }
 
-    private void updateAffinityTopology(VoltTable tables[]) {
+    private void updateAffinityTopology(VoltTable[] tables) {
         //First table contains the description of partition ids master/slave relationships
         VoltTable vt = tables[0];
 
         //In future let TOPO return cooked bytes when cooked and we use correct recipe
+        //TODO: this method now only called if tables.length > 1; remove excess code
         boolean cooked = false;
         if (tables.length == 1) {
             //Just in case the new client connects to the old version of Volt that only returns 1 topology table
@@ -1516,7 +1522,7 @@ class Distributer {
                     cooked);
         }
         m_partitionMasters.clear();
-        m_partitionReplicas.clear();
+
         // The MPI's partition ID is 16383 (MpInitiator.MP_INIT_PID), so we shouldn't inadvertently
         // hash to it.  Go ahead and include it in the maps, we can use it at some point to
         // route MP transactions directly to the MPI node.
@@ -1530,18 +1536,13 @@ class Distributer {
                 continue;
             }
 
-            ArrayList<NodeConnection> connections = new ArrayList<>();
             for (String site : sites.split(",")) {
                 site = site.trim();
                 Integer hostId = Integer.valueOf(site.split(":")[0]);
-                if (m_hostIdToConnection.containsKey(hostId)) {
-                    connections.add(m_hostIdToConnection.get(hostId));
-                } else {
+                if (!m_hostIdToConnection.containsKey(hostId)) {
                     unconnected.add(hostId);
                }
             }
-            m_partitionReplicas.put(partition, connections.toArray(new NodeConnection[0]));
-
 
             Integer leaderHostId = Integer.valueOf(leader.split(":")[0]);
             if (m_hostIdToConnection.containsKey(leaderHostId)) {
@@ -1690,38 +1691,70 @@ class Distributer {
         }
     }
 
-    void setTopologyChangeAware(boolean topoAware) {
+    /**
+     * Configure topology-change awareness
+     */
+    void setTopologyChangeAware(boolean topoAware, boolean autoReconnect) {
         m_topologyChangeAware = topoAware;
+        m_topoAwareReconnect = topoAware & autoReconnect;
     }
 
+    /**
+     * Called inline with every queued transaction, to determine if any
+     * topology changes have occurred that require new connections.
+     * TODO: this seems sort of expensive when there is usually
+     *       going to be no change. Make more efficient?
+     * TODO: there is an apparent race between the thread that sets
+     *       'in progress' true and the thread that discovers a non-empty
+     *       set of unconnected hosts. Is this important?
+     */
     void createConnectionsUponTopologyChange() {
-
-        if(!m_topologyChangeAware || m_createConnectionUponTopoChangeInProgress.get()) {
+        if (!m_topologyChangeAware) {
             return;
         }
-        m_createConnectionUponTopoChangeInProgress.set(true);
-        ImmutableSet<Integer> unconnected = m_unconnectedHosts.get();
-        if (unconnected != null && !unconnected.isEmpty()) {
-            m_unconnectedHosts.compareAndSet(unconnected, ImmutableSet.copyOf(new HashSet<Integer>()));
-            for (Integer host : unconnected) {
-                if (!isHostConnected(host)) {
-                    for (ClientStatusListenerExt csl : m_listeners) {
-                        if (csl instanceof ClientImpl.InternalClientStatusListener) {
-                            ((ClientImpl.InternalClientStatusListener)csl).createConnectionsUponTopologyChange();
-                            break;
-                        }
-                    }
+        if (!m_createConnectionUponTopoChangeInProgress.compareAndSet(false, true)) {
+            return;
+        }
+        try {
+            ImmutableSet<Integer> unconnected = m_unconnectedHosts.get();
+            if (unconnected == null || unconnected.isEmpty()) {
+                return;
+            }
+            ClientImpl.InternalClientStatusListener internalListener = null;
+            for (ClientStatusListenerExt csl : m_listeners) {
+                if (csl instanceof ClientImpl.InternalClientStatusListener) {
+                    internalListener = (ClientImpl.InternalClientStatusListener) csl;
+                    break;
                 }
             }
+            if (internalListener == null) {
+                return;
+            }
+            unconnected = m_unconnectedHosts.getAndSet(ImmutableSet.copyOf(new HashSet<Integer>()));
+            for (Integer host : unconnected) {
+                if (!isHostConnected(host)) {
+                    internalListener.createConnectionsUponTopologyChange();
+                    break;
+                }
+            }
+        } finally {
+            m_createConnectionUponTopoChangeInProgress.set(false);
         }
-        m_createConnectionUponTopoChangeInProgress.set(false);
     }
 
+    /**
+     * Call from client implementation when a new connection has been made
+     * by the topology-aware connection task. Requests updated topology info.
+     */
     void setCreateConnectionsUponTopologyChangeComplete() throws NoConnectionsException {
-        m_createConnectionUponTopoChangeInProgress.set(false);
+        m_createConnectionUponTopoChangeInProgress.set(false); // TODO: WHY?
         ProcedureInvocation spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@Statistics", "TOPO", 0);
         queue(spi, new TopoUpdateCallback(), true, System.nanoTime(), USE_DEFAULT_CLIENT_TIMEOUT);
     }
+
+    /**
+     * Utility: do we have a connection for this host?
+     */
     boolean isHostConnected(Integer hostId) {
         return m_hostIdToConnection.containsKey(hostId);
     }

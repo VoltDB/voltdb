@@ -24,7 +24,9 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.List;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
@@ -33,6 +35,7 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Logger;
 
 import com.google_voltpatches.common.net.HostAndPort;
@@ -42,6 +45,8 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.ssl.SSLConfiguration;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
+import org.voltdb.client.ClientStatusListenerExt.AutoConnectionStatus;
+import org.voltdb.client.ClientStatusListenerExt.DisconnectCause;
 import org.voltdb.client.VoltBulkLoader.BulkLoaderFailureCallBack;
 import org.voltdb.client.VoltBulkLoader.BulkLoaderState;
 import org.voltdb.client.VoltBulkLoader.BulkLoaderSuccessCallback;
@@ -57,6 +62,9 @@ import org.voltdb.utils.Encoder;
  */
 public final class ClientImpl implements Client {
     private static final Logger LOG = Logger.getLogger(ClientImpl.class.getName());
+
+    // Time to wait before retrying a failed connection attempt
+    private static final int CONNECTION_RETRY_DELAY_SEC = 10;
 
     // Global instance of null callback for performance (we only need one)
     private static final ProcedureCallback NULL_CALLBACK = new NullCallback();
@@ -75,11 +83,16 @@ public final class ClientImpl implements Client {
     // Mux/demux connections to cluster
     private final Distributer m_distributer;
 
-    // For reconnect on connection loss (null if not enabled)
+    // True for any kind of automatic reconnect.
+    private final boolean m_autoReconnect;
+
+    // For reconnect on connection loss (null if not enabled
+    // or if running in topology-change-aware mode).
     private final ReconnectStatusListener m_reconnectStatusListener;
 
     // Execution service for topology-change-aware clients
     private final ScheduledExecutorService m_ex;
+    private final boolean m_topologyChangeAware;
 
     // Our own status listener - package access for unit test
     final InternalClientStatusListener m_listener = new InternalClientStatusListener();
@@ -95,6 +108,11 @@ public final class ClientImpl implements Client {
     private final CopyOnWriteArrayList<Long> m_blessedThreadIds = new CopyOnWriteArrayList<>();
     private boolean m_backpressure = false;
     private boolean m_blockingQueue = true;
+
+    // Tracks historical connections for when we have nothing
+    // to ask for topo info.
+    private final Set<HostAndPort> m_connectHistory;
+    private boolean m_newConnectEpoch;
 
     // For bulk-loader use
     private final BulkLoaderState m_vblGlobals = new BulkLoaderState(this);
@@ -139,14 +157,19 @@ public final class ClientImpl implements Client {
                                         m_sslContext);
         m_distributer.addClientStatusListener(m_listener);
 
-        m_distributer.setTopologyChangeAware(config.m_topologyChangeAware);
-        if (config.m_topologyChangeAware) {
+        m_autoReconnect = config.m_reconnectOnConnectionLoss;
+        m_topologyChangeAware = config.m_topologyChangeAware;
+
+        m_distributer.setTopologyChangeAware(m_topologyChangeAware, m_autoReconnect);
+        if (m_topologyChangeAware) {
             m_ex = Executors.newSingleThreadScheduledExecutor(CoreUtils.getThreadFactory("Topoaware thread"));
+            m_connectHistory = new LinkedHashSet<>();
         } else {
             m_ex = null;
+            m_connectHistory = null;
         }
 
-        if (config.m_reconnectOnConnectionLoss) {
+        if (m_autoReconnect && !m_topologyChangeAware) {
             m_reconnectStatusListener = new ReconnectStatusListener(this,
                                                                     config.m_initialConnectionRetryIntervalMS,
                                                                     config.m_maxConnectionRetryIntervalMS);
@@ -427,7 +450,6 @@ public final class ClientImpl implements Client {
         }
 
         SyncCallbackLight cb = new SyncCallbackLight();
-
         boolean success = internalAsyncCallProcedure(cb, clientTimeoutNanos, invocation);
         if (!success) {
             final ClientResponseImpl r = new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE,
@@ -595,9 +617,7 @@ public final class ClientImpl implements Client {
                     " without deadlocking the client library");
         }
         m_isShutdown = true;
-        synchronized (m_backpressureLock) {
-            m_backpressureLock.notifyAll();
-        }
+        setLocalBackpressureState(false);
 
         if (m_reconnectStatusListener != null) {
             m_distributer.removeClientStatusListener(m_reconnectStatusListener);
@@ -678,7 +698,9 @@ public final class ClientImpl implements Client {
     }
 
     /*
-     * Convenient class holding details of single host
+     * Convenient class holding details of single host. The strange implementation
+     * of setValue is needed because a HostConfig is set up by reading a VoltTable
+     * in which each row has a parameter name and a value.
      */
     private class HostConfig {
         String m_ipAddress;
@@ -717,25 +739,37 @@ public final class ClientImpl implements Client {
 
         @Override
         public void backpressure(boolean status) {
-            synchronized (m_backpressureLock) {
-                if (status) {
-                    m_backpressure = true;
-                } else {
-                    m_backpressure = false;
-                    m_backpressureLock.notifyAll();
+            setLocalBackpressureState(status);
+        }
+
+        @Override
+        public void connectionCreated(String hostname, int port, AutoConnectionStatus status) {
+            if (m_topologyChangeAware && m_autoReconnect && status == AutoConnectionStatus.SUCCESS) {
+                // Track potential targets for reconnection. A new epoch begins
+                // on the first successful connection after having no connections;
+                // previous targets are then forgotten.
+                synchronized (m_connectHistory) {
+                    if (m_newConnectEpoch) {
+                        m_newConnectEpoch = false;
+                        m_connectHistory.clear();
+                    }
+                    m_connectHistory.add(HostAndPort.fromParts(hostname, port));
                 }
             }
         }
 
         @Override
         public void connectionLost(String hostname, int port, int connectionsLeft,
-                                   ClientStatusListenerExt.DisconnectCause cause) {
+                                   DisconnectCause cause) {
             if (connectionsLeft == 0) {
-                //Wake up client and let it attempt to queue work
-                //and then fail with a NoConnectionsException
-                synchronized (m_backpressureLock) {
-                    m_backpressure = false;
-                    m_backpressureLock.notifyAll();
+                if (m_topologyChangeAware && m_autoReconnect && !m_isShutdown) {
+                    // Special-case handling of no connections in topo-change aware mode.
+                    // Must make a connection first of all.
+                    createAnyConnection();
+                } else {
+                    // Wake up client and let it attempt to queue work
+                    // and then fail with a NoConnectionsException
+                    setLocalBackpressureState(false);
                 }
             }
         }
@@ -786,36 +820,60 @@ public final class ClientImpl implements Client {
         }
 
         /**
-         * notify client upon a connection creation failure.
+         * Notify client upon a connection creation failure.
+         *
          * @param host HostConfig with IP address and port
          * @param status The status of connection creation
          */
-        void notifyClientConnectionCreation(HostConfig host, ClientStatusListenerExt.AutoConnectionStatus status) {
-            if (m_clientStatusListener != null) {
-                m_clientStatusListener.connectionCreated((host != null) ? host.m_hostName : "",
-                        (host != null) ? host.m_clientPort : -1, status);
+        void notifyClientConnectionCreation(HostConfig host, AutoConnectionStatus status) {
+            if (host != null) {
+                notifyClientConnectionCreation(host.m_hostName, host.m_clientPort, status);
+            } else {
+                notifyClientConnectionCreation("", -1, status);
             }
         }
 
-        void retryConnectionCreationIfNeeded(int failCount) {
-            if (failCount == 0) {
-                try {
-                    m_distributer.setCreateConnectionsUponTopologyChangeComplete();
-                } catch (Exception e) {
-                    notifyClientConnectionCreation(null, ClientStatusListenerExt.AutoConnectionStatus.UNABLE_TO_CONNECT);
-                }
-            } else if (connectionTaskCount.get() < 2) {
-                //if there are tasks in the queue, do not need schedule again since all the tasks do the same job
-                m_ex.schedule(new CreateConnectionTask(this, connectionTaskCount), 10, TimeUnit.SECONDS);
+        void notifyClientConnectionCreation(String host, int port, AutoConnectionStatus status) {
+            if (m_clientStatusListener != null) {
+                m_clientStatusListener.connectionCreated(host, port, status);
             }
         }
 
         /**
-         * find all the host which have not been connected to the client via @SystemInformation
+         * Handles completion of automatic reconnection attempt.
+         * Success: kick distributer into querying updated toplogy.
+         * Failure: schedule a retry.
+         * @param failCount - non-zero if retry needed
+         * @param first - determines which task to requeue
+         */
+        void retryConnectionCreationIfNeeded(int failCount, boolean first) {
+            if (failCount == 0) {
+                try {
+                    m_distributer.setCreateConnectionsUponTopologyChangeComplete();
+                } catch (Exception e) {
+                    notifyClientConnectionCreation(null, AutoConnectionStatus.UNABLE_TO_CONNECT);
+                }
+            } else if (first) {
+                m_ex.schedule(new FirstConnectionTask(this, connectionTaskCount), CONNECTION_RETRY_DELAY_SEC, TimeUnit.SECONDS);
+            } else if (connectionTaskCount.get() < 2) { // TODO: why 2? current task has decremented count, so count is only count of queued
+                // if there are tasks in the queue, do not need schedule again since all the tasks do the same job
+                m_ex.schedule(new CreateConnectionTask(this, connectionTaskCount), CONNECTION_RETRY_DELAY_SEC, TimeUnit.SECONDS);
+            }
+        }
+
+        /**
+         * Find all the host which have not been connected to the client via @SystemInformation
          * and make connections (called from Distributer)
          */
         public void createConnectionsUponTopologyChange() {
             m_ex.execute(new CreateConnectionTask(this, connectionTaskCount));
+        }
+
+        /**
+         * We have no connections; make the first one
+         */
+        public void createAnyConnection() {
+            m_ex.execute(new FirstConnectionTask(this, connectionTaskCount));
         }
     }
 
@@ -827,7 +885,7 @@ public final class ClientImpl implements Client {
         final InternalClientStatusListener listener;
         final AtomicInteger connectionTaskCount;
 
-        CreateConnectionTask(InternalClientStatusListener listener, AtomicInteger connectionTaskCount ) {
+        CreateConnectionTask(InternalClientStatusListener listener, AtomicInteger connectionTaskCount) {
             this.listener = listener;
             this.connectionTaskCount = connectionTaskCount;
             connectionTaskCount.incrementAndGet();
@@ -843,27 +901,87 @@ public final class ClientImpl implements Client {
                     for(Map.Entry<Integer, HostConfig> entry : hosts.entrySet()) {
                         HostConfig config = entry.getValue();
                         try {
-                            createConnection(config.m_ipAddress,config.getPort(listener.m_useAdminPort));
-                            listener.notifyClientConnectionCreation(config, ClientStatusListenerExt.AutoConnectionStatus.SUCCESS);
+                            createConnectionImpl(config.m_ipAddress,config.getPort(listener.m_useAdminPort));
+                            listener.notifyClientConnectionCreation(config, AutoConnectionStatus.SUCCESS);
                         } catch (Exception e) {
-                            listener.notifyClientConnectionCreation(config, ClientStatusListenerExt.AutoConnectionStatus.UNABLE_TO_CONNECT);
+                            listener.notifyClientConnectionCreation(config, AutoConnectionStatus.UNABLE_TO_CONNECT);
                             failCount++;
                         }
                     }
                 } else {
-                    listener.notifyClientConnectionCreation(null, ClientStatusListenerExt.AutoConnectionStatus.UNABLE_TO_QUERY_TOPOLOGY);
+                    listener.notifyClientConnectionCreation(null, AutoConnectionStatus.UNABLE_TO_QUERY_TOPOLOGY);
                     failCount++;
                 }
             } catch (Exception e) {
-                listener.notifyClientConnectionCreation(null, ClientStatusListenerExt.AutoConnectionStatus.UNABLE_TO_QUERY_TOPOLOGY);
+                listener.notifyClientConnectionCreation(null, AutoConnectionStatus.UNABLE_TO_QUERY_TOPOLOGY);
                 failCount++;
             } finally {
                 connectionTaskCount.decrementAndGet();
-                listener.retryConnectionCreationIfNeeded(failCount);
+                listener.retryConnectionCreationIfNeeded(failCount, false);
             }
         }
     }
 
+    /*
+     * Asynchronously create connection, used for topology-aware clients in the
+     * specific case that we have zero connections left (and therefore cannot now
+     * know the topology). Uses the connect history to get a connection to any
+     * one of the previously-connected hosts. From there, normal topo handling
+     * can take over again. Runs in thread managed by ScheduledServiceExecutor.
+     */
+    private class FirstConnectionTask implements Runnable {
+        final InternalClientStatusListener listener;
+        final AtomicInteger connectionTaskCount;
+        final LinkedHashSet<HostAndPort> targets;
+
+        FirstConnectionTask(InternalClientStatusListener listener, AtomicInteger connectionTaskCount ) {
+            this.listener = listener;
+            this.connectionTaskCount = connectionTaskCount;
+            synchronized (m_connectHistory) {
+                targets = new LinkedHashSet<>(m_connectHistory);
+                m_newConnectEpoch = true; // discard old history in successful completion
+            }
+            connectionTaskCount.incrementAndGet();
+        }
+
+        @Override
+        public void run() {
+            int failCount = 0;
+            try {
+                for (HostAndPort hap : targets) {
+                    try {
+                        createConnectionImpl(hap.getHost(), hap.getPort());
+                        listener.notifyClientConnectionCreation(hap.getHost(), hap.getPort(), AutoConnectionStatus.SUCCESS);
+                        setLocalBackpressureState(false);
+                        break; // one is enough
+                    } catch (Exception e) {
+                        // Does client need to know about this?
+                        failCount++;
+                    }
+                }
+                if (targets.isEmpty()) { // should not happen, but there's no way out of this
+                    listener.notifyClientConnectionCreation(null, AutoConnectionStatus.NO_KNOWN_SERVERS);
+                }
+            }
+            finally {
+                connectionTaskCount.decrementAndGet();
+                listener.retryConnectionCreationIfNeeded(failCount, true);
+            }
+        }
+    }
+
+    /*
+     * Updates local backpressure state, controlling the
+     * barrier/retry loop in internalAsyncCallProcedure
+     */
+    private void setLocalBackpressureState(boolean onoff) {
+        synchronized (m_backpressureLock) {
+            m_backpressure = onoff;
+            if (!onoff) {
+                m_backpressureLock.notifyAll();
+            }
+        }
+    }
 
     /****************************************************
                         Implementation
@@ -907,11 +1025,15 @@ public final class ClientImpl implements Client {
     @Override
     public void createConnection(String host) throws IOException {
         HostAndPort hp = parseHostAndPort(host);
-        createConnection(hp.getHost(), hp.getPort());
+        createConnectionImpl(hp.getHost(), hp.getPort());
     }
 
     @Override
     public void createConnection(String host, int port) throws IOException {
+        createConnectionImpl(host, port);
+    }
+
+    private void createConnectionImpl(String host, int port) throws IOException {
         if (m_username == null) {
             throw new IllegalStateException("Attempted to use createConnection() with a client" +
                                             " that wasn't constructed with a username and password specified");
@@ -1005,7 +1127,7 @@ public final class ClientImpl implements Client {
 
     @Override
     public boolean isAutoReconnectEnabled() {
-        return (m_reconnectStatusListener != null);
+        return m_autoReconnect;
     }
 
     @Override
@@ -1023,8 +1145,8 @@ public final class ClientImpl implements Client {
     }
 
     @Override
-    public boolean callAllPartitionProcedure(AllPartitionProcedureCallback callback, String procedureName,
-            Object... params) throws IOException, ProcCallException {
+    public boolean callAllPartitionProcedure(AllPartitionProcedureCallback callback, String procedureName, Object... params)
+            throws IOException, ProcCallException {
         if (callback == null) {
             throw new IllegalArgumentException("AllPartitionProcedureCallback can not be null");
         }

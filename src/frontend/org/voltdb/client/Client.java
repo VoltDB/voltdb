@@ -67,7 +67,7 @@ public interface Client {
     throws UnknownHostException, IOException;
 
     /**
-     * <p>Create a connection to a VoltDB node.</p>
+     * <p>Create a connection to a VoltDB node and add it to the set of connections.</p>
      *
      * <p>This is a synchronous operation.</p>
      *
@@ -386,9 +386,7 @@ public interface Client {
      * <p>Get the list of VoltDB server hosts that this client has open TCP connections
      * to. Note that this doesn't guarantee that those nodes are actually alive at
      * the precise moment this method is called. There is also a race condition
-     * between calling this method and acting on the results. It is true that the list
-     * won't grow unless createConnection is called, and the list will never contain
-     * hosts that weren't explicitly connected to.</p>
+     * between calling this method and acting on the results.</p>
      *
      * @return An list of {@link java.net.InetSocketAddress} representing the connected hosts.
      */

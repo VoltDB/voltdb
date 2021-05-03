@@ -45,7 +45,7 @@ import com.google_voltpatches.common.base.Throwables;
  */
 public class ClientStats {
     String m_procName;
-    long m_startTS; // java.util.Date compatible microseconds since epoch
+    long m_startTS; // java.util.Date compatible milliseconds since epoch
     long m_endTS;
 
     long m_connectionId;
