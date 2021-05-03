@@ -359,7 +359,9 @@ public class ClientConfig {
     }
 
     /**
-     * @deprecated since reads must always be sent to the leader.
+     * @deprecated no longer meaningful: reads are always sent
+     * to the leader; sending to a replica would not have resulted
+     * in better performance.
      *
      * @param on unused
      */
