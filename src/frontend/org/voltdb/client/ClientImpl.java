@@ -820,20 +820,23 @@ public final class ClientImpl implements Client {
         }
 
         /**
-         * Notify client upon a connection creation failure.
+         * Notify client upon a connection creation failure when the connection
+         * arose from topology-aware client action. Not used for successful
+         * completion, since the Distributer takes care of that in its
+         * createConnectionWithHashedCredentials routine.
          *
          * @param host HostConfig with IP address and port
-         * @param status The status of connection creation
+         * @param status Reason for failure
          */
-        void notifyClientConnectionCreation(HostConfig host, AutoConnectionStatus status) {
+        void notifyAutoConnectFailure(HostConfig host, AutoConnectionStatus status) {
             if (host != null) {
-                notifyClientConnectionCreation(host.m_hostName, host.m_clientPort, status);
+                notifyAutoConnectFailure(host.m_hostName, host.m_clientPort, status);
             } else {
-                notifyClientConnectionCreation("", -1, status);
+                notifyAutoConnectFailure("", -1, status);
             }
         }
 
-        void notifyClientConnectionCreation(String host, int port, AutoConnectionStatus status) {
+        void notifyAutoConnectFailure(String host, int port, AutoConnectionStatus status) {
             if (m_clientStatusListener != null) {
                 m_clientStatusListener.connectionCreated(host, port, status);
             }
@@ -851,7 +854,7 @@ public final class ClientImpl implements Client {
                 try {
                     m_distributer.setCreateConnectionsUponTopologyChangeComplete();
                 } catch (Exception e) {
-                    notifyClientConnectionCreation(null, AutoConnectionStatus.UNABLE_TO_CONNECT);
+                    notifyAutoConnectFailure(null, AutoConnectionStatus.UNABLE_TO_QUERY_TOPOLOGY);
                 }
             } else if (first) {
                 m_ex.schedule(new FirstConnectionTask(this, connectionTaskCount), CONNECTION_RETRY_DELAY_SEC, TimeUnit.SECONDS);
@@ -902,18 +905,17 @@ public final class ClientImpl implements Client {
                         HostConfig config = entry.getValue();
                         try {
                             createConnectionImpl(config.m_ipAddress,config.getPort(listener.m_useAdminPort));
-                            listener.notifyClientConnectionCreation(config, AutoConnectionStatus.SUCCESS);
                         } catch (Exception e) {
-                            listener.notifyClientConnectionCreation(config, AutoConnectionStatus.UNABLE_TO_CONNECT);
+                            listener.notifyAutoConnectFailure(config, AutoConnectionStatus.UNABLE_TO_CONNECT);
                             failCount++;
                         }
                     }
                 } else {
-                    listener.notifyClientConnectionCreation(null, AutoConnectionStatus.UNABLE_TO_QUERY_TOPOLOGY);
+                    listener.notifyAutoConnectFailure(null, AutoConnectionStatus.UNABLE_TO_QUERY_TOPOLOGY);
                     failCount++;
                 }
             } catch (Exception e) {
-                listener.notifyClientConnectionCreation(null, AutoConnectionStatus.UNABLE_TO_QUERY_TOPOLOGY);
+                listener.notifyAutoConnectFailure(null, AutoConnectionStatus.UNABLE_TO_QUERY_TOPOLOGY);
                 failCount++;
             } finally {
                 connectionTaskCount.decrementAndGet();
@@ -951,7 +953,6 @@ public final class ClientImpl implements Client {
                 for (HostAndPort hap : targets) {
                     try {
                         createConnectionImpl(hap.getHost(), hap.getPort());
-                        listener.notifyClientConnectionCreation(hap.getHost(), hap.getPort(), AutoConnectionStatus.SUCCESS);
                         setLocalBackpressureState(false);
                         break; // one is enough
                     } catch (Exception e) {
@@ -960,7 +961,7 @@ public final class ClientImpl implements Client {
                     }
                 }
                 if (targets.isEmpty()) { // should not happen, but there's no way out of this
-                    listener.notifyClientConnectionCreation(null, AutoConnectionStatus.NO_KNOWN_SERVERS);
+                    listener.notifyAutoConnectFailure(null, AutoConnectionStatus.NO_KNOWN_SERVERS);
                 }
             }
             finally {
