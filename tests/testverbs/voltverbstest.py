@@ -54,8 +54,7 @@ volt_verbs_mapping = {'check': 'check',
                       'get': 'get',
                       'init': 'initialize',
                       'mask': 'mask',
-                      'start': 'probe',
-                      'stop': 'stop'}
+                      'start': 'probe' }
 
 # create all the options
 class Opt:
@@ -154,7 +153,6 @@ volt_opts = {'check': [],
                        replica,
                        topicsport,
                        topicspublic],
-             'stop': [host],
              }
 
 volt_opts_mandatory = {'check': [],
@@ -162,8 +160,7 @@ volt_opts_mandatory = {'check': [],
                        'get': [],
                        'init': [],
                        'mask': [],
-                       'start': [],
-                       'stop': []}
+                       'start': []}
 
 volt_opts_negative = [unknown]
 
@@ -174,8 +171,7 @@ volt_verbs_output = {'check': '',
                      'get': ' RESOURCE',
                      'init': '',
                      'mask': ' DEPLOYMENTFILE ...',
-                     'start': '',
-                     'stop': ''}
+                     'start': ''}
 
 # some verbs will generate default opts to java command line
 
@@ -184,8 +180,7 @@ volt_opts_default = {'check': {},
                      'get': {},
                      'init': {},
                      'mask': {},
-                     'start': {placementgroup.javaname: '0', mesh.javaname: "\"\""},
-                     'stop': {}}
+                     'start': {placementgroup.javaname: '0', mesh.javaname: "\"\""}}
 
 # regular expression for pre-process the actual output before comparison
 ignore = "^(Exec:|Run:) (?P<java_path>.+?)(java) (?P<java_opts>.+?) (-classpath) (?P<classpath>.+?) (org.voltdb.VoltDB)";
@@ -224,7 +219,7 @@ objects = [ deployment, schema, irr_classes ]  # required
 options = [ voltdbrootdir, out, "none", ]
 
 # TODO: add other irregular verbs
-# check, collect, mask, stop
+# check, collect, mask
 # above structures do not seem sufficiently general
 
 class TestsContainer(unittest.TestCase):

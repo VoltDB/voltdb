@@ -25,7 +25,8 @@ from voltcli import utility
         VOLT.IntegerOption('-I', '--instance', 'instance',
             #'specify an instance number for multiple servers on the same host'),
             None),
-    ]
+    ],
+    hideverb=True
 )
 def stop(runner):
     daemonizer = runner.create_daemonizer(description="VoltDB server")
