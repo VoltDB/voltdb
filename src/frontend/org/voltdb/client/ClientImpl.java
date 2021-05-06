@@ -405,32 +405,6 @@ public final class ClientImpl implements Client {
     }
 
     /**
-     * TODO remove
-     */
-    @Deprecated
-    @Override
-    public int calculateInvocationSerializedSize(
-            String procName,
-            Object... parameters) {
-        final ProcedureInvocation invocation =
-            new ProcedureInvocation(0, procName, parameters);
-        return invocation.getSerializedSize();
-    }
-
-    /**
-     * TODO remove
-     */
-    @Deprecated
-    @Override
-    public final boolean callProcedure(
-           ProcedureCallback callback,
-           int expectedSerializedSize,
-           String procName,
-           Object... parameters) throws IOException {
-        return callProcedure(callback, procName, parameters);
-    }
-
-    /**
      * Implementation of synchronous procedure call.
      *
      * @param clientTimeoutNanos timeout on this query

@@ -154,47 +154,6 @@ public interface Client {
     throws IOException, NoConnectionsException;
 
     /**
-     * <p>Asynchronously invoke a replicated procedure. If there is backpressure
-     * this call will block until the invocation is queued. If configureBlocking(false) is invoked
-     * then it will return immediately. Check the return value to determine if queuing actually took place.</p>
-     *
-     * <p>An opportunity is provided to hint what the size of the invocation
-     * will be once serialized. This is used to perform more efficient memory allocation and serialization. The size
-     * of an invocation can be calculated using {@link #calculateInvocationSerializedSize(String, Object...)}.
-     * Only Clients that are resource constrained or expect to process hundreds of thousands of txns/sec will benefit
-     * from accurately determining the serialized size of message.</p>
-     *
-     * @deprecated because hinting at the serialized size no longer has any effect.
-     * @param callback ProcedureCallback that will be invoked with procedure results.
-     * @param procName class name (not qualified by package) of the procedure to execute.
-     * @param parameters vararg list of procedure's parameter values.
-     * @param expectedSerializedSize A hint indicating the size the procedure invocation is expected to be
-     *                               once serialized. Allocations are done in powers of two.
-     * @return <code>true</code> if the procedure was queued and <code>false</code> otherwise.
-     * @throws NoConnectionsException if this {@link Client} instance is not connected to any servers.
-     * @throws IOException if there is a Java network or connection problem.
-     */
-    @Deprecated
-    public boolean callProcedure(
-            ProcedureCallback callback,
-            int expectedSerializedSize,
-            String procName,
-            Object... parameters)
-    throws IOException, NoConnectionsException;
-
-    /**
-     * <p>Calculate the size of a stored procedure invocation once it is serialized. This is computationally intensive
-     * as the invocation is serialized as part of the calculation.</p>
-     *
-     * @deprecated because hinting at the serialized size no longer has any effect.
-     * @param procName class name (not qualified by package) of the procedure to execute.
-     * @param parameters vararg list of procedure's parameter values.
-     * @return The size of the invocation once serialized.
-     */
-    @Deprecated
-    public int calculateInvocationSerializedSize(String procName, Object... parameters);
-
-    /**
      * <p>Synchronously invokes UpdateApplicationCatalog procedure. Blocks until a
      * result is available. A {@link ProcCallException} is thrown if the
      * response is anything other then success.</p>
