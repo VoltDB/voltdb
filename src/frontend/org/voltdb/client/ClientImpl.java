@@ -107,7 +107,8 @@ public final class ClientImpl implements Client {
     private final Object m_backpressureLock = new Object();
     private final CopyOnWriteArrayList<Long> m_blessedThreadIds = new CopyOnWriteArrayList<>();
     private boolean m_backpressure = false;
-    private boolean m_blockingQueue = true;
+    private boolean m_nonblocking = false;
+    private long m_asyncBlockingTimeout = 0;
 
     // Tracks historical connections for when we have nothing
     // to ask for topo info.
@@ -401,7 +402,7 @@ public final class ClientImpl implements Client {
             callback = NULL_CALLBACK;
         }
 
-        return internalAsyncCallProcedure(callback, clientTimeoutUnit.toNanos(clientTimeout), invocation);
+        return internalAsyncCallProcedure(callback, clientTimeoutUnit.toNanos(clientTimeout), m_nonblocking, invocation);
     }
 
     /**
@@ -424,7 +425,7 @@ public final class ClientImpl implements Client {
         }
 
         SyncCallbackLight cb = new SyncCallbackLight();
-        boolean success = internalAsyncCallProcedure(cb, clientTimeoutNanos, invocation);
+        boolean success = internalAsyncCallProcedure(cb, clientTimeoutNanos, false/*blocking*/, invocation);
         if (!success) {
             final ClientResponseImpl r = new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE,
                                                                 ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
@@ -450,10 +451,16 @@ public final class ClientImpl implements Client {
      *
      * @param callback completion callback
      * @param clientTimeoutNanos timeout on this query
+     * @param nonblockingAsync true iff async nonblocking request
      * @param invocation the procedure to call
+     * @returns true iff request was queued
+     *
+     * The non-blocking mode can, at the client's request, block for
+     * a very short time hoping to ride out a short blip in backpressure.
      */
     private final boolean internalAsyncCallProcedure(ProcedureCallback callback,
                                                      long clientTimeoutNanos,
+                                                     boolean nonblockingAsync,
                                                      ProcedureInvocation invocation) throws IOException {
         if (m_isShutdown) {
             throw new NoConnectionsException("Client instance is shut down");
@@ -466,8 +473,32 @@ public final class ClientImpl implements Client {
         final long nowNanos = System.nanoTime();
 
         // Blessed threads (the ones that invoke callbacks) are not subject to backpressure
+        // and nor do they support non-blocking operation
         boolean isBlessed = m_blessedThreadIds.contains(Thread.currentThread().getId());
 
+        // Non-blocking mode
+        if (nonblockingAsync && !isBlessed) {
+            boolean queued = m_distributer.queueNonblocking(invocation, callback, nowNanos, clientTimeoutNanos);
+            if (!queued && m_asyncBlockingTimeout > 0) {
+
+                // Wait on backpressure, but not for very long
+                boolean bp = true;
+                try {
+                    bp = backpressureBarrier(nowNanos, m_asyncBlockingTimeout);
+                }
+                catch (InterruptedException e) {
+                    // ignore
+                }
+
+                // If backpressure cleared, issue a single retry
+                if (!bp) {
+                    queued = m_distributer.queueNonblocking(invocation, callback, nowNanos, clientTimeoutNanos);
+                }
+            }
+            return queued;
+        }
+
+        // Blocking mode
         while (!m_distributer.queue(invocation, callback, isBlessed, nowNanos, clientTimeoutNanos)) {
 
             // Wait on backpressure, honoring the timeout settings
@@ -970,8 +1001,9 @@ public final class ClientImpl implements Client {
      ****************************************************/
 
     @Override
-    public void configureBlocking(boolean blocking) {
-        m_blockingQueue = blocking;
+    public void configureNonblockingAsync(long blockingTimeout) {
+        m_nonblocking = true;
+        m_asyncBlockingTimeout = Math.max(0, blockingTimeout);
     }
 
     @Override
@@ -987,11 +1019,6 @@ public final class ClientImpl implements Client {
     @Override
     public String getBuildString() {
         return m_distributer.getBuildString();
-    }
-
-    @Override
-    public boolean blocking() {
-        return m_blockingQueue;
     }
 
     // Used by system tests
@@ -1121,7 +1148,7 @@ public final class ClientImpl implements Client {
         try {
             latch.await();
         } catch (InterruptedException e) {
-            throw new java.io.InterruptedIOException("Interrupted while waiting for response");
+            throw new InterruptedIOException("Interrupted while waiting for response");
         }
         return callBack.getResponse();
     }

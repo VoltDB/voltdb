@@ -20,12 +20,11 @@ package org.voltdb.client;
 import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.Deque;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+
+import org.voltcore.utils.EstTime;
 
 /**
  * Provide the {@link Client} with a way to throttle throughput in one
@@ -40,13 +39,14 @@ class RateLimiter {
     final static int HISTORY_SIZE = 25;
     final static int RECENT_HISTORY_SIZE = 5;
     final static int MINIMUM_MOVEMENT = 5;
+    final static int DEFAULT_TXN_LIMIT = 10;
 
     // If true, we're doing actual rate limiting.
     // If false, we're just limiting outstanding txns.
     protected boolean m_doesAnyTuning = false;
 
     // Data used in rate limiting
-    protected int m_maxOutstandingTxns = 10;
+    protected int m_maxOutstandingTxns = DEFAULT_TXN_LIMIT;
     protected int m_outstandingTxns = 0;
     protected long m_currentBlockTimestamp = -1;
     protected int m_currentBlockSendCount = 0;
@@ -60,7 +60,16 @@ class RateLimiter {
     protected int m_latencyTarget = 5;
 
     // Non-rate-limiting data
-    protected Semaphore m_outstandingTxnsSemaphore = new Semaphore(10);
+    protected Semaphore m_outstandingTxnsSemaphore = new Semaphore(DEFAULT_TXN_LIMIT);
+
+    // Flow maintenance in non-blocking mode
+    private Runnable m_resumeSendCallback = null;
+    private boolean m_needResume = false;
+    private long m_resumeWaitTimeout = 0;
+    private int m_nonblockingOutCount = 0;
+    private int m_nonblockingResumeLevel = Math.round(DEFAULT_TXN_LIMIT * RESUME_THRESHOLD);
+    private final static float RESUME_THRESHOLD = 0.25f;
+    private final static int RESUME_TIMEOUT_FACTOR = 5;
 
     /*
      * Implements the autotune mechanisms.
@@ -158,6 +167,8 @@ class RateLimiter {
         m_maxOutstandingTxns = maxOutstanding;
         m_outstandingTxnsSemaphore.drainPermits();
         m_outstandingTxnsSemaphore.release(maxOutstanding);
+        m_nonblockingOutCount = 0;
+        m_nonblockingResumeLevel = Math.round(maxOutstanding * RESUME_THRESHOLD);
     }
 
     /**
@@ -170,6 +181,15 @@ class RateLimiter {
         limits[0] = m_targetTxnsPerSecond;
         limits[1] = m_maxOutstandingTxns;
         return limits;
+    }
+
+    /**
+     * Sets the "resume callback" needed for non-blocking mode (see the
+     * transactionResponseReceived method below) and implicitly declares
+     * the intent to use non-blocking sends.
+     */
+    synchronized void setNonblockingResumeHook(Runnable callbk) {
+        m_resumeSendCallback = callbk;
     }
 
     /**
@@ -193,7 +213,34 @@ class RateLimiter {
             }
         } else if (!ignoreBackpressure) {
             m_outstandingTxnsSemaphore.release();
+            if (m_resumeSendCallback != null && shouldResumeSending()) {
+                m_resumeSendCallback.run();
+            }
         }
+    }
+
+    /*
+     * When the client is using non-blocking sends and has previously failed
+     * to acquire a send permit (too many outstanding txns), we need to tell
+     * it when it can resume. This is done when the outstanding txn count
+     * drops below some threshold, currently set to 25% of the available
+     * send permits. Note, nonblocking count can be wrong if client mixes
+     * non-blocking and blocking sends. We don't expect it to be frequent.
+     * We also implement a (fairly long) timeout that, in practice, we
+     * expect to never be needed. It's there to protect against unexpected
+     * problems, which will probably indicate bugs.
+     */
+    private synchronized boolean shouldResumeSending() {
+        if (m_nonblockingOutCount > 0) {
+            --m_nonblockingOutCount;
+        }
+        if (m_needResume && (m_nonblockingOutCount <= m_nonblockingResumeLevel ||
+                             EstTime.currentTimeMillis() >= m_resumeWaitTimeout)) {
+            m_needResume = false;
+            m_resumeWaitTimeout = 0;
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -266,6 +313,41 @@ class RateLimiter {
         return timestampNanos;
     }
 
+    /**
+     * We're about to send a request for a non-blocking client;
+     * this method handles rate-limiting. Unlike the blocking case,
+     * this only supports a limit based on an outstanding transaction
+     * count. We try to acquire the semaphore, but never wait.
+     *
+     * @param callTimeNanos The time as measured when the call is made.
+     * @return The time as measured when the call returns, or -1 for no send permission.
+     */
+    long prepareToSendTransactionNonblocking(long callTimeNanos) {
+
+        // Rate-limiting mode not supported. The problem lies in
+        // having an efficient mechanism to determine when to resume.
+        if (m_doesAnyTuning) {
+            throw new IllegalStateException("Nonblocking not available with rate-limiting");
+        }
+
+        // Outstanding transaction count mode
+        boolean acquired = m_outstandingTxnsSemaphore.tryAcquire();
+        synchronized (this) {
+            if (!acquired) {
+                if (!m_needResume) {
+                    m_needResume = true;
+                    m_resumeWaitTimeout = EstTime.currentTimeMillis() +
+                                         (m_maxOutstandingTxns * RESUME_TIMEOUT_FACTOR);
+                }
+                return -1;
+            }
+            ++m_nonblockingOutCount;
+        }
+
+        // Can send now (no need to update timestamp)
+        return callTimeNanos;
+    }
+
     /*
      * Checks current transaction rate against the target limit, to determine
      * if a further send is now possible.  If so, updates the outstanding
@@ -280,7 +362,7 @@ class RateLimiter {
         ensureCurrentBlockIsKosher(timestamp);
         assert(timestamp - m_currentBlockTimestamp <= BLOCK_SIZE);
 
-        // Check current rate, but Skip calculations if we're going to
+        // Check current rate, but skip calculations if we're going to
         // ignore the result anyway
         if (ignoreBackpressure || checkRate(timestamp)) {
             ++m_currentBlockSendCount;

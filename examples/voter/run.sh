@@ -76,6 +76,11 @@ function client() {
     async-benchmark
 }
 
+# run the non-blocking version
+function nbclient() {
+    nonblocking-benchmark
+}
+
 # Asynchronous benchmark sample
 # Use this target for argument help
 function async-benchmark-help() {
@@ -85,10 +90,22 @@ function async-benchmark-help() {
 
 # latencyreport: default is OFF
 # ratelimit: must be a reasonable value if lantencyreport is ON
-# Disable the comments to get latency report
 function async-benchmark() {
     jars-ifneeded
     java -classpath voter-client.jar:$CLIENTCLASSPATH voter.AsyncBenchmark \
+        --displayinterval=5 \
+        --warmup=5 \
+        --duration=120 \
+        --servers=$SERVERS \
+        --contestants=6 \
+        --maxvotes=2
+}
+
+# latencyreport: default is OFF
+# ratelimit: must be a reasonable value if latencyreport is ON
+function nonblocking-benchmark() {
+    jars-ifneeded
+    java -classpath voter-client.jar:$CLIENTCLASSPATH voter.NonblockingBenchmark \
         --displayinterval=5 \
         --warmup=5 \
         --duration=120 \

@@ -420,11 +420,16 @@ class Distributer {
 
     /**
      * Node connection - represents a single connection to a VoltDB cluster.
-     * Manages addition of work queues representing procedure calls.
+     * Manages addition of work queues representing procedure calls. There are
+     * two variants:
      *
-     * A createWork call may block in the rate limiter awaiting permission
-     * to send, based on either a simple outstanding transaction count, or
-     * else consideration of the transaction send rate.
+     * createWork - the 'normal' case. The request may block in the rate limiter
+     * awaiting permission to send, based on either a simple outstanding transaction
+     * count, or else consideration of the transaction send rate.
+     *
+     * createWorkNonBlocking - similar, but will never block; instead returns a
+     * true/false status to the caller, indicating whether work was accepted into
+     * the queue, or not.
      *
      * Backpressure:
      *
@@ -432,6 +437,10 @@ class Distributer {
      * gets too large, or TCP cannot accept more data, the distributer is notified
      * of backpressure starting. When the length drops down again the distributer
      * is notified of backpressure ending.
+     *
+     * In non-blocking mode, refusal by the rate limiter to accept more work is
+     * also considered as backpressure. The rate limiter will eventually give
+     * the distributer a callback when queueing can be resumed.
      */
     private class NodeConnection extends VoltProtocolHandler implements org.voltcore.network.QueueMonitor {
         private final AtomicInteger m_callbacksToInvoke = new AtomicInteger(0);
@@ -439,6 +448,7 @@ class Distributer {
         private final NonBlockingHashMap<String, ClientStats> m_stats = new NonBlockingHashMap<>();
         private Connection m_connection;
         private volatile boolean m_isConnected = true;
+        private boolean m_nonblockingInitDone = false;
 
         volatile long m_lastResponseTimeNanos = System.nanoTime();
         boolean m_outstandingPing = false;
@@ -477,6 +487,57 @@ class Distributer {
                 return;
             }
 
+            // Now join common code to enqueue buffer, schedule timeout, etc.
+            createWorkCommon(nowNanos, handle, name, buffer, callback, ignoreBackpressure,
+                             timeoutNanos, afterRateLimitNanos);
+        }
+
+        /*
+         * Create work, never blocking in rate limiter.
+         */
+        public boolean createWorkNonblocking(final long nowNanos, long handle, String name, ByteBuffer buffer,
+                                             ProcedureCallback callback, long timeoutNanos) {
+            assert(callback != null);
+            if (timeoutNanos == Distributer.USE_DEFAULT_CLIENT_TIMEOUT) {
+                timeoutNanos = m_procedureCallTimeoutNanos;
+            }
+
+            // First time through, do any one-time setup
+            synchronized (this) {
+                if (!m_nonblockingInitDone) {
+                    m_rateLimiter.setNonblockingResumeHook(offBackPressure());
+                    m_nonblockingInitDone = true;
+                }
+            }
+
+            // Check rate limiting and max outstanding related backpressure. Does not
+            // block. Returns -1 instead of a timestamp if we would block. We need to sync
+            // on the distributer so that reporting backpressure on, and subsequent removal
+            // of backpressure by the rate limiter, occur in the right order.
+            long afterRateLimitNanos;
+            synchronized (Distributer.this) {
+                afterRateLimitNanos = m_rateLimiter.prepareToSendTransactionNonblocking(nowNanos);
+                if (afterRateLimitNanos < 0) {
+                    for (ClientStatusListenerExt s : m_listeners) {
+                        s.backpressure(true);
+                    }
+                    return false; // would block
+                }
+            }
+
+            // Now join common code to enqueue buffer, schedule timeout, etc.
+            createWorkCommon(nowNanos, handle, name, buffer, callback, false,
+                             timeoutNanos, afterRateLimitNanos);
+            return true;
+        }
+
+        /*
+         * Common tail for the two 'create work' entry points.
+         * Cannot fail to enqueue the transaction,
+         */
+        private void createWorkCommon(final long nowNanos, long handle, String name, ByteBuffer buffer,
+                                      ProcedureCallback callback, boolean ignoreBackpressure,
+                                      final long timeoutNanos, final long afterRateLimitNanos) {
             // Drain needs to know when all callbacks have been invoked
             final int callbacksToInvoke = m_callbacksToInvoke.incrementAndGet();
             assert(callbacksToInvoke >= 0);
@@ -906,7 +967,7 @@ class Distributer {
          * Called during port setup to create a runnable callback
          * which will eventually be called from the write stream.
          * Callback does nothing; backpressure is reported to client
-         * from 'next' call to queue.
+         * from 'next' call to queue/queueNonblocking.
          */
         @Override
         public Runnable onBackPressure() {
@@ -1219,6 +1280,44 @@ class Distributer {
             createConnectionsUponTopologyChange();
         }
         return true;
+  }
+
+    boolean queueNonblocking(ProcedureInvocation invocation,
+                             ProcedureCallback cb,
+                             final long nowNanos,
+                             final long timeoutNanos) throws NoConnectionsException {
+        assert(invocation != null);
+        assert(cb != null);
+        if (m_shutdown.get()) {
+            return false;
+        }
+
+        CxnStatsData statsData = new CxnStatsData();
+        NodeConnection cxn = findCxnForQueue(invocation, false, statsData);
+        if (cxn == null) {
+            if (m_topologyChangeAware) {
+                createConnectionsUponTopologyChange();
+            }
+            return false; // backpressured
+        }
+
+        ByteBuffer buf = null;
+        try {
+            buf = serializeSPI(invocation);
+        } catch (Exception e) {
+            Throwables.propagate(e);
+        }
+
+        boolean queued = cxn.createWorkNonblocking(nowNanos, invocation.getHandle(), invocation.getProcName(),
+                                                   buf, cb, timeoutNanos);
+        if (queued) {
+            updateAffinityStats(statsData);
+        }
+
+        if (m_topologyChangeAware) {
+            createConnectionsUponTopologyChange();
+        }
+        return queued;
     }
 
     /**
@@ -1365,6 +1464,8 @@ class Distributer {
             m_timeoutReaperHandle.cancel(true);
             m_ex.shutdownNow();
         } else {
+            // stop callbacks if we were in non-blocking mode
+            m_rateLimiter.setNonblockingResumeHook(null);
             // stop the old proc call reaper
             m_timeoutReaperHandle.cancel(false);
             m_ex.shutdown();

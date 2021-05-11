@@ -97,9 +97,11 @@ public interface Client {
      * <p>Asynchronously invoke a replicated procedure, by providing a callback that will be invoked by the single
      * thread backing the client instance when the procedure invocation receives a response.
      * See the {@link Client} class documentation for information on the negative performance impact of slow or
-     * blocking callbacks. If there is backpressure
-     * this call will block until the invocation is queued. If configureBlocking(false) is invoked
-     * then it will return immediately. Check the return value to determine if queueing actually took place.</p>
+     * blocking callbacks. </p>
+     *
+     * <p>If there is backpressure this call will block until the invocation is queued. If configureNonblockingAsync()
+     * has been called, then it will return immediately. Check the return value to determine if queueing actually
+     * took place.</p>
      *
      * @param callback {@link ProcedureCallback} that will be invoked with procedure results.
      * @param procName class name (not qualified by package) of the procedure to execute.
@@ -134,9 +136,11 @@ public interface Client {
      * <p>Asynchronously invoke a replicated procedure with timeout, by providing a callback that will be invoked by
      * the single thread backing the client instance when the procedure invocation receives a response.
      * See the {@link Client} class documentation for information on the negative performance impact of slow or
-     * blocking callbacks. If there is backpressure
-     * this call will block until the invocation is queued. If configureBlocking(false) is invoked
-     * then it will return immediately. Check the return value to determine if queueing actually took place.</p>
+     * blocking callbacks.</p>
+     *
+     * <p>If there is backpressure this call will block until the invocation is queued. If configureNonblockingAsync()
+     * has been called, then it will return immediately. Check the return value to determine if queueing actually
+     * took place.</p>
      *
      * <p>WARNING: Use of a queryTimeout value that is greater than the global timeout value for your VoltDB configuration
      * will temporarily override that safeguard. Currently, non-privileged users (requiring only SQLREAD permissions)
@@ -277,8 +281,8 @@ public interface Client {
      * <p>Blocks the current thread until there is no more backpressure or there are no more connections
      * to the database</p>
      *
+     * @deprecated This method is untested and has questionable utility.
      * @throws InterruptedException if this blocking call is interrupted.
-     * @deprecated The non-blocking feature set is untested and has questionable utility. If it is something you need contact us.
      */
     @Deprecated
     public void backpressureBarrier() throws InterruptedException;
@@ -312,26 +316,19 @@ public interface Client {
 
     /**
      * <p>The default behavior for queueing of asynchronous procedure invocations is to block until
-     * it is possible to queue the invocation. If blocking is set to false, an async callProcedure
-     * will always return immediately if it is not possible to queue the procedure invocation due
-     * to backpressure. There is no effect on the synchronous variants of callProcedure.</p>
+     * it is possible to queue the invocation. If this method has been called, then an async
+     * callProcedure will return immediately if it is not possible to queue the procedure
+     * invocation due to backpressure. There is no effect on the synchronous variants of
+     * callProcedure.</p>
      *
-     * @param blocking Whether you want procedure calls to block on backpressure.
-     * @deprecated The non-blocking feature set is untested and has questionable utility. If it is something you need contact us.
-     */
-    @Deprecated
-    public void configureBlocking(boolean blocking);
-
-    /**
-     * <p>Will {@link #callProcedure(ProcedureCallback, String, Object...)} block
-     * if an async procedure invocation could not be queued due to backpressure?</p>
+     * <p>Performance is sometimes improved if the callProcedure is permitted to block
+     * for a short while, say a few hundred microseconds, to ride out a short blip in
+     * backpressure.</p>
      *
-     * @return true if {@link #callProcedure(ProcedureCallback, String, Object...)} will
-     * block until backpressure ceases and false otherwise.
-     * @deprecated The non-blocking feature set is untested and has questionable utility. If it is something you need contact us.
+     * @param blockingTimeout limit on blocking time, in nanoseconds; zero
+     *        if immediate return is desired.
      */
-    @Deprecated
-    public boolean blocking();
+    public void configureNonblockingAsync(long blockingTimeout);
 
     /**
      * <p>Get the instantaneous values of the rate limiting values for this client.</p>
