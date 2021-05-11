@@ -315,12 +315,19 @@ public class ClientConfig {
     }
 
     /**
-     * <p>Attempts to connect to all nodes in the cluster</p>
+     * <p>Configures the client so that it attempts to connect to all nodes in
+     * the cluster as they are discovered, and will reconnect if those connections fail.</p>
+     *
+     * If the first connection attempt fails, then retries are made with
+     * a fixed 10-second interval.
+     *
      * <p>Defaults to false.</p>
+     *
      * @param enabled Enable or disable the topology awareness feature.
      */
     public void setTopologyChangeAware(boolean enabled) {
         m_topologyChangeAware = enabled;
+        m_reconnectOnConnectionLoss |= enabled;
     }
 
     /**
@@ -337,7 +344,16 @@ public class ClientConfig {
     }
 
     /**
-     * <p>Attempts to reconnect to a node with retry after connection loss. See the {@link ReconnectStatusListener}.</p>
+     * <p>Attempts to automatically reconnect to a node after connection loss,
+     * with retry until successful. The interval between retries is subject
+     * to exponential backoff between user-supplied limits.
+     * See {@link #setInitialConnectionRetryInterval}
+     * and {@link #setMaxConnectionRetryInterval}.
+     * </p>
+     *
+     * <p>Topology-change-aware clients automatically attempt to reconnect
+     * failed connections, regardless of whether enabled by this method.
+     * See {@link #setTopologyChangeAware}.</p>
      *
      * @param on Enable or disable the reconnection feature. Default is off.
      */
@@ -346,7 +362,10 @@ public class ClientConfig {
     }
 
     /**
-     * <p>Set the initial connection retry interval. Only takes effect if {@link #m_reconnectOnConnectionLoss} is turned on.</p>
+     * <p>Set the initial connection retry interval for automatic reconnection.
+     * This is the delay between the first and second reconnect attempts.
+     * Only has an effect if reconnection on connection loss is enabled.
+     * </p>
      *
      * @param ms initial connection retry interval in milliseconds.
      */
@@ -355,7 +374,11 @@ public class ClientConfig {
     }
 
     /**
-     * <p>Set the max connection retry interval. Only takes effect if {@link #m_reconnectOnConnectionLoss} is turned on.</p>
+     * <p>Set the maximum connection retry interval. After each reconnection
+     * failure, the interval before the next retry is doubled, but will never
+     * exceed this maximum.
+     * Only has an effect if reconnection on connection loss is enabled.
+     * </p>
      *
      * @param ms max connection retry interval in milliseconds.
      */

@@ -455,8 +455,13 @@ public final class ClientImpl implements Client {
     private final boolean internalAsyncCallProcedure(ProcedureCallback callback,
                                                      long clientTimeoutNanos,
                                                      ProcedureInvocation invocation) throws IOException {
-        assert(!m_isShutdown);
-        assert(callback != null);
+        if (m_isShutdown) {
+            throw new NoConnectionsException("Client instance is shut down");
+        }
+
+        if (callback == null) {
+            throw new IllegalArgumentException("Callback required for async procedure call");
+        }
 
         final long nowNanos = System.nanoTime();
 
@@ -830,6 +835,8 @@ public final class ClientImpl implements Client {
                 } catch (Exception e) {
                     notifyAutoConnectFailure(null, AutoConnectionStatus.UNABLE_TO_QUERY_TOPOLOGY);
                 }
+            } else if (m_isShutdown) {
+                notifyAutoConnectFailure(null, AutoConnectionStatus.UNABLE_TO_CONNECT);
             } else if (first) {
                 m_ex.schedule(new FirstConnectionTask(this, connectionTaskCount), CONNECTION_RETRY_DELAY_SEC, TimeUnit.SECONDS);
             } else if (connectionTaskCount.get() < 2) { // TODO: why 2? current task has decremented count, so count is only count of queued
