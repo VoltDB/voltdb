@@ -102,7 +102,7 @@ public class TestSnapshotConverter extends JUnit4LocalClusterTest
         results = client.callProcedure("@SnapshotSave", snapshotDir.getPath(), nonce, 1).getResults();
 
         System.out.println(results[0]);
-        results = client.callProcedure("@SnapshotStatus").getResults();
+        results = client.callProcedure("@Statistics", "SnapshotStatus", 0).getResults();
 
         System.out.println(results[0]);
         // better be two rows

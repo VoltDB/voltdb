@@ -180,7 +180,7 @@ public class TestCatalogUpdateDuringSnapshot extends JUnit4LocalClusterTest {
     private void waitForSnapshotToComplete() throws Exception {
         int attempt = 0;
         do {
-            VoltTable table = m_client.callProcedure("@SnapshotStatus").getResults()[0];
+            VoltTable table = m_client.callProcedure("@Statistics", "SnapshotStatus", 0).getResults()[0];
             boolean completed = true;
             while (table.advanceRow()) {
                 if (table.getLong("END_TIME") == 0) {

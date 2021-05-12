@@ -360,11 +360,6 @@ public class SystemProcedureCatalog {
                         Initiator.MULTI_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
                         false, true,false, Durability.NOT_DURABLE,
                         false, true, Restartability.NOT_APPLICABLE ));
-        builder.put("@SnapshotStatus",
-                new Config("org.voltdb.sysprocs.SnapshotStatus",
-                        Initiator.MULTI_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,
-                        false, false, true, Durability.NOT_APPLICABLE,
-                        false, true, Restartability.NOT_APPLICABLE));
         builder.put("@SnapshotScan",
                 new Config("org.voltdb.sysprocs.SnapshotScan",
                         Initiator.MULTI_PARTITION, Mutable.READ_WRITE, 0, VoltType.INVALID,

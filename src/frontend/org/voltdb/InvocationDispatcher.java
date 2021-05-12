@@ -450,13 +450,6 @@ public final class InvocationDispatcher {
                 m_snapshotDaemon.requestUserSnapshot(task, ccxn);
                 return null;
             }
-            else if ("@SnapshotStatus".equals(procName)) {
-                // SnapshotStatus is really through @Statistics now, but preserve the
-                // legacy calling mechanism
-                Object[] params = new Object[] { "SNAPSHOTSTATUS" };
-                task.setParams(params);
-                return dispatchStatistics(OpsSelector.STATISTICS, task, ccxn);
-            }
             else if ("@SnapshotScan".equals(procName)) {
                 return dispatchStatistics(OpsSelector.SNAPSHOTSCAN, task, ccxn);
             }

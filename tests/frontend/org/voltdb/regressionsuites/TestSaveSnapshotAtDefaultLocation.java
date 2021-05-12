@@ -49,7 +49,7 @@ public class TestSaveSnapshotAtDefaultLocation extends RegressionSuite {
 
     //
     // Also does some basic smoke tests
-    // of @SnapshotStatus, @SnapshotScan and @SnapshotDelete
+    // of @SnapshotScan and @SnapshotDelete
     //
     public void testSnapshotSaveForBackup() throws Exception
     {

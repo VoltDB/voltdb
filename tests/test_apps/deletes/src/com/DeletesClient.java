@@ -511,7 +511,7 @@ public class DeletesClient
         VoltTable[] results = null;
         try
         {
-            results = client.callProcedure("@SnapshotStatus").getResults();
+            results = client.callProcedure("@Statistics", "SnapshotStatus", 0).getResults();
         }
         catch (NoConnectionsException e1)
         {

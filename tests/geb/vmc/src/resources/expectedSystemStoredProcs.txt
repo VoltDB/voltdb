@@ -14,7 +14,6 @@
 @SnapshotSave
 @SnapshotSave
 @SnapshotScan
-@SnapshotStatus
 @Statistics
 @SystemCatalog
 @SystemInformation

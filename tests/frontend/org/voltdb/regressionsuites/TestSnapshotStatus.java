@@ -54,7 +54,7 @@ public class TestSnapshotStatus extends SaveRestoreBase {
         System.out.println(results[0]);
         // better be four rows, one for each execution site, in the blocking save results:
         assertEquals(4, results[0].getRowCount());
-        results = client.callProcedure("@SnapshotStatus").getResults();
+        results = client.callProcedure("@Statistics", "SnapshotStatus", 0).getResults();
         System.out.println(results[0]);
         // better be six rows, one for each table at each node, in the status results:
         assertEquals(6 + countSnapshotingSystemTables(), results[0].getRowCount());
@@ -83,7 +83,7 @@ public class TestSnapshotStatus extends SaveRestoreBase {
 
         System.out.println(results[0]);
         try {
-            results = client.callProcedure("@SnapshotStatus").getResults();
+            results = client.callProcedure("@Statistics", "SnapshotStatus", 0).getResults();
         } catch (NoConnectionsException e) {
             e.printStackTrace();
         } catch (Exception ex) {

@@ -95,7 +95,6 @@ class VoltQueryClient(cmd.Cmd):
         self.snapshotrestore = VoltProcedure(self.fs, "@SnapshotRestore",
                                              [FastSerializer.VOLTTYPE_STRING,
                                               FastSerializer.VOLTTYPE_STRING])
-        self.snapshotstatus = VoltProcedure(self.fs, "@SnapshotStatus")
 
         self.systemcatalog = VoltProcedure(self.fs, "@SystemCatalog",
                                                [FastSerializer.VOLTTYPE_STRING])
@@ -319,19 +318,6 @@ Get the statistics:
     def help_snapshotrestore(self):
         self.safe_print("Restore a snapshot:")
         self.safe_print("\tsnapshotrestore directory nonce")
-
-    def do_snapshotstatus(self, command):
-        if self.fs == None:
-            return
-
-        self.safe_print("Getting snapshot status")
-        self.response = self.__safe_call(self.snapshotstatus,
-                                         timeout = self.__timeout)
-        self.safe_print(self.response)
-
-    def help_snapshotstatus(self):
-        self.safe_print("Get snapshot status")
-        self.safe_print("\tsnapshotstatus")
 
     def do_syscatalog(self, command):
         if self.fs == None:

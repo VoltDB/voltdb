@@ -1287,8 +1287,6 @@ public class SQLCommand {
                 ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<>()).build());
         Procedures.put("@Promote",
                 ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<>()).build());
-        Procedures.put("@SnapshotStatus",
-                ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<>()).build());
         Procedures.put("@Explain",
                 ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
         Procedures.put("@ExplainProc",

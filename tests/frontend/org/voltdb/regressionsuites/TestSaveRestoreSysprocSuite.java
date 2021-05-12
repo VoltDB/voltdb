@@ -1703,7 +1703,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
     //
     // Also does some basic smoke tests
-    // of @SnapshotStatus, @SnapshotScan and @SnapshotDelete
+    // of @Statistics SnapshotStatus, @SnapshotScan and @SnapshotDelete
     //
     @Test
     @Flaky(description="TestSaveRestoreSysprocSuite.testSnapshotSave, for sub-class TestReplicatedSaveRestoreSysprocSuite")
@@ -2509,7 +2509,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
         validateSnapshot(false, TESTNONCE);
 
-        results = client.callProcedure("@SnapshotStatus").getResults();
+        results = client.callProcedure("@Statistics", "SnapshotStatus", 0).getResults();
         boolean hasFailure = false;
         while (results[0].advanceRow())
         {
@@ -3811,7 +3811,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
                 client.close();
             }
 
-            // Connect to each host and check @SnapshotStatus.
+            // Connect to each host and check @Statistics SnapshotStatus.
             // Only one host should say it saved the replicated table we're watching.
             Set<Long> hostIds = new HashSet<>();
             for (int iclient = 0; iclient < host_count; iclient++) {
@@ -3852,8 +3852,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
             String result, Integer rowCount)
             throws NoConnectionsException, IOException, ProcCallException {
 
-        // Execute @SnapshotStatus to get raw results.
-        VoltTable statusResults[] = client.callProcedure("@SnapshotStatus").getResults();
+        // Execute @Statistics SnapshotStatus to get raw results.
+        VoltTable statusResults[] = client.callProcedure("@Statistics", "SnapshotStatus", 0).getResults();
         assertNotNull(statusResults);
         assertEquals( 1, statusResults.length);
         assertEquals( 15, statusResults[0].getColumnCount());
