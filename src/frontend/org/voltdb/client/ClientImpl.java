@@ -378,6 +378,9 @@ public final class ClientImpl implements Client {
      * @param unit TimeUnit of procedure timeout
      * @param parameters vararg list of procedure's parameter values.
      * @return True if the procedure was queued and false otherwise
+     *
+     * If the request was not queued, then the callback will not have been
+     * called with any ClientResponse.
      */
     public boolean callProcedureWithClientTimeout(ProcedureCallback callback,
                                                   int batchTimeout,
@@ -408,7 +411,7 @@ public final class ClientImpl implements Client {
     /**
      * Implementation of synchronous procedure call.
      *
-     * @param clientTimeoutNanos timeout on this query
+     * @param clientTimeoutNanos timeout on this query (0 for default)
      * @param invocation the procedure to call
      */
     private final ClientResponse internalSyncCallProcedure(long clientTimeoutNanos,
@@ -416,7 +419,7 @@ public final class ClientImpl implements Client {
         throws ProcCallException, IOException {
 
         if (m_isShutdown) {
-            throw new NoConnectionsException("Client instance is shutdown");
+            throw new NoConnectionsException("Client is shut down");
         }
 
         if (m_blessedThreadIds.contains(Thread.currentThread().getId())) {
@@ -424,15 +427,16 @@ public final class ClientImpl implements Client {
                     " without deadlocking the client library");
         }
 
+        ClientResponse resp = null;
         SyncCallbackLight cb = new SyncCallbackLight();
-        boolean success = internalAsyncCallProcedure(cb, clientTimeoutNanos, false/*blocking*/, invocation);
-        if (!success) {
-            final ClientResponseImpl r = new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE,
-                                                                ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
-                                                                "",
-                                                                new VoltTable[0],
-                                                                "Unable to queue client request.");
-            throw new ProcCallException(r);
+        boolean queued = internalAsyncCallProcedure(cb, clientTimeoutNanos, false/*blocking*/, invocation);
+        if (!queued) { // request was not sent, so graceful failure, not request timed out
+             resp = new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE,
+                                           ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
+                                           "",
+                                           new VoltTable[0],
+                                           "Procedure call not queued: timed out waiting for host connection");
+             throw new ProcCallException(resp);
         }
 
         try {
@@ -440,30 +444,35 @@ public final class ClientImpl implements Client {
         } catch (final InterruptedException e) {
             throw new InterruptedIOException("Interrupted while waiting for response");
         }
-        if (cb.getResponse().getStatus() != ClientResponse.SUCCESS) {
-            throw new ProcCallException(cb.getResponse());
+        resp = cb.getResponse();
+
+        if (resp.getStatus() != ClientResponse.SUCCESS) {
+            throw new ProcCallException(resp);
         }
-        return cb.getResponse();
+        return resp;
     }
 
     /**
      * Implementation of asynchronous procedure call.
      *
      * @param callback completion callback
-     * @param clientTimeoutNanos timeout on this query
+     * @param clientTimeoutNanos timeout on this query (0 for default)
      * @param nonblockingAsync true iff async nonblocking request
      * @param invocation the procedure to call
      * @returns true iff request was queued
      *
      * The non-blocking mode can, at the client's request, block for
      * a very short time hoping to ride out a short blip in backpressure.
+     *
+     * If this method returns 'false' then the callback has definitely
+     * not been called with a ClientResponse.
      */
     private final boolean internalAsyncCallProcedure(ProcedureCallback callback,
                                                      long clientTimeoutNanos,
                                                      boolean nonblockingAsync,
                                                      ProcedureInvocation invocation) throws IOException {
         if (m_isShutdown) {
-            throw new NoConnectionsException("Client instance is shut down");
+            throw new NoConnectionsException("Client is shut down");
         }
 
         if (callback == null) {
@@ -507,24 +516,15 @@ public final class ClientImpl implements Client {
                 m_distributer.getProcedureTimeoutNanos() :
                 clientTimeoutNanos;
 
+            boolean bp = true;
             try {
-                if (backpressureBarrier(nowNanos, timeout - delta)) {
-                    ClientResponse response = new ClientResponseImpl(ClientResponse.CONNECTION_TIMEOUT,
-                                                                     ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
-                                                                     "",
-                                                                     new VoltTable[0],
-                                                                     String.format("No response received in the allotted time (set to %d ms).",
-                                                                                   TimeUnit.NANOSECONDS.toMillis(clientTimeoutNanos)));
-                    try {
-                        callback.clientCallback(response);
-                    }
-                    catch (Throwable thrown) {
-                        m_distributer.uncaughtException(callback, response, thrown);
-                    }
-                }
+                bp = backpressureBarrier(nowNanos, timeout - delta);
             }
             catch (InterruptedException e) {
-                throw new InterruptedIOException("Interrupted while invoking procedure asynchronously");
+                // ignore
+            }
+            if (bp) { // proc call timeout expired and backpressure still present
+                return false;
             }
         }
 
@@ -1048,7 +1048,7 @@ public final class ClientImpl implements Client {
                                             " that wasn't constructed with a username and password specified");
         }
         if (m_isShutdown) {
-            throw new IOException("Client instance is shutdown");
+            throw new NoConnectionsException("Client is shut down");
         }
         m_distributer.createConnectionWithHashedCredentials(host, m_username, m_passwordHash, port, m_hashScheme);
     }

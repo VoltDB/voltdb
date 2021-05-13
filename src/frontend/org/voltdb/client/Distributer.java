@@ -1235,6 +1235,9 @@ class Distributer {
      * reconnection is in effect. This case is handled via backpressure, identically
      * to all connections being backpressured.
      *
+     * If this method returns 'false' then the callback has definitely not been
+     * called with a ClientResponse.
+     *
      * @param invocation
      * @param cb
      * @param ignoreBackpressure If true the invocation will be queued even if there is backpressure

@@ -103,6 +103,9 @@ public interface Client {
      * has been called, then it will return immediately. Check the return value to determine if queueing actually
      * took place.</p>
      *
+     * <p>A <code>false</code> return, meaning that the procedure call was not queued, implicitly indicates
+     * that no ClientResponse has been delivered to the callback.</p>
+     *
      * @param callback {@link ProcedureCallback} that will be invoked with procedure results.
      * @param procName class name (not qualified by package) of the procedure to execute.
      * @param parameters vararg list of procedure's parameter values.
@@ -141,6 +144,9 @@ public interface Client {
      * <p>If there is backpressure this call will block until the invocation is queued. If configureNonblockingAsync()
      * has been called, then it will return immediately. Check the return value to determine if queueing actually
      * took place.</p>
+     *
+     * <p>A <code>false</code> return, meaning that the procedure call was not queued, implicitly indicates
+     * that no ClientResponse has been delivered to the callback.</p>
      *
      * <p>WARNING: Use of a queryTimeout value that is greater than the global timeout value for your VoltDB configuration
      * will temporarily override that safeguard. Currently, non-privileged users (requiring only SQLREAD permissions)
