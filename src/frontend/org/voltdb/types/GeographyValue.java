@@ -423,7 +423,7 @@ public class GeographyValue {
      * (Assumes that the 4-byte length prefix for variable-length data has already been serialized.)
      *
      * @param output into which this object will be serialized
-     * @throws IOException
+     * @throws IOException if any I/O error occurs
      */
     public void serialize(DataOutput output) throws IOException {
         output.write(INCOMPLETE_ENCODING_FROM_JAVA);

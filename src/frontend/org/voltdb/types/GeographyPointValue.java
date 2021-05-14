@@ -218,7 +218,7 @@ public class GeographyPointValue {
      * Serialize this point to a {@link DataOutput}
      *
      * @param output to which this point will be serialized
-     * @throws IOException
+     * @throws IOException if any I/O error occurs
      */
     public void serialize(DataOutput output) throws IOException {
         output.writeDouble(getLongitude());
