@@ -109,7 +109,7 @@ public class ClientStatsContext {
      *
      * If the merged {@link ClientStats} has no recorded transactions
      * then we force the timestamps to the context's range, to avoid
-     * strange results from start time > end time
+     * strange results from the start time being after the end time.
      *
      * @return A {@link ClientStats} instance.
      */
