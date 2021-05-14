@@ -107,10 +107,19 @@ public class ClientStatsContext {
      * all connection ids. The {@link ClientStats} instance will
      * apply to the time period currently covered by the context.
      *
+     * If the merged {@link ClientStats} has no recorded transactions
+     * then we force the timestamps to the context's range, to avoid
+     * strange results from start time > end time
+     *
      * @return A {@link ClientStats} instance.
      */
     public ClientStats getStats() {
-        return ClientStats.merge(getStatsByConnection().values());
+        ClientStats cs = ClientStats.merge(getStatsByConnection().values());
+        if (cs.m_endTS == Long.MIN_VALUE) { // empty stats
+            cs.m_startTS = m_baselineTS;
+            cs.m_endTS = m_currentTS;
+        }
+        return cs;
     }
 
     /**
