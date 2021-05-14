@@ -68,6 +68,8 @@ public class ClientConfig {
     boolean m_topologyChangeAware = false;
     boolean m_enableSSL = false;
     String m_sslPropsFile = null;
+    boolean m_nonblocking = false;
+    long m_asyncBlockingTimeout = 0;
 
     //For unit testing. This should really be in Environment class we should assemble all such there.
     public static final boolean ENABLE_SSL_FOR_TEST = Boolean.valueOf(
@@ -287,6 +289,9 @@ public class ClientConfig {
             throw new IllegalArgumentException(
                     "Max TPS must be greater than 0, " + maxTxnsPerSecond + " was specified");
         }
+        if (m_nonblocking) {
+            throw new IllegalStateException("Cannot set limit on TPS with non-blocking async");
+        }
         m_maxTransactionsPerSecond = maxTxnsPerSecond;
     }
 
@@ -299,7 +304,37 @@ public class ClientConfig {
      * <p>See {@link #setAutoTuneTargetInternalLatency(int)}.</p>
      */
     public void enableAutoTune() {
+        if (m_nonblocking) {
+            throw new IllegalStateException("Cannot use auto-tuning with non-blocking async");
+        }
         m_autoTune = true;
+    }
+
+    /**
+     * <p>The default behavior for queueing of asynchronous procedure invocations is to block until
+     * it is possible to queue the invocation. If non-blocking async is configured, then an async
+     * callProcedure will return immediately if it is not possible to queue the procedure
+     * invocation due to backpressure. There is no effect on the synchronous variants of
+     * callProcedure.</p>
+     *
+     * <p>Performance is sometimes improved if the callProcedure is permitted to block
+     * for a short while, say a few hundred microseconds, to ride out a short blip in
+     * backpressure.</p>
+     *
+     * <p>Not supported if rate-limiting has been configured by setMaxTransactionsPerSecond.</p>
+     *
+     * @param blockingTimeout limit on blocking time, in nanoseconds; zero
+     *        if immediate return is desired.
+     */
+    public void setNonblockingAsync(long blockingTimeout) {
+        if (m_maxTransactionsPerSecond != Integer.MAX_VALUE) {
+            throw new IllegalStateException("Cannot set non-blocking with limit on TPS");
+        }
+        if (m_autoTune) {
+            throw new IllegalStateException("Cannot set non-blocking with autotuning");
+        }
+        m_nonblocking = true;
+        m_asyncBlockingTimeout = Math.max(0, blockingTimeout);
     }
 
     /**

@@ -194,6 +194,9 @@ public final class ClientImpl implements Client {
         }
 
         m_blessedThreadIds.addAll(m_distributer.getThreadIds());
+
+        m_nonblocking = config.m_nonblocking;
+        m_asyncBlockingTimeout = config.m_asyncBlockingTimeout;
     }
 
     /**
@@ -999,12 +1002,6 @@ public final class ClientImpl implements Client {
     /****************************************************
                         Implementation
      ****************************************************/
-
-    @Override
-    public void configureNonblockingAsync(long blockingTimeout) {
-        m_nonblocking = true;
-        m_asyncBlockingTimeout = Math.max(0, blockingTimeout);
-    }
 
     @Override
     public ClientStatsContext createStatsContext() {

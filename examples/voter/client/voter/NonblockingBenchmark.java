@@ -101,7 +101,6 @@ public class NonblockingBenchmark {
     long backpressureWaited = 0;
     long backpressureMaxWait = 0;
     long backpressureMinWait = Long.MAX_VALUE;
-    boolean nonBlocking = false;
 
     // communication between main thread and backpressure
     // notification (used for wait/notify)
@@ -171,13 +170,11 @@ public class NonblockingBenchmark {
 
         @Override
         public void backpressure(boolean status) {
-            if (nonBlocking) { // blocking: don't care about this
-                synchronized (backpressureEvent) {
-                    if (backpressureOn ^ status) {
-                        backpressureOn = status;
-                        if (!status) { // backpressure removed
-                            backpressureEvent.notify();
-                        }
+            synchronized (backpressureEvent) {
+                if (backpressureOn ^ status) {
+                    backpressureOn = status;
+                    if (!status) { // backpressure removed
+                        backpressureEvent.notify();
                     }
                 }
             }
@@ -212,6 +209,8 @@ public class NonblockingBenchmark {
 
         // Not effective in non-blocking mode
         // clientConfig.setMaxTransactionsPerSecond(config.ratelimit);
+
+        clientConfig.setNonblockingAsync(500_000);
 
         if (config.topologyaware) {
             clientConfig.setTopologyChangeAware(true);
@@ -452,9 +451,6 @@ public class NonblockingBenchmark {
         System.out.println(" Starting Benchmark");
         System.out.println(HORIZONTAL_RULE);
 
-        // for simplicity, blocking is enabled for warmup
-        nonBlocking = false;
-
         // Run the benchmark loop for the requested warmup time
         // The throughput may be throttled depending on client configuration
         System.out.println("Warming up...");
@@ -463,7 +459,9 @@ public class NonblockingBenchmark {
             // Get the next phone call
             PhoneCallGenerator.PhoneCall call = switchboard.receive();
 
-            // asynchronously call the "Vote" procedure
+            // Call the "Vote" procedure asynchronously for warmup
+            // ignoring backpressure events for simplicity (so some
+            // of these calls will be refused, that's ok)
             client.callProcedure(new NullCallback(),
                                  "Vote",
                                  call.phoneNumber,
@@ -479,9 +477,7 @@ public class NonblockingBenchmark {
         benchmarkStartTS = System.currentTimeMillis();
         schedulePeriodicStats();
 
-        // now set non-blocking mode (with 500 usec grace period)
-        client.configureNonblockingAsync(500_000);
-        nonBlocking = true;
+        // init counts for benchmark
         backpressureCount = 0;
         backpressureWaited = 0;
         backpressureMinWait = Long.MAX_VALUE;

@@ -99,9 +99,9 @@ public interface Client {
      * See the {@link Client} class documentation for information on the negative performance impact of slow or
      * blocking callbacks. </p>
      *
-     * <p>If there is backpressure this call will block until the invocation is queued. If configureNonblockingAsync()
-     * has been called, then it will return immediately. Check the return value to determine if queueing actually
-     * took place.</p>
+     * <p>If there is backpressure this call will block until the invocation is queued. If the client
+     * configuration used setNonblockingAsync(), then this call will return immediately. Check the
+     * return value to determine if queueing actually took place.</p>
      *
      * <p>A <code>false</code> return, meaning that the procedure call was not queued, implicitly indicates
      * that no ClientResponse has been delivered to the callback.</p>
@@ -141,9 +141,9 @@ public interface Client {
      * See the {@link Client} class documentation for information on the negative performance impact of slow or
      * blocking callbacks.</p>
      *
-     * <p>If there is backpressure this call will block until the invocation is queued. If configureNonblockingAsync()
-     * has been called, then it will return immediately. Check the return value to determine if queueing actually
-     * took place.</p>
+     * <p>If there is backpressure this call will block until the invocation is queued. If the client
+     * configuration used setNonblockingAsync(), then this call will return immediately. Check the
+     * return value to determine if queueing actually took place.</p>
      *
      * <p>A <code>false</code> return, meaning that the procedure call was not queued, implicitly indicates
      * that no ClientResponse has been delivered to the callback.</p>
@@ -319,22 +319,6 @@ public interface Client {
      * @return Volt server build string.
      */
     public String getBuildString();
-
-    /**
-     * <p>The default behavior for queueing of asynchronous procedure invocations is to block until
-     * it is possible to queue the invocation. If this method has been called, then an async
-     * callProcedure will return immediately if it is not possible to queue the procedure
-     * invocation due to backpressure. There is no effect on the synchronous variants of
-     * callProcedure.</p>
-     *
-     * <p>Performance is sometimes improved if the callProcedure is permitted to block
-     * for a short while, say a few hundred microseconds, to ride out a short blip in
-     * backpressure.</p>
-     *
-     * @param blockingTimeout limit on blocking time, in nanoseconds; zero
-     *        if immediate return is desired.
-     */
-    public void configureNonblockingAsync(long blockingTimeout);
 
     /**
      * <p>Get the instantaneous values of the rate limiting values for this client.</p>
