@@ -482,7 +482,7 @@ public final class ClientImpl implements Client {
             throw new IllegalArgumentException("Callback required for async procedure call");
         }
 
-        final long nowNanos = System.nanoTime();
+        final long startNanos = System.nanoTime();
 
         // Blessed threads (the ones that invoke callbacks) are not subject to backpressure
         // and nor do they support non-blocking operation
@@ -490,13 +490,13 @@ public final class ClientImpl implements Client {
 
         // Non-blocking mode
         if (nonblockingAsync && !isBlessed) {
-            boolean queued = m_distributer.queueNonblocking(invocation, callback, nowNanos, clientTimeoutNanos);
+            boolean queued = m_distributer.queueNonblocking(invocation, callback, startNanos, clientTimeoutNanos);
             if (!queued && m_asyncBlockingTimeout > 0) {
 
                 // Wait on backpressure, but not for very long
                 boolean bp = true;
                 try {
-                    bp = backpressureBarrier(nowNanos, m_asyncBlockingTimeout);
+                    bp = backpressureBarrier(startNanos, m_asyncBlockingTimeout);
                 }
                 catch (InterruptedException e) {
                     // ignore
@@ -504,24 +504,24 @@ public final class ClientImpl implements Client {
 
                 // If backpressure cleared, issue a single retry
                 if (!bp) {
-                    queued = m_distributer.queueNonblocking(invocation, callback, nowNanos, clientTimeoutNanos);
+                    queued = m_distributer.queueNonblocking(invocation, callback, startNanos, clientTimeoutNanos);
                 }
             }
             return queued;
         }
 
         // Blocking mode
-        while (!m_distributer.queue(invocation, callback, isBlessed, nowNanos, clientTimeoutNanos)) {
+        while (!m_distributer.queue(invocation, callback, isBlessed, startNanos, clientTimeoutNanos)) {
 
             // Wait on backpressure, honoring the timeout settings
-            final long delta = Math.max(1, System.nanoTime() - nowNanos);
+            final long delta = Math.max(1, System.nanoTime() - startNanos);
             final long timeout = clientTimeoutNanos == Distributer.USE_DEFAULT_CLIENT_TIMEOUT ?
                 m_distributer.getProcedureTimeoutNanos() :
                 clientTimeoutNanos;
 
             boolean bp = true;
             try {
-                bp = backpressureBarrier(nowNanos, timeout - delta);
+                bp = backpressureBarrier(startNanos, timeout - delta);
             }
             catch (InterruptedException e) {
                 // ignore
@@ -661,11 +661,15 @@ public final class ClientImpl implements Client {
      * Wait on backpressure with a timeout. Not part of public API, but exposed
      * for test code.
      *
+     * Return value is:
+     * false on no backpressure or pending shutdown
+     * true on timeout (thus backpressure stil in effect)
+     *
      * @param start time request processing started (nanoseconds since epoch), 0 for no timeout
-     * @param timeoutNanos initial timeout value, ignored if start is 0
-     * @return true on timeout, false otherwise (i.e., reflects last known state of backpressure)
+     * @param timeoutNanos timeout value, ignored if start is 0
+     * @return true on timeout, false otherwise
      */
-    boolean backpressureBarrier(final long start, long timeoutNanos) throws InterruptedException {
+    boolean backpressureBarrier(final long start, final long timeoutNanos) throws InterruptedException {
         if (m_isShutdown) {
             return false;
         }
@@ -673,41 +677,34 @@ public final class ClientImpl implements Client {
             throw new RuntimeException("Can't invoke backpressureBarrier from within the client callback thread " +
                     " without deadlocking the client library");
         }
-        if (m_backpressure) {
+
+        if (start == 0) {
+            // wait indefinitely.
             synchronized (m_backpressureLock) {
-                if (m_backpressure) {
-                    while (m_backpressure && !m_isShutdown) {
-                       if (start != 0) {
-                           if (timeoutNanos <= 0) {
-                               // timeout nano value is negative or zero, indicating it timed out.
-                               return true;
-                           }
-
-                            //Wait on the condition for the specified timeout remaining
-                            m_backpressureLock.wait(timeoutNanos / TimeUnit.MILLISECONDS.toNanos(1), (int)(timeoutNanos % TimeUnit.MILLISECONDS.toNanos(1)));
-
-                            //Condition is true, break and return false
-                            if (!m_backpressure) {
-                                break;
-                            }
-
-                            //Calculate whether the timeout should be triggered
-                            final long nowNanos = System.nanoTime();
-                            final long deltaNanos = Math.max(1, nowNanos - start);
-                            if (deltaNanos >= timeoutNanos) {
-                                return true;
-                            }
-
-                            //Reassigning timeout nanos with remainder of timeout
-                            timeoutNanos -= deltaNanos;
-                       } else {
-                           m_backpressureLock.wait();
-                       }
-                    }
+                while (m_backpressure && !m_isShutdown) {
+                    m_backpressureLock.wait();
                 }
+                return false;
             }
         }
-        return false;
+
+        else {
+            // wait with time limit.
+            // the trickery with Math.min ensures the remaining time ticks down
+            // even if the clock is not ticking upwards.
+            final long msToNs = TimeUnit.MILLISECONDS.toNanos(1);
+            synchronized (m_backpressureLock) {
+                long remainingTime = start + timeoutNanos - System.nanoTime();
+                while (m_backpressure && !m_isShutdown) {
+                    if (remainingTime <= 0) {
+                        return true;
+                    }
+                    m_backpressureLock.wait(remainingTime / msToNs, (int)(remainingTime % msToNs));
+                    remainingTime = Math.min(start + timeoutNanos - System.nanoTime(), remainingTime - 1);
+                }
+                return false;
+            }
+        }
     }
 
     /*

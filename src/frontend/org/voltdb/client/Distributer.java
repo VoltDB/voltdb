@@ -828,7 +828,7 @@ class Distributer {
         }
 
         /**
-         * Did the underlying connection report back pressure?
+         * Did the underlying connection report backpressure?
          */
         public boolean hadBackPressure() {
             return m_connection.writeStream().hadBackPressure();
@@ -942,7 +942,8 @@ class Distributer {
         /*
          * Called during port setup to create a runnable callback
          * which will eventually be called from the write stream.
-         * Callback immediately reports end of back pressure to client.
+         * Callback immediately reports end of backpressure to
+         * all client listeners.
          */
         @Override
         public Runnable offBackPressure() {
@@ -964,10 +965,10 @@ class Distributer {
         }
 
         /*
-         * Called during port setup to create a runnable callback
-         * which will eventually be called from the write stream.
-         * Callback does nothing; backpressure is reported to client
-         * from 'next' call to queue/queueNonblocking.
+         * Called during port setup to create a runnable callback which will
+         * eventually be called from the write stream. We don't have such a
+         * callback. Backpressure is instead reported to client from the
+         * 'next' call to queue/queueNonblocking.
          */
         @Override
         public Runnable onBackPressure() {
@@ -1362,7 +1363,7 @@ class Distributer {
         NodeConnection cxn = null;
         statsData.stats = null;
 
-        // Check if the master for the partition is known. No back pressure check, to ensure correct
+        // Check if the master for the partition is known. No backpressure check, to ensure correct
         // routing, but backpressure will be managed anyways. This is where we guess partition based
         // on client affinity and known topology (hashinator initialized).
         if (m_hashinator != null) {
