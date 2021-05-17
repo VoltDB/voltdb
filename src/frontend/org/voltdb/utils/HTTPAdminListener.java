@@ -233,7 +233,10 @@ public class HTTPAdminListener {
             }
 
             ServletContextHandler rootContext = new ServletContextHandler(ServletContextHandler.SESSIONS);
+            
             ServletHandler servlets = rootContext.getServletHandler();
+            // make the JSESSIONID context-specific by adding port number
+            rootContext.getSessionHandler().getSessionCookieConfig().setName("JSESSIONID_" + Integer.toString(port));
             // the default is 200k which well short of out 2M row size limit
             rootContext.setMaxFormContentSize(HTTPClientInterface.MAX_QUERY_PARAM_SIZE);
             // close another attack vector where potentially one may send a large number of keys
