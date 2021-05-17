@@ -79,22 +79,26 @@ function server() {
     jars-ifneeded
     echo "Starting the VoltDB server."
     echo "Remember -- the Kafka topic must exist before launching this test."
-    echo "To perform this action manually, use the command line: "
+    echo "To perform this action manually, use the command lines: "
     echo
-    echo "voltdb create -d deployment.xml -l $LICENSE -H $HOST"
+    echo "voltdb init -C deployment.xml -l $LICENSE"
+    echo "voltdb start -H $HOST"
     echo
-    voltdb create -d deployment.xml -l $LICENSE -H $HOST
+    voltdb init -C deployment.xml -l $LICENSE
+    voltdb start -H $HOST
 }
 
 #kafka importer
 function kafka() {
     jars-ifneeded
     echo "Starting the VoltDB server."
-    echo "To perform this action manually, use the command line: "
+    echo "To perform this action manually, use the command lines: "
     echo
-    echo "voltdb create -d deployment-kafka.xml -l $LICENSE -H $HOST"
+    echo "voltdb init -C deployment-kafka.xml -l $LICENSE"
+    echo "voltdb start -H $HOST"
     echo
-    voltdb create -d deployment-kafka.xml -l $LICENSE -H $HOST
+    voltdb init -C deployment-kafka.xml -l $LICENSE
+    voltdb start -H $HOST
 }
 
 # load schema and procedures
@@ -120,7 +124,8 @@ function wait_for_startup() {
 function background_server_andload() {
     jars-ifneeded
     # run the server in the background
-    voltdb create -B -d deployment.xml -l $LICENSE -H $HOST > nohup.log 2>&1 &
+    voltdb init -C deployment.xml -l $LICENSE > nohup.log 2>&1
+    voltdb start -B -H $HOST >> nohup.log 2>&1
     wait_for_startup
     init
 }

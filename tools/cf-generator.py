@@ -138,7 +138,8 @@ TEMPLATE = r"""
                                                                      "set -x\n",
                                                                      "cd ", { "Ref": "Example" },
                                                                      ";echo \"Starting VoltDB server\"\n",
-                                                                     "../../bin/voltdb create -B -H `hostname -I` -l ../../voltdb/license.xml -d /tmp/deployment.xml\n",
+                                                                     "../../bin/voltdb init -l ../../voltdb/license.xml -C /tmp/deployment.xml\n",
+                                                                     "../../bin/voltdb start -B -H `hostname -I`\n",
                                                                      "\n",
                                                                      "while true; do\n",
                                                                      "    sleep 1\n",
@@ -297,7 +298,8 @@ SERVER_TEMPLATE = r"""
                                                                      "sudo su - voltdb -c bash << EOF\n",
                                                                      "cd ", { "Ref": "Example" },
                                                                      ";echo \"Starting VoltDB server\"\n",
-                                                                     "../../bin/voltdb create -B -H ", { "Fn::GetAtt": [ "DBServer1", "PrivateIp" ]}, " -l ../../voltdb/license.xml -d /tmp/deployment.xml\n",
+                                                                     "../../bin/voltdb init -l ../../voltdb/license.xml -C /tmp/deployment.xml\n",
+                                                                     "../../bin/voltdb start -B -H ", { "Fn::GetAtt": [ "DBServer1", "PrivateIp" ]}, "\n",
                                                                      "EOF\n"
                                                                  ]]}}
             }

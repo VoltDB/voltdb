@@ -2105,7 +2105,7 @@ public class VoltCompiler {
                                         "upgrade is available in \"%s\".",
                                 versionFromCatalog, versionFromVoltDB, outputTextPath));
                         throw new IOException(String.format(
-                                "Catalog upgrade failed. You will need to recompile using voltdb compile."));
+                                "Catalog upgrade failed. You will need to recompile."));
                     }
                 }
             } catch (IOException ioe) { // Do nothing because this could come from the normal failure path
@@ -2122,7 +2122,7 @@ public class VoltCompiler {
                                 "upgrade is available in \"%s\".",
                         versionFromCatalog, versionFromVoltDB, outputTextPath));
                 throw new IOException(String.format(
-                        "Catalog upgrade failed. You will need to recompile using voltdb compile."));
+                        "Catalog upgrade failed. You will need to recompile."));
             } finally {
                 // Restore the original class loader
                 m_classLoader = originalClassLoader;

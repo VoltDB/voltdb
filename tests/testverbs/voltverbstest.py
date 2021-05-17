@@ -39,15 +39,16 @@ from optparse import OptionParser
 
 random.seed()
 
-# verbs contains verb to version (denote old cli version 1)
-volt_support_version = [1, 2]
+# verbs contains verb to version map.
+# version 2 is the 'new' cli (which is about 9 years old)
+# version 1 was the 'legacy' cli (totally removed in v11.0)
+volt_support_version = [2]
 
 # regular verbs only here. more-or-less, if the python
 # 'voltdb' commands does not run the actual voltdb server,
 # it won't work in this list. see volt_irregular_verbs.
 volt_verbs = {'init': 2,
               'start': 2}
-
 
 volt_verbs_mapping = {'check': 'check',
                       'collect': 'collect',
@@ -64,51 +65,38 @@ class Opt:
         self.datatype = datatype
         self.ver = ver
 
+# alphabetical order please
 
-# for oldcli
-admin = Opt('admin', 'adminport', str, 1)
-client = Opt('client', 'port', str, 1)
-externalinterface = Opt('externalinterface', 'externalinterface', str, 1)
-drpublic = Opt('drpublic', 'drpublic', str, 1)
-http = Opt('http', 'httpport', str, 1)
-internal = Opt('internal', 'internalport', str, 1)
-internalinterface = Opt('internalinterface', 'internalinterface', str, 1)
-publicinterface = Opt('publicinterface', 'publicinterface', str, 1)
-replication = Opt('replication', 'replicationport', str, 1)
-zookeeper = Opt('zookeeper', 'zkport', str, 1)
-deployment = Opt('deployment', 'deployment', str, 1)
-force = Opt('force', 'force', None, 1)
-placementgroup = Opt('placement-group', 'placementgroup', str, 1)
-host = Opt('host', 'host', str, 1)
-licensefile = Opt('license', 'license', str, 1)
-pause = Opt('pause', 'paused', None, 1)
-missing = Opt('missing', 'missing', str, 1)
-# 'replica' should be immediately after verb
-replica = Opt('replica', 'replica', None, 1)
-# 'blocking' is only for rejoin, does not have corresponding java optional
-# name, change verb 'live rejoin' to 'rejoin'
-blocking = Opt('blocking', '', None, 1)
-topicsport = Opt('topicsport', 'topicsHostPort', str, 1)
-topicspublic = Opt('topicspublic', 'topicspublic', str, 1)
-
-# for newcli only
-mesh = Opt('host', 'mesh', str, 2)
-config = Opt('config', 'deployment', str, 2)
-voltdbroot = Opt('dir', 'voltdbroot', str, 2)
-hostcount = Opt('count', 'hostcount', int, 2)
 add = Opt('add', 'enableadd', None, 2)
-out = Opt('out', 'file', str, 2)
-verbose = Opt('verbose', 'verbose', None, 2)
-output = Opt('output', 'file', str, 2)
-# Ddir = Opt('
-schema = Opt('schema', 'schema', str, 2)
+admin = Opt('admin', 'adminport', str, 2)
 classes = Opt('classes', 'classes', str, 2)
-
-prefix = Opt('prefix', 'prefix', str, 2)
-dryrun = Opt('dry-run', 'dry-run', None, 2)
-skipheapdump = Opt('skip-heap-dump', 'skip-heap-dump', None, 2)
+client = Opt('client', 'port', str, 2)
+config = Opt('config', 'deployment', str, 2)
 days = Opt('days', 'days', int, 2)
-
+drpublic = Opt('drpublic', 'drpublic', str, 2)
+dryrun = Opt('dry-run', 'dry-run', None, 2)
+externalinterface = Opt('externalinterface', 'externalinterface', str, 2)
+force = Opt('force', 'force', None, 2)
+hostcount = Opt('count', 'hostcount', int, 2)
+http = Opt('http', 'httpport', str, 2)
+internalinterface = Opt('internalinterface', 'internalinterface', str, 2)
+internal = Opt('internal', 'internalport', str, 2)
+licensefile = Opt('license', 'license', str, 2)
+mesh = Opt('host', 'mesh', str, 2)
+missing = Opt('missing', 'missing', str, 2)
+output = Opt('output', 'file', str, 2)
+pause = Opt('pause', 'paused', None, 2)
+placementgroup = Opt('placement-group', 'placementgroup', str, 2)
+prefix = Opt('prefix', 'prefix', str, 2)
+publicinterface = Opt('publicinterface', 'publicinterface', str, 2)
+replication = Opt('replication', 'replicationport', str, 2)
+schema = Opt('schema', 'schema', str, 2)
+skipheapdump = Opt('skip-heap-dump', 'skip-heap-dump', None, 2)
+topicsport = Opt('topicsport', 'topicsHostPort', str, 2)
+topicspublic = Opt('topicspublic', 'topicspublic', str, 2)
+verbose = Opt('verbose', 'verbose', None, 2)
+voltdbroot = Opt('dir', 'voltdbroot', str, 2)
+zookeeper = Opt('zookeeper', 'zkport', str, 2)
 
 # negative opt
 unknown = Opt('unknown', None, None, 0)
@@ -150,7 +138,6 @@ volt_opts = {'check': [],
                        licensefile,
                        missing,
                        pause,
-                       replica,
                        topicsport,
                        topicspublic],
              }
@@ -204,7 +191,10 @@ option_ignore = ['version', 'help', 'verbose', 'background', 'ignore', 'blocking
 volt_irregular_verbs = { "get": 2, }
 get = Opt("get", "get", str, 2)
 mask = Opt("mask", "mask", str, 2)
+irr_deployment = Opt('deployment', 'deployment', str, 2)
+irr_schema = Opt("schema", "schema", str, 2)
 irr_classes = Opt("classes", "classes", str, 2)
+irr_license = Opt("license", "license", str, 2)
 voltdbrootdir = Opt("--dir somedir", "getvoltdbroot somedir", str, 2)
 otheroot = Opt("otheroot", "getvoltdbroot otheroot", str, 2)
 defaultroot = Opt("", "getvoltdbroot voltdbroot",  str, 2)
@@ -215,7 +205,7 @@ defaultroot = Opt("", "getvoltdbroot voltdbroot",  str, 2)
 somefile = "somefile"
 out = Opt("--output "+somefile, "file"+" "+somefile, str, 2)
 verbs = [ get, ]
-objects = [ deployment, schema, irr_classes ]  # required
+objects = [ irr_deployment, irr_schema, irr_classes, irr_license ]  # required
 options = [ voltdbrootdir, out, "none", ]
 
 # TODO: add other irregular verbs

@@ -45,7 +45,8 @@ function clean() {
 
 # run the voltdb server locally
 function server() {
-    voltdb create -d deployment.xml -H $HOST
+    voltdb init -C deployment.xml
+    voltdb start -H $HOST
 }
 
 # run the client that drives the example

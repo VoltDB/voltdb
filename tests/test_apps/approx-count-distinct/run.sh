@@ -100,7 +100,8 @@ if (($? != 0)); then
     exit 1
 fi
 
-voltdb create &
+voltdb init
+voltdb start &
 wait_for_startup
 
 sqlcmd < ddl.sql

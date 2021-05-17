@@ -195,6 +195,7 @@ CREATE PROCEDURE Test AS SELECT ID, TM, VAR FROM P1 WHERE TM < ? AND ID > ?;
     f = open("/tmp/tempGenJavaSPTool/ddl.sql", "w")
     f.write(ddl)
     f.close()
+    # not sure what to do here. "voltdb compile" has not existed since 2017
     subprocess.check_call("voltdb compile ddl.sql".split())
     if not os.path.exists("catalog.jar"):
         print "cannot generate catalog.jar"

@@ -145,7 +145,7 @@ On each of the servers (voltserver1, voltserver2, voltserver3), run the followin
 
     # on each host
     cd $HOME/voltdb_instance
-    voltdb init --force --config=deployment.xml
+    voltdb init --force --config deployment.xml --license license.xml
 
 This will create a "voltdbroot" folder in the current directory (voltdb_instance) with subfolders for the persistent disk storage that will be used by the database.
 
@@ -156,12 +156,12 @@ On each of the servers (voltserver1, voltserver2, voltserver3), run the followin
 
     # on each host
     cd $HOME/voltdb_instance
-    voltdb start -B -l license.xml -H "voltserver1,voltserver2,voltserver3"
+    voltdb start -B -H "voltserver1,voltserver2,voltserver3"
 
 - The -B parameter will start the database as a background daemon, and redirect console outputs to the $HOME/.voltdb_server directory.
 - The -H parameter identifies all the hosts in the cluster that the node will connect to. Alternatively, you could just identify a subset of the hosts and use the -c parameter to indicate how many nodes are in the cluster, like so (this may be preferrable for larger clusters):
 
-    voltdb start -B -l license.xml -H "voltserver1,voltserver2" -c 3
+    voltdb start -B -H "voltserver1,voltserver2" -c 3
 
 While the -H (host) parameter could list just a single server, that won't work in all cases for restarting a failed node, since the local process uses this hostname to find other nodes in the cluster, so at least two servers should generally be listed.
 
@@ -221,7 +221,7 @@ From any server in the cluster, in any directory, run the following.
 On each of the servers (voltserver1, voltserver2, voltserver3), run the same command that was used to start the cluster before.
 
     # on each host
-    voltdb start -B -l license.xml -H "voltserver1,voltserver2,voltserver3"
+    voltdb start -B -H "voltserver1,voltserver2,voltserver3"
 
 See the earlier section [Verifying that the database is available](Verifying-that-the-database-is-available) to check that the restart was successful and the data was reloaded.
 
@@ -239,10 +239,15 @@ To resume the cluster, from any server in the cluster, in any directory, run:
     voltadmin resume
 
 ## Updating the license file
-When a license expires, the cluster will continue to run, but subsequent actions such as stopping and restarting may require that the new license be in place.  Prior to expiration, the new license should be copied in place of the old file so that it will be picked up by any subsequent actions that require a license check.  This can be done while the cluster is running (it will have no immediate effect).
+When a license expires, the cluster will continue to run, but subsequent actions such as stopping and restarting may require that the new license be in place.  Prior to expiration, the new license should be updated.
 
-    cd $HOME/voltdb_instance
-    cp <new_license_file.xml> license.xml
+    # from any host in the cluster
+    voltadmin license <new_license_file.xml>
+
+Alternatively, if the cluster has already been shut down, you can add the "--license <new_license_file.xml>" option to the "voltdb start" command you use to restart each host.
+
+    # only needed once per host
+    voltdb start --license <new_license_file.xml> ...
 
 ## Taking a manual backup
 A snapshot is a point-in-time consistent copy of the entire contents of the database.  It is written to local disk at each node in a cluster to distribute the work of persistence.  A snapshot can be taken at any time, whether the database is online and available to users or in admin mode.
@@ -267,7 +272,7 @@ Note: The files with this prefix need to be located in the specified path on one
 
 
 ## Reconfiguring the Cluster during a Maintenance Window
-To make major configuration changes to the database, such as changing the kfactor or sitesperhost settings, or modifying the configuration of command logging or export, the database must be stopped and restarted.  Using "voltdb recover" to recover from the command log is for recovering the cluster in exactly the same configuration, not to make configuration changes, so the process involves restarting the database empty as if for the first time using "voltdb start" and then restoring a backup.  The additional commands "pause" and "resume" ensure that users do not try to add any data between when the snapshot (backup) is taken and when it is restored.
+To make major configuration changes to the database, such as changing the kfactor or sitesperhost settings, or modifying the configuration of command logging or export, the database must be stopped and restarted.  Using "voltdb start" to recover from the command log is for recovering the cluster in exactly the same configuration, not to make configuration changes, so the process involves reinitializing the database to the empty state using "voltdb init --force", restarting as if for the first time using "voltdb start", and then restoring a backup.  The additional commands "pause" and "resume" ensure that users do not try to add any data between when the snapshot (backup) is taken and when it is restored.
 
 
 Pause the database (stop accepting requests from users)
@@ -290,14 +295,14 @@ Make changes to the configuration file and copy it to each of the servers.
 Reinitialize the database root directory on all nodes, specifying the edited configuration file
 
     cd $HOME/voltdb_instance
-    voltdb init --force --config=deployment.xml
+    voltdb init --force --config=deployment.xml --license license.xml
 
 
 Restart the database in admin mode
 
     # on each host
     cd $HOME/voltdb_instance
-    voltdb start -B -l license.xml -H "voltserver1,voltserver2,voltserver3" --pause
+    voltdb start -B -H "voltserver1,voltserver2,voltserver3" --pause
 
 (Optionally) Reload the schema, if any changes were made
 
@@ -317,7 +322,7 @@ If a node failed, it can be restarted and joined back to the cluster using the s
 
     # run from the app working folder where the deployment file is located
     cd /home/voltdb/voltdb_instance
-    voltdb start -B -l license.xml -H "voltserver1,voltserver2,voltserver3"
+    voltdb start -B -H "voltserver1,voltserver2,voltserver3"
 
 To verify that the node has successfully rejoined the cluster, make sure you can connect to it with sqlcmd:
 
@@ -344,6 +349,7 @@ To add more capacity (RAM as well as throughput) to the cluster, additional serv
 
     # the host parameter can be the hostname of any existing server in the cluster
     cd /home/voltdb/voltdb_instance
-    voltdb start --host=voltserver1 --license=license.xml --add
+    voltdb init --license=license.xml
+    voltdb start --host=voltserver1 --add
 
 Note: K-factor + 1 is the number of servers that must be added at a time.  If the cluster is configured with k-factor=1, then 2 servers must be added.

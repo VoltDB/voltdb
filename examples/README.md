@@ -84,10 +84,11 @@ The examples all contain a bash script file named "run.sh" that contains functio
 The following steps will run an example:
 
 1. Make sure "bin" inside the VoltDB kit is in your path.
-2. Type "voltdb create --force" to start an empty, single-node VoltDB server.
-3. Open a second terminal window in the same working directory.
-4. Type "sqlcmd < ddl.sql" to load the schema and the jarfile of procedures into VoltDB.
-5. Type "./run.sh client" to run the client code.
+2. Type "voltdb init --force" to create an empty database on the local node.
+3. Type "voltdb start" to start a single-node VoltDB server.
+4. Open a second terminal window in the same working directory.
+5. Type "sqlcmd < ddl.sql" to load the schema and the jarfile of procedures into VoltDB.
+6. Type "./run.sh client" to run the client code.
 
 Typing "./run.sh help" will also show the available targets for each example.
 

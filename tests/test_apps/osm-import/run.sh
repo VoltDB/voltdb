@@ -83,7 +83,8 @@ function jars-ifneeded() {
 # Start DB, load schema, procedures, and static data
 function init() {
     echo "starting server in background..."
-    voltdb create -B -l $LICENSE -H $HOST > nohup.log 2>&1 &
+    voltdb init -l $LICENSE > nohup.log 2>&1
+    voltdb start -B -H $HOST >> nohup.log 2>&1
     wait_for_startup
     jars-ifneeded
     sqlcmd < ddl.sql

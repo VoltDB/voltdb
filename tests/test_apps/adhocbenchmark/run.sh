@@ -54,8 +54,9 @@ function jars-ifneeded() {
 
 # run the voltdb server locally
 function server() {
-    # note: "create --force" will delete any existing data
-    voltdb create --force -H $STARTUPLEADERHOST
+    # note: "init --force" will delete any existing data
+    voltdb init --force
+    voltdb start -H $STARTUPLEADERHOST
 }
 
 # load schema and procedures

@@ -6,11 +6,12 @@ Before getting started, be sure to include the VoltDB /bin directory in your PAT
 
 CREATING THE DATABASE
 =====================
-VoltDB is a ACID-compliant relational database. You define database tables using standard SQL just like you would in any other SQL database. The first step is to create a database instance using the “voltdb create” command:
+VoltDB is a ACID-compliant relational database. You define database tables using standard SQL just like you would in any other SQL database. The first step is to create a database instance using the “voltdb init” and "voltdb start" commands:
 
-        $ voltdb create
+        $ voltdb init
+        $ voltdb start
 
-Once the database is initialized, we can go ahead and define a database table to hold the words "hello" and "world". Just to make it interesting, let's add a DIALECT column so we can identify the language the words represent.
+Once the database is initialized and started, we can go ahead and define a database table to hold the words "hello" and "world". Just to make it interesting, let's add a DIALECT column so we can identify the language the words represent.
 
         CREATE TABLE HELLOWORLD (
            HELLO VARCHAR(15),
@@ -88,8 +89,11 @@ All that’s left to do is compile the client application (setting CLASSPATH to 
 
 To see the full application in action, we can start with a fresh copy of the database. From the shell prompt use the “voltadmin shutdown” command to stop the current database. You can then create a new database and once it is running, use the sqlcmd utility to load the schema (provided in the file hello world.sql). Then run the client application:
 
-        $ voltdb create &
+        $ voltdb init --force
+        $ voltdb start
         $ sqlcmd < helloworld.sql
         $ java Client
+
+The "--force" option on "voltdb init" causes any existing database to be deleted, so use it only when you intend such deletion.
 
 To learn more about VoltDB we encourage you to try out the complete tutorial, run the other sample applications that come with the software and look through the documentation that is availaBle at http://docs.voltdb.com/

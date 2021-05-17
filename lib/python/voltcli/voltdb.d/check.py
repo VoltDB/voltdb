@@ -46,6 +46,7 @@ def displayResults():
 @VOLT.Command(
     description = 'Check system properties.'
 )
+
 def check(runner):
     systemCheck()
 

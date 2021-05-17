@@ -101,7 +101,7 @@ function server() {
     echo "  with license file \"$LICENSE_FILE\""
     /bin/rm -rf "$OBJ"
     mkdir -p "$OBJ"
-    (cd "$OBJ"; voltdb create -d "$DEPLOYMENT_FILE" -l "$LICENSE_FILE" -H localhost &)
+    (cd "$OBJ"; voltdb init -C "$DEPLOYMENT_FILE" -l "$LICENSE_FILE"; voltdb start -H localhost &)
 }
 
 # Load the schema.  We don't have any stored procedures
