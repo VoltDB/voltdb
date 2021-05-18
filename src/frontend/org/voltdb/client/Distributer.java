@@ -130,6 +130,9 @@ class Distributer {
     // Outgoing transaction rate limiter; package access for client implementation
     final RateLimiter m_rateLimiter = new RateLimiter();
 
+    // Last reported backpressure state
+    private boolean m_lastBackpressureReport;
+
     // Data for topology-aware client operation, The 'unconnected hosts' list
     // contains all nodes from the latest topo update for which we do not
     // have connections. It's not directly adjusted on connection failure.
@@ -518,9 +521,7 @@ class Distributer {
             synchronized (Distributer.this) {
                 afterRateLimitNanos = m_rateLimiter.prepareToSendTransactionNonblocking(nowNanos);
                 if (afterRateLimitNanos < 0) {
-                    for (ClientStatusListenerExt s : m_listeners) {
-                        s.backpressure(true);
-                    }
+                    reportBackpressure(true);
                     return false; // would block
                 }
             }
@@ -956,9 +957,7 @@ class Distributer {
                      * has ended thus resulting in a lost wakeup.
                      */
                     synchronized (Distributer.this) {
-                        for (final ClientStatusListenerExt csl : m_listeners) {
-                            csl.backpressure(false);
-                        }
+                        reportBackpressure(false);
                     }
                 }
             };
@@ -1354,9 +1353,7 @@ class Distributer {
             if (ignoreBackpressure) {
                 throw new NoConnectionsException("No connections (and ignoreBackpressure set).");
             }
-            for (ClientStatusListenerExt s : m_listeners) {
-                s.backpressure(true);
-            }
+            reportBackpressure(true);
             return null;
         }
 
@@ -1420,14 +1417,37 @@ class Distributer {
         // Still no unbackpressured connection? Report backpressure while
         // still under Distributer sync
         if (cxn == null) {
-            for (ClientStatusListenerExt s : m_listeners) {
-                s.backpressure(true);
-            }
+            reportBackpressure(true);
         }
         return cxn;
     }
 
-   /**
+    /**
+     * Internal utility to report backpressure changes to client
+     * level.  All backpressure reporting, whether originating
+     * in the Distributer or in the network write stream, passes
+     * through here. Caller must own the monitor lock.
+     *
+     * We aspire to not report a non-change, for example hearing
+     * backpressure on when it is already on (this can arise, for
+     * example, if queue() calls are in flight when backpressure
+     * begins). However, out of fear of stalling the pipeline, for
+     * now we will always report any transition to backpressure off,
+     * even if we thought it was already off.
+     *
+     * @param bp : true if backpressure starting
+     *             false if backpressure ending
+     */
+    private void reportBackpressure(boolean bp) {
+        if (m_lastBackpressureReport ^ bp || !bp) {
+            m_lastBackpressureReport = bp;
+            for (ClientStatusListenerExt sl : m_listeners) {
+                sl.backpressure(bp);
+            }
+        }
+    }
+
+    /**
      * Does affinity-stats accounting once we know we're going to send
      * a transaction on the connection found by FindCxnForQueue
      */
