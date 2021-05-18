@@ -105,7 +105,7 @@ function async-benchmark() {
 # ratelimit: must be a reasonable value if latencyreport is ON
 function nonblocking-benchmark() {
     jars-ifneeded
-    java -classpath voter-client.jar:$CLIENTCLASSPATH voter.NonblockingBenchmark \
+    java -classpath voter-client.jar:$CLIENTCLASSPATH voter.NonblockingAsyncBenchmark \
         --displayinterval=5 \
         --warmup=5 \
         --duration=120 \

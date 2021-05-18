@@ -57,7 +57,7 @@ import org.voltdb.client.ClientStatusListenerExt;
 import org.voltdb.client.NullCallback;
 import org.voltdb.client.ProcedureCallback;
 
-public class NonblockingBenchmark {
+public class NonblockingAsyncBenchmark {
 
     // Initialize some common constants and variables
     static final String CONTESTANT_NAMES_CSV =
@@ -197,7 +197,7 @@ public class NonblockingBenchmark {
      *
      * @param config Parsed & validated CLI options.
      */
-    public NonblockingBenchmark(VoterConfig config) {
+    public NonblockingAsyncBenchmark(VoterConfig config) {
         this.config = config;
 
         StatusListener sl = new StatusListener();
@@ -545,9 +545,9 @@ public class NonblockingBenchmark {
     public static void main(String[] args) throws Exception {
         // create a configuration from the arguments
         VoterConfig config = new VoterConfig();
-        config.parse(NonblockingBenchmark.class.getName(), args);
+        config.parse(NonblockingAsyncBenchmark.class.getName(), args);
 
-        NonblockingBenchmark benchmark = new NonblockingBenchmark(config);
+        NonblockingAsyncBenchmark benchmark = new NonblockingAsyncBenchmark(config);
         benchmark.runBenchmark();
     }
 }
