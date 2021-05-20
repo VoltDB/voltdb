@@ -233,7 +233,7 @@ public class HTTPAdminListener {
             }
 
             ServletContextHandler rootContext = new ServletContextHandler(ServletContextHandler.SESSIONS);
-            
+
             ServletHandler servlets = rootContext.getServletHandler();
             // make the JSESSIONID context-specific by adding port number
             rootContext.getSessionHandler().getSessionCookieConfig().setName("JSESSIONID_" + Integer.toString(port));
