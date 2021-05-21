@@ -26,6 +26,7 @@ package org.voltdb;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
@@ -65,74 +66,78 @@ final public class TestVoltDB {
         VoltDB.Configuration blankConfig = new VoltDB.Configuration();
         assertFalse(blankConfig.m_noLoadLibVOLTDB);
         assertEquals(BackendTarget.NATIVE_EE_JNI, blankConfig.m_backend);
-        assertEquals(null, blankConfig.m_pathToCatalog);
-        assertEquals(null, blankConfig.m_pathToDeployment);
+        assertNull(blankConfig.m_pathToCatalog);
+        assertNull(blankConfig.m_pathToDeployment);
         assertEquals(VoltDB.DEFAULT_PORT, blankConfig.m_port);
 
-        String args1[] = { "create", "noloadlib" };
-        assertTrue(new VoltDB.Configuration(args1).m_noLoadLibVOLTDB);
+        // Following tests use 'initialize' to exercise the constructor even
+        // though the selected arguments may not be valid for init. This avoids
+        // the check for an initialized root that 'probe' would make.
 
-        String args2[] = { "create", "hsqldb" };
-        VoltDB.Configuration cfg2 = new VoltDB.Configuration(args2);
-        assertEquals(BackendTarget.HSQLDB_BACKEND, cfg2.m_backend);
-        String args3[] = { "create", "jni" };
-        VoltDB.Configuration cfg3 = new VoltDB.Configuration(args3);
-        assertEquals(BackendTarget.NATIVE_EE_JNI, cfg3.m_backend);
-        String args4[] = { "create", "ipc" };
-        VoltDB.Configuration cfg4 = new VoltDB.Configuration(args4);
-        assertEquals(BackendTarget.NATIVE_EE_IPC, cfg4.m_backend);
+        String args101[] = { "initialize" };
+        VoltDB.Configuration cfg101 = new VoltDB.Configuration(args101);
+        assertEquals(StartAction.INITIALIZE, cfg101.m_startAction);
+
+        String args102[] = { "initialize", "noloadlib" };
+        VoltDB.Configuration cfg102 = new VoltDB.Configuration(args102);
+        assertTrue(cfg102.m_noLoadLibVOLTDB);
+
+        String args103[] = { "initialize", "hsqldb" };
+        VoltDB.Configuration cfg103 = new VoltDB.Configuration(args103);
+        assertEquals(BackendTarget.HSQLDB_BACKEND, cfg103.m_backend);
+
+        String args104[] = { "initialize", "jni" };
+        VoltDB.Configuration cfg104 = new VoltDB.Configuration(args104);
+        assertEquals(BackendTarget.NATIVE_EE_JNI, cfg104.m_backend);
+
+        String args105[] = { "initialize", "ipc" };
+        VoltDB.Configuration cfg105 = new VoltDB.Configuration(args105);
+        assertEquals(BackendTarget.NATIVE_EE_IPC, cfg105.m_backend);
+
         // what happens if arguments conflict?
-        String args5[] = { "create", "ipc", "hsqldb" };
-        VoltDB.Configuration cfg5 = new VoltDB.Configuration(args5);
-        assertEquals(BackendTarget.HSQLDB_BACKEND, cfg5.m_backend);
+        String args106[] = { "initialize", "ipc", "hsqldb" };
+        VoltDB.Configuration cfg106 = new VoltDB.Configuration(args106);
+        assertEquals(BackendTarget.HSQLDB_BACKEND, cfg106.m_backend);
 
-        String args10[] = { "create", "catalog", "ytestystringy" };
-        VoltDB.Configuration cfg10 = new VoltDB.Configuration(args10);
-        assertEquals("ytestystringy", cfg10.m_pathToCatalog);
+        String args107[] = { "initialize", "port", "1234" };
+        VoltDB.Configuration cfg107 = new VoltDB.Configuration(args107);
+        assertEquals(1234, cfg107.m_port);
 
-        String args12[] = { "create", "port", "1234" };
-        VoltDB.Configuration cfg12 = new VoltDB.Configuration(args12);
-        assertEquals(1234, cfg12.m_port);
-        String args13[] = { "create", "port", "5678" };
-        VoltDB.Configuration cfg13 = new VoltDB.Configuration(args13);
-        assertEquals(5678, cfg13.m_port);
+        String args108[] = { "initialize", "port", "5678" };
+        VoltDB.Configuration cfg108 = new VoltDB.Configuration(args108);
+        assertEquals(5678, cfg108.m_port);
 
-        String args14[] = { "create" };
-        VoltDB.Configuration cfg14 = new VoltDB.Configuration(args14);
-        assertEquals(StartAction.CREATE, cfg14.m_startAction);
-        String args15[] = { "recover" };
-        VoltDB.Configuration cfg15 = new VoltDB.Configuration(args15);
-        assertEquals(StartAction.RECOVER, cfg15.m_startAction);
-        String args16[] = { "recover", "safemode" };
-        VoltDB.Configuration cfg16 = new VoltDB.Configuration(args16);
-        assertEquals(StartAction.SAFE_RECOVER, cfg16.m_startAction);
+        String args109[] = { "initialize", "safemode" };
+        VoltDB.Configuration cfg109 = new VoltDB.Configuration(args109);
+        assertEquals(StartAction.INITIALIZE, cfg109.m_startAction);
+        assertTrue(cfg109.m_safeMode);
 
         // test host:port formats
-        String args18[] = {"create", "port", "localhost:5678"};
-        VoltDB.Configuration cfg18 = new VoltDB.Configuration(args18);
-        assertEquals(5678, cfg18.m_port);
-        assertEquals("localhost", cfg18.m_clientInterface);
+        String args110[] = {"initialize", "port", "localhost:5678"};
+        VoltDB.Configuration cfg110 = new VoltDB.Configuration(args110);
+        assertEquals(5678, cfg110.m_port);
+        assertEquals("localhost", cfg110.m_clientInterface);
 
-        String args19[] = {"create", "adminport", "localhost:5678"};
-        VoltDB.Configuration cfg19 = new VoltDB.Configuration(args19);
-        assertEquals(5678, cfg19.m_adminPort);
-        assertEquals("localhost", cfg19.m_adminInterface);
+        String args111[] = {"initialize", "adminport", "localhost:5678"};
+        VoltDB.Configuration cfg111 = new VoltDB.Configuration(args111);
+        assertEquals(5678, cfg111.m_adminPort);
+        assertEquals("localhost", cfg111.m_adminInterface);
 
-        String args20[] = {"create", "httpport", "localhost:7777"};
-        VoltDB.Configuration cfg20 = new VoltDB.Configuration(args20);
-        assertEquals(7777, cfg20.m_httpPort);
-        assertEquals("localhost", cfg20.m_httpPortInterface);
+        String args112[] = {"initialize", "httpport", "localhost:7777"};
+        VoltDB.Configuration cfg112 = new VoltDB.Configuration(args112);
+        assertEquals(7777, cfg112.m_httpPort);
+        assertEquals("localhost", cfg112.m_httpPortInterface);
 
-        String args21[] = {"create", "internalport", "localhost:7777"};
-        VoltDB.Configuration cfg21 = new VoltDB.Configuration(args21);
-        assertEquals(7777, cfg21.m_internalPort);
-        assertEquals("localhost", cfg21.m_internalInterface);
+        String args113[] = {"initialize", "internalport", "localhost:7777"};
+        VoltDB.Configuration cfg113 = new VoltDB.Configuration(args113);
+        assertEquals(7777, cfg113.m_internalPort);
+        assertEquals("localhost", cfg113.m_internalInterface);
 
         //with override
-        String args22[] = {"create", "internalinterface", "xxxxxx", "internalport", "localhost:7777"};
-        VoltDB.Configuration cfg22 = new VoltDB.Configuration(args22);
-        assertEquals(7777, cfg22.m_internalPort);
-        assertEquals("localhost", cfg22.m_internalInterface);
+        String args114[] = {"initialize", "internalinterface", "xxxxxx", "internalport", "localhost:7777"};
+        VoltDB.Configuration cfg114 = new VoltDB.Configuration(args114);
+        assertEquals(7777, cfg114.m_internalPort);
+        assertEquals("localhost", cfg114.m_internalInterface);
 
         // XXX don't test what happens if port is invalid, because the code
         // doesn't handle that
@@ -150,73 +155,42 @@ final public class TestVoltDB {
 
     @Test
     public void testConfigurationConstructorBadArgs() {
-        String[] args9 = { "create", "catalog xtestxstringx" };
-        assertTrue(causesExit(args9));
-     }
+        String[] args201 = { "initialize", "deployment" };
+        assertTrue(causesExit(args201));
+
+        String[] args202 = { "initialize", "deployment xtestxstringx" };
+        assertTrue(causesExit(args202));
+
+        String[] args203 = {"probe", "voltdbroot", "qwerty"};
+        assertTrue(causesExit(args203));
+    }
 
     @Test
     public void testConfigurationValidate() throws Exception {
         VoltDB.Configuration config;
 
-        // missing leader provided deployment - not okay.
-        String[] argsya = {"create", "catalog", "qwerty", "deployment", "qwerty"};
-        config = new VoltDB.Configuration(argsya);
+        // There is very little remaining validation to
+        // check, once the old verbs are removed.  We are
+        // currently unable to test 'probe' options here
+        // due to the need for a complete init first.
+
+        /* TODO - these ought to be validated but are not yet validated
+        String[] args301 = {"initialize", "paused"};
+        config = new VoltDB.Configuration(args301);
         assertFalse(config.validate());
 
-        // missing deployment (it's okay now that a default deployment is supported)
-        String[] args3 = {"create", "host", "hola", "catalog", "teststring2"};
-        config = new VoltDB.Configuration(args3);
-        assertTrue(config.validate());
-
-        // default deployment with default leader -- okay.
-        config = new VoltDB.Configuration(new String[]{"create", "catalog", "catalog.jar"});
-        assertTrue(config.validate());
-
-        // empty leader -- tests could pass in empty leader to indicate bind to all interfaces on mac
-        String[] argsyo = {"create", "host", "", "catalog", "sdfs", "deployment", "sdfsd"};
-        config = new VoltDB.Configuration(argsyo);
-        assertTrue(config.validate());
-
-        // empty deployment
-        String[] args6 = {"create", "host", "hola", "catalog", "teststring6", "deployment", ""};
-        config = new VoltDB.Configuration(args6);
+        String[] args302 = {"initialize", "safemode"};
+        config = new VoltDB.Configuration(args302);
         assertFalse(config.validate());
 
-        // replica with explicit create
-        String[] args8 = {"host", "hola", "deployment", "teststring4", "catalog", "catalog.jar", "create"};
-        config = new VoltDB.Configuration(args8);
-        assertTrue(config.validate());
+        String[] args303 = {"initialize", "hostcount", "2"};
+        config = new VoltDB.Configuration(args303);
+        assertFalse(config.validate());
+        */
 
-        // valid config
-        String[] args10 = {"create", "leader", "localhost", "deployment", "te", "catalog", "catalog.jar"};
-        config = new VoltDB.Configuration(args10);
+        String[] args304 = {"initialize", "deployment", "qwerty"};
+        config = new VoltDB.Configuration(args304);
         assertTrue(config.validate());
-
-        // valid config
-        String[] args100 = {"create", "host", "hola", "deployment", "teststring4", "catalog", "catalog.jar"};
-        config = new VoltDB.Configuration(args100);
-        assertTrue(config.validate());
-
-        // valid rejoin config
-        String[] args200 = {"rejoin", "host", "localhost"};
-        config = new VoltDB.Configuration(args200);
-        assertTrue(config.validate());
-
-        // invalid rejoin config, missing rejoin host
-        String[] args250 = {"rejoin"};
-        config = new VoltDB.Configuration(args250);
-        assertFalse(config.validate()); // false in both pro and community
-
-        // rejoinhost should still work
-        String[] args201 = {"rejoinhost", "localhost"};
-        config = new VoltDB.Configuration(args201);
-        assertTrue(config.validate());
-
-        // valid rejoin config
-        String[] args300 = {"live", "rejoin", "host", "localhost"};
-        config = new VoltDB.Configuration(args300);
-        assertTrue(config.validate());
-        assertEquals(StartAction.LIVE_REJOIN, config.m_startAction);
     }
 
     AtomicReference<Throwable> serverException = new AtomicReference<>(null);
