@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -262,9 +262,9 @@ public class TestSSL extends JUnit4LocalClusterTest {
         Thread.sleep(100);
 
         VoltDB.Configuration config = new VoltDB.Configuration(LocalCluster.portGenerator);
-        config.m_startAction = m_cluster.isNewCli() ? StartAction.PROBE : StartAction.REJOIN;
+        config.m_startAction = m_cluster.isOldCli() ? StartAction.REJOIN : StartAction.PROBE;
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("sslRejoin.jar");
-        if (m_cluster.isNewCli()) {
+        if (!m_cluster.isOldCli()) {
             config.m_voltdbRoot = new File(m_cluster.getServerSpecificRoot("0"));
             config.m_forceVoltdbCreate = false;
             config.m_hostCount = hostCount;

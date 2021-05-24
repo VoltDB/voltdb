@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -331,7 +331,7 @@ public class TestSnapshotWithViews extends TestExportBase {
                 BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);
         ((LocalCluster) config).setHasLocalServer(false);
         //TODO: Snapshot test to use old CLI
-        ((LocalCluster)config).setNewCli(false);
+        ((LocalCluster)config).setOldCli();
         config.setMaxHeap(1024);
         boolean compile = config.compile(project);
         assertTrue(compile);

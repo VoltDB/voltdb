@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -44,7 +44,6 @@ public class TestHttpTraceDisabled extends JUnit4LocalClusterTest{
     public void testCanAccessRootPath() throws IOException {
         try {
             LocalCluster cluster = new LocalCluster("testCanAccessRootPath.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-            cluster.setNewCli(true);
             VoltProjectBuilder builder = new VoltProjectBuilder();
             cluster.compile(builder);
             cluster.startUp();
@@ -65,7 +64,6 @@ public class TestHttpTraceDisabled extends JUnit4LocalClusterTest{
     public void testCannotAccessPathsByTrace() throws IOException {
         try {
             LocalCluster cluster = new LocalCluster("testCannotAccessRootPathsByTrace.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-            cluster.setNewCli(true);
             VoltProjectBuilder builder = new VoltProjectBuilder();
             cluster.compile(builder);
             cluster.startUp();

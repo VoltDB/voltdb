@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -63,7 +63,7 @@ public class TestSnapshotComparer extends JUnit4LocalClusterTest {
     public static void setUpBeforeClass() throws Exception {
         m_server = new LocalCluster("testsnapshotcomparer.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
         m_server.setHasLocalServer(false);
-        m_server.setNewCli(false);
+        m_server.setOldCli();
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addLiteralSchema(
                 "CREATE TABLE T_SP(A2 VARCHAR(128), A1 INTEGER NOT NULL, A3 VARCHAR(64), A4 VARCHAR(64));" +

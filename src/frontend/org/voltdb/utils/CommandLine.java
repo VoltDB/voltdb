@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -132,7 +132,7 @@ public class CommandLine extends VoltDB.Configuration
         cl.m_hostCount = m_hostCount;
         cl.m_enableAdd = m_enableAdd;
         cl.m_voltdbRoot = m_voltdbRoot;
-        cl.m_newCli = m_newCli;
+        cl.m_oldCli = m_oldCli;
         cl.m_sslEnable = m_sslEnable;
         cl.m_sslExternal = m_sslExternal;
         cl.m_sslInternal = m_sslInternal;
@@ -355,11 +355,9 @@ public class CommandLine extends VoltDB.Configuration
 
     String voltFilePrefix = "";
     public CommandLine voltFilePrefix(String voltFilePrefix) {
-        if (m_newCli) {
-            return this;
+        if (m_oldCli) {
+            this.voltFilePrefix = voltFilePrefix;
         }
-
-        this.voltFilePrefix = voltFilePrefix;
         return this;
     }
 
@@ -604,7 +602,7 @@ public class CommandLine extends VoltDB.Configuration
         if (includeTestOpts)
         {
             cmdline.add("-DLOG_SEGMENT_SIZE=8");
-            if (!m_newCli) {
+            if (m_oldCli) {
                 cmdline.add("-DVoltFilePrefix=" + voltFilePrefix);
             }
             cmdline.add("-ea");
@@ -1095,12 +1093,15 @@ public class CommandLine extends VoltDB.Configuration
         }
     }
 
-    boolean m_newCli = false;
-    //Return true if we are going to run init and start.
-    boolean isNewCli() {
-        return m_newCli;
+    boolean m_oldCli = false;
+
+    boolean isOldCli() {
+        return m_oldCli;
     }
-    public void setNewCli(boolean flag) { m_newCli = flag; };
+
+    public void setOldCli() {
+        m_oldCli = true;
+    }
 
     String m_placementGroup = "";
     public void setPlacementGroup(String placementGroup) {

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -272,7 +272,6 @@ public class TestSnapshotsWithFailures extends JUnit4LocalClusterTest {
                 + " FILLER VARCHAR(" + fillerSize + " BYTES) NOT NULL,"
                 + " PRIMARY KEY (ID)); PARTITION TABLE P1 ON COLUMN ID;";
         LocalCluster cluster = new LocalCluster(jarName, sph, hostCount, kfactor, BackendTarget.NATIVE_EE_JNI);
-        cluster.setNewCli(true);
         cluster.overrideAnyRequestForValgrind();
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema(schema);

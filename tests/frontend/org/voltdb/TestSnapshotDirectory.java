@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -57,7 +57,7 @@ public class TestSnapshotDirectory extends JUnit4LocalClusterTest {
         VoltFile.recursivelyDelete(new VoltFile("/tmp/" + System.getProperty("user.name")));
         m_config = new LocalCluster("tpcc.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
         m_config.setHasLocalServer(false);
-        m_config.setNewCli(false);
+        m_config.setOldCli();
         TPCCProjectBuilder project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();

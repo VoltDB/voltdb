@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -633,7 +633,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         SaveRestoreTestProjectBuilder project = new SaveRestoreTestProjectBuilder();
         project.addAllDefaults();
         LocalCluster lc = new LocalCluster(JAR_NAME, 1, 2, 0, BackendTarget.NATIVE_EE_JNI);
-        lc.setNewCli(false);
+        lc.setOldCli();
         // Fails if local server flag is true. Collides with m_config.
         lc.setHasLocalServer(false);
 
@@ -717,7 +717,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         SaveRestoreTestProjectBuilder project = new SaveRestoreTestProjectBuilder();
         project.addAllDefaults();
         LocalCluster lc = new LocalCluster(JAR_NAME, 1, 2, 0, BackendTarget.NATIVE_EE_JNI);
-        lc.setNewCli(false);
+        lc.setOldCli();
         lc.setJavaProperty("ELASTIC_TOTAL_TOKENS", "4");
         // Fails if local server flag is true. Collides with m_config.
         lc.setHasLocalServer(false);
@@ -981,8 +981,9 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         LocalCluster lc = new LocalCluster( JAR_NAME, 2, 3, 0, BackendTarget.NATIVE_EE_JNI);
         lc.setHasLocalServer(false);
         //TODO: figure out snapshot save restore with new CLI
-        if (lc.isNewCli()) {
-            lc.setNewCli(false);
+        //  (I guess no-one figured it out yet?)
+        if (!lc.isOldCli()) {
+            lc.setOldCli();
         }
         SaveRestoreTestProjectBuilder project = new SaveRestoreTestProjectBuilder();
         project.addAllDefaults();
@@ -3147,7 +3148,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         project.addAllDefaults();
         LocalCluster lc = new LocalCluster(JAR_NAME, 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         //Add not supported yet.
-        lc.setNewCli(false);
+        lc.setOldCli();
         // Fails if local server flag is true. Collides with m_config.
         lc.setHasLocalServer(false);
 
@@ -3256,7 +3257,6 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         int num_partitioned_items = 126;
 
         LocalCluster lc = new LocalCluster( JAR_NAME, 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        lc.setNewCli(true);
         lc.setHasLocalServer(false);
         SaveRestoreTestProjectBuilder project = new SaveRestoreTestProjectBuilder();
         project.addAllDefaults();
@@ -3325,7 +3325,6 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         int num_partitioned_items = 126;
 
         LocalCluster lc = new LocalCluster( JAR_NAME, 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        lc.setNewCli(true);
         lc.setHasLocalServer(false);
         SaveRestoreTestProjectBuilder project = new SaveRestoreTestProjectBuilder();
         project.addAllDefaults();
@@ -3435,7 +3434,6 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         int num_partitioned_items = 126;
 
         LocalCluster lc = new LocalCluster( JAR_NAME, 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        lc.setNewCli(true);
         lc.setHasLocalServer(false);
         SaveRestoreTestProjectBuilder project = new SaveRestoreTestProjectBuilder();
         project.addAllDefaults();
@@ -3530,7 +3528,6 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
         // 2 node k=1 cluster
         LocalCluster lc = new LocalCluster( JAR_NAME, 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
-        lc.setNewCli(true);
         lc.setHasLocalServer(false);
         SaveRestoreTestProjectBuilder project = new SaveRestoreTestProjectBuilder();
         project.addAllDefaults();
@@ -3627,7 +3624,6 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
         // 2 node k=1 cluster
         LocalCluster lc = new LocalCluster( JAR_NAME, 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-        lc.setNewCli(true);
         lc.setHasLocalServer(false);
         SaveRestoreTestProjectBuilder project = new SaveRestoreTestProjectBuilder();
         project.addAllDefaults();

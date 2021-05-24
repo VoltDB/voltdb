@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -44,7 +44,7 @@ public class TestCommandLine
         cl.setInitialHeap(2048);
         System.out.println(cl);
         assertTrue(cl.toString().contains("-DLOG_SEGMENT_SIZE"));
-        assertTrue(cl.toString().contains("-DVoltFilePrefix"));
+        assertFalse(cl.toString().contains("-DVoltFilePrefix")); // old CLI only
         assertTrue(cl.toString().contains("MaxDirectMemorySize"));
         assertTrue(cl.toString().contains("timestampsalt"));
         assertFalse(cl.toString().contains("HeapDumpPath=/tmp"));

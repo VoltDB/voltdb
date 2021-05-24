@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -330,7 +330,7 @@ public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
 
         m_nonEmptyConfig = new LocalCluster("non-empty-database.jar", SITE_COUNT, HOST_COUNT, 0, BackendTarget.NATIVE_EE_JNI);
         //TODO: Migrate to new cli
-        m_nonEmptyConfig.setNewCli(false);
+        m_nonEmptyConfig.setOldCli();
         boolean compile = m_nonEmptyConfig.compile(project);
         assertTrue(compile);
         builder.addServerConfig(m_nonEmptyConfig, MultiConfigSuiteBuilder.ReuseServer.NEVER);
@@ -338,7 +338,7 @@ public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
 
         m_emptyConfig = new LocalCluster("empty-database.jar", SITE_COUNT, HOST_COUNT, 0, BackendTarget.NATIVE_EE_JNI);
         //TODO: Migrate to new cli
-        m_emptyConfig.setNewCli(false);
+        m_emptyConfig.setOldCli();
         project = new VoltProjectBuilder();
         project.setUseDDLSchema(true);
         compile = m_emptyConfig.compile(project);
@@ -347,7 +347,7 @@ public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
 
         m_emptyCatalogConfig = new LocalCluster("empty-catalog-database.jar", SITE_COUNT, HOST_COUNT, 0, BackendTarget.NATIVE_EE_JNI);
         //TODO: Migrate to new cli
-        m_emptyCatalogConfig.setNewCli(false);
+        m_emptyCatalogConfig.setOldCli();
         project = new VoltProjectBuilder();
         compile = m_emptyCatalogConfig.compile(project);
         assertTrue(compile);

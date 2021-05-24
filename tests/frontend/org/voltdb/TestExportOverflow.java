@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -112,8 +112,8 @@ public class TestExportOverflow extends RegressionSuite {
         client.drain();
         client.callProcedure("@Quiesce");
         File overflowDir;
-        boolean newCli = ((LocalCluster)m_config).isNewCli();
-        if (newCli) {
+        boolean oldCli = ((LocalCluster)m_config).isOldCli();
+        if (!oldCli) {
             overflowDir = new File(((LocalCluster)m_config).getServerSpecificRoot("0") + "/export_overflow");
         } else {
             ArrayList<File> subroots = ((LocalCluster) m_config).getSubRoots();
@@ -167,7 +167,7 @@ public class TestExportOverflow extends RegressionSuite {
                 BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);
         config.setHasLocalServer(false);
         // This is only for testing create --force.
-        config.setNewCli(false);
+        config.setOldCli();
         boolean compile = config.compile(project);
         assertTrue(compile);
         builder.addServerConfig(config);
