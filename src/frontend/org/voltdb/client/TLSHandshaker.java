@@ -31,6 +31,11 @@ import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLSession;
 
 public class TLSHandshaker {
+    // Netty uses 10 seconds most except client uses known number of connection hence not configuring per connection.
+    // If somehealthcheck opens a connection and keeps it open beyond 30 seconds we will see a log and that will indicate
+    // a DOS attack.
+    public static final long DEFAULT_HANDSHAKE_TIMEOUT_MILLIS = Long.getLong("TLS_HANDSHAKE_TIMEOUT", 30000L);
+
     private final SSLEngine m_eng;
     private final SocketChannel m_sc;
 
@@ -61,11 +66,10 @@ public class TLSHandshaker {
         ByteBuffer txNetData = allocateBuffer(session.getPacketBufferSize());
         ByteBuffer clearData = allocateBuffer(session.getApplicationBufferSize());
 
-        SSLEngineResult result = null;
         m_eng.beginHandshake();
         HandshakeStatus status = m_eng.getHandshakeStatus();
-        boolean isBlocked = m_sc.isBlocking();
 
+        boolean isBlocked;
         synchronized (m_sc.blockingLock()) {
             isBlocked = m_sc.isBlocking();
             if (isBlocked) {
@@ -75,8 +79,13 @@ public class TLSHandshaker {
         Selector selector = Selector.open();
         m_sc.register(selector, SelectionKey.OP_READ);
 
+        SSLEngineResult result;
         try {
+            long endTs = System.currentTimeMillis() + DEFAULT_HANDSHAKE_TIMEOUT_MILLIS;
             while (status != HandshakeStatus.FINISHED && status != HandshakeStatus.NOT_HANDSHAKING) {
+                if (System.currentTimeMillis() > endTs) {
+                    throw new IllegalStateException("TLS handshake timed out after: " + DEFAULT_HANDSHAKE_TIMEOUT_MILLIS + " Milliseconds");
+                }
                 boolean waitForData = true;
                 switch(status) {
                 case NEED_UNWRAP:
