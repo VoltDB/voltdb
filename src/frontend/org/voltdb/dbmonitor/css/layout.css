@@ -4798,3 +4798,7 @@ table.dataTable {top:0;}
   overflow: auto;
   height: 250px;
 }
+
+  .tabs-filter-wrapperDR {
+    margin-bottom: 0px !important;
+  }

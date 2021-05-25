@@ -12,12 +12,12 @@
     <link href="css/theme.default.min.css" rel="stylesheet" />
     <link href="css/jquery.dataTables.css" rel="stylesheet" />
     <link href="css/jquery-ui.css" rel="stylesheet" />
-    <link href="css/layout.css" rel="stylesheet" />
     <link href="css/nv.d3.css" rel="stylesheet" />
     <link href="css/tablesorter.css" rel="stylesheet" />
     <link href="css/bootstrap.min.css" id="styleBootstrapMin" disabled rel="stylesheet">
-    <link href="css/bootstrap-responsive.css" id="styleBootstrapResponsive" disabled rel="stylesheet">
     <link href="css/theme.bootstrap.css" id="styleThemeBootstrap" disabled rel="stylesheet">
+    <link href="css/layout.css" rel="stylesheet" />
+    <link href="css/bootstrap-responsive.css" id="styleBootstrapResponsive" disabled rel="stylesheet">
     <script type="text/javascript" src="js/jquery-1.11.1.min.js"></script>
     <script type="text/javascript" src="js/d3.v3.min.js"></script>
     <script type="text/javascript" src="js/nv.d3.min(modified).js"></script>
@@ -130,7 +130,7 @@
                             <div class="clear"></div>
                         </div>
                         <div class="clusterDetailsContRight" id="clusterDetailsRight">
-                            <ul class="serverStat" id="serverStatSection">
+                            <ul class="serverStat serverStat-ht" id="serverStatSection">
                                 <li>Monitoring</li>
                                 <li class="activeServerName" id="activeServerName" title=""></li>
                             </ul>
@@ -180,7 +180,7 @@
                             </div>
                         </div>
                     </div>
-                    <div class="content displayPre" id="contentServer">
+                    <div class="content displayPre" id="contentServer" style="padding: 20px 20px 10px !important;">
                         <div class="leftShowhide">
                             <div id="GraphBlock" class="">
                                 <h1 class="headText1"><a href="#" id="showHideGraphBlock" class="showhideIcon expanded arrowAdjust">Show/Hide Graph</a></h1>
@@ -323,9 +323,9 @@
 
                                 <div id="divDTSection" class="dTShowHide" style="display:none;">
                                     <div id="tblDT_wrapper" class="dataTables_wrapper no-footer">
-                                        <div class="tabs-filter-wrapperDR">
-                                            <div class="drTitle icon-tables" id="dTTitle">Database Tables</div>
-                                            <div class="filter"><input name="filter" id="filterDT" type="text" class="search-box" onBlur="" placeholder="Search Database Tables"><a id="searchDT" href="javascript:void(0)" class="icon-search drIcon" title="Search">search</a></div>
+                                        <div class="tabs-filter-wrapperDR ">
+                                            <div class="drTitle icon-tables drT-title" id="dTTitle">Database Tables</div>
+                                            <div class="filter"><input name="filter" id="filterDT" type="text" class="search-box search-ht" onBlur="" placeholder="Search Database Tables"><a id="searchDT" href="javascript:void(0)" class="icon-search drIcon" title="Search" style="height: 40px; top: -20px; left: 10px;">search</a></div>
                                             <div class="clear"></div>
                                         </div>
                                         <div class="clear"></div>
