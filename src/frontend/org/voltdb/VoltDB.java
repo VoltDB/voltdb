@@ -42,6 +42,7 @@ import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.lang3.StringUtils;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.voltcore.logging.VoltLog4jLogger;
 import org.voltcore.logging.VoltLogger;
@@ -379,7 +380,8 @@ public class VoltDB {
 
         /** This is set to 'kubernetes' iff running under kubernetes, and may
             affect some operational behaviour. Other values reserved for future. */
-        private String m_voltdbContainer = System.getenv("VOLTDB_CONTAINER");
+        private final String m_voltdbContainer = System.getenv("VOLTDB_CONTAINER");
+        private final String m_voltdbContainerDeployment = System.getenv("VOLTDB_K8S_CLUSTER_DEPLOYMENT");
 
         public boolean runningUnderKubernetes() {
             return "kubernetes".equals(m_voltdbContainer);
@@ -948,7 +950,13 @@ public class VoltDB {
          */
         private void checkInitializationMarker() {
             File inzFH = new VoltFile(m_voltdbRoot, VoltDB.INITIALIZED_MARKER);
-            File deploymentFH = new VoltFile(new VoltFile(m_voltdbRoot, Constants.CONFIG_DIR), "deployment.xml");
+            File deploymentFH;
+            if (runningUnderKubernetes() && StringUtils.isNotEmpty(m_voltdbContainerDeployment)) {
+                hostLog.info("Running in kubernetes environment, using deployment from: " + m_voltdbContainerDeployment);
+                deploymentFH = new VoltFile(m_voltdbContainerDeployment);
+            } else {
+                deploymentFH = new VoltFile(new VoltFile(m_voltdbRoot, Constants.CONFIG_DIR), "deployment.xml");
+            }
             File configCFH = null;
             File optCFH = null;
 
