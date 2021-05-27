@@ -41,7 +41,6 @@ import org.voltdb.compiler.VoltProjectBuilder;
  *  1. On initialization, the large_query_swap directory is created
  *  2. On database start, any existing files in there are deleted
  *  3. On shutdown, if any files are in the directory, they should be deleted
- * This should be tested for both classic and new CLI.
  */
 public class TestLargeBlockManagerStartUpSuite extends RegressionSuite {
 
@@ -124,15 +123,6 @@ public class TestLargeBlockManagerStartUpSuite extends RegressionSuite {
 
         config = new LocalCluster("testLargeBlockManagerStartUpSuite-onesite.jar", 3, 1, 0, BackendTarget.NATIVE_EE_JNI);
         config.setHasLocalServer(false);
-        success = config.compile(project);
-        assert(success);
-        builder.addServerConfig(config);
-
-        // Just like above but use the old CLI
-        // (Use a different number of sites per host so junit method names are distinct)
-        config = new LocalCluster("testLargeBlockManagerStartUpSuite-onesite-oldCli.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        config.setHasLocalServer(false);
-        config.setOldCli();
         success = config.compile(project);
         assert(success);
         builder.addServerConfig(config);

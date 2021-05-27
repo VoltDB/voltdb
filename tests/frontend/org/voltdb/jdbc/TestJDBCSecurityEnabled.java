@@ -362,9 +362,9 @@ public class TestJDBCSecurityEnabled {
     }
 
     @Test
-    public void testUsingCrendentialFileIncludingSpecialCharactersInPassword()
+    public void testUsingCredentialFileIncludingSpecialCharactersInPassword()
             throws NoConnectionsException, IOException, ProcCallException, InterruptedException {
-        System.out.println("Starting testUsingCrendentialFileIncludingSpecialCharactersInPassword");
+        System.out.println("Starting testUsingCredentialFileIncludingSpecialCharactersInPassword");
         // write username / password to csv
         String[] authData = {"username: userWithAdminPerm2", "password: password!!!"};
         try {

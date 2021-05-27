@@ -312,7 +312,7 @@ public class TestSnapshotWithViews extends TestExportBase {
         System.setProperty(ExportDataProcessor.EXPORT_TO_TYPE, "org.voltdb.exportclient.NoOpExporter");
         String dexportClientClassName = System.getProperty("exportclass", "");
         System.out.println("Test System override export class is: " + dexportClientClassName);
-        VoltServerConfig config;
+        LocalCluster config;
         Map<String, String> additionalEnv = new HashMap<>();
         additionalEnv.put(ExportDataProcessor.EXPORT_TO_TYPE, "org.voltdb.exportclient.NoOpExporter");
 
@@ -329,14 +329,13 @@ public class TestSnapshotWithViews extends TestExportBase {
          */
         config = new LocalCluster("export-ddl-cluster-rep.jar", 8, 3, 1,
                 BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);
-        ((LocalCluster) config).setHasLocalServer(false);
+        config.setHasLocalServer(false);
         //TODO: Snapshot test to use old CLI
-        ((LocalCluster)config).setOldCli();
+        config.setOldCli();
         config.setMaxHeap(1024);
         boolean compile = config.compile(project);
         assertTrue(compile);
         builder.addServerConfig(config, MultiConfigSuiteBuilder.ReuseServer.NEVER);
-
 
         compile = config.compile(project);
         MiscUtils.copyFile(project.getPathToDeployment(),

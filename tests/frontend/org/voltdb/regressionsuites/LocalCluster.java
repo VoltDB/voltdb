@@ -103,6 +103,9 @@ public class LocalCluster extends VoltServerConfig {
     // how long to wait for startup of external procs
     static final long PIPE_WAIT_MAX_TIMEOUT = 60 * 1000 *2; //*2 == slow machine allowance
 
+    // define environment variable to log the wall of text, mostly classpath
+    static final private boolean logFullCmdLine = (System.getenv("FULL_CMDLINE_LOGGING") != null);
+
     String m_callingClassName = "";
     String m_callingMethodName = "";
     boolean m_compiled = false;
@@ -195,7 +198,7 @@ public class LocalCluster extends VoltServerConfig {
     // instance.
     private final CommandLine templateCmdLine = new CommandLine(StartAction.PROBE);
 
-    private boolean isOldCli = false;
+    private boolean isOldCli = false; // TODO: eventually remove all 'old CLI' support
 
     public boolean isOldCli() { return isOldCli; };
 
@@ -204,7 +207,7 @@ public class LocalCluster extends VoltServerConfig {
         isOldCli = true;
         templateCmdLine.setOldCli();
         templateCmdLine.startCommand(StartAction.CREATE);
-    };
+    }
 
     private boolean isEnableSSL = Boolean.parseBoolean(System.getProperty("ENABLE_SSL", System.getenv("ENABLE_SSL")));
     public boolean isEnableSSL() { return isEnableSSL; };
@@ -213,7 +216,7 @@ public class LocalCluster extends VoltServerConfig {
         templateCmdLine.m_sslEnable = flag;
         templateCmdLine.m_sslExternal = flag;
         templateCmdLine.m_sslInternal = flag;
-    };
+    }
 
     private String m_prefix = null;
     private boolean m_isPaused = false;
@@ -606,13 +609,14 @@ public class LocalCluster extends VoltServerConfig {
 
     @Override
     public void startUp() {
-        startUp(true);
+        // Clear dir, do init, do start
+        startImpl(true, true, true);
     }
 
     @Override
     public void startUp(boolean clearLocalDataDirectories) {
-        //if cleardirectory is true we dont skip init.
-        startUp(clearLocalDataDirectories, ! clearLocalDataDirectories);
+        // If clearing dir, we must do init, otherwise not; always do start
+        startImpl(clearLocalDataDirectories, clearLocalDataDirectories, true);
     }
 
     public void setForceVoltdbCreate(boolean newVoltdb) {
@@ -819,7 +823,7 @@ public class LocalCluster extends VoltServerConfig {
         //If we are initializing lets wait for it to finish.
         ServerThread th = new ServerThread(cmdln);
         File root = VoltFile.getServerSpecificRoot(String.valueOf(hostId), clearLocalDataDirectories);
-        assert(! root.getName().equals(Constants.DBROOT)) : root.getAbsolutePath();
+        assert(!root.getName().equals(Constants.DBROOT)) : root.getAbsolutePath();
         cmdln.voltdbRoot(new File(root, Constants.DBROOT));
         try {
             th.initialize();
@@ -883,9 +887,20 @@ public class LocalCluster extends VoltServerConfig {
     }
 
     public void startUp(boolean clearLocalDataDirectories, boolean skipInit) {
+        startImpl(clearLocalDataDirectories, !skipInit, true);
+    }
+
+    public void startUpInitOnly(boolean clearLocalDataDirectories) {
+        startImpl(clearLocalDataDirectories, true, false);
+    }
+
+    // Negative options make my head hurt: inverting them here.
+    private void startImpl(boolean clearLocalDataDirectories, boolean doInit, boolean doStart) {
+        assertTrue(doInit | doStart);
         if (m_running) {
             return;
         }
+
         VoltServerConfig.addInstance(this);
 
         // needs to be called before any call to pick a filename
@@ -956,10 +971,16 @@ public class LocalCluster extends VoltServerConfig {
                 ++oopStartIndex;
             }
             try {
-                if (!isOldCli && !skipInit) { // Init
-                    initLocalServer(oopStartIndex, clearLocalDataDirectories);
+                if (isOldCli) { // single command
+                    startLocalServer(oopStartIndex, clearLocalDataDirectories);
+                } else {
+                    if (doInit) {
+                        initLocalServer(oopStartIndex, clearLocalDataDirectories);
+                    }
+                    if (doStart) {
+                        startLocalServer(oopStartIndex, clearLocalDataDirectories);
+                    }
                 }
-                startLocalServer(oopStartIndex, clearLocalDataDirectories);
             } catch (IOException ioe) {
                 throw new RuntimeException(ioe);
             }
@@ -972,15 +993,22 @@ public class LocalCluster extends VoltServerConfig {
                 continue;
             }
             try {
-                if (!isOldCli && !skipInit) {
-                    initOne(i, clearLocalDataDirectories);
-                }
                 String placementGroup = null;
                 if (m_placementGroups != null && m_placementGroups.length == m_hostCount) {
                     placementGroup = m_placementGroups[i];
                 }
 
-                startOne(i, clearLocalDataDirectories, StartAction.CREATE, true, placementGroup);
+                if (isOldCli) { // single command
+                    startOne(i, clearLocalDataDirectories, StartAction.CREATE, true, placementGroup);
+                } else {
+                    if (doInit) {
+                        initOne(i, clearLocalDataDirectories, !doStart);
+                    }
+                    if (doStart) {
+                        startOne(i, clearLocalDataDirectories, StartAction.CREATE, true, placementGroup);
+                    }
+                }
+
                 //wait before next one
                 if (m_delayBetweenNodeStartupMS > 0) {
                     try {
@@ -991,6 +1019,11 @@ public class LocalCluster extends VoltServerConfig {
             } catch (IOException ioe) {
                 throw new RuntimeException(ioe);
             }
+        }
+
+        if (!isOldCli && !doStart) {
+            System.out.println("VoltDB start not required");
+            return;
         }
 
         printTiming(logtime, "Pre-witness: " + (System.currentTimeMillis() - startTime) + "ms");
@@ -1075,7 +1108,7 @@ public class LocalCluster extends VoltServerConfig {
         failIfValgrindErrors(valgrindOutputFile);
     }
 
-    private void initOne(int hostId, boolean clearLocalDataDirectories) throws IOException {
+    private void initOne(int hostId, boolean clearLocalDataDirectories, boolean savePipe) throws IOException {
         PipeToFile ptf = null;
         CommandLine cmdln = (templateCmdLine.makeCopy());
         cmdln.setJavaProperty(clusterHostIdProperty, String.valueOf(hostId));
@@ -1088,14 +1121,10 @@ public class LocalCluster extends VoltServerConfig {
         try {
             //If clear clean VoltFile.getServerSpecificRoot(String.valueOf(hostId))
             root = VoltFile.getServerSpecificRoot(String.valueOf(hostId), clearLocalDataDirectories);
-            assert( root.getName().equals(Constants.DBROOT) == false ) : root.getAbsolutePath();
+            assert(!root.getName().equals(Constants.DBROOT)) : root.getAbsolutePath();
             cmdln = cmdln.voltdbRoot(new File(root, Constants.DBROOT));
             cmdln = cmdln.startCommand(StartAction.INITIALIZE);
-            if (clearLocalDataDirectories) {
-                cmdln.setForceVoltdbCreate(true);
-            } else {
-                cmdln.setForceVoltdbCreate(false);
-            }
+            cmdln.setForceVoltdbCreate(clearLocalDataDirectories);
             if (new Integer(hostId).equals(m_mismatchNode)) {
                 assert m_usesStagedSchema;
                 cmdln.m_userSchemas = m_mismatchSchema == null ? null
@@ -1103,12 +1132,16 @@ public class LocalCluster extends VoltServerConfig {
             }
             m_procBuilder.command().clear();
             List<String> cmdlnList = cmdln.createCommandLine();
-            String cmdLineFull = "Init cmd host=" + String.valueOf(hostId) + " :";
-            for (String element : cmdlnList) {
-                assert(element != null);
-                cmdLineFull += " " + element;
+            String cmdLineFull = "Init cmd host=" + String.valueOf(hostId);
+            if (logFullCmdLine) {
+                cmdLineFull += " :";
+                for (String element : cmdlnList) {
+                    assert(element != null);
+                    cmdLineFull += " " + element;
+                }
             }
             log.info(cmdLineFull);
+
             m_procBuilder.command().addAll(cmdlnList);
 
             // write output to obj/release/testoutput/<test name>-n.txt
@@ -1154,6 +1187,9 @@ public class LocalCluster extends VoltServerConfig {
                 ptf = new PipeToFile(fileName, proc.getInputStream(), String.valueOf(hostId), false,
                         proc, m_logMessageMatchPatterns, m_logMessageMatchResults.get(hostId));
                 ptf.setHostId(hostId);
+            }
+            if (savePipe) {
+                m_pipes.add(ptf);
             }
             ptf.setName("ClusterPipe:" + String.valueOf(hostId));
             ptf.start();
@@ -1288,10 +1324,13 @@ public class LocalCluster extends VoltServerConfig {
             m_cmdLines.add(cmdln);
             m_procBuilder.command().clear();
             List<String> cmdlnList = cmdln.createCommandLine();
-            String cmdLineFull = "Start cmd host=" + String.valueOf(hostId) + " :";
-            for (String element : cmdlnList) {
-                assert(element != null);
-                cmdLineFull += " " + element;
+            String cmdLineFull = "Start cmd host=" + String.valueOf(hostId);
+            if (logFullCmdLine) {
+                cmdLineFull += " :";
+                for (String element : cmdlnList) {
+                    assert(element != null);
+                    cmdLineFull += " " + element;
+                }
             }
             log.info(cmdLineFull);
             System.out.println(cmdLineFull);
@@ -1596,9 +1635,12 @@ public class LocalCluster extends VoltServerConfig {
             //Rejoin does not do paused mode.
 
             List<String> rejoinCmdLnStr = rejoinCmdLn.createCommandLine();
-            String cmdLineFull = "Rejoin cmd line:";
-            for (String element : rejoinCmdLnStr) {
-                cmdLineFull += " " + element;
+            String cmdLineFull = "Rejoin cmd host=" + String.valueOf(hostId);
+            if (logFullCmdLine) {
+                cmdLineFull += " :";
+                for (String element : rejoinCmdLnStr) {
+                    cmdLineFull += " " + element;
+                }
             }
             log.info(cmdLineFull);
 

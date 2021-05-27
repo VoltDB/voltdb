@@ -166,8 +166,7 @@ public class TestExportOverflow extends RegressionSuite {
         LocalCluster config = new LocalCluster("export-overflow-test.jar", 1, 1, 0,
                 BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);
         config.setHasLocalServer(false);
-        // This is only for testing create --force.
-        config.setOldCli();
+
         boolean compile = config.compile(project);
         assertTrue(compile);
         builder.addServerConfig(config);

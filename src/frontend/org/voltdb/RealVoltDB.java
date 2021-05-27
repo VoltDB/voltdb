@@ -936,38 +936,45 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             connectLicensing();
             m_licensing.readLicenseFile(config);
 
-            // Log some facts about the user account: account name,
-            // home dir, working dir where Java was started
-            hostLog.info(String.format("User properties: user.name '%s' user.home '%s' user.dir '%s'",
-                                       System.getProperty("user.name"),
-                                       System.getProperty("user.home"),
-                                       System.getProperty("user.dir")));
-
-            // Warn if user is named "root"
-            if (System.getProperty("user.name").equals("root")) {
-                hostLog.warn("VoltDB is running as root. " +
-                             "Running the VoltDB server software from the system root account is not recommended.");
+            // By default, omit the wall of text in unit tests
+            if (CoreUtils.isJunitTest() && System.getenv("FULL_CMDLINE_LOGGING") == null) {
+                hostLog.info("Declining to log command line arguments in unit test");
             }
 
-            // Replay command line args that we can see
-            StringBuilder sb = new StringBuilder(2048).append("Command line arguments: ");
-            sb.append(System.getProperty("sun.java.command", "[not available]"));
-            hostLog.info(sb.toString());
+            else {
+                // Log some facts about the user account: account name,
+                // home dir, working dir where Java was started
+                hostLog.info(String.format("User properties: user.name '%s' user.home '%s' user.dir '%s'",
+                                           System.getProperty("user.name"),
+                                           System.getProperty("user.home"),
+                                           System.getProperty("user.dir")));
 
-            List<String> iargs = ManagementFactory.getRuntimeMXBean().getInputArguments();
-            sb.delete(0, sb.length()).append("Command line JVM arguments:");
-            for (String iarg : iargs) {
-                sb.append(" ").append(iarg);
-            }
-            if (iargs.size() > 0) {
+                // Warn if user is named "root"
+                if (System.getProperty("user.name").equals("root")) {
+                    hostLog.warn("VoltDB is running as root. " +
+                                 "Running the VoltDB server software from the system root account is not recommended.");
+                }
+
+                // Replay command line args that we can see
+                StringBuilder sb = new StringBuilder(2048).append("Command line arguments: ");
+                sb.append(System.getProperty("sun.java.command", "[not available]"));
                 hostLog.info(sb.toString());
-            } else {
-                hostLog.info("No JVM command line args known.");
-            }
 
-            sb.delete(0, sb.length()).append("Command line JVM classpath: ");
-            sb.append(System.getProperty("java.class.path", "[not available]"));
-            hostLog.info(sb.toString());
+                List<String> iargs = ManagementFactory.getRuntimeMXBean().getInputArguments();
+                sb.delete(0, sb.length()).append("Command line JVM arguments:");
+                for (String iarg : iargs) {
+                    sb.append(" ").append(iarg);
+                }
+                if (iargs.size() > 0) {
+                    hostLog.info(sb.toString());
+                } else {
+                    hostLog.info("No JVM command line args known.");
+                }
+
+                sb.delete(0, sb.length());sb.append("Command line JVM classpath: ");
+                sb.append(System.getProperty("java.class.path", "[not available]"));
+                hostLog.info(sb.toString());
+            }
 
             if (config.m_startAction == StartAction.INITIALIZE) {
                 if (config.m_forceVoltdbCreate) {
