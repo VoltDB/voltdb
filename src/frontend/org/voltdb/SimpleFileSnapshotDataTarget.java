@@ -138,9 +138,12 @@ public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
                     }
                     try {
                         int totalWritten = 0;
-
                         final ByteBuffer dataBuf = data.b();
-                        DefaultSnapshotDataTarget.enforceSnapshotRateLimit(dataBuf.remaining());
+
+                        //Do not enforce rate limiter if nothing to be written
+                        if (dataBuf.hasRemaining()) {
+                            DefaultSnapshotDataTarget.enforceSnapshotRateLimit(dataBuf.remaining());
+                        }
 
                         while (dataBuf.hasRemaining()) {
                             int written = m_fc.write(dataBuf);
