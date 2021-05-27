@@ -57,6 +57,8 @@ set $PREV isDRed false
 set $PREV tableType 1
 set $PREV migrationTarget ""
 set $PREV topicName ""
+set $PREV topicKeyColumnNames ""
+set $PREV topicValueColumnNames ""
 add /clusters#cluster/databases#database/tables#EMPLOYEES columns EMP_ID
 set /clusters#cluster/databases#database/tables#EMPLOYEES/columns#EMP_ID index 1
 set $PREV type 5
