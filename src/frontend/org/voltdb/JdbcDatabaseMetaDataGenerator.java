@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -228,8 +228,7 @@ public class JdbcDatabaseMetaDataGenerator
             new ColumnInfo("IS_SINGLE", VoltType.STRING),
             new ColumnInfo("IS_OPAQUE", VoltType.STRING),
             new ColumnInfo("STREAM_NAME", VoltType.STRING),
-            new ColumnInfo("PROCEDURE_NAME", VoltType.STRING),
-            new ColumnInfo("PROFILE", VoltType.STRING)
+            new ColumnInfo("PROCEDURE_NAME", VoltType.STRING)
     };
 
     JdbcDatabaseMetaDataGenerator(Catalog catalog, DefaultProcedureManager defaultProcs, InMemoryJarfile jarfile)
@@ -874,7 +873,7 @@ public class JdbcDatabaseMetaDataGenerator
         VoltTable results = new VoltTable(TOPICS_SCHEMA);
         for (Topic topic : m_database.getTopics()) {
             results.addRow(topic.getTypeName(), Boolean.toString(topic.getIssingle()), Boolean.toString(topic.getIsopaque()),
-                    topic.getStreamname(), topic.getProcedurename(), topic.getProfile());
+                    topic.getStreamname(), topic.getProcedurename());
         }
         return results;
     }

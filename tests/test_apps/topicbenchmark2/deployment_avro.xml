@@ -23,14 +23,20 @@
        <!--  should be 3/4 number of cores (32 cores on volt16)  -->
        <property name="network.thread.count">24</property>
      </broker>
+     <!-- Note: do not specify a format for the topic in order to let the key format be determined as LONG -->
      <topic name="TEST_TOPIC" procedure="test_topic" retention="1 dy">
        <property name="producer.parameters.includeKey">true</property>
+       <property name="producer.format.value">avro</property>
+       <property name="consumer.format.value">avro</property>
        <!-- option to test inline encoding
        <property name="topic.store.encoded">true</property>
        -->
      </topic>
+     <!-- Note: do not specify a format for the topic in order to let the key format be determined as LONG -->
      <topic name="TEST_TOPIC01" procedure="test_topic01" retention="1 dy">
        <property name="producer.parameters.includeKey">true</property>
+       <property name="producer.format.value">avro</property>
+       <property name="consumer.format.value">avro</property>
        <!-- option to test inline encoding
        <property name="topic.store.encoded">true</property>
        -->

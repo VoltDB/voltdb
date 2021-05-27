@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -43,7 +43,7 @@ import org.junit.Test;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltdb.utils.PBDUtils.ConfigurationException;
+import org.voltdb.e3.topics.TopicRetention;
 import org.voltdb.utils.TestPersistentBinaryDeque.ExtraHeaderMetadata;
 
 import com.google.common.collect.ImmutableMap;
@@ -393,7 +393,6 @@ public class TestMaxBytesRetentionPolicy {
         bldr.put("100 Mb", 100L * 1024L * 1024L);
         bldr.put("2gb", 2L * 1024L * 1024L * 1024L);
         bldr.put("3 GB", 3L * 1024L * 1024L * 1024L);
-        bldr.put("+5 gb", 5L * 1024L * 1024L * 1024L);
         s_validLimits = bldr.build();
     }
     private static final Set<String> s_invalidLimits;
@@ -401,25 +400,28 @@ public class TestMaxBytesRetentionPolicy {
         ImmutableSet.Builder<String> bldr = ImmutableSet.builder();
         bldr.add("2 mb");
         bldr.add("63 mb");
-        bldr.add("66 Mo");
+        bldr.add("66 Mx");
         bldr.add("-2 gb");
         bldr.add("4 go");
         bldr.add("foo 4 gb");
+        bldr.add("+5 gb");
         s_invalidLimits = bldr.build();
     }
 
     @Test
     public void testParsingLimits() throws Exception {
         for (Map.Entry<String, Long> e : s_validLimits.entrySet()) {
-            long lim = PBDUtils.parseByteValue(e.getKey());
-            assertEquals(lim, e.getValue().longValue());
+            TopicRetention retention = TopicRetention.parse(e.getKey());
+            assertEquals(e.getValue().longValue(), retention.getEffectiveLimit());
         }
         for (String limStr : s_invalidLimits) {
             try {
-                PBDUtils.parseByteValue(limStr);
+                TopicRetention retention = TopicRetention.parse(limStr);
+                assertEquals(retention.getPolicy(), TopicRetention.Policy.SIZE);
+                System.out.println("Failed = " + limStr);
                 fail();
             }
-            catch (ConfigurationException expected) {
+            catch (Exception expected) {
                 ; // good
             }
         }

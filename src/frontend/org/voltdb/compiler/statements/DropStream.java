@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,7 +20,6 @@ package org.voltdb.compiler.statements;
 import java.util.regex.Matcher;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
-import org.hsqldb_voltpatches.lib.StringUtil;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DDLCompiler;
 import org.voltdb.compiler.DDLCompiler.DDLStatement;
@@ -46,12 +45,6 @@ public class DropStream extends StatementProcessor {
                     throw m_compiler.new VoltCompilerException(String.format(
                             "Invalid DROP STREAM statement: %s is not a stream.",
                             name));
-                }
-                String topic = element.attributes.get("topicName");
-                if (!StringUtil.isEmpty(topic)) {
-                    throw m_compiler.new VoltCompilerException(String.format(
-                            "Cannot drop stream %s: It is used by topic %s.",
-                            name, topic));
                 }
                 break;
             }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -66,6 +66,7 @@ import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Column;
+import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Deployment;
 import org.voltdb.catalog.FilteredCatalogDiffEngine;
@@ -1322,42 +1323,20 @@ public class VoltCompiler {
 
     void addExportTableToConnector(final String targetName, final String tableName, final Database catdb)
             throws VoltCompilerException {
-        assert tableName != null && ! tableName.trim().isEmpty() && catdb != null;
+        assert !StringUtils.isBlank(tableName) && catdb != null;
 
         // Catalog Connector
-        org.voltdb.catalog.Connector catconn = catdb.getConnectors().getIgnoreCase(targetName);
+        Connector catconn = catdb.getConnectors().getIgnoreCase(targetName);
         if (catconn == null) {
             catconn = catdb.getConnectors().add(targetName);
         }
-        org.voltdb.catalog.Table tableref = catdb.getTables().getIgnoreCase(tableName);
+        Table tableref = catdb.getTables().getIgnoreCase(tableName);
         if (tableref == null) {
             throw new VoltCompilerException("While configuring export, table " + tableName + " was not present in " +
             "the catalog.");
         } else if (TableType.isStream(tableref.getTabletype())) {
-            // streams cannot have tuple limits
-            if (tableref.getTuplelimit() != Integer.MAX_VALUE) {
-                throw new VoltCompilerException("Streams cannot have row limits configured");
-            }
-            Column pc = tableref.getPartitioncolumn();
-            //Get views
-            List<Table> tlist = CatalogUtil.getMaterializeViews(catdb, tableref);
-            if (pc == null && tlist.size() != 0) {
-                compilerLog.error("While configuring export, stream " + tableName + " is a source table " +
-                        "for a materialized view. Streams support views as long as partitioned column is part of the view.");
-                throw new VoltCompilerException("Stream configured with materialized view without partitioned column.");
-            }
-            if (pc != null && pc.getName() != null && tlist.size() != 0) {
-                for (Table t : tlist) {
-                    if (t.getColumns().get(pc.getName()) == null) {
-                        compilerLog.error("While configuring export, table " + t + " is a source table " +
-                                "for a materialized view. Export only tables support views as long as partitioned column is part of the view.");
-                        throw new VoltCompilerException("Stream configured with materialized view without partitioned column in the view.");
-                    } else {
-                        //Set partition column of view table to partition column of stream
-                        t.setPartitioncolumn(t.getColumns().get(pc.getName()));
-                    }
-                }
-            }
+            checkExportedStream(tableref, catdb, "export");
+
             // This is used to enforce default connectors assigned to streams through the Java Property
             // for streams that don't have the Export To Target clause
             if (TableType.isConnectorLessStream(tableref.getTabletype()) && System.getProperty(ExportDataProcessor.EXPORT_TO_TYPE) != null) {
@@ -1368,15 +1347,6 @@ public class VoltCompiler {
             compilerLog.error("While configuring export, " + tableName + " is a " +
                                         "materialized view.  A view cannot be export source.");
             throw new VoltCompilerException("View configured as export source");
-        } else if (tableref.getIndexes().size() > 0 && TableType.isStream(tableref.getTabletype())) {
-            compilerLog.error("While configuring export, stream " + tableName + " has indexes defined. " +
-                    "Streams can't have indexes (including primary keys).");
-            throw new VoltCompilerException("Streams cannot be configured with indexes");
-        } else if (tableref.getIsreplicated() && !TableType.needsShadowStream(tableref.getTabletype())) {
-            // if you don't specify partition columns, make
-            // export tables partitioned, but on no specific column (iffy)
-            tableref.setIsreplicated(false);
-            tableref.setPartitioncolumn(null);
         }
         org.voltdb.catalog.ConnectorTableInfo connTableInfo =
                 catconn.getTableinfo().getIgnoreCase(tableName);
@@ -1388,14 +1358,57 @@ public class VoltCompiler {
         } else  {
             throw new VoltCompilerException(String.format("Table \"%s\" is already exported", tableName));
         }
+    }
 
+    // Note: this method has side-effects on the stream being checked, and the views using it
+    void checkExportedStream(Table table, final Database catdb, String what) throws VoltCompilerException {
+        assert TableType.isStream(table.getTabletype());
+
+        // Check views on stream
+        Column pc = table.getPartitioncolumn();
+        List<Table> tlist = CatalogUtil.getMaterializeViews(catdb, table);
+
+        if (pc == null && tlist.size() != 0) {
+            compilerLog.error("While configuring " + what + ", stream " + table.getTypeName() + " is a source table " +
+                    "for a materialized view. Streams support views as long as partitioned column is part of the view.");
+            throw new VoltCompilerException("Stream configured with materialized view without partitioned column.");
+        }
+        if (pc != null && pc.getName() != null && tlist.size() != 0) {
+            for (Table t : tlist) {
+                if (t.getColumns().get(pc.getName()) == null) {
+                    compilerLog.error("While configuring " + what + ", table " + t + " is a source table " +
+                            "for a materialized view. Export only tables support views as long as partitioned column is part of the view.");
+                    throw new VoltCompilerException("Stream configured with materialized view without partitioned column in the view.");
+                } else {
+                    //Set partition column of view table to partition column of stream
+                    t.setPartitioncolumn(t.getColumns().get(pc.getName()));
+                }
+            }
+        }
+
+        // Other checks
+        if (table.getTuplelimit() != Integer.MAX_VALUE) {
+            throw new VoltCompilerException("Streams cannot have row limits configured");
+        }
+        if (table.getIndexes().size() > 0) {
+            compilerLog.error("While configuring " + what + ", stream " + table + " has indexes defined. " +
+                    "Streams can't have indexes (including primary keys).");
+            throw new VoltCompilerException("Streams cannot be configured with indexes");
+        }
+
+        // Streams exporting to topic or target should never be set to replicated even if no partition column
+        // exists. The results are "partitioned" streams with no partitioning column (iffy).
+        if (table.getIsreplicated()) {
+            table.setIsreplicated(false);
+            table.setPartitioncolumn(null);
+        }
     }
 
     void compileDRTable(final Entry<String, String> drNode, final Database db) throws VoltCompilerException {
         String tableName = drNode.getKey();
         String action = drNode.getValue();
 
-        org.voltdb.catalog.Table tableref = db.getTables().getIgnoreCase(tableName);
+        Table tableref = db.getTables().getIgnoreCase(tableName);
         if (tableref.getMaterializer() != null) {
             throw new VoltCompilerException("While configuring dr, table " + tableName + " is a materialized view." +
                     " DR does not support materialized view.");

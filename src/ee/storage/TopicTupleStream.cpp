@@ -34,12 +34,12 @@ namespace voltdb {
 // property keys for topics. These are a duplicate of what is in TopicProperties.java
 const std::string TopicTupleStream::PROP_STORE_ENCODED = "topic.store.encoded";
 const std::string TopicTupleStream::PROP_TOPIC_FORMAT = "topic.format";
-const std::string TopicTupleStream::PROP_TOPIC_FORMAT_VALUES = "topic.format.values";
+const std::string TopicTupleStream::PROP_TOPIC_FORMAT_VALUE = "topic.format.value";
 const std::string TopicTupleStream::PROP_CONSUMER_FORMAT = "consumer.format";
-const std::string TopicTupleStream::PROP_CONSUMER_FORMAT_KEYS = "consumer.format.keys";
-const std::string TopicTupleStream::PROP_CONSUMER_FORMAT_VALUES = "consumer.format.values";
-const std::string TopicTupleStream::PROP_CONSUMER_KEYS = "consumer.keys";
-const std::string TopicTupleStream::PROP_CONSUMER_VALUES = "consumer.values";
+const std::string TopicTupleStream::PROP_CONSUMER_FORMAT_KEY = "consumer.format.key";
+const std::string TopicTupleStream::PROP_CONSUMER_FORMAT_VALUE = "consumer.format.value";
+const std::string TopicTupleStream::PROP_CONSUMER_KEY = "consumer.key";
+const std::string TopicTupleStream::PROP_CONSUMER_VALUE = "consumer.value";
 static const std::string s_undefinedFormat = "UNDEFINED";
 
 
@@ -75,13 +75,13 @@ std::pair<topics::TupleEncoder*, topics::TupleEncoder*> TopicTupleStream::create
         props[prop.second->name()] = prop.second->value();
     }
 
-    std::vector<std::string> keyFormats { PROP_CONSUMER_FORMAT_KEYS, PROP_CONSUMER_FORMAT, PROP_TOPIC_FORMAT };
-    topics::TupleEncoder *keyEncoder = createEncoder(stream, keyFormats, PROP_CONSUMER_KEYS, "",
+    std::vector<std::string> keyFormats { PROP_CONSUMER_FORMAT_KEY, PROP_CONSUMER_FORMAT, PROP_TOPIC_FORMAT };
+    topics::TupleEncoder *keyEncoder = createEncoder(stream, keyFormats, PROP_CONSUMER_KEY, "",
             topic.consumerKeySchemaId(), props);
 
-    std::vector<std::string> valueFormats { PROP_CONSUMER_FORMAT_VALUES, PROP_CONSUMER_FORMAT, PROP_TOPIC_FORMAT_VALUES,
+    std::vector<std::string> valueFormats { PROP_CONSUMER_FORMAT_VALUE, PROP_CONSUMER_FORMAT, PROP_TOPIC_FORMAT_VALUE,
             PROP_TOPIC_FORMAT };
-    topics::TupleEncoder *valueEncoder = createEncoder(stream, valueFormats, PROP_CONSUMER_VALUES, "*",
+    topics::TupleEncoder *valueEncoder = createEncoder(stream, valueFormats, PROP_CONSUMER_VALUE, "*",
             topic.consumerValueSchemaId(), props);
 
     return {keyEncoder, valueEncoder};

@@ -39,6 +39,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.function.LongConsumer;
+import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -60,10 +61,14 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
+import org.voltdb.compiler.deploymentfile.PropertyType;
+import org.voltdb.compiler.deploymentfile.TopicType;
+import org.voltdb.e3.topics.TopicProperties;
 import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.test.utils.RandomTestRule;
 import org.voltdb.utils.VoltFile;
+
 import com.google_voltpatches.common.collect.ImmutableList;
 
 public class LocalClustersTestBase extends JUnit4LocalClusterTest {
@@ -99,10 +104,15 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
                     + "partition table {0}" + STREAM_TAG + "{1} on column key;"
                     + "create procedure " + INSERT_PREFIX + "{0}" + STREAM_TAG + "{1} as insert into {0}" + STREAM_TAG + "{1} (key, value) values (?, ?);");
 
+    /*
+     * Topic creation format:
+     * NOTES:
+     * - topic name in deployment == table name in DDL (although preserving the original case)
+     */
     public static final MessageFormat TOPIC_FMT = new MessageFormat(
-            "create stream {0}" + TOPIC_TAG + "{1} partition on column key (key bigint not null, value bigint not null);"
-                    + "create procedure " + INSERT_PREFIX + "{0}" + TOPIC_TAG + "{1} as insert into {0}" + TOPIC_TAG + "{1} (key, value) values (?, ?);"
-                    + "create topic using stream {0}" + TOPIC_TAG + "{1} EXECUTE PROCEDURE " + INSERT_PREFIX + "{0}" + TOPIC_TAG + "{1} {2} PROPERTIES (consumer.keys=key);");
+            "create stream {0}" + TOPIC_TAG + "{1} partition on column key export to topic {0}" + TOPIC_TAG + "{1} "
+                    + "(key bigint not null, value bigint not null);"
+                    + "create procedure " + INSERT_PREFIX + "{0}" + TOPIC_TAG + "{1} as insert into {0}" + TOPIC_TAG + "{1} (key, value) values (?, ?);");
 
     // Track the current running clusters so they can be reused between tests if the configuration doesn't change
     private static final List<ClusterConfiguration> CLUSTER_CONFIGURATIONS = new ArrayList<>();
@@ -427,6 +437,7 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
             try {
                 System.out.println("Creating cluster " + clusterNumber);
                 String schemaDDL = schema.createSchemaDDL();
+                deployTopics(config.builder, schema.m_topicsCount);
                 lc = LocalCluster.createLocalCluster(schemaDDL, config.siteCount, config.hostCount, config.kfactor,
                         clusterNumber, 11000 + (clusterNumber * 100), clusterNumber == 0 ? 11100 : 11000,
                         m_temporaryFolder.newFolder().getAbsolutePath(), JAR_NAME, drRoleType,
@@ -459,15 +470,47 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
     }
 
     protected void generateTopicDDL(int topicNum, StringBuffer sb) {
-        generateTopicDDL(topicNum, "", sb);
-    }
-
-    protected void generateTopicDDL(int topicNum, String profileClause, StringBuffer sb) {
-        TableType.TOPIC.generateTableDDL(sb, m_methodName, topicNum, profileClause);
+        TableType.TOPIC.generateTableDDL(sb, m_methodName, topicNum);
     }
 
     protected TableDdlStatements getTableDdlStatements(int tableNumber) {
         return new TableDdlStatements(m_methodName, tableNumber);
+    }
+
+    /**
+     * Deploy the topics in the project builder before instantiating the clusters
+     * <p>
+     * Since we don't know how callers structure their configs, check for existence before creating.
+     *
+     * @param builder       {@link VoltProjectBuilder} instance to update
+     * @param topicsCount   count of topics to create
+     */
+    protected void deployTopics(VoltProjectBuilder builder, int topicsCount) {
+        if (topicsCount == 0) {
+            return;
+        }
+
+        List<TopicType> topics = builder.getTopicsConfiguration().getTopic();
+        Set<String> topicNames = topics.stream().map(TopicType::getName).collect(Collectors.toCollection(HashSet::new));
+
+        // Create common property identifying consumer key
+        PropertyType prop = new PropertyType();
+        prop.setName(TopicProperties.Key.CONSUMER_KEY.name());
+        prop.setValue("key");
+
+        // Deploy topics with table name and procedure name - skip those that exist
+        for (int i = 0; i < topicsCount; i++) {
+            String topicName = getTableName(i, TableType.TOPIC);
+            if (topicNames.contains(topicName)) {
+                continue;
+            }
+
+            TopicType topic = new TopicType();
+            topic.setName(topicName);
+            topic.setProcedure(getProcedureName(i, TableType.TOPIC));
+            topic.getProperty().add(prop);
+            topics.add(topic);
+        }
     }
 
     /**
@@ -621,6 +664,16 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
      */
     protected String getTableName(int tableNumber, TableType tableType) {
         return getDbResourceName("", tableNumber, tableType);
+    }
+
+    /**
+     *
+     * @param tableNumber 0 based table number
+     * @param tableType the type of the table
+     * @return the name of the corresponding procedure
+     */
+    protected String getProcedureName(int tableNumber, TableType tableType) {
+        return getDbResourceName(INSERT_PREFIX, tableNumber, tableType);
     }
 
     /**

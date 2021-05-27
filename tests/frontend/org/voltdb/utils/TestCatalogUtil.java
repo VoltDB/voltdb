@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -88,7 +88,7 @@ public class TestCatalogUtil extends TestCase {
         // Simple check to make sure things look ok...
         for (Table catalog_tbl : catalog_db.getTables()) {
             StringBuilder sb = new StringBuilder();
-            CatalogSchemaTools.toSchema(sb, catalog_tbl, null, false, null, null);
+            CatalogSchemaTools.toSchema(sb, catalog_tbl, null, false, null, null, null);
             String sql = sb.toString();
             assertTrue(sql.startsWith("CREATE TABLE " + catalog_tbl.getTypeName()));
 

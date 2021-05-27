@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -112,6 +112,7 @@ import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.PlanFragment;
 import org.voltdb.catalog.Procedure;
+import org.voltdb.catalog.Property;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Systemsettings;
@@ -149,7 +150,11 @@ import org.voltdb.compiler.deploymentfile.SnmpType;
 import org.voltdb.compiler.deploymentfile.SslType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.ThreadPoolsType;
+import org.voltdb.compiler.deploymentfile.TopicType;
+import org.voltdb.compiler.deploymentfile.TopicsType;
 import org.voltdb.compiler.deploymentfile.UsersType;
+import org.voltdb.e3.topics.TopicProperties;
+import org.voltdb.e3.topics.TopicRetention;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportManager;
 import org.voltdb.expressions.AbstractExpression;
@@ -951,6 +956,7 @@ public abstract class CatalogUtil {
             }
             if (!isPlaceHolderCatalog) {
                 setExportInfo(catalog, deployment.getExport(), deployment.getThreadpools());
+                setTopics(catalog, deployment.getTopics());
                 setImportInfo(catalog, deployment.getImport());
                 setSnmpInfo(deployment.getSnmp());
             }
@@ -968,7 +974,7 @@ public abstract class CatalogUtil {
             // should return an error, and let the caller decide what to do (crash or not, for
             // example)
             errmsg = "Error validating deployment configuration: " + e.getMessage();
-            hostLog.error(errmsg);
+            hostLog.error(errmsg, e);
             return errmsg;
         }
 
@@ -1900,7 +1906,7 @@ public abstract class CatalogUtil {
             if (catconn == null) {
                 if (connectorEnabled) {
                     hostLog.info("Export configuration enabled and provided for export target " + targetName
-                            + " in deployment file however no export tables are assigned to the this target. "
+                            + " in deployment file however no export tables are assigned to this target. "
                             + "Export target " + targetName + " will be disabled.");
                 }
                 continue;
@@ -2035,6 +2041,120 @@ public abstract class CatalogUtil {
             } else {
                 groupidToTopics.put(groupid, topics);
             }
+        }
+    }
+
+    /**
+     * Set {@code Topic} instances in catalog, and connect their streams.
+     * <p>
+     * Historically topics were created by a CREATE TOPIC DDL command, which
+     * has been replaced by deployment file specification. However, inline encoding
+     * requires sending {@code Topic} instances to the EE.
+     * <p>
+     * Note: on @UpdateClasses this is called with deployment already compiled in the
+     * catalog. Overwrite the existing objects (FIXME: not efficient).
+     *
+     * @param catalog {@code Catalog} being built
+     * @param topicsType {@code TopicsType} from deployment
+     */
+    private static void setTopics(Catalog catalog, TopicsType topicsType) {
+        final Cluster cluster = getCluster(catalog);
+        Database db = cluster.getDatabases().get("database");
+
+        if (topicsType == null) {
+            return;
+        }
+
+        // Build a map of streams referring to topics - multiple streams to same topic is caught here,
+        // not in validation. Since catalog rejects homonyms differing by case, perform case-insensitive checks.
+        Map<String, Table> topicStreams = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+        for (Table table : db.getTables()) {
+            if (!StringUtils.isBlank(table.getTopicname())) {
+                // For now we only support connectorless streams exporting to topic
+                assert TableType.isConnectorLessStream(table.getTabletype()) : "Table " + table.getTypeName()
+                    + " has invalid type " + table.getTabletype() + " for topics";
+
+                Table curTable = topicStreams.put(table.getTopicname(), table);
+                if (curTable != null) {
+                    throw new RuntimeException(String.format("Streams %s and %s refer to the same topic %s",
+                            curTable.getTypeName(), table.getTypeName(), table.getTopicname()));
+                }
+            }
+        }
+
+        // Detect topic duplicates here since we have an update logic below: note case-insensitive check
+        HashSet<String> topics = new HashSet<>();
+
+        // Create topics, connecting them to streams as we go
+        CatalogMap<Topic> cataTopics = db.getTopics();
+        cataTopics.clear();
+        for (TopicType topic : topicsType.getTopic()) {
+            if (!topics.add(topic.getName().toUpperCase())) {
+                throw new RuntimeException(String.format("Topic %s conflicts with other homonym topics in deployment", topic.getName()));
+            }
+            Topic cataTopic = cataTopics.add(topic.getName());
+            String procName = topic.getProcedure();
+            if (!StringUtils.isBlank(procName)) {
+                cataTopic.setProcedurename(procName);
+            }
+            if (topic.isOpaque()) {
+                /*
+                 * The opaque topic will be partitioned only if the OPAQUE_PARTITIONED property
+                 * is true.
+                 */
+                cataTopic.setIsopaque(true);
+                cataTopic.setIssingle(true);
+            }
+            String roles = topic.getAllow();
+            if (!StringUtils.isBlank(roles)) {
+                cataTopic.setRoles(roles);
+            }
+            TopicRetention retention = TopicRetention.parse(topic.getRetention());
+            retention.toTopic(cataTopic);
+
+            /*
+             * Copy the properties: note special processing for single-partition opaque
+             * topics, caching the "single" property in the catalog object. This was required
+             * when transitioning from DDL to deployment. It was decided to make the "single"
+             * a property but existing code relied heavily on Topic.getIssingle().
+             */
+            CatalogMap<Property> cataProps = cataTopic.getProperties();
+            for (PropertyType prop : topic.getProperty()) {
+                if (TopicProperties.Key.OPAQUE_PARTITIONED.name().equals(prop.getName()) && cataTopic.getIsopaque()) {
+                    cataTopic.setIssingle(!Boolean.parseBoolean(prop.getValue()));
+                }
+                cataProps.add(prop.getName()).setValue(prop.getValue());
+            }
+
+            // Historical: topic format is a property
+            String formatName = topic.getFormat();
+            if (!StringUtils.isBlank(formatName)) {
+                cataProps.add(TopicProperties.Key.TOPIC_FORMAT.name()).setValue(formatName);
+            }
+
+            // Connect stream to topic
+            String streamName = null;
+            Table table = topicStreams.get(cataTopic.getTypeName());
+            if (table != null) {
+                // stream exports to topic, change stream type
+                streamName = table.getTypeName();
+                table.setTabletype(TableType.STREAM.get());
+
+                // Transfer stream column info to topic as properties (historical from previous topic DDL)
+                String keyColumns = table.getTopickeycolumnnames();
+                if (!StringUtils.isBlank(keyColumns)) {
+                    cataProps.add(TopicProperties.Key.CONSUMER_KEY.name()).setValue(keyColumns);
+                }
+                String valColumns = table.getTopicvaluecolumnnames();
+                if (!StringUtils.isBlank(valColumns)) {
+                    cataProps.add(TopicProperties.Key.CONSUMER_VALUE.name()).setValue(valColumns);
+                }
+            }
+            else if (topic.isOpaque()) {
+                // Streams are automatically created for opaque topics
+                streamName = topic.getName().toUpperCase();
+            }
+            cataTopic.setStreamname(streamName);
         }
     }
 

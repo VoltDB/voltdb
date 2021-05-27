@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -25,7 +25,6 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.EnumSet;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
@@ -50,12 +49,10 @@ import org.voltdb.catalog.Group;
 import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Procedure;
-import org.voltdb.catalog.Property;
 import org.voltdb.catalog.Table;
 import org.voltdb.catalog.Task;
 import org.voltdb.catalog.TaskParameter;
 import org.voltdb.catalog.TimeToLive;
-import org.voltdb.catalog.Topic;
 import org.voltdb.common.Constants;
 import org.voltdb.common.Permission;
 import org.voltdb.compilereport.ProcedureAnnotation;
@@ -101,11 +98,12 @@ public abstract class CatalogSchemaTools {
      * @param viewQuery - the Query if this Table is a View
      * @param isExportOnly Is this a export table.
      * @param streamPartitionColumn stream partition column
-     * @param streamTarget - true if this Table is an Export Table
+     * @param streamTarget - export name if this Table exports to a target
+     * @params topicName - topic name if this Table if this table exports to a topic
      * @return SQL Schema text representing the CREATE TABLE statement to generate the table
      */
     public static String toSchema(StringBuilder sb, Table catalog_tbl, String viewQuery,
-            boolean isExportOnly, String streamPartitionColumn, String streamTarget) {
+            boolean isExportOnly, String streamPartitionColumn, String streamTarget, String topicName) {
         assert(!catalog_tbl.getColumns().isEmpty());
         boolean tableIsView = (viewQuery != null);
 
@@ -127,7 +125,28 @@ public abstract class CatalogSchemaTools {
                 }
                 if (streamTarget != null && !streamTarget.equalsIgnoreCase(Constants.CONNECTORLESS_STREAM_TARGET_NAME) &&
                         TableType.isStream(catalog_tbl.getTabletype())) {
+                    assert topicName == null : "Table " + catalog_tbl.getTypeName()
+                    + " cannot export to target " + streamTarget + " and to topic " + topicName;
                     table_sb.append(" EXPORT TO TARGET ").append(streamTarget);
+                }
+                else if (topicName != null) {
+                    assert streamTarget == null || streamTarget.equalsIgnoreCase(Constants.CONNECTORLESS_STREAM_TARGET_NAME)
+                            : "Table " + catalog_tbl.getTypeName() + " cannot export to target " + streamTarget + " and to topic " + topicName;
+                    table_sb.append(" EXPORT TO TOPIC ").append(topicName);
+
+                    // Optional topic clauses must have been set in catalog
+                    String keyColumns = catalog_tbl.getTopickeycolumnnames();
+                    String valueColumns = catalog_tbl.getTopicvaluecolumnnames();
+
+                    if (!StringUtils.isBlank(keyColumns) || !StringUtils.isBlank(valueColumns)) {
+                        table_sb.append(" WITH ");
+                    }
+                    if (!StringUtils.isBlank(keyColumns)) {
+                        table_sb.append("KEY (").append(keyColumns).append(") ");
+                    }
+                    if (!StringUtils.isBlank(valueColumns)) {
+                        table_sb.append("VALUE (").append(valueColumns).append(") ");
+                    }
                 }
             } else {
                 table_sb.append("CREATE TABLE ").append(catalog_tbl.getTypeName());
@@ -494,52 +513,6 @@ public abstract class CatalogSchemaTools {
         sb.append(task.getEnabled() ? " ENABLE" : " DISABLE").append(";\n");
     }
 
-    public static void toSchema(StringBuilder sb, Topic topic) {
-        sb.append("CREATE");
-        if (topic.getIsopaque()) {
-           sb.append(" OPAQUE");
-        }
-        sb.append(" TOPIC");
-
-        if (StringUtils.isNotBlank(topic.getStreamname())) {
-            sb.append(" USING STREAM");
-        }
-
-        sb.append(" " + topic.getTypeName());
-
-        if (topic.getIsopaque() && !topic.getIssingle()) {
-            sb.append(" PARTITIONED");
-        }
-
-        if (StringUtils.isNoneBlank(topic.getProcedurename())) {
-            sb.append(" EXECUTE PROCEDURE " + topic.getProcedurename());
-        }
-
-        if (StringUtils.isNoneBlank(topic.getRoles())) {
-            sb.append(" ALLOW " + topic.getRoles());
-        }
-
-        if (StringUtils.isNoneBlank(topic.getProfile())) {
-            sb.append(" PROFILE " + topic.getProfile());
-        }
-
-        if (!topic.getProperties().isEmpty()) {
-            sb.append(" PROPERTIES (");
-            Iterator<Property> iter = topic.getProperties().iterator();
-            if (iter.hasNext()) {
-                Property prop = iter.next();
-                sb.append(prop.getTypeName()).append("='").append(prop.getValue()).append('\'');
-                while (iter.hasNext()) {
-                    prop = iter.next();
-                    sb.append(',').append(prop.getTypeName()).append("='").append(prop.getValue()).append('\'');
-                }
-            }
-            sb.append(')');
-        }
-
-        sb.append(";\n");
-    }
-
     private static void appendTaskParameters(StringBuilder sb, CatalogMap<TaskParameter> params) {
         if (!params.isEmpty()) {
             String delimiter = " WITH (";
@@ -708,12 +681,13 @@ public abstract class CatalogSchemaTools {
                         }
                         toSchema(sb, table, null, TableType.isStream(table.getTabletype()),
                                 (table.getPartitioncolumn() != null ? table.getPartitioncolumn().getName() : null),
-                                CatalogUtil.getExportTargetIfExportTableOrNullOtherwise(db, table));
+                                CatalogUtil.getExportTargetIfExportTableOrNullOtherwise(db, table),
+                                StringUtils.isBlank(table.getTopicname()) ? null : table.getTopicname());
                     }
                     // A View cannot precede a table that it depends on in the DDL
                     for (Table table : viewList) {
                         String viewQuery = ((TableAnnotation) table.getAnnotation()).ddl;
-                        toSchema(sb, table, viewQuery, false, null, null);
+                        toSchema(sb, table, viewQuery, false, null, null, null);
                     }
                 }
 
@@ -735,13 +709,6 @@ public abstract class CatalogSchemaTools {
                 if (!schedules.isEmpty()) {
                     for (Task task : schedules) {
                         toSchema(sb, task);
-                    }
-                }
-
-                CatalogMap<Topic> topics = db.getTopics();
-                if (!topics.isEmpty()) {
-                    for (Topic topic : topics) {
-                        toSchema(sb, topic);
                     }
                 }
 

@@ -199,7 +199,7 @@ TEST_F(TopicTupleStreamTest, GetTopicForStream) {
 TEST_F(TopicTupleStreamTest, NullEncoders) {
     const catalog::Topic* topic = createTopic("topic");
     TopicProperties props;
-    props[TopicTupleStream::PROP_CONSUMER_VALUES] = "";
+    props[TopicTupleStream::PROP_CONSUMER_VALUE] = "";
     addProperties(topic, props);
 
     std::vector<ValueType> types {ValueType::tBIGINT, ValueType::tBIGINT};
@@ -287,8 +287,8 @@ TEST_F(TopicTupleStreamTest, SimpleTypeEncoders) {
     // Test with int and bigint
     TopicProperties props;
     props[TopicTupleStream::PROP_STORE_ENCODED] = "true";
-    props[TopicTupleStream::PROP_CONSUMER_KEYS] = "integer";
-    props[TopicTupleStream::PROP_CONSUMER_VALUES] = "bigint";
+    props[TopicTupleStream::PROP_CONSUMER_KEY] = "integer";
+    props[TopicTupleStream::PROP_CONSUMER_VALUE] = "bigint";
     addProperties(topic, props);
 
     std::unique_ptr<TopicTupleStream> tts(TopicTupleStream::create(*stream, *topic, 1, 1, 1));
@@ -325,8 +325,8 @@ TEST_F(TopicTupleStreamTest, SimpleTypeEncoders) {
 
     // Now try double and varchar
     {
-        props[TopicTupleStream::PROP_CONSUMER_KEYS] = "double";
-        props[TopicTupleStream::PROP_CONSUMER_VALUES] = "varchar";
+        props[TopicTupleStream::PROP_CONSUMER_KEY] = "double";
+        props[TopicTupleStream::PROP_CONSUMER_VALUE] = "varchar";
         addProperties(topic, props);
 
         tts->update(*stream, *m_database);
@@ -367,8 +367,8 @@ TEST_F(TopicTupleStreamTest, SimpleTypeEncoders) {
 
     // Now try varbinary and null
     {
-        props[TopicTupleStream::PROP_CONSUMER_KEYS] = "varbinary";
-        props[TopicTupleStream::PROP_CONSUMER_VALUES] = "";
+        props[TopicTupleStream::PROP_CONSUMER_KEY] = "varbinary";
+        props[TopicTupleStream::PROP_CONSUMER_VALUE] = "";
         addProperties(topic, props);
 
         tts->update(*stream, *m_database);
@@ -405,8 +405,8 @@ TEST_F(TopicTupleStreamTest, SimpleTypeEncoders) {
 
     // Now try geography types which will be encoded as a string
     {
-        props[TopicTupleStream::PROP_CONSUMER_KEYS] = "geography";
-        props[TopicTupleStream::PROP_CONSUMER_VALUES] = "";
+        props[TopicTupleStream::PROP_CONSUMER_KEY] = "geography";
+        props[TopicTupleStream::PROP_CONSUMER_VALUE] = "";
         addProperties(topic, props);
 
         tts->update(*stream, *m_database);
@@ -483,7 +483,7 @@ TEST_F(TopicTupleStreamTest, MultiColumnAvroEncoder) {
     // Test with default columns with avro value
     TopicProperties props;
     props[TopicTupleStream::PROP_STORE_ENCODED] = "true";
-    props[TopicTupleStream::PROP_CONSUMER_FORMAT_VALUES] = "AVRO";
+    props[TopicTupleStream::PROP_CONSUMER_FORMAT_VALUE] = "AVRO";
     addProperties(topic, props);
 
     std::unique_ptr<TopicTupleStream> tts(TopicTupleStream::create(*stream, *topic, 1, 1, 1));
@@ -553,8 +553,8 @@ TEST_F(TopicTupleStreamTest, MultiColumnAvroEncoder) {
     }
 
     // Now try it with a key and some value columns
-    props[TopicTupleStream::PROP_CONSUMER_KEYS] = "integer, double";
-    props[TopicTupleStream::PROP_CONSUMER_VALUES] = "bigint, varchar, varbinary";
+    props[TopicTupleStream::PROP_CONSUMER_KEY] = "integer, double";
+    props[TopicTupleStream::PROP_CONSUMER_VALUE] = "bigint, varchar, varbinary";
     props[TopicTupleStream::PROP_CONSUMER_FORMAT] = "AVRO";
     addProperties(topic, props);
 
@@ -677,7 +677,7 @@ TEST_F(TopicTupleStreamTest, MultiColumnCsvEncoder) {
     // Test with default columns with csv value
     TopicProperties props;
     props[TopicTupleStream::PROP_STORE_ENCODED] = "true";
-    props[TopicTupleStream::PROP_CONSUMER_FORMAT_VALUES] = "CSV";
+    props[TopicTupleStream::PROP_CONSUMER_FORMAT_VALUE] = "CSV";
     addProperties(topic, props);
 
     std::unique_ptr<TopicTupleStream> tts(TopicTupleStream::create(*stream, *topic, 1, 1, 1));

@@ -180,11 +180,12 @@ begin Table                                  "A table (relation) in the database
   int tableType                              "Types: no stream(persistent), view-only stream, stream with target, persistent table for export and migration"
   string migrationTarget                     "The target where the data are migrated to"
   string topicName                           "Associated topic for stream"
+  string topicKeyColumnNames                 "List of topic key column names"
+  string topicValueColumnNames               "List of topic value column names"
   // Fields which were once part of topic streams but were replaced by topic objects in the catalog
   removed isTopic                         "Replaced by topicName not being empty"
   removed topicProfile                    "Moved to topic class"
   removed topicFormat                     "Moved to topic class"
-  removed topicKeyColumnNames             "Moved to topic class"
   removed topicAllowedRoleNames           "Moved to topic class"
 
 end
@@ -196,8 +197,11 @@ begin Topic                                  "A topic in the database"
   int consumerValueSchemaId                  "The schema ID for the consumer values"
   string streamName                          "Stream for the topic"
   string procedureName                       "Stored procedure for the topic"
+  int retentionPolicy                        "Retention policy of the topic"
+  int retentionLimit                         "Retention limit of the topic"
+  string retentionUnit                       "Retention unit of the topic"
   string roles                               "A CSV string of the roles to access this topic"
-  string profile                             "The deployment profile of the topic"
+  removed profile                            "The deployment profile of the topic"
   Property* properties                       "Configuration properties for the topic"
 end
 

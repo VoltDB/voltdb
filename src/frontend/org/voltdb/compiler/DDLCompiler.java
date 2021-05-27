@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -68,7 +68,6 @@ import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compiler.statements.AlterTask;
-import org.voltdb.compiler.statements.AlterTopic;
 import org.voltdb.compiler.statements.CatchAllVoltDBStatement;
 import org.voltdb.compiler.statements.CreateAggregateFunctionFromClass;
 import org.voltdb.compiler.statements.CreateFunctionFromMethod;
@@ -77,7 +76,6 @@ import org.voltdb.compiler.statements.CreateProcedureAsScript;
 import org.voltdb.compiler.statements.CreateProcedureFromClass;
 import org.voltdb.compiler.statements.CreateRole;
 import org.voltdb.compiler.statements.CreateTask;
-import org.voltdb.compiler.statements.CreateTopic;
 import org.voltdb.compiler.statements.DRTable;
 import org.voltdb.compiler.statements.DropAggregateFunction;
 import org.voltdb.compiler.statements.DropFunction;
@@ -85,7 +83,6 @@ import org.voltdb.compiler.statements.DropProcedure;
 import org.voltdb.compiler.statements.DropRole;
 import org.voltdb.compiler.statements.DropStream;
 import org.voltdb.compiler.statements.DropTask;
-import org.voltdb.compiler.statements.DropTopic;
 import org.voltdb.compiler.statements.PartitionStatement;
 import org.voltdb.compiler.statements.ReplicateTable;
 import org.voltdb.compiler.statements.SetGlobalParam;
@@ -248,9 +245,6 @@ public class DDLCompiler {
                                 .addNextProcessor(new CreateTask(this))
                                 .addNextProcessor(new DropTask(this))
                                 .addNextProcessor(new AlterTask(this))
-                                .addNextProcessor(new CreateTopic(this))
-                                .addNextProcessor(new DropTopic(this))
-                                .addNextProcessor(new AlterTopic(this))
                                 // CatchAllVoltDBStatement need to be the last processor in the chain.
                                 .addNextProcessor(new CatchAllVoltDBStatement(this, m_voltStatementProcessor));
     }
@@ -689,9 +683,12 @@ public class DDLCompiler {
             // check the table portion
             String tableName = checkIdentifierStart(statementMatcher.group(1), statement);
             String targetName = null;
+            String topicName = null;
+            String keyColumnNames = null;
+            String valueColumnNames = null;
             String columnName = null;
 
-            // Parse the EXPORT, PARTITION, and TOPIC clauses.
+            // Parse the EXPORT and PARTITION captures.
             if ((statementMatcher.groupCount() > 1) &&
                 (statementMatcher.group(2) != null) &&
                 (!statementMatcher.group(2).isEmpty())) {
@@ -703,11 +700,23 @@ public class DDLCompiler {
 
                     if (matcher.group(SQLParser.CAPTURE_EXPORT_TARGET) != null) {
                         // Add target info if it's an Export clause. Only one is allowed
-                        if (targetName != null) {
+                        if (targetName != null || topicName != null) {
                             throw m_compiler.new VoltCompilerException(
                                 "Only one Export clause is allowed for CREATE STREAM.");
                         }
                         targetName = matcher.group(SQLParser.CAPTURE_EXPORT_TARGET);
+                    }
+                    else if (matcher.group(SQLParser.CAPTURE_EXPORT_TOPIC) != null) {
+                        // Add target info if it's an Export clause. Only one is allowed
+                        if (targetName != null || topicName != null) {
+                            throw m_compiler.new VoltCompilerException(
+                                "Only one Export clause is allowed for CREATE STREAM.");
+                        }
+                        topicName = matcher.group(SQLParser.CAPTURE_EXPORT_TOPIC);
+
+                        // Add optional clauses
+                        keyColumnNames = matcher.group(SQLParser.CAPTURE_TOPIC_KEY_COLUMNS);
+                        valueColumnNames = matcher.group(SQLParser.CAPTURE_TOPIC_VALUE_COLUMNS);
                     }
                     else if (matcher.group(SQLParser.CAPTURE_STREAM_PARTITION_COLUMN) != null) {
                         // Add partition info if it's a PARTITION clause. Only one is allowed.
@@ -719,6 +728,8 @@ public class DDLCompiler {
                     }
                 }
             }
+
+            // Update table
             VoltXMLElement tableXML = m_schema.findChild("table", tableName.toUpperCase());
             if (tableXML != null) {
                 tableXML.attributes.put("stream", "true");
@@ -726,6 +737,7 @@ public class DDLCompiler {
                 throw m_compiler.new VoltCompilerException(String.format(
                         "Invalid STREAM statement: table %s does not exist", tableName));
             }
+
             // process partition if specified
             if (columnName != null) {
                 tableXML.attributes.put("partitioncolumn", columnName.toUpperCase());
@@ -735,7 +747,7 @@ public class DDLCompiler {
                 m_compiler.markTableAsDirty(tableName);
             }
 
-            // process export
+            // process export to target
             targetName = (targetName != null) ? checkIdentifierStart(
                     targetName, statement) : Constants.CONNECTORLESS_STREAM_TARGET_NAME;
 
@@ -744,6 +756,19 @@ public class DDLCompiler {
                         "Invalid CREATE STREAM statement: table %s is a DR table.", tableName));
             } else {
                 tableXML.attributes.put("export", targetName);
+            }
+
+            // process export to topic - note it erases the connector information
+            if (topicName != null) {
+                tableXML.attributes.put("topicName", topicName);
+                tableXML.attributes.remove("export");
+
+                if (keyColumnNames != null) {
+                    tableXML.attributes.put("topicKeyColumnNames", keyColumnNames);
+                }
+                if (valueColumnNames != null) {
+                    tableXML.attributes.put("topicValueColumnNames", valueColumnNames);
+                }
             }
         } else {
             throw m_compiler.new VoltCompilerException(String.format("Invalid CREATE STREAM statement: \"%s\", "
@@ -908,6 +933,12 @@ public class DDLCompiler {
                         checkValidPartitionTableIndex(index, partitionCol, tableName);
                     }
                 }
+            }
+            else if (!StringUtils.isBlank(table.getTopicname())) {
+                // Reject out of hand non-partitioned streams exporting to topics,
+                // even if the topic isn't declared yet in the deployment
+                throw m_compiler.new VoltCompilerException(String.format(
+                        "Invalid topic %s: stream %s must be partitioned", table.getTopicname(), table.getTypeName()));
             }
         }
     }
@@ -1410,13 +1441,7 @@ public class DDLCompiler {
         // any ASSUMEUNIQUE index to be UNIQUE index on replicated table. Therefore, we
         // set it according to current DDL state, then recheck table.m_isreplicated in handlePartitions().
         table.setIsreplicated(!node.attributes.containsKey("partitioncolumn"));
-        if (isStream) {
-            if(streamTarget != null && !Constants.CONNECTORLESS_STREAM_TARGET_NAME.equals(streamTarget)) {
-                table.setTabletype(TableType.STREAM.get());
-            } else {
-                table.setTabletype(TableType.CONNECTOR_LESS_STREAM.get());
-            }
-        }
+
         // map of index replacements for later constraint fixup
         final Map<String, String> indexReplacementMap = new TreeMap<>();
 
@@ -1492,13 +1517,30 @@ public class DDLCompiler {
             }
         }
 
-        // Note: This code depends on the {@link Topic} to have ben added to catalog.
-        // If table is a topic, its type may change from CONNECTOR_LESS_STREAM to STREAM,
-        // the reverse change may occur when we drop a topic.
+        // If table is a stream, initialize stream type
+        if (isStream) {
+            if(streamTarget != null && !Constants.CONNECTORLESS_STREAM_TARGET_NAME.equals(streamTarget)) {
+                table.setTabletype(TableType.STREAM.get());
+            } else {
+                table.setTabletype(TableType.CONNECTOR_LESS_STREAM.get());
+            }
+        }
+
+        // If table is a topic, it is created as a CONNECTOR_LESS_STREAM and will be changed to STREAM,
+        // if the topic is found to exist (see CatalogUtil.setTopics).
         final String topicName = node.attributes.get("topicName");
-        if (!StringUtil.isEmpty(topicName)  && db.getTopics().get(topicName) != null) {
+        if (!StringUtils.isBlank(topicName)) {
             table.setTopicname(topicName);
-            table.setTabletype(TableType.STREAM.get());
+
+            // Set the optional clauses
+            String keyColumns = node.attributes.get("topicKeyColumnNames");
+            if (keyColumns != null) {
+                table.setTopickeycolumnnames(keyColumns);
+            }
+            String valueColumns = node.attributes.get("topicValueColumnNames");
+            if (valueColumns != null) {
+                table.setTopicvaluecolumnnames(valueColumns);
+            }
         }
 
         final String migratingIndexName =
@@ -1600,7 +1642,8 @@ public class DDLCompiler {
         } else {
             // Get the final DDL for the table rebuilt from the catalog object
             // Don't need a real StringBuilder or export state to get the CREATE for a table
-            annotation.ddl = CatalogSchemaTools.toSchema(new StringBuilder(), table, query, isStream, streamPartitionColumn, streamTarget);
+            annotation.ddl = CatalogSchemaTools.toSchema(new StringBuilder(), table, query, isStream, streamPartitionColumn,
+                    streamTarget, topicName);
         }
     }
 

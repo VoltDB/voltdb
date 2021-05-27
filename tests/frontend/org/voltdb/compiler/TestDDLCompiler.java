@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -600,39 +600,6 @@ public class TestDDLCompiler extends TestCase {
         jarOut.delete();
     }
 
-    public void testTopic() {
-        File jarOut = new File("Topics.jar");
-        jarOut.deleteOnExit();
-        String schema[] = {
-                "CREATE STREAM FOO1 (S1 INTEGER);" +
-                "CREATE TOPIC USING STREAM foo1 EXECUTE PROCEDURE z ALLOW X,Y,Z PROFILE prof1 PROPERTIES (format.consumer.key = int, format.value = avro);",
-                "CREATE OPAQUE TOPIC foo2 PARTITIONED ALLOW X8,Y1,Z1 PROFILE prof1;",
-                "CREATE OPAQUE TOPIC foo3 ALLOW X,Y,Z PROFILE prof1;",
-                "CREATE OPAQUE TOPIC foo4 PARTITIONED;",
-                "CREATE STREAM FOO5 (S1 INTEGER); CREATE TOPIC USING STREAM foo5 ALLOW X,Y,Z PROFILE prof1 PROPERTIES (format.consumer.key = int);"
-        };
-        VoltCompiler compiler = new VoltCompiler(false);
-        for (int ii = 0; ii < schema.length; ++ii) {
-            File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema[ii]);
-            String schemaPath = schemaFile.getPath();
-            assertTrue(compiler.compileFromDDL(jarOut.getPath(), schemaPath));
-            jarOut.delete();
-        }
-
-        String schema1[] = {
-                "CREATE STREAM FOO6 (S1 INTEGER);" +
-                "CREATE TOPIC USING STREAM foo6 EXECUTE PROCEDURE z ALLOW X1,Y1,Z1 PROFILE prof1 PROPERTIES (key.procedure.use = true, format.consumer.key = avro, format.value);",
-                "CREATE OPAQUE TOPIC foo7 PARTITIONED ALLOW PRODUCER X,Y,Z ALLOW PRODUCER X12,Y1,Z1 PROFILE prof1;",
-                "CREATE TOPIC USING STREAM foo8 EXECUTE PROCEDURE z ALLOW X1,Y1,Z1 PROFILE prof1 PROPERTIES (key.procedure.use = true, format.consumer.key = avro, format.value);",
-        };
-        compiler = new VoltCompiler(false);
-        for (int ii = 0; ii < schema1.length; ++ii) {
-            File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema1[ii]);
-            String schemaPath = schemaFile.getPath();
-            assertFalse(compiler.compileFromDDL(jarOut.getPath(), schemaPath));
-            jarOut.delete();
-        }
-    }
     public void testSetDatabaseConfig() {
         File jarOut = new File("setDatabaseConfig.jar");
         jarOut.deleteOnExit();

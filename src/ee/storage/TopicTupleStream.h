@@ -56,12 +56,12 @@ public:
     // property keys for topics. These are a duplicate of what is in TopicProperties.java
     static const std::string PROP_STORE_ENCODED;
     static const std::string PROP_TOPIC_FORMAT;
-    static const std::string PROP_TOPIC_FORMAT_VALUES;
+    static const std::string PROP_TOPIC_FORMAT_VALUE;
     static const std::string PROP_CONSUMER_FORMAT;
-    static const std::string PROP_CONSUMER_FORMAT_KEYS;
-    static const std::string PROP_CONSUMER_FORMAT_VALUES;
-    static const std::string PROP_CONSUMER_KEYS;
-    static const std::string PROP_CONSUMER_VALUES;
+    static const std::string PROP_CONSUMER_FORMAT_KEY;
+    static const std::string PROP_CONSUMER_FORMAT_VALUE;
+    static const std::string PROP_CONSUMER_KEY;
+    static const std::string PROP_CONSUMER_VALUE;
 
 protected:
     ExportStreamBlock* allocateBlock(char* buffer, size_t length, int64_t uso) const override {

@@ -529,6 +529,23 @@ public class LocalCluster extends VoltServerConfig {
     }
 
     /**
+     * Compile project and return deployment string. It is recommended that {@code builder} is the same builder which was
+     * used to compile this instance with the appropriate modifications.
+     *
+     * @param builder   {@link VoltProjectBuilder} with updated configuration.
+     * @return          the deployment string to use in @UpdateApplicationCatalog
+     * @throws IOException
+     */
+    public String getDeploymentString(VoltProjectBuilder builder) throws IOException {
+        m_compiled = false;
+        assertTrue(compile(builder));
+
+        String deploymentString = new String(Files.readAllBytes(Paths.get(builder.getPathToDeployment())),
+                Constants.UTF8ENCODING);
+        return deploymentString;
+    }
+
+    /**
      * Update the catalog of a running instance. It is recommended that {@code builder} is the same builder which was
      * used to compile this instance with the appropriate modifications.
      *
@@ -540,15 +557,11 @@ public class LocalCluster extends VoltServerConfig {
      */
     public void updateCatalog(VoltProjectBuilder builder, ClientConfig clientConfig)
             throws IOException, ProcCallException, InterruptedException {
-        m_compiled = false;
-        assertTrue(compile(builder));
-
-        String deplymentString = new String(Files.readAllBytes(Paths.get(builder.getPathToDeployment())),
-                Constants.UTF8ENCODING);
+        String deploymentString = getDeploymentString(builder);
         Client client = createAdminClient(clientConfig);
         try {
             assertEquals(ClientResponse.SUCCESS,
-                    client.callProcedure("@UpdateApplicationCatalog", null, deplymentString).getStatus());
+                    client.callProcedure("@UpdateApplicationCatalog", null, deploymentString).getStatus());
         } finally {
             client.close();
         }

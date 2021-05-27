@@ -935,8 +935,7 @@ public class CatalogDiffEngine {
             suspect instanceof ColumnRef ||
             suspect instanceof Statement ||
             suspect instanceof PlanFragment ||
-            suspect instanceof TimeToLive ||
-            suspect instanceof Topic ) {
+            suspect instanceof TimeToLive) {
             return null;
         }
 
@@ -982,6 +981,10 @@ public class CatalogDiffEngine {
             return null;
         }
         if (suspect instanceof Deployment && field.equals("schemaRegistryUrl")) {
+            m_requiresNewExportGeneration = true;
+            return null;
+        }
+        if (suspect instanceof Topic) {
             m_requiresNewExportGeneration = true;
             return null;
         }

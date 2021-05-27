@@ -77,8 +77,8 @@ public class TopicProperties extends TypedPropertiesBase<TopicProperties.Key<?>>
      */
     public EncodeFormat getProducerValueFormat() {
         return firstValidFormat(
-                Key.PRODUCER_FORMAT_VALUES,
-                Key.TOPIC_FORMAT_VALUES,
+                Key.PRODUCER_FORMAT_VALUE,
+                Key.TOPIC_FORMAT_VALUE,
                 Key.TOPIC_FORMAT);
     }
 
@@ -87,7 +87,7 @@ public class TopicProperties extends TypedPropertiesBase<TopicProperties.Key<?>>
      */
     public EncodeFormat getConsumerKeyFormat() {
         return firstValidFormat(
-                Key.CONSUMER_FORMAT_KEYS,
+                Key.CONSUMER_FORMAT_KEY,
                 Key.CONSUMER_FORMAT,
                 Key.TOPIC_FORMAT);
     }
@@ -97,9 +97,9 @@ public class TopicProperties extends TypedPropertiesBase<TopicProperties.Key<?>>
      */
     public EncodeFormat getConsumerValueFormat() {
         return firstValidFormat(
-                Key.CONSUMER_FORMAT_VALUES,
+                Key.CONSUMER_FORMAT_VALUE,
                 Key.CONSUMER_FORMAT,
-                Key.TOPIC_FORMAT_VALUES,
+                Key.TOPIC_FORMAT_VALUE,
                 Key.TOPIC_FORMAT);
     }
 
@@ -135,23 +135,26 @@ public class TopicProperties extends TypedPropertiesBase<TopicProperties.Key<?>>
 
         // Formats which apply to both producer and consumer
         public static final Key<EncodeFormat> TOPIC_FORMAT = new FormatKey("topic.format");
-        public static final Key<EncodeFormat> TOPIC_FORMAT_VALUES = new FormatKey("topic.format.values");
+        public static final Key<EncodeFormat> TOPIC_FORMAT_VALUE = new FormatKey("topic.format.value");
 
         // Formats which just apply to producer records
-        public static final Key<EncodeFormat> PRODUCER_FORMAT_VALUES = new FormatKey("producer.format.values");
+        public static final Key<EncodeFormat> PRODUCER_FORMAT_VALUE = new FormatKey("producer.format.value");
 
         // Formats which just apply to consumer records
         public static final Key<EncodeFormat> CONSUMER_FORMAT = new FormatKey("consumer.format");
-        public static final Key<EncodeFormat> CONSUMER_FORMAT_KEYS = new FormatKey("consumer.format.keys");
-        public static final Key<EncodeFormat> CONSUMER_FORMAT_VALUES = new FormatKey("consumer.format.values");
+        public static final Key<EncodeFormat> CONSUMER_FORMAT_KEY = new FormatKey("consumer.format.key");
+        public static final Key<EncodeFormat> CONSUMER_FORMAT_VALUE = new FormatKey("consumer.format.value");
+
+        public static final Key<Boolean> OPAQUE_PARTITIONED = new TopicProperties.BooleanKey(
+                "opaque.partitioned", false);
 
         public static final Key<Boolean> PRODUCER_PARAMETERS_INCLUDE_KEY = new BooleanKey(
                 "producer.parameters.includeKey", Boolean.FALSE);
 
-        public static final Key<List<String>> CONSUMER_KEYS = new ColumnsKey("consumer.keys", ImmutableList.of());
+        public static final Key<List<String>> CONSUMER_KEY = new ColumnsKey("consumer.key", ImmutableList.of());
 
         // Default to * to indicate all columns are in the value
-        public static final Key<List<String>> CONSUMER_VALUES = new ColumnsKey("consumer.values", ALL_COLUMNS);
+        public static final Key<List<String>> CONSUMER_VALUE = new ColumnsKey("consumer.value", ALL_COLUMNS);
 
         // Mutable property allowing skipping over consumer errors
         public static final Key<Boolean> CONSUMER_SKIP_ERRORS = new BooleanKey("consumer.skip.errors", Boolean.FALSE);

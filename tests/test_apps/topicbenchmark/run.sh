@@ -30,7 +30,7 @@ HOST="localhost"
 function clean() {
     rm -rf obj debugoutput voltdbroot statement-plans catalog-report.html log *.jar *.csv
     find . -name '*.class' | xargs rm -f
-    rm -rf voltdbroot    
+    rm -rf voltdbroot
 }
 
 # Grab the necessary command line arguments
@@ -75,7 +75,7 @@ function jars() {
 
 # compile the procedure and client jarfiles if they don't exist
 function srccompile-ifneeded() {
-    if [ ! -e TopicBenchmark.jar ] || [ ! -e topicbenchmark-client.jar ] ; then
+    if [ ! -e topicbenchmark-procedures.jar ] || [ ! -e topicbenchmark-client.jar ] ; then
         srccompile;
     fi
 }

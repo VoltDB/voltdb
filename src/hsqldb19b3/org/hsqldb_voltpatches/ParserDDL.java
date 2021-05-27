@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2021, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -1485,10 +1485,9 @@ public class ParserDDL extends ParserRoutine {
                                    null, null);
     }
 
-    // skip Export to target of statment
-    // skip constraint ?
     StatementSchema compileCreateStream(int type) {
 
+        // Read name and create stream object
         HsqlName name = readNewSchemaObjectNameNoCheck(SchemaObject.TABLE);
         HsqlArrayList tempConstraints = new HsqlArrayList();
 
@@ -1500,6 +1499,10 @@ public class ParserDDL extends ParserRoutine {
             return readTableAsSubqueryDefinition(table);
         }
 
+        // Skip some stream-specific tokens that will be analyzed in DDLCompiler.processCreateStreamStatement
+        skipStreamSpecificTokens();
+
+        // Parse the stream columns
         int position = getPosition();
 
         readUntilThis(Tokens.OPENBRACKET);
@@ -1626,6 +1629,111 @@ public class ParserDDL extends ParserRoutine {
         return new StatementSchema(sql, StatementTypes.CREATE_TABLE, args,
                                    null, null);
     }
+
+    /**
+     * Skip stream-specific tokens preceding the column definitions
+     * <p>
+     * CREATE STREAM foo [ PARTITION ON COLUMN ... ] [ EXPORT TO ... ] (column-definitions)
+     * <p>
+     * PARTITION and EXPORT can be in any order, EXPORT TO TOPIC ... WITH may contains clauses
+     * with brackets ()  that must be ignored at this level.
+     */
+    private void skipStreamSpecificTokens() {
+        boolean parsedPartition = false;
+        boolean parsedExport = false;
+
+        do {
+            if (!parsedPartition && token.tokenType == Tokens.PARTITION) {
+                skipStreamPartition();
+                parsedPartition = true;
+            }
+            else if (!parsedExport && token.tokenType == Tokens.EXPORT) {
+                skipStreamExport();
+                parsedExport = true;
+            }
+            else if (token.tokenType != Tokens.OPENBRACKET) {
+                throw unexpectedToken();
+            }
+        } while (token.tokenType != Tokens.OPENBRACKET);
+    }
+
+    private void skipStreamPartition() {
+        assert token.tokenType == Tokens.PARTITION;
+
+        read();
+        if (token.tokenType != Tokens.ON) {
+            throw unexpectedToken();
+        }
+        read();
+        if (token.tokenType != Tokens.COLUMN) {
+            throw unexpectedToken();
+        }
+        read();
+        // Note: accept reserved identifiers like 'timestamp' or undelimited identifiers like 'key'
+        if (token.tokenType != Tokens.X_IDENTIFIER && !token.isReservedIdentifier
+                && !token.isUndelimitedIdentifier) {
+            throw unexpectedToken();
+        }
+        read();
+    }
+
+    private void skipStreamExport() {
+        assert token.tokenType == Tokens.EXPORT;
+        boolean toTopic = false;
+
+        // Common skipping EXPORT TO [ TARGET | TOPIC ] <identifier>
+        read();
+        if (token.tokenType != Tokens.TO) {
+            throw unexpectedToken();
+        }
+        read();
+        if (token.tokenType == Tokens.TOPIC) {
+            toTopic = true;
+        }
+        else if (token.tokenType != Tokens.TARGET) {
+            throw unexpectedToken();
+        }
+        read();
+        // Note: accept reserved or undelimited identifiers like exporting to target 'default' or 'key'
+        if (token.tokenType != Tokens.X_IDENTIFIER && !token.isReservedIdentifier
+                && !token.isUndelimitedIdentifier) {
+            throw unexpectedToken();
+        }
+        read();
+
+        if (!toTopic || token.tokenType != Tokens.WITH) {
+            return;
+        }
+
+        // Special skipping topic tokens [ WITH [ KEY (...) ] [ VALUE (....) ] ]
+        // KEY and VALUE tokens are ordered
+        boolean hasKey = false;
+        boolean hasValue = false;
+        read();
+        if (token.tokenType == Tokens.KEY) {
+            hasKey = true;
+            read();
+            if (token.tokenType != Tokens.OPENBRACKET) {
+                throw unexpectedTokenRequire(Tokens.getKeyword(Tokens.OPENBRACKET));
+            }
+            readUntilThis(Tokens.CLOSEBRACKET);
+            readThis(Tokens.CLOSEBRACKET);
+        }
+        if (token.tokenType == Tokens.VALUE) {
+            hasValue = true;
+            read();
+            if (token.tokenType != Tokens.OPENBRACKET) {
+                throw unexpectedTokenRequire(Tokens.getKeyword(Tokens.OPENBRACKET));
+            }
+            readUntilThis(Tokens.CLOSEBRACKET);
+            readThis(Tokens.CLOSEBRACKET);
+        }
+        if (!hasKey && !hasValue) {
+            // Must have one of them with WITH
+            throw unexpectedToken();
+        }
+    }
+
 
 
     private ColumnSchema[] readLikeTable(Table table) {

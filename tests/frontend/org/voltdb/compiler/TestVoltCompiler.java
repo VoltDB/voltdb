@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -3677,12 +3677,20 @@ public class TestVoltCompiler extends TestCase {
                 "create stream 1table_name_not_valid (id integer, f1 varchar(16));"
                 );
 
-        badDDLAgainstSimpleSchema("Invalid CREATE STREAM statement:.*",
+        badDDLAgainstSimpleSchema(".+unexpected token:.*",
                "create stream foo export to target bar1,bar2 (i bigint not null);"
                 );
 
-        badDDLAgainstSimpleSchema("Invalid CREATE STREAM statement:.*",
+        badDDLAgainstSimpleSchema(".+unexpected token:.*",
+                "create stream foo export to topic bar1,bar2 (i bigint not null);"
+                 );
+
+        badDDLAgainstSimpleSchema(".+unexpected token:.*",
                 "create stream foo,foo2 export to target bar (i bigint not null);"
+                );
+
+        badDDLAgainstSimpleSchema(".+unexpected token:.*",
+                "create stream foo,foo2 export to topic bar (i bigint not null);"
                 );
 
         badDDLAgainstSimpleSchema("Invalid CREATE STREAM statement:.*",
@@ -3691,6 +3699,10 @@ public class TestVoltCompiler extends TestCase {
 
         badDDLAgainstSimpleSchema("Streams cannot be configured with indexes.*",
                 "create stream foo export to target bar (id integer, primary key(id));"
+                );
+
+        badDDLAgainstSimpleSchema("Invalid topic bar: stream FOO must be partitioned",
+                "create stream foo export to topic bar (id integer, primary key(id));"
                 );
 
         badDDLAgainstSimpleSchema("Stream configured with materialized view without partitioned.*",

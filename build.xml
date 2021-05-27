@@ -326,7 +326,6 @@
     <include name='org/voltdb/np/Test*.class' />
     <include name='org/voltdb/task/Test*.class' />
     <include name='org/voltdb/e3/topics/**/Test*.class' />
-
     <!-- Exclude tests -->
     <patternset refid='junit.exclusions'/>
 </patternset>

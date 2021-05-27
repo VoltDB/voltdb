@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2020 VoltDB Inc.
+ * Copyright (C) 2020-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -26,7 +26,6 @@ import java.util.stream.Collectors;
 import org.voltdb.compiler.deploymentfile.PropertiesType;
 import org.voltdb.compiler.deploymentfile.PropertyType;
 import org.voltdb.utils.PBDUtils;
-import org.voltdb.utils.PBDUtils.ConfigurationException;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 
@@ -120,11 +119,8 @@ public class TopicsConfiguration extends TypedPropertiesBase<TopicsConfiguration
 
         @Override
         protected Long parseValue(String strValue) {
-            try {
-                return TimeUnit.MILLISECONDS.toNanos(PBDUtils.parseTimeValue(strValue));
-            } catch (ConfigurationException e) {
-                throw new IllegalArgumentException(e);
-            }
+            TopicRetention retention = TopicRetention.parse(strValue);
+            return TimeUnit.MILLISECONDS.toNanos(retention.getEffectiveLimit());
         }
     }
 

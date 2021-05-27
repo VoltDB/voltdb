@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2021, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -342,9 +342,10 @@ public class Tokens {
     // End of VoltDB extension
     static final String        T_TABLE             = "TABLE";
     static final String        T_TABLESAMPLE       = "TABLESAMPLE";
-    // A VoltDB extension NIBBLE EXPORT
+    // A VoltDB extension NIBBLE EXPORT, EXPORT TO TARGET, EXPORT TO TOPIC
     static final String        T_EXPORT            = "EXPORT";
     static final String        T_TARGET            = "TARGET";
+    static final String        T_TOPIC             = "TOPIC";
     static final String        T_UPDATEOLD         = "UPDATE_OLD";
     static final String        T_UPDATENEW         = "UPDATE_NEW";
     // End of VoltDB extension
@@ -1129,6 +1130,7 @@ public class Tokens {
     public static final int EXPORT                           = 1402;
     public static final int UPDATEOLD                        = 1403;
     public static final int UPDATENEW                        = 1404;
+    public static final int TOPIC                            = 1405;
     // End of VoltDB extension
     public static final int TABLE                            = 276;
     public static final int TABLESAMPLE                      = 277;
@@ -1945,10 +1947,11 @@ public class Tokens {
         reservedKeys.put(Tokens.T_SYMMETRIC, SYMMETRIC);
         reservedKeys.put(Tokens.T_SYSTEM, SYSTEM);
         reservedKeys.put(Tokens.T_SYSTEM_USER, SYSTEM_USER);
-        // A VoltDB extension STREAM
+        // A VoltDB extension STREAM / TOPIC / NIBBLE EXPORT
         reservedKeys.put(Tokens.T_STREAM, STREAM);
         reservedKeys.put(Tokens.T_MIGRATE, MIGRATE);
         reservedKeys.put(Tokens.T_TARGET, TARGET);
+        reservedKeys.put(Tokens.T_TOPIC, TOPIC);
         reservedKeys.put(Tokens.T_EXPORT, EXPORT);
         reservedKeys.put(Tokens.T_UPDATEOLD, UPDATEOLD);
         reservedKeys.put(Tokens.T_UPDATENEW, UPDATENEW);

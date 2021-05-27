@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -80,6 +80,7 @@ import org.voltdb.compiler.deploymentfile.SnmpType;
 import org.voltdb.compiler.deploymentfile.SslType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType.Temptables;
+import org.voltdb.compiler.deploymentfile.ThreadPoolsType;
 import org.voltdb.compiler.deploymentfile.TopicsType;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.compiler.deploymentfile.UsersType.User;
@@ -341,6 +342,7 @@ public class VoltProjectBuilder {
     private DrRoleType m_drRole = DrRoleType.MASTER;
     private FeaturesType m_featureOptions;
     private TopicsType m_topicsConfiguration;
+    private ThreadPoolsType m_threadPoolsConfiguration;
 
     public VoltProjectBuilder setQueryTimeout(int target) {
         m_queryTimeout = target;
@@ -425,6 +427,13 @@ public class VoltProjectBuilder {
             m_topicsConfiguration = new TopicsType();
         }
         return m_topicsConfiguration;
+    }
+
+    public ThreadPoolsType getThreadPoolsConfiguration() {
+        if (m_threadPoolsConfiguration == null) {
+            m_threadPoolsConfiguration = new ThreadPoolsType();
+        }
+        return m_threadPoolsConfiguration;
     }
 
     public boolean isTopicsEnabled() {
@@ -1416,6 +1425,7 @@ public class VoltProjectBuilder {
 
         deployment.setFeatures(m_featureOptions);
         setTopicsConfiguration(deployment);
+        setThreadPoolsConfiguration(deployment);
 
         // Have some yummy boilerplate!
         File file = File.createTempFile("myAppDeployment", ".tmp");
@@ -1431,6 +1441,12 @@ public class VoltProjectBuilder {
     private void setTopicsConfiguration(DeploymentType deployment) {
         if (m_topicsConfiguration != null) {
             deployment.setTopics(m_topicsConfiguration);
+        }
+    }
+
+    private void setThreadPoolsConfiguration(DeploymentType deployment) {
+        if (m_threadPoolsConfiguration != null) {
+            deployment.setThreadpools(m_threadPoolsConfiguration);
         }
     }
 

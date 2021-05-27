@@ -98,6 +98,13 @@ function server() {
     server_common
 }
 
+# run the voltdb server locally for AVRO testing
+function server_avro() {
+    srccompile-ifneeded
+    voltdb init --force --config=deployment_avro.xml
+    server_common
+}
+
 function server_common() {
     # Set up options
     VOLTDB_OPTS="-XX:+UseConcMarkSweepGC -XX:+CMSParallelRemarkEnabled -XX:+UseTLAB"

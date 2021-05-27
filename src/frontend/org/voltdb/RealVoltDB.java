@@ -141,7 +141,6 @@ import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
-import org.voltdb.compiler.deploymentfile.TopicsType;
 import org.voltdb.dr2.DRConsumerStatsBase;
 import org.voltdb.dtxn.InitiatorStats;
 import org.voltdb.dtxn.LatencyHistogramStats;
@@ -149,7 +148,6 @@ import org.voltdb.dtxn.LatencyStats;
 import org.voltdb.dtxn.LatencyUncompressedHistogramStats;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
-import org.voltdb.e3.topics.TopicsConfiguration;
 import org.voltdb.elastic.BalancePartitionsStatistics;
 import org.voltdb.elastic.ElasticService;
 import org.voltdb.importer.ImportManager;
@@ -3023,10 +3021,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             stringer.keySymbolValuePair("publicInterface", m_config.m_publicInterface);
             stringer.keySymbolValuePair("topicsPublicHost", VoltDB.getPublicTopicsInterface());
             stringer.keySymbolValuePair("topicsPublicPort", VoltDB.getPublicTopicsPort());
-            TopicsType t = m_catalogContext.getDeployment().getTopics();
-            int port = new TopicsConfiguration(t == null ? null : t.getProperties())
-                .getConfigValue(TopicsConfiguration.Entry.PORT);
-            stringer.keySymbolValuePair("topicsport", VoltDB.getTopicsPort(port));
+            stringer.keySymbolValuePair("topicsport", VoltDB.getTopicsPort(VoltDB.DEFAULT_TOPICS_PORT));
             stringer.endObject();
             JSONObject obj = new JSONObject(stringer.toString());
             // possibly atomic swap from null to realz
@@ -3801,8 +3796,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return true;
     }
 
-    // Create a Procedure mapper from the database
-    private static Function<String, Procedure> createProcedureMapper(Database database) {
+    /**
+     * Create a procedure mapper from a catalog database
+     *
+     * @param database a {@link Database} from a {@link CatalogContext}
+     * @return a {@link Function} returning {@link Procedure} from procedure name or {@code null}
+     */
+    public static Function<String, Procedure> createProcedureMapper(Database database) {
         if (database == null) {
             throw new IllegalArgumentException("Missing Catalog Database");
         }
