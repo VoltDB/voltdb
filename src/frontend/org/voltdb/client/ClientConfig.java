@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -43,10 +43,14 @@ public class ClientConfig {
 
     private static final String DEFAULT_SSL_PROPS_FILE = "ssl-config";
 
-    static final long DEFAULT_PROCEDURE_TIMOUT_NANOS = TimeUnit.MINUTES.toNanos(2);// default timeout is 2 minutes;
-    static final long DEFAULT_CONNECTION_TIMOUT_MS = 2 * 60 * 1000; // default timeout is 2 minutes;
+    static final long DEFAULT_PROCEDURE_TIMOUT_NANOS = TimeUnit.MINUTES.toNanos(2);// default timeout is 2 minutes
+    static final long DEFAULT_CONNECTION_TIMOUT_MS = 2 * 60 * 1000; // default timeout is 2 minutes
     static final long DEFAULT_INITIAL_CONNECTION_RETRY_INTERVAL_MS = 1000; // default initial connection retry interval is 1 second
     static final long DEFAULT_MAX_CONNECTION_RETRY_INTERVAL_MS = 8000; // default max connection retry interval is 8 seconds
+    static final long DEFAULT_NONBLOCKING_ASYNC_TIMEOUT_NANOS = 500_000; // default timeout, 500 microseconds
+    static final int DEFAULT_MAX_OUTSTANDING_TRANSACTIONS = 3000; // maximum outstanding transaction count
+    static final int DEFAULT_BACKPRESSURE_QUEUE_REQUEST_LIMIT = 100; // default request limit
+    static final int DEFAULT_BACKPRESSURE_QUEUE_BYTE_LIMIT = 256 * 1024; // default byte limit, 256K
 
     final ClientAuthScheme m_hashScheme;
     final String m_username;
@@ -54,7 +58,7 @@ public class ClientConfig {
     final boolean m_cleartext;
     final ClientStatusListenerExt m_listener;
     boolean m_heavyweight = false;
-    int m_maxOutstandingTxns = 3000;
+    int m_maxOutstandingTxns = DEFAULT_MAX_OUTSTANDING_TRANSACTIONS;
     int m_maxTransactionsPerSecond = Integer.MAX_VALUE;
     boolean m_autoTune = false;
     int m_autoTuneTargetInternalLatency = 5;
@@ -69,7 +73,9 @@ public class ClientConfig {
     boolean m_enableSSL = false;
     String m_sslPropsFile = null;
     boolean m_nonblocking = false;
-    long m_asyncBlockingTimeout = 0;
+    long m_asyncBlockingTimeout = DEFAULT_NONBLOCKING_ASYNC_TIMEOUT_NANOS;
+    int m_backpressureQueueRequestLimit = DEFAULT_BACKPRESSURE_QUEUE_REQUEST_LIMIT;
+    int m_backpressureQueueByteLimit = DEFAULT_BACKPRESSURE_QUEUE_BYTE_LIMIT;
 
     //For unit testing. This should really be in Environment class we should assemble all such there.
     public static final boolean ENABLE_SSL_FOR_TEST = Boolean.valueOf(
@@ -261,19 +267,25 @@ public class ClientConfig {
 
     /**
      * <p>Set the maximum number of outstanding requests that will be submitted before
-     * blocking. Similar to the number of concurrent connections in a traditional synchronous API.
-     * Defaults to 2k.</p>
+     * blocking. Similar to the number of concurrent connections in a traditional synchronous
+     * API. The default value is 3000.</p>
      *
      * @param maxOutstanding The maximum outstanding transactions before calls to
      * {@link Client#callProcedure(ProcedureCallback, String, Object...)} will block
-     * or return false (depending on settings).
+     * or return false (depending on settings). Use 0 to reset to default.
      */
     public void setMaxOutstandingTxns(int maxOutstanding) {
-        if (maxOutstanding < 1) {
-            throw new IllegalArgumentException(
-                    "Max outstanding must be greater than 0, " + maxOutstanding + " was specified");
-        }
-        m_maxOutstandingTxns = maxOutstanding;
+        m_maxOutstandingTxns = maxOutstanding > 0 ? maxOutstanding : DEFAULT_MAX_OUTSTANDING_TRANSACTIONS;
+    }
+
+    /**
+     * <p>Returns the maximum number of outstanding requests as settable by
+     * {@link setMaxOutstandingTxns}.</p>
+     *
+     * @return max outstanding transaction count
+     */
+    public int getMaxOutstandingTxns() {
+        return m_maxOutstandingTxns;
     }
 
     /**
@@ -319,9 +331,17 @@ public class ClientConfig {
      *
      * <p>Performance is sometimes improved if the callProcedure is permitted to block
      * for a short while, say a few hundred microseconds, to ride out a short blip in
-     * backpressure.</p>
+     * backpressure. By default, this timeout is set to 500 microseconds.</p>
      *
      * <p>Not supported if rate-limiting has been configured by setMaxTransactionsPerSecond.</p>
+     */
+    public void setNonblockingAsync() {
+        setNonblockingAsync(DEFAULT_NONBLOCKING_ASYNC_TIMEOUT_NANOS);
+    }
+
+    /**
+     * <p>Variation on {@link setNonblockingAsync() setNonblockingAsync} with provision
+     * for user-supplied blocking time limit.</p>
      *
      * @param blockingTimeout limit on blocking time, in nanoseconds; zero
      *        if immediate return is desired.
@@ -335,6 +355,44 @@ public class ClientConfig {
         }
         m_nonblocking = true;
         m_asyncBlockingTimeout = Math.max(0, blockingTimeout);
+    }
+
+    /**
+     * <p>Returns non-blocking async setting, as established by
+     * a prior {@link setNonblockingAsync}.
+     *
+     * @return negative if non-blocking async is not enabled,
+     *         otherwise the blocking timeout in nanoseconds.
+     */
+    public long getNonblockingAsync() {
+        return m_nonblocking ? m_asyncBlockingTimeout : -1;
+    }
+
+    /**
+     * <p>Set thresholds for backpressure reporting based on pending
+     * request count and pending byte count.</p>
+     *
+     * <p>Reducing limit below current queue length will not cause
+     * backpressure indication until next callProcedure.</p>
+     *
+     * @param reqLimit:  request limit, greater than 0 for actual
+     *                   limit, 0 to reset to default
+     * @param byteLimit: byte limit, greater than 0 for actual
+     *                   limit, 0 to reset to default
+     */
+    public void setBackpressureQueueThresholds(int reqLimit, int byteLimit) {
+        m_backpressureQueueRequestLimit = reqLimit > 0 ? reqLimit : DEFAULT_BACKPRESSURE_QUEUE_REQUEST_LIMIT;
+        m_backpressureQueueByteLimit = byteLimit > 0 ? byteLimit : DEFAULT_BACKPRESSURE_QUEUE_BYTE_LIMIT;
+    }
+
+    /**
+     * <p>Get thresholds for backpressure reporting, as set by
+     * {@link setBackpressureQueueThresholds}.</p>
+     *
+     * @return integer array: reqLimit, byteLimit, in that order.
+     */
+    public int[] getBackpressureQueueThresholds() {
+        return new int[] { m_backpressureQueueRequestLimit, m_backpressureQueueByteLimit };
     }
 
     /**

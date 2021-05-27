@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -130,8 +130,11 @@ class Distributer {
     // Outgoing transaction rate limiter; package access for client implementation
     final RateLimiter m_rateLimiter = new RateLimiter();
 
-    // Last reported backpressure state
+    // Backpressure configuration and status
     private boolean m_lastBackpressureReport;
+    private int m_backpressureQueueLimit = ClientConfig.DEFAULT_BACKPRESSURE_QUEUE_REQUEST_LIMIT;
+    private int m_maxQueuedBytes = ClientConfig.DEFAULT_BACKPRESSURE_QUEUE_BYTE_LIMIT;
+    private int m_queuedBytes;
 
     // Data for topology-aware client operation, The 'unconnected hosts' list
     // contains all nodes from the latest topo update for which we do not
@@ -715,6 +718,7 @@ class Distributer {
         }
 
         /**
+         * InputHandler
          * Response handler
          */
         @Override
@@ -821,6 +825,7 @@ class Distributer {
         }
 
         /**
+         * InputHandler
          * Get maximum read size for connection (basically unlimited)
          */
         @Override
@@ -834,7 +839,6 @@ class Distributer {
         public boolean hadBackPressure() {
             return m_connection.writeStream().hadBackPressure();
         }
-
 
         /**
          * Update NodeConnection with new connection, and notify
@@ -850,6 +854,7 @@ class Distributer {
         }
 
         /**
+         * InputHandler
          * Shut down this connection
          */
         @Override
@@ -941,6 +946,7 @@ class Distributer {
         }
 
         /*
+         * InputHandler
          * Called during port setup to create a runnable callback
          * which will eventually be called from the write stream.
          * Callback immediately reports end of backpressure to
@@ -964,6 +970,7 @@ class Distributer {
         }
 
         /*
+         * InputHandler
          * Called during port setup to create a runnable callback which will
          * eventually be called from the write stream. We don't have such a
          * callback. Backpressure is instead reported to client from the
@@ -975,6 +982,7 @@ class Distributer {
         }
 
         /*
+         * InputHandler
          * Queue-length monitor, called by write stream to determine
          * backpressure.
          */
@@ -983,10 +991,10 @@ class Distributer {
             return this;
         }
 
-        // TODO: expose magic numbers
-        private int m_queuedBytes = 0;
-        private final int m_maxQueuedBytes = 262144;
-
+        /*
+         * QueueMonitor
+         * called from write stream
+         */
         @Override
         public boolean queue(int bytes) {
             m_queuedBytes += bytes;
@@ -1002,7 +1010,7 @@ class Distributer {
     }
 
     /*
-     * Drains all work for this connection
+     * Drains all work for all connections
      */
     void drain() throws InterruptedException {
         boolean more;
@@ -1029,6 +1037,26 @@ class Distributer {
                 }
             }
         } while(more);
+    }
+
+    /**
+     * Set thresholds for backpressure reporting based on pending
+     * request count and pending byte count.
+     *
+     * Reducing limit below current queue length will not cause
+     * backpressure indication until next callProcedure.
+     *
+     * (Synchronized to avoid race with new connection setup)
+     *
+     * @param reqLimit:  request limit
+     * @param byteLimit: byte limit
+     */
+    public synchronized void setBackpressureQueueThresholds(int reqLimit, int byteLimit) {
+        m_maxQueuedBytes = byteLimit;
+        m_backpressureQueueLimit = reqLimit;
+        for (NodeConnection cxn : m_connections) {
+            cxn.m_connection.writeStream().setPendingWriteBackpressureThreshold(reqLimit);
+        }
     }
 
     ////////////////////////////////////////
@@ -1101,9 +1129,7 @@ class Distributer {
         NodeConnection cxn = new NodeConnection(instanceIdWhichIsTimestampAndLeaderIp);
         Connection c = null;
         try {
-            if (aChannel != null) {
-                c = m_network.registerChannel(aChannel, cxn, m_cipherService, sslEngine);
-            }
+            c = m_network.registerChannel(aChannel, cxn, m_cipherService, sslEngine);
         }
         catch (Exception e) {
             // Need to clean up the socket if there was any failure
@@ -1120,6 +1146,9 @@ class Distributer {
         cxn.setConnection(c);
 
         synchronized (this) {
+
+            // Set queue limit for new connection
+            cxn.m_connection.writeStream().setPendingWriteBackpressureThreshold(m_backpressureQueueLimit);
 
             // If there are no connections, discard any previous connection ids and allow the client
             // to connect to a new cluster.

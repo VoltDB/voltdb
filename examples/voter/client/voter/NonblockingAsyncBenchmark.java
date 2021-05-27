@@ -29,7 +29,7 @@
  * to handle such backpressure.
  *
  * The essential differences between this class and AsyncBenchmark are:
- * 1. Set client non-blocking before running 'benchmark' phase.
+ * 1. Set client configuration for non-blocking async operation.
  * 2. Handle failure return from callProcedure by waiting on sync object.
  * 3. Backpressure callback in StatusListener to signal the sync object.
  *
@@ -131,8 +131,17 @@ public class NonblockingAsyncBenchmark {
         @Option(desc = "Maximum number of votes cast per voter.")
         int maxvotes = 2;
 
-        @Option(desc = "Maximum TPS rate for benchmark (not supported).")
-        int ratelimit = Integer.MAX_VALUE;
+        @Option(desc = "Backpressure threshold, outstanding transaction limit (0 for default).")
+        int maxoutstandingtxns = 0;
+
+        @Option(desc = "Backpressure threshold, pending requests (0 for default).")
+        int queuereqlimit = 0;
+
+        @Option(desc = "Backpressure threshold, pending bytes (0 for default).")
+        int queuebytelimit = 0;
+
+        //@Option(desc = "Maximum TPS rate for benchmark (not supported).")
+        //int ratelimit = Integer.MAX_VALUE;
 
         @Option(desc = "Report latency for non-blocking benchmark run.")
         boolean latencyreport = false;
@@ -159,7 +168,7 @@ public class NonblockingAsyncBenchmark {
             if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
             if (contestants <= 0) exitWithMessageAndUsage("contestants must be > 0");
             if (maxvotes <= 0) exitWithMessageAndUsage("maxvotes must be > 0");
-            if (ratelimit <= 0) exitWithMessageAndUsage("ratelimit must be > 0");
+            //if (ratelimit <= 0) exitWithMessageAndUsage("ratelimit must be > 0");
         }
     }
 
@@ -210,7 +219,9 @@ public class NonblockingAsyncBenchmark {
         // Not effective in non-blocking mode
         // clientConfig.setMaxTransactionsPerSecond(config.ratelimit);
 
-        clientConfig.setNonblockingAsync(500_000);
+        clientConfig.setNonblockingAsync();
+        clientConfig.setMaxOutstandingTxns(config.maxoutstandingtxns);
+        clientConfig.setBackpressureQueueThresholds(config.queuereqlimit, config.queuebytelimit);
 
         if (config.topologyaware) {
             clientConfig.setTopologyChangeAware(true);

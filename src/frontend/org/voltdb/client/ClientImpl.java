@@ -197,6 +197,8 @@ public final class ClientImpl implements Client {
 
         m_nonblocking = config.m_nonblocking;
         m_asyncBlockingTimeout = config.m_asyncBlockingTimeout;
+        m_distributer.setBackpressureQueueThresholds(config.m_backpressureQueueRequestLimit,
+                                                     config.m_backpressureQueueByteLimit);
     }
 
     /**

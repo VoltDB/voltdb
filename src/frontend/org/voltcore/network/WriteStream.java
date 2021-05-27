@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -80,4 +80,12 @@ public interface WriteStream {
      * Return the number of messages waiting to be written to the network
      */
     int getOutstandingMessageCount();
+
+    /**
+     * Set backpressure queue limit (optional method)
+     * @param limit desired limit, greater than zero
+     */
+    default void setPendingWriteBackpressureThreshold(int limit) {
+        throw new UnsupportedOperationException("setPendingWriteBackpressureThreshold");
+    }
 }

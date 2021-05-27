@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -62,7 +62,7 @@ public class VoltNIOWriteStream extends NIOWriteStreamBase implements WriteStrea
 
     protected ArrayDeque<DeferredSerialization> m_queuedWrites = m_queuedWrites1;
 
-    protected final int m_maxQueuedWritesBeforeBackpressure = 100;
+    protected volatile int m_maxQueuedWritesBeforeBackpressure = 100;
 
     private final Runnable m_offBackPressureCallback;
     private final Runnable m_onBackPressureCallback;
@@ -294,6 +294,11 @@ public class VoltNIOWriteStream extends NIOWriteStreamBase implements WriteStrea
         if (m_queuedWrites.size() > m_maxQueuedWritesBeforeBackpressure && !m_hadBackPressure) {
             backpressureStarted();
         }
+    }
+
+    @Override
+    public void setPendingWriteBackpressureThreshold(int limit) {
+        m_maxQueuedWritesBeforeBackpressure = Math.max(1, limit);
     }
 
     @Override
