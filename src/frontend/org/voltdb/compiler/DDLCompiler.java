@@ -88,6 +88,7 @@ import org.voltdb.compiler.statements.ReplicateTable;
 import org.voltdb.compiler.statements.SetGlobalParam;
 import org.voltdb.compiler.statements.VoltDBStatementProcessor;
 import org.voltdb.compilereport.TableAnnotation;
+import org.voltdb.e3.topics.TopicProperties;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractExpression.UnsafeOperatorsForDDL;
 import org.voltdb.expressions.ExpressionUtil;
@@ -1533,13 +1534,23 @@ public class DDLCompiler {
             table.setTopicname(topicName);
 
             // Set the optional clauses
+            Map<String, String> columnProperties = new HashMap<>();
             String keyColumns = node.attributes.get("topicKeyColumnNames");
-            if (keyColumns != null) {
+            if (!StringUtils.isBlank(keyColumns)) {
                 table.setTopickeycolumnnames(keyColumns);
+                columnProperties.put(TopicProperties.Key.CONSUMER_KEY.name(), keyColumns);
             }
             String valueColumns = node.attributes.get("topicValueColumnNames");
-            if (valueColumns != null) {
+            if (!StringUtils.isBlank(valueColumns)) {
                 table.setTopicvaluecolumnnames(valueColumns);
+                columnProperties.put(TopicProperties.Key.CONSUMER_VALUE.name(), valueColumns);
+            }
+
+            // Validate the topic columns by creating a TopicProperties instance parsing the column lists
+            if (!columnProperties.isEmpty()) {
+                TopicProperties topicProperties = new TopicProperties(columnProperties);
+                validateTopicColumns(topicName, table.getTypeName(), columnMap, topicProperties.get(TopicProperties.Key.CONSUMER_KEY));
+                validateTopicColumns(topicName, table.getTypeName(), columnMap, topicProperties.get(TopicProperties.Key.CONSUMER_VALUE));
             }
         }
 
@@ -1646,6 +1657,37 @@ public class DDLCompiler {
                     streamTarget, topicName);
         }
     }
+
+    /**
+     * Validate that the topic columns correspond to a existing columns in the {@link Table}
+     * <p>
+     * Note: Moved here from {@link TopicsValidator} to catch errors on CREATE STREAM
+     * even if no topics are defined in deployment.
+     *
+     * @param topicName         name of topic
+     * @param tableName         name of table
+     * @param tableColumns      map of columns defined in {@link Table}
+     * @param selectedColumns   list of selected column names in topic
+     * @throws VoltCompilerException
+     */
+    private void validateTopicColumns(String topicName, String tableName,
+            Map<String, Column> tableColumns, List<String> selectedColumns) throws VoltCompilerException {
+        if (selectedColumns != null && !selectedColumns.isEmpty()) {
+            // If there is only * in the list, go for all columns.
+            if (TopicProperties.ALL_COLUMNS.equals(selectedColumns)) {
+                return;
+            }
+
+            for (String columnName : selectedColumns) {
+                if (tableColumns.get(columnName) == null) {
+                    throw m_compiler.new VoltCompilerException(String.format(
+                            "Invalid topic %s: column %s specified in WITH clause is not defined in stream %s",
+                            topicName, columnName, tableName));
+                }
+            }
+        }
+    }
+
 
     private static void addColumnToCatalog(Table table,
                             VoltXMLElement node,
