@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -370,7 +370,7 @@ public class TestDistributer extends TestCase {
             // reading anything.
             Distributer dist = new Distributer(
                     false,
-                    ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
+                    ClientConfig.DEFAULT_PROCEDURE_TIMEOUT_NANOS,
                     10,
                     null,
                     null);
@@ -480,8 +480,8 @@ public class TestDistributer extends TestCase {
             CSL csl = new CSL();
 
             Distributer dist = new Distributer(false,
-                    ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
-                    ClientConfig.DEFAULT_CONNECTION_TIMOUT_MS,
+                    ClientConfig.DEFAULT_PROCEDURE_TIMEOUT_NANOS,
+                    ClientConfig.DEFAULT_CONNECTION_TIMEOUT_MS,
                     null /* subject */, null);
             dist.addClientStatusListener(csl);
             dist.createConnection("localhost", "", "", 20000, ClientAuthScheme.HASH_SHA1);
@@ -552,8 +552,8 @@ public class TestDistributer extends TestCase {
             CSL csl = new CSL();
 
             Distributer dist = new Distributer(false,
-                    ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
-                    ClientConfig.DEFAULT_CONNECTION_TIMOUT_MS,
+                    ClientConfig.DEFAULT_PROCEDURE_TIMEOUT_NANOS,
+                    ClientConfig.DEFAULT_CONNECTION_TIMEOUT_MS,
                     null /* subject */, null);
             dist.addClientStatusListener(csl);
             dist.createConnection("localhost", "", "", 20000, ClientAuthScheme.HASH_SHA1);
@@ -642,7 +642,7 @@ public class TestDistributer extends TestCase {
 
         // create distributer and connect it to the client
         Distributer dist = new Distributer(false,
-                ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
+                ClientConfig.DEFAULT_PROCEDURE_TIMEOUT_NANOS,
                 1000 /* One second connection timeout */,
                 null /* subject */, null);
         dist.addClientStatusListener(new TimeoutMonitorCSL());
@@ -709,7 +709,7 @@ public class TestDistributer extends TestCase {
 
         // create distributer and connect it to the client
         Distributer dist = new Distributer(false,
-                ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
+                ClientConfig.DEFAULT_PROCEDURE_TIMEOUT_NANOS,
                 2000 /* Two seconds connection timeout */,
                 null /* subject */, null);
         dist.addClientStatusListener(new TimeoutMonitorCSL());
@@ -779,7 +779,7 @@ public class TestDistributer extends TestCase {
 
         // create distributer and connect it to the client
         Distributer dist = new Distributer(false,
-                ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
+                ClientConfig.DEFAULT_PROCEDURE_TIMEOUT_NANOS,
                 30000 /* thirty second connection timeout */,
                 null /* subject */, null);
         dist.createConnection("localhost", "", "", 20000, ClientAuthScheme.HASH_SHA1);
@@ -835,7 +835,7 @@ public class TestDistributer extends TestCase {
 
         // create distributer and connect it to the client
         Distributer dist = new Distributer( false,
-                ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
+                ClientConfig.DEFAULT_PROCEDURE_TIMEOUT_NANOS,
                 CONNECTION_TIMEOUT /* six second connection timeout */,
                 null /* subject */, null);
         dist.addClientStatusListener(new TimeoutMonitorCSL());

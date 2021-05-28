@@ -1065,8 +1065,8 @@ class Distributer {
 
     Distributer() {
         this(false,
-             ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
-             ClientConfig.DEFAULT_CONNECTION_TIMOUT_MS,
+             ClientConfig.DEFAULT_PROCEDURE_TIMEOUT_NANOS,
+             ClientConfig.DEFAULT_CONNECTION_TIMEOUT_MS,
              null,
              null);
     }

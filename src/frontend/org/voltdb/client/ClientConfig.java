@@ -43,8 +43,8 @@ public class ClientConfig {
 
     private static final String DEFAULT_SSL_PROPS_FILE = "ssl-config";
 
-    static final long DEFAULT_PROCEDURE_TIMOUT_NANOS = TimeUnit.MINUTES.toNanos(2);// default timeout is 2 minutes
-    static final long DEFAULT_CONNECTION_TIMOUT_MS = 2 * 60 * 1000; // default timeout is 2 minutes
+    static final long DEFAULT_PROCEDURE_TIMEOUT_NANOS = TimeUnit.MINUTES.toNanos(2);// default timeout is 2 minutes
+    static final long DEFAULT_CONNECTION_TIMEOUT_MS = 2 * 60 * 1000; // default timeout is 2 minutes
     static final long DEFAULT_INITIAL_CONNECTION_RETRY_INTERVAL_MS = 1000; // default initial connection retry interval is 1 second
     static final long DEFAULT_MAX_CONNECTION_RETRY_INTERVAL_MS = 8000; // default max connection retry interval is 8 seconds
     static final long DEFAULT_NONBLOCKING_ASYNC_TIMEOUT_NANOS = 500_000; // default timeout, 500 microseconds
@@ -62,8 +62,8 @@ public class ClientConfig {
     int m_maxTransactionsPerSecond = Integer.MAX_VALUE;
     boolean m_autoTune = false;
     int m_autoTuneTargetInternalLatency = 5;
-    long m_procedureCallTimeoutNanos = DEFAULT_PROCEDURE_TIMOUT_NANOS;
-    long m_connectionResponseTimeoutMS = DEFAULT_CONNECTION_TIMOUT_MS;
+    long m_procedureCallTimeoutNanos = DEFAULT_PROCEDURE_TIMEOUT_NANOS;
+    long m_connectionResponseTimeoutMS = DEFAULT_CONNECTION_TIMEOUT_MS;
     Subject m_subject = null;
     boolean m_reconnectOnConnectionLoss;
     long m_initialConnectionRetryIntervalMS = DEFAULT_INITIAL_CONNECTION_RETRY_INTERVAL_MS;
