@@ -198,9 +198,7 @@ function async-benchmark() {
         --procedure=JiggleSinglePartition \
         --poolsize=100000 \
         --wait=0 \
-        --ratelimit=100000 \
-        --autotune=true \
-        --latencytarget=10
+        --ratelimit=100000
 }
 
 function clean-vertica() {
@@ -224,8 +222,6 @@ function async-export() {
         --port=21212 \
         --procedure=JiggleExportSinglePartition \
         --poolsize=100000 \
-        --autotune=false \
-        --latencytarget=10 \
         --ratelimit=500 \
         --usetableexport=true \
         --timeout=300
@@ -243,8 +239,6 @@ function async-export-geo() {
         --port=21212 \
         --procedure=JiggleExportGeoSinglePartition \
         --poolsize=100000 \
-        --autotune=false \
-        --latencytarget=10 \
         --ratelimit=500 \
         --timeout=300
 }

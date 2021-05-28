@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -111,12 +111,6 @@ public class MOBenchmark {
         @Option(desc = "Maximum TPS rate for benchmark.")
         int ratelimit = Integer.MAX_VALUE;
 
-        @Option(desc = "Determine transaction rate dynamically based on latency.")
-        boolean autotune = false;
-
-        @Option(desc = "Server-side latency target for auto-tuning.")
-        int latencytarget = 5;
-
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
 
@@ -147,7 +141,6 @@ public class MOBenchmark {
             if (warmup < 0) exitWithMessageAndUsage("warmup must be >= 0");
             if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
             if (ratelimit <= 0) exitWithMessageAndUsage("ratelimit must be > 0");
-            if (latencytarget <= 0) exitWithMessageAndUsage("latencytarget must be > 0");
             if (sproscale < 0) exitWithMessageAndUsage("sproscale must be >= 0");
             if (sprwscale < 0) exitWithMessageAndUsage("sprwscale must be >= 0");
             if (mproscale < 0) exitWithMessageAndUsage("mproscale must be >= 0");
@@ -186,13 +179,7 @@ public class MOBenchmark {
         rand.nextBytes(payload);
 
         ClientConfig clientConfig = new ClientConfig(config.user, config.password, new StatusListener());
-        if (config.autotune) {
-            clientConfig.enableAutoTune();
-            clientConfig.setAutoTuneTargetInternalLatency(config.latencytarget);
-        }
-        else {
-            clientConfig.setMaxTransactionsPerSecond(config.ratelimit);
-        }
+        clientConfig.setMaxTransactionsPerSecond(config.ratelimit);
         client = ClientFactory.createClient(clientConfig);
 
         periodicStatsContext = client.createStatsContext();
@@ -314,9 +301,6 @@ public class MOBenchmark {
         System.out.println(" System Server Statistics");
         System.out.println(HORIZONTAL_RULE);
 
-        if (config.autotune) {
-            System.out.printf("Targeted Internal Avg Latency: %,9d ms\n", config.latencytarget);
-        }
         System.out.printf("Reported Internal Avg Latency: %,9.2f ms\n", stats.getAverageInternalLatency());
 
         // 4. Write stats to file if requested

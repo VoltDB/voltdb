@@ -90,8 +90,6 @@ function benchmark() {
         --duration=30 \
         --servers=localhost:21212 \
         --ratelimit=100000 \
-        --autotune=true \
-        --latencytarget=6 \
         --mproscale=0.0 \
         --mprwscale=0.0 \
         --sproscale=1.0 \

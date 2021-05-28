@@ -313,8 +313,11 @@ public class ClientConfig {
      * The latency value used is the internal latency as reported by the servers.
      * The internal latency is a good measure of system saturation.</p>
      *
+     * @deprecated to be removed in V11.0
+     *
      * <p>See {@link #setAutoTuneTargetInternalLatency(int)}.</p>
      */
+    @Deprecated
     public void enableAutoTune() {
         if (m_nonblocking) {
             throw new IllegalStateException("Cannot use auto-tuning with non-blocking async");
@@ -484,8 +487,11 @@ public class ClientConfig {
      * latency as reported by the server(s), not round-trip latency measured by the
      * client. Default value is 5 if this is not called.</p>
      *
+     * @deprecated to be removed in V11.0
+     *
      * @param targetLatency New target latency in milliseconds.
      */
+    @Deprecated
     public void setAutoTuneTargetInternalLatency(int targetLatency) {
         if (targetLatency < 1) {
             throw new IllegalArgumentException(

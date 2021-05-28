@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -461,8 +461,6 @@ public class TestClientFeatures extends TestCase {
         assertFalse(dut.m_heavyweight);
         assertEquals(3000, dut.m_maxOutstandingTxns);
         assertEquals(Integer.MAX_VALUE, dut.m_maxTransactionsPerSecond);
-        assertFalse(dut.m_autoTune);
-        assertEquals(5, dut.m_autoTuneTargetInternalLatency);
         assertEquals(TimeUnit.MINUTES.toNanos(2), dut.m_procedureCallTimeoutNanos);
         assertEquals(TimeUnit.MINUTES.toMillis(2), dut.m_connectionResponseTimeoutMS);
         assertFalse(dut.m_reconnectOnConnectionLoss);

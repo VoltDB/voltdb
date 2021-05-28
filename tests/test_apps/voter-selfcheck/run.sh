@@ -118,9 +118,7 @@ function async-benchmark-help() {
 
 function async-benchmark() {
     benchmark Async \
-        --ratelimit=100000 \
-        --autotune=false $@ \
-        --latencytarget=10
+        --ratelimit=100000
 }
 
 function secure-benchmark() {

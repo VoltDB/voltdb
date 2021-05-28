@@ -95,8 +95,6 @@ function async-benchmark() {
         --pool-size=100000 \
         --wait=0 \
         --ratelimit=25000 \
-        --autotune=true \
-        --latency-target=12.0 \
         --run-loader=false
 }
 
@@ -110,9 +108,7 @@ function async-export() {
         --servers=localhost \
         --port=21212 \
         --pool-size=100000 \
-        --ratelimit=10000 \
-        --autotune=false \
-        --latency-target=10.0
+        --ratelimit=10000
 }
 
 # Multi-threaded synchronous benchmark sample

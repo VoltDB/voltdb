@@ -85,8 +85,6 @@ function async-benchmark() {
         --duration=${DURATION:-300} \
         --servers=$SERVERS \
         --ratelimit=${RATE:-100000} \
-        --autotune=false \
-        --latencytarget=1 \
         --testcase=ADHOCSINGLEPARTPTN
         #--testcase=UPDATEAPPLICATIONCATALOG
         #--testcase=LOADSINGLEPARTITIONTABLEPTN   # this case fails

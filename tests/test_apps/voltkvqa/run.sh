@@ -124,10 +124,8 @@ function async-benchmark() {
         --entropy=127 \
         --usecompression=false \
         --ratelimit=100000 \
-        --autotune=true \
         --multisingleratio=0.1 \
-        --recover=false \
-        --latencytarget=10
+        --recover=false
 }
 
 # Multi-threaded synchronous benchmark sample

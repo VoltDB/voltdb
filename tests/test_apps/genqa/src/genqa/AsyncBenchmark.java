@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -52,7 +52,6 @@ import org.voltdb.client.exampleutils.AppHelper;
 import org.voltdb.client.exampleutils.ClientConnection;
 import org.voltdb.client.exampleutils.ClientConnectionPool;
 import org.voltdb.client.exampleutils.IRateLimiter;
-import org.voltdb.client.exampleutils.LatencyLimiter;
 import org.voltdb.client.exampleutils.RateLimiter;
 
 public class AsyncBenchmark
@@ -83,8 +82,6 @@ public class AsyncBenchmark
                 .add("procedure", "procedure_name", "Procedure to call.", "JiggleSinglePartition")
                 .add("wait", "wait_duration", "Wait duration (only when calling one of the Wait procedures), in milliseconds.", 0)
                 .add("ratelimit", "rate_limit", "Rate limit to start from (number of transactions per second).", 100000)
-                .add("autotune", "auto_tune", "Flag indicating whether the benchmark should self-tune the transaction rate for a target execution latency (true|false).", "true")
-                .add("latencytarget", "latency_target", "Execution latency to target to tune transaction rate (in milliseconds).", 10.0d)
                 .setArguments(args)
             ;
 
@@ -97,8 +94,6 @@ public class AsyncBenchmark
             final String procedure     = apph.stringValue("procedure");
             final long wait            = apph.intValue("wait");
             final long rateLimit       = apph.longValue("ratelimit");
-            final boolean autoTune     = apph.booleanValue("autotune");
-            final double latencyTarget = apph.doubleValue("latencytarget");
             final String csv           = apph.stringValue("statsfile");
 
 
@@ -107,7 +102,6 @@ public class AsyncBenchmark
                 .validate("poolsize", (duration > 0))
                 .validate("wait", (wait >= 0))
                 .validate("ratelimit", (rateLimit > 0))
-                .validate("latencytarget", (latencyTarget > 0))
             ;
 
             // Display actual parameters, for reference
@@ -136,12 +130,8 @@ public class AsyncBenchmark
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------
 
-            // Pick the transaction rate limiter helping object to use based on user request (rate limiting or latency targeting)
-            IRateLimiter limiter = null;
-            if (autoTune)
-                limiter = new LatencyLimiter(Con, procedure, latencyTarget, rateLimit);
-            else
-                limiter = new RateLimiter(rateLimit);
+            // Pick the transaction rate limiter helping object to use for rate limiting
+            IRateLimiter limiter = new RateLimiter(rateLimit);
 
             // Run the benchmark loop for the requested duration
             final long endTime = System.currentTimeMillis() + (1000l * duration);

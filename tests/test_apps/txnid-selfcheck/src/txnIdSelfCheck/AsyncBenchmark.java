@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -116,12 +116,6 @@ public class AsyncBenchmark {
         @Option(desc = "Maximum TPS rate for benchmark.")
         int ratelimit = 100000;
 
-        @Option(desc = "Determine transaction rate dynamically based on latency.")
-        boolean autotune = false;
-
-        @Option(desc = "Server-side latency target for auto-tuning.")
-        int latencytarget = 5;
-
         @Option(desc = "Multi/single ratio.")
         double multisingleratio = 0.1;
 
@@ -155,7 +149,6 @@ public class AsyncBenchmark {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
             if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
             if (ratelimit <= 0) exitWithMessageAndUsage("ratelimit must be > 0");
-            if (latencytarget <= 0) exitWithMessageAndUsage("latencytarget must be > 0");
             if (multisingleratio < 0) exitWithMessageAndUsage("multisingleratio must be within [0, 1]");
             if (multisingleratio > 1) exitWithMessageAndUsage("multisingleratio must be within [0, 1]");
             if (windowsize <= 0) exitWithMessageAndUsage("windowsize must be > 0");
@@ -196,13 +189,7 @@ public class AsyncBenchmark {
     Client createClient(int serverCount) {
         ClientConfig clientConfig = new ClientConfig("", "");
         clientConfig.setReconnectOnConnectionLoss(true);
-        if (config.autotune) {
-            clientConfig.enableAutoTune();
-            clientConfig.setAutoTuneTargetInternalLatency(config.latencytarget);
-        }
-        else {
-            clientConfig.setMaxTransactionsPerSecond(config.ratelimit / serverCount);
-        }
+        clientConfig.setMaxTransactionsPerSecond(config.ratelimit / serverCount);
 
         if (config.topologyaware) {
               clientConfig.setTopologyChangeAware(true);

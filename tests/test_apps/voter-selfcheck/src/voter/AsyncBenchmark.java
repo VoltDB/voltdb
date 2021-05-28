@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -119,12 +119,6 @@ public class AsyncBenchmark {
         @Option(desc = "Maximum TPS rate for benchmark.")
         int ratelimit = Integer.MAX_VALUE;
 
-        @Option(desc = "Determine transaction rate dynamically based on latency.")
-        boolean autotune = false;
-
-        @Option(desc = "Server-side latency target for auto-tuning.")
-        int latencytarget = 5;
-
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
 
@@ -142,7 +136,6 @@ public class AsyncBenchmark {
             if (contestants <= 0) exitWithMessageAndUsage("contestants must be > 0");
             if (maxvotes <= 0) exitWithMessageAndUsage("maxvotes must be > 0");
             if (ratelimit <= 0) exitWithMessageAndUsage("ratelimit must be > 0");
-            if (latencytarget <= 0) exitWithMessageAndUsage("latencytarget must be > 0");
         }
     }
 
@@ -170,13 +163,7 @@ public class AsyncBenchmark {
         this.config = config;
 
         ClientConfig clientConfig = new ClientConfig(config.username, config.password, new StatusListener());
-        if (config.autotune) {
-            clientConfig.enableAutoTune();
-            clientConfig.setAutoTuneTargetInternalLatency(config.latencytarget);
-        }
-        else {
-            clientConfig.setMaxTransactionsPerSecond(config.ratelimit);
-        }
+        clientConfig.setMaxTransactionsPerSecond(config.ratelimit);
         client = ClientFactory.createClient(clientConfig);
 
         periodicStatsContext = client.createStatsContext();
@@ -318,9 +305,6 @@ public class AsyncBenchmark {
         System.out.println(" System Server Statistics");
         System.out.println(HORIZONTAL_RULE);
 
-        if (config.autotune) {
-            System.out.printf("Targeted Internal Avg Latency: %,9d ms\n", config.latencytarget);
-        }
         System.out.printf("Reported Internal Avg Latency: %,9.2f ms\n", stats.getAverageInternalLatency());
 
         // 4. Write stats to file if requested

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -58,7 +58,6 @@ import org.voltdb.client.exampleutils.AppHelper;
 import org.voltdb.client.exampleutils.ClientConnection;
 import org.voltdb.client.exampleutils.ClientConnectionPool;
 import org.voltdb.client.exampleutils.IRateLimiter;
-import org.voltdb.client.exampleutils.LatencyLimiter;
 import org.voltdb.client.exampleutils.RateLimiter;
 
 public class AsyncBenchmark

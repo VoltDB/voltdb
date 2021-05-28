@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -120,8 +120,6 @@ public class AsyncExportClient {
         final int port;
         final int poolSize;
         final int rateLimit;
-        final boolean autoTune;
-        final int latencyTarget;
         final String [] parsedServers;
         final String procedure;
         final int exportTimeout;
@@ -137,8 +135,6 @@ public class AsyncExportClient {
             port                 = apph.intValue("port");
             poolSize             = apph.intValue("poolsize");
             rateLimit            = apph.intValue("ratelimit");
-            autoTune             = apph.booleanValue("autotune");
-            latencyTarget        = apph.intValue("latencytarget");
             procedure            = apph.stringValue("procedure");
             parsedServers        = servers.split(",");
             exportTimeout        = apph.intValue("timeout");
@@ -178,8 +174,6 @@ public class AsyncExportClient {
                 .add("poolsize", "pool_size", "Size of the record pool to operate on - larger sizes will cause a higher insert/update-delete rate.", 100000)
                 .add("procedure", "procedure_name", "Procedure to call.", "JiggleExportSinglePartition")
                 .add("ratelimit", "rate_limit", "Rate limit to start from (number of transactions per second).", 100000)
-                .add("autotune", "auto_tune", "Flag indicating whether the benchmark should self-tune the transaction rate for a target execution latency (true|false).", "true")
-                .add("latencytarget", "latency_target", "Execution latency to target to tune transaction rate (in milliseconds).", 10)
                 .add("timeout","export_timeout","max seconds to wait for export to complete",300)
                 .add("migrate-ttl","false","use DDL that includes TTL MIGRATE action","false")
                 .add("usetableexport", "usetableexport","use DDL that includes CREATE TABLE with EXPORT ON ... action","false")
@@ -195,8 +189,7 @@ public class AsyncExportClient {
             // Validate parameters
             apph.validate("duration", (config.duration > 0))
                 .validate("poolsize", (config.poolSize > 0))
-                .validate("ratelimit", (config.rateLimit > 0))
-                .validate("latencytarget", (config.latencyTarget > 0));
+                .validate("ratelimit", (config.rateLimit > 0));
 
             // Display actual parameters, for reference
             apph.printActualUsage();
@@ -474,14 +467,8 @@ public class AsyncExportClient {
         clientConfig.setReconnectOnConnectionLoss(true); // needed so clients reconnect on node stop/restarts
         clientConfig.setClientAffinity(true);
         clientConfig.setTopologyChangeAware(true);
+        clientConfig.setMaxTransactionsPerSecond(config.rateLimit);
 
-        if (config.autoTune) {
-            clientConfig.enableAutoTune();
-            clientConfig.setAutoTuneTargetInternalLatency(config.latencyTarget);
-        }
-        else {
-            clientConfig.setMaxTransactionsPerSecond(config.rateLimit);
-        }
         Client client = ClientFactory.createClient(clientConfig);
         String[] serverArray = config.parsedServers;
         for (final String server : serverArray) {
