@@ -37,13 +37,11 @@ class RateLimiter {
 
     final static int BLOCK_SIZE = 100; // ms
     final static int HISTORY_SIZE = 25;
-    final static int RECENT_HISTORY_SIZE = 5;
-    final static int MINIMUM_MOVEMENT = 5;
     final static int DEFAULT_TXN_LIMIT = 10;
 
     // If true, we're doing actual rate limiting.
     // If false, we're just limiting outstanding txns.
-    protected boolean m_doesAnyTuning = false;
+    protected boolean m_doesRateLimiting = false;
 
     // Data used in rate limiting
     protected int m_maxOutstandingTxns = DEFAULT_TXN_LIMIT;
@@ -53,11 +51,7 @@ class RateLimiter {
     protected int m_currentBlockRecvSuccessCount = 0;
     protected long m_currentBlockTotalInternalLatency = 0;
     protected Deque<Double> m_prevInternalLatencyAvgs = new ArrayDeque<>();
-
-    // Autotuning-specific data
-    protected boolean m_autoTune = false;
     protected int m_targetTxnsPerSecond = Integer.MAX_VALUE;
-    protected int m_latencyTarget = 5;
 
     // Non-rate-limiting data
     protected Semaphore m_outstandingTxnsSemaphore = new Semaphore(DEFAULT_TXN_LIMIT);
@@ -70,38 +64,6 @@ class RateLimiter {
     private int m_nonblockingResumeLevel = Math.round(DEFAULT_TXN_LIMIT * RESUME_THRESHOLD);
     private final static float RESUME_THRESHOLD = 0.25f;
     private final static int RESUME_TIMEOUT_FACTOR = 5;
-
-    /*
-     * Implements the autotune mechanisms.
-     */
-    private void autoTuneTargetFromHistory() {
-        double recentLatency = 0, mediumTermLatency = 0;
-        if (! m_prevInternalLatencyAvgs.isEmpty()) {
-            int i = 0;
-            for (double value : m_prevInternalLatencyAvgs) {
-                if (i < RECENT_HISTORY_SIZE) recentLatency += value;
-                mediumTermLatency += value;
-                ++i;
-            }
-            recentLatency /= Math.min(m_prevInternalLatencyAvgs.size(), RECENT_HISTORY_SIZE);
-            mediumTermLatency /= m_prevInternalLatencyAvgs.size();
-        }
-
-        if (mediumTermLatency > m_latencyTarget && recentLatency > m_latencyTarget) {
-            m_maxOutstandingTxns -= Math.max(0.1 * m_maxOutstandingTxns, MINIMUM_MOVEMENT);
-        } else if (mediumTermLatency < m_latencyTarget && recentLatency > m_latencyTarget) {
-            --m_maxOutstandingTxns;
-        } else if (mediumTermLatency > m_latencyTarget && recentLatency < m_latencyTarget) {
-            m_maxOutstandingTxns++;
-        } else { // if ((mediumTermLatency < m_latencyTarget) && (recentLatency < m_latencyTarget)) {
-            m_maxOutstandingTxns += Math.max(0.1 * m_maxOutstandingTxns, MINIMUM_MOVEMENT);
-        }
-
-        // don't let this go to 0, latency be damned
-        if (m_maxOutstandingTxns <= 0) {
-            m_maxOutstandingTxns = 1;
-        }
-    }
 
     /*
      * Given the timestamp of a transaction, checks whether the timestamp is
@@ -133,24 +95,7 @@ class RateLimiter {
             m_currentBlockSendCount = 0;
             m_currentBlockRecvSuccessCount = 0;
             m_currentBlockTotalInternalLatency = 0;
-
-            if (m_autoTune) {
-                autoTuneTargetFromHistory();
-            }
         }
-    }
-
-    /**
-     * Unconditionally enables autotuning based on using some target
-     * latency to dynamically adjust the limit of outstandind txns.
-     * May not be reflected until the next 100ms.
-     */
-    synchronized void enableAutoTuning(int latencyTarget) {
-        m_autoTune = true;
-        m_doesAnyTuning = true;
-        m_targetTxnsPerSecond = Integer.MAX_VALUE;
-        m_maxOutstandingTxns = 20;
-        m_latencyTarget = latencyTarget;
     }
 
     /**
@@ -161,8 +106,7 @@ class RateLimiter {
      * May not be reflected until the next 100ms.
      */
     synchronized void setLimits(int txnsPerSec, int maxOutstanding) {
-        m_autoTune = false;
-        m_doesAnyTuning = (txnsPerSec < Integer.MAX_VALUE / 2);
+        m_doesRateLimiting = (txnsPerSec < Integer.MAX_VALUE / 2);
         m_targetTxnsPerSecond = txnsPerSec;
         m_maxOutstandingTxns = maxOutstanding;
         m_outstandingTxnsSemaphore.drainPermits();
@@ -201,7 +145,7 @@ class RateLimiter {
      * @param ignoreBackpressure Don't return a permit for backpressure purposes since none was ever taken
      */
     void transactionResponseReceived(long timestampNanos, int internalLatency, boolean ignoreBackpressure) {
-        if (m_doesAnyTuning) {
+        if (m_doesRateLimiting) {
             synchronized (this) {
                 ensureCurrentBlockIsKosher(TimeUnit.NANOSECONDS.toMillis(timestampNanos));
                 --m_outstandingTxns;
@@ -247,7 +191,7 @@ class RateLimiter {
      * We're about to send a request; this method handles rate-limiting.
      * Two major modes of operation are possible:
      *
-     * 1. Normal rate-limiting mode ('doesAnyTuning' is true)
+     * 1. Normal rate-limiting mode ('doesRateLimiting' is true)
      *    We do rate calculations and then either return so that the
      *    request can be sent, or else we wait a tick and then retry.
      *    We'll keep retrying until the rate drops below the limit,
@@ -282,7 +226,7 @@ class RateLimiter {
         long timestampNanos = callTimeNanos; // updated if we block
 
         // Rate-limiting mode
-        if (m_doesAnyTuning) {
+        if (m_doesRateLimiting) {
             while (!rateWithinLimit(timestampNanos, ignoreBackpressure)) {
 
                 // timed out? (TODO - surely this is required ?)
@@ -326,7 +270,7 @@ class RateLimiter {
 
         // Rate-limiting mode not supported. The problem lies in
         // having an efficient mechanism to determine when to resume.
-        if (m_doesAnyTuning) {
+        if (m_doesRateLimiting) {
             throw new IllegalStateException("Nonblocking not available with rate-limiting");
         }
 

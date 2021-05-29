@@ -184,14 +184,9 @@ public final class ClientImpl implements Client {
         }
         m_clientStatusListener = config.m_listener;
 
-        if (config.m_autoTune) {
-            m_distributer.m_rateLimiter.enableAutoTuning(config.m_autoTuneTargetInternalLatency);
-        }
-        else {
-            assert(config.m_maxOutstandingTxns > 0);
-            m_distributer.m_rateLimiter.setLimits(config.m_maxTransactionsPerSecond,
-                                                  config.m_maxOutstandingTxns);
-        }
+        assert(config.m_maxOutstandingTxns > 0);
+        m_distributer.m_rateLimiter.setLimits(config.m_maxTransactionsPerSecond,
+                                              config.m_maxOutstandingTxns);
 
         m_blessedThreadIds.addAll(m_distributer.getThreadIds());
 

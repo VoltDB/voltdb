@@ -60,8 +60,6 @@ public class ClientConfig {
     boolean m_heavyweight = false;
     int m_maxOutstandingTxns = DEFAULT_MAX_OUTSTANDING_TRANSACTIONS;
     int m_maxTransactionsPerSecond = Integer.MAX_VALUE;
-    boolean m_autoTune = false;
-    int m_autoTuneTargetInternalLatency = 5;
     long m_procedureCallTimeoutNanos = DEFAULT_PROCEDURE_TIMEOUT_NANOS;
     long m_connectionResponseTimeoutMS = DEFAULT_CONNECTION_TIMEOUT_MS;
     Subject m_subject = null;
@@ -308,24 +306,6 @@ public class ClientConfig {
     }
 
     /**
-     * <p>Enable the Auto Tuning feature, which dynamically adjusts the maximum
-     * allowable transaction number with the goal of maintaining a target latency.
-     * The latency value used is the internal latency as reported by the servers.
-     * The internal latency is a good measure of system saturation.</p>
-     *
-     * @deprecated to be removed in V11.0
-     *
-     * <p>See {@link #setAutoTuneTargetInternalLatency(int)}.</p>
-     */
-    @Deprecated
-    public void enableAutoTune() {
-        if (m_nonblocking) {
-            throw new IllegalStateException("Cannot use auto-tuning with non-blocking async");
-        }
-        m_autoTune = true;
-    }
-
-    /**
      * <p>The default behavior for queueing of asynchronous procedure invocations is to block until
      * it is possible to queue the invocation. If non-blocking async is configured, then an async
      * callProcedure will return immediately if it is not possible to queue the procedure
@@ -352,9 +332,6 @@ public class ClientConfig {
     public void setNonblockingAsync(long blockingTimeout) {
         if (m_maxTransactionsPerSecond != Integer.MAX_VALUE) {
             throw new IllegalStateException("Cannot set non-blocking with limit on TPS");
-        }
-        if (m_autoTune) {
-            throw new IllegalStateException("Cannot set non-blocking with autotuning");
         }
         m_nonblocking = true;
         m_asyncBlockingTimeout = Math.max(0, blockingTimeout);
@@ -480,24 +457,6 @@ public class ClientConfig {
      */
     public void setMaxConnectionRetryInterval(long ms) {
         this.m_maxConnectionRetryIntervalMS = ms;
-    }
-
-    /**
-     * <p>Set the target latency for the Auto Tune feature. Note this represents internal
-     * latency as reported by the server(s), not round-trip latency measured by the
-     * client. Default value is 5 if this is not called.</p>
-     *
-     * @deprecated to be removed in V11.0
-     *
-     * @param targetLatency New target latency in milliseconds.
-     */
-    @Deprecated
-    public void setAutoTuneTargetInternalLatency(int targetLatency) {
-        if (targetLatency < 1) {
-            throw new IllegalArgumentException(
-                    "Max auto tune latency must be greater than 0, " + targetLatency + " was specified");
-        }
-        m_autoTuneTargetInternalLatency = targetLatency;
     }
 
     /**
