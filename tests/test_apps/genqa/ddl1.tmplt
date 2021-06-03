@@ -33,8 +33,7 @@ AS
 
 %%STREAM name=export_partitioned_table_jdbc, export_target=jdbc_target, partition_key=rowid
 
-%%STREAM name=TOPIC_STREAM, partition_key=rowid
-%%TOPIC name=TOPIC_STREAM, profile=topicprofile
+%%STREAM name=TOPIC_STREAM, partition_key=rowid, topic_target=TOPIC_STREAM, topic_key=rowid
 
 %%TABLE name=export_mirror_partitioned_table, partition_key=rowid
 
@@ -74,7 +73,7 @@ CREATE STREAM export_done_table_file EXPORT TO TARGET file_target
 %%TABLE name=export_replicated_table_cdc, export_target=kafka_target, export_cdc="insert, update, delete"
 
 CREATE PROCEDURE PARTITION ON TABLE export_partitioned_table_kafka COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleExportGroupSinglePartition;
-CREATE PROCEDURE PARTITION ON TABLE topic_stream COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.InsertTopicStream;
+CREATE PROCEDURE PARTITION ON TABLE TOPIC_STREAM COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.InsertTopicStream;
 CREATE PROCEDURE PARTITION ON TABLE partitioned_table COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleSinglePartition;
 CREATE PROCEDURE PARTITION ON TABLE export_partitioned_table_kafka COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleExportSinglePartition;
 CREATE PROCEDURE FROM CLASS genqa.procedures.InsertExportDoneDetails;
