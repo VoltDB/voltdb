@@ -18,8 +18,6 @@
 package org.voltdb.client;
 
 import java.io.IOException;
-import java.util.ArrayDeque;
-import java.util.Deque;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -36,7 +34,6 @@ import org.voltcore.utils.EstTime;
 class RateLimiter {
 
     final static int BLOCK_SIZE = 100; // ms
-    final static int HISTORY_SIZE = 25;
     final static int DEFAULT_TXN_LIMIT = 10;
 
     // If true, we're doing actual rate limiting.
@@ -50,7 +47,6 @@ class RateLimiter {
     protected int m_currentBlockSendCount = 0;
     protected int m_currentBlockRecvSuccessCount = 0;
     protected long m_currentBlockTotalInternalLatency = 0;
-    protected Deque<Double> m_prevInternalLatencyAvgs = new ArrayDeque<>();
     protected int m_targetTxnsPerSecond = Integer.MAX_VALUE;
 
     // Non-rate-limiting data
@@ -68,7 +64,7 @@ class RateLimiter {
     /*
      * Given the timestamp of a transaction, checks whether the timestamp is
      * represented within the current block of transactions, and if not, starts
-     * a new block. Autotuning is applied at this time if desired.
+     * a new block.
      */
     private void ensureCurrentBlockIsKosher(long timestamp) {
         long thisBlock = timestamp - (timestamp % BLOCK_SIZE);
@@ -87,11 +83,6 @@ class RateLimiter {
         if (thisBlock > m_currentBlockTimestamp) {
             // need to deal with 100ms skips here TODO
             m_currentBlockTimestamp = thisBlock;
-            m_prevInternalLatencyAvgs.addFirst(
-                    m_currentBlockTotalInternalLatency / (double) m_currentBlockRecvSuccessCount);
-            while (m_prevInternalLatencyAvgs.size() > HISTORY_SIZE) {
-                m_prevInternalLatencyAvgs.pollLast();
-            }
             m_currentBlockSendCount = 0;
             m_currentBlockRecvSuccessCount = 0;
             m_currentBlockTotalInternalLatency = 0;
@@ -140,14 +131,14 @@ class RateLimiter {
      * Do housekeeping on rate-limiting mechanism when response is received
      * or we time out on awaiting a response.
      *
-     * @param timestampNanos The time as measured when the call is made.
+     * @param endNanos The time as measured when the response was received
      * @param internalLatency Latency measurement of this transaction in millis (-1 for no response)
      * @param ignoreBackpressure Don't return a permit for backpressure purposes since none was ever taken
      */
-    void transactionResponseReceived(long timestampNanos, int internalLatency, boolean ignoreBackpressure) {
+    void transactionResponseReceived(long endNanos, int internalLatency, boolean ignoreBackpressure) {
         if (m_doesRateLimiting) {
             synchronized (this) {
-                ensureCurrentBlockIsKosher(TimeUnit.NANOSECONDS.toMillis(timestampNanos));
+                ensureCurrentBlockIsKosher(TimeUnit.NANOSECONDS.toMillis(endNanos));
                 --m_outstandingTxns;
                 assert(m_outstandingTxns >= 0);
                 if (internalLatency != -1) {
@@ -215,22 +206,20 @@ class RateLimiter {
      * When ignoreBackpressure is true, timeoutNanos has no effect.
      * TODO - this may be a bug.
      *
-     * @param callTimeNanos The time as measured when the call is made.
+     * @param startNanos The time as measured when the call is made.
      * @param timeoutNanos Limit on time waiting for permission to send
      * @param ignoreBackpressure If true, send permission immediately granted
-     * @return The time as measured when the call returns.
      */
-    long prepareToSendTransaction(long callTimeNanos, long timeoutNanos, boolean ignoreBackpressure)
+    void prepareToSendTransaction(long startNanos, long timeoutNanos, boolean ignoreBackpressure)
         throws TimeoutException, InterruptedException {
-
-        long timestampNanos = callTimeNanos; // updated if we block
 
         // Rate-limiting mode
         if (m_doesRateLimiting) {
+            long timestampNanos = startNanos; // updated if we block
             while (!rateWithinLimit(timestampNanos, ignoreBackpressure)) {
 
                 // timed out? (TODO - surely this is required ?)
-                //if (timestampNanos - callTimeNanos >= timeoutNanos) {
+                //if (timestampNanos - startNanos >= timeoutNanos) {
                 //    throw new TimeoutException("timed out in rate limiter");
                 //}
 
@@ -249,12 +238,8 @@ class RateLimiter {
                 if (!acquired) {
                     throw new TimeoutException("timed out awaiting send permit");
                 }
-                timestampNanos = System.nanoTime();
             }
         }
-
-        // This time may have changed if this call blocked
-        return timestampNanos;
     }
 
     /**
@@ -263,10 +248,9 @@ class RateLimiter {
      * this only supports a limit based on an outstanding transaction
      * count. We try to acquire the semaphore, but never wait.
      *
-     * @param callTimeNanos The time as measured when the call is made.
-     * @return The time as measured when the call returns, or -1 for no send permission.
+     * @return true for permission to send, false for not
      */
-    long prepareToSendTransactionNonblocking(long callTimeNanos) {
+    boolean prepareToSendTransactionNonblocking() {
 
         // Rate-limiting mode not supported. The problem lies in
         // having an efficient mechanism to determine when to resume.
@@ -283,13 +267,13 @@ class RateLimiter {
                     m_resumeWaitTimeout = EstTime.currentTimeMillis() +
                                          (m_maxOutstandingTxns * RESUME_TIMEOUT_FACTOR);
                 }
-                return -1;
+                return false;
             }
             ++m_nonblockingOutCount;
         }
 
-        // Can send now (no need to update timestamp)
-        return callTimeNanos;
+        // Can send now
+        return true;
     }
 
     /*
@@ -339,9 +323,7 @@ class RateLimiter {
      * Debug aid, dump rate-limit stats to standard out
      */
     synchronized void debug() {
-        System.out.printf("Target throughput/s is %d and max outstanding txns is %d\n",
-                m_targetTxnsPerSecond, m_maxOutstandingTxns);
-        System.out.printf("Current outstanding is %d and recent internal latency is %.2f\n",
-                m_outstandingTxns, m_prevInternalLatencyAvgs.peekFirst());
+        System.out.printf("Target txns/sec is %d, max outstanding txns is %d, current outstanding is %d\n",
+                          m_targetTxnsPerSecond, m_maxOutstandingTxns, m_outstandingTxns);
     }
 }
