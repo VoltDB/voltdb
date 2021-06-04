@@ -2070,8 +2070,8 @@ public abstract class CatalogUtil {
         Map<String, Table> topicStreams = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
         for (Table table : db.getTables()) {
             if (!StringUtils.isBlank(table.getTopicname())) {
-                // For now we only support connectorless streams exporting to topic
-                assert TableType.isConnectorLessStream(table.getTabletype()) : "Table " + table.getTypeName()
+                // For now we only support streams exporting to topic
+                assert TableType.isStream(table.getTabletype()) : "Table " + table.getTypeName()
                     + " has invalid type " + table.getTabletype() + " for topics";
 
                 Table curTable = topicStreams.put(table.getTopicname(), table);
@@ -2136,9 +2136,14 @@ public abstract class CatalogUtil {
             String streamName = null;
             Table table = topicStreams.get(cataTopic.getTypeName());
             if (table != null) {
-                // stream exports to topic, change stream type
                 streamName = table.getTypeName();
-                table.setTabletype(TableType.STREAM.get());
+
+                // On DDL update, stream exporting to topics are set to connectorless.
+                // If stream exports to topic, change stream type.
+                // Note that on LOAD CLASSES the table type is already set
+                if (TableType.isConnectorLessStream(table.getTabletype())) {
+                    table.setTabletype(TableType.STREAM.get());
+                }
 
                 // Transfer stream column info to topic as properties (historical from previous topic DDL)
                 String keyColumns = table.getTopickeycolumnnames();
@@ -2155,6 +2160,15 @@ public abstract class CatalogUtil {
                 streamName = topic.getName().toUpperCase();
             }
             cataTopic.setStreamname(streamName);
+        }
+
+        // Handle the cases where the topic is removed from deployment: any
+        // stream referring to it must be converted to connectorless.
+        for (Table table : topicStreams.values()) {
+            if (cataTopics.get(table.getTopicname()) != null || TableType.isConnectorLessStream(table.getTabletype())) {
+                continue;
+            }
+            table.setTabletype(TableType.CONNECTOR_LESS_STREAM.get());
         }
     }
 
