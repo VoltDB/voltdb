@@ -21,11 +21,10 @@
 	 */
 	$.fn.popup = function(settings){
 
-		var selector = this.selector,
-			popup = new $.Popup(settings),
-			content = settings && settings.content
-				? settings.content
-				: $(this).attr('href');
+		var selector = $(this).getSelector()[0],
+      popup = new $.Popup(settings),
+      content =
+        settings && settings.content ? settings.content : $(this).attr("href");
 
 		$(document)
 			.on('click.popup', selector, function(e){

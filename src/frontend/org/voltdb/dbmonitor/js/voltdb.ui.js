@@ -22,7 +22,7 @@ $(document).ready(function () {
         var value = localStorage[key];
         if(key != 'queries' && key != 'queryNameList' && key != 'key' ){
             if(value != undefined){
-                var data = $.parseJSON(value);
+                var data = JSON.parse(value);
             }
             if(!data.hasOwnProperty('time')){
                 if($.cookie('sessionCookie') == undefined){
@@ -127,10 +127,10 @@ $(document).ready(function () {
     } catch (e) {/*Ignore error.*/ }
 
     // Toogle Server popup
-    $('#btnPopServerList').click(function (event) {
+    $('#btnPopServerList').on('click',function (event) {
         $("#popServerSearch").val('');
         $("#popServerSearch").attr('placeholder', 'Search Server');
-        $('#popServerSearch').keyup();
+        $('#popServerSearch').trigger('keyup');
         event.stopPropagation();
         if ($('#popServerList').css('display') == 'none') {
             $(this).removeClass('showServers');
@@ -141,7 +141,7 @@ $(document).ready(function () {
         };
         $('#popServerList').toggle('slide', '', 1500);
 
-        $("#wrapper").click(function () {
+        $("#wrapper").on('click',function () {
             if ($('#popServerList').css('display') == 'block') {
                 $('#popServerList').hide();
                 $('#btnPopServerList').removeClass('hideServers');
@@ -156,13 +156,13 @@ $(document).ready(function () {
     });
 
     // Pop Slide Server Search
-    $('#popServerSearch').keyup(function () {
-        var searchText = $(this).val().toLowerCase();
-        $('#serversList > tbody > tr.filterClass').each(function () {
-            var currentLiText = $(this).text().toLowerCase(),
-                showCurrentLi = currentLiText.indexOf(searchText) !== -1;
-            $(this).toggle(showCurrentLi);
-        });
+    $("#popServerSearch").on("keyup", function () {
+      var searchText = $(this).val().toLowerCase();
+      $("#serversList > tbody > tr.filterClass").each(function () {
+        var currentLiText = $(this).text().toLowerCase(),
+          showCurrentLi = currentLiText.indexOf(searchText) !== -1;
+        $(this).toggle(showCurrentLi);
+      });
     });
 
     // Implements Scroll in Server List div
@@ -177,7 +177,7 @@ $(document).ready(function () {
     $(".tab_content:first").show(); //Show first tab content
 
     // Show Hide Graph Block for cluster lantency
-    $('#showHideGraphBlock').click(function () {
+    $('#showHideGraphBlock').on('click',function () {
         var userPreferences = getUserPreferences();
         if (userPreferences != null) {
             if (userPreferences['ClusterLatency'] != false || userPreferences['ClusterTransactions'] != false || userPreferences['ServerCPU'] != false || userPreferences['ServerRAM'] != false || userPreferences["PartitionIdleTime"] != false || userPreferences["CommandLogStat"] != false || userPreferences["CommandLogTables"] != false) {
@@ -197,7 +197,7 @@ $(document).ready(function () {
     });
 
     //Show Hide Graph Block for importer
-    $('#showHideImporterGraphBlock').click(function () {
+    $('#showHideImporterGraphBlock').on('click',function () {
         var graphState = $("#mainImporterGraphBlock").css('display');
         if (graphState == 'none') {
             $(".showhideImporterIcon").removeClass('collapsed');
@@ -210,7 +210,7 @@ $(document).ready(function () {
     });
 
     //Show Hide Graph Block for exporter
-    $('#showHideExporterGraphBlock').click(function () {
+    $('#showHideExporterGraphBlock').on('click',function () {
         var graphState = $("#mainExporterGraphBlock").css('display');
         if (graphState == 'none') {
             $(".showhideExporterIcon").removeClass('collapsed');
@@ -235,7 +235,7 @@ $(document).ready(function () {
 
     //DR Show/hide toggle
     // Show Hide Graph Block
-    $('#showHideDrBlock').click(function () {
+    $('#showHideDrBlock').on('click',function () {
         $(".drShowHide").toggle();
         var $this = $(this);
         var drState = $(".drShowHide").css('display');
@@ -251,7 +251,7 @@ $(document).ready(function () {
     });
 
     // Show Hide Command Log Performance Block
-    $('#showHideCLPBlock').click(function () {
+    $('#showHideCLPBlock').on('click',function () {
         $(".clpShowHide").toggle();
         var $this = $(this);
         var clpState = $(".clpShowHide").css('display');
@@ -308,7 +308,7 @@ $(document).ready(function () {
     refreshCss();
 
     var navLeft = $("#nav").css("left");
-    $("#nav li").click(function () {
+    $("#nav li").on('click',function () {
         $('.contents').hide().eq($(this).index()).show();
         $("#nav li").removeClass('active');
         $(this).addClass('active');
@@ -357,7 +357,7 @@ $(document).ready(function () {
                     var btn_id = "#runBTn-" + element_id
 
                     if ($(btn_id).attr('disabled') != "disabled")
-                        $(btn_id).button().click();
+                        $(btn_id).button().trigger('click');
                 });
             } else {
                 shortcut.add("F5", function () {
@@ -366,7 +366,7 @@ $(document).ready(function () {
                     var btn_id = "#runBTn-" + element_id
 
                     if ($(btn_id).attr('disabled') != "disabled")
-                        $(btn_id).button().click();
+                        $(btn_id).button().trigger('click');
                 });
             }
         } else {
@@ -891,7 +891,7 @@ var loadPage = function (serverName, portid) {
             //hide loading icon
             $("#overlay").hide();
 
-            $('#serversList > tbody > tr > td.active > a').click(function () {
+            $('#serversList > tbody > tr > td.active > a').on('click',function () {
                 var clickedServer = $(this).html();
                 $('.activeServerName').html(clickedServer).attr('title', clickedServer);
 
@@ -947,7 +947,7 @@ var loadPage = function (serverName, portid) {
                 openPopup($(this));
             });
 
-            $('.tblshutdown  >tbody > tr.activeHost > td:first-child > a').click(function () {
+            $('.tblshutdown  >tbody > tr.activeHost > td:first-child > a').on('click',function () {
                 var clickedServer = $(this).html();
                 var serverIp = voltDbRenderer.getServerIP($(this).parent().siblings('td:first').next().find("a").attr('data-hostid'));
                 var currentUrl = window.location.href.split('?')[0];
@@ -1077,7 +1077,7 @@ var loadPage = function (serverName, portid) {
 
         var getLicenseInformation = function (licenseInfo) {
             if (licenseInfo != undefined && licenseInfo != "") {
-                var licInfo = $.parseJSON(licenseInfo);
+                var licInfo = JSON.parse(licenseInfo);
                 if(!VoltDbAdminConfig.isExportLoading){
                     $("#addNewConfigLink").show();
                 }
@@ -1789,7 +1789,7 @@ var loadPage = function (serverName, portid) {
             }
 
 
-            $("#dbPane_" + i + " div.menu_head").click(function (e) {
+            $("#dbPane_" + i + " div.menu_head").on('click',function (e) {
                 e.preventDefault();
                 var id = $(this).parent().attr('id').substring(7);
                 var headerState = $("#dbPane_" + id + " div.menu_body").css('display');
@@ -1803,7 +1803,7 @@ var loadPage = function (serverName, portid) {
                 $(this).next("div.menu_body").slideToggle(300).siblings("div.menu_body").slideUp("slow");
             });
 
-            $("#showHideDrBlock_" + combinedId).click(function (e) {
+            $("#showHideDrBlock_" + combinedId).on('click',function (e) {
                 e.preventDefault();
                 var headerState = $("#drSection_"+ combinedId).css('display');
                 if (headerState == 'none') {
@@ -2527,7 +2527,7 @@ var loadPage = function (serverName, portid) {
     });
 
     //slides the element with class "menu_body" when paragraph with class "menu_head" is clicked
-    $("#firstpane div.menu_head").click(function () {
+    $("#firstpane div.menu_head").on('click',function () {
         var userPreferences = getUserPreferences();
         if (userPreferences != null) {
             if (userPreferences['DatabaseTables'] != false || userPreferences['StoredProcedures'] != false) {
@@ -2554,7 +2554,7 @@ var loadPage = function (serverName, portid) {
     });
 
     //remove
-    $("#dbPane div.menu_head").click(function () {
+    $("#dbPane div.menu_head").on('click',function () {
         var headerState = $("#dbPane div.menu_body").css('display');
         if (headerState == 'none') {
             $(this).removeClass('collapsedDR');
@@ -3235,7 +3235,7 @@ var getCurrentTab = function () {
 
 var getUserPreferences = function () {
     try {
-        voltDbRenderer.userPreferences = $.parseJSON(VoltDbUI.getFromLocalStorage("user-preferences"));
+        voltDbRenderer.userPreferences = JSON.parse(VoltDbUI.getFromLocalStorage("user-preferences"));
     } catch (e) {
         voltDbRenderer.userPreferences = {};
         var preferencesList = ["ServerCPU", "ServerRAM", "ClusterLatency", "ClusterTransactions", "StoredProcedures", "DatabaseTables", "PartitionIdleTime", "CommandLogStat", "CommandLogTables"];
@@ -3370,7 +3370,7 @@ var showHideGraph = function (userpreferences) {
 
 function ChangeGraphLabelColor() {
     if (VoltDbUI.getFromLocalStorage("user-preferences") != undefined) {
-        var userPreferences = $.parseJSON(VoltDbUI.getFromLocalStorage("user-preferences"));
+        var userPreferences = JSON.parse(VoltDbUI.getFromLocalStorage("user-preferences"));
 
         if (userPreferences['ClusterLatency'] != false || userPreferences['ClusterTransactions'] != false || userPreferences['ServerCPU'] != false || userPreferences['ServerRAM'] != false || userPreferences["PartitionIdleTime"] != false || userPreferences["CommandLogStat"] != false || userPreferences["CommandLogStat"] != false) {
             $('#showHideGraphBlock').css('color', '#000000');
@@ -3384,7 +3384,7 @@ function ChangeGraphLabelColor() {
 
 function ChangeTableProcedureLabelColor() {
     if (VoltDbUI.getFromLocalStorage("user-preferences") != undefined) {
-        var userPreferences = $.parseJSON(VoltDbUI.getFromLocalStorage("user-preferences"));
+        var userPreferences = JSON.parse(VoltDbUI.getFromLocalStorage("user-preferences"));
         if (userPreferences['DatabaseTables'] != false || userPreferences['StoredProcedures'] != false) {
             $('#ShowHideBlock').css('color', '#000000');
         } else {
@@ -3512,7 +3512,7 @@ var adjustExporterGraphSpacing = function() {
             var value =  undefined
             var data = localStorage.getItem(name + "_" + VoltDBConfig.GetPortId())
             if(data != undefined)
-                value =  $.parseJSON(data)
+                value =  JSON.parse(data)
             return value == undefined ? value : value['value']
         },
 
@@ -3532,7 +3532,7 @@ var adjustExporterGraphSpacing = function() {
                             VoltDBCore.isServerConnected = false;
                             if (!$('#conpop').is(':visible') && !$('#shutdownPop').is(':visible')) {
                                 window.clearInterval(VoltDbUI.connectionTimeInterval);
-                                $('#conPopup').click();
+                                $('#conPopup').trigger('click');
                             }
                         } else {
                             VoltDbUI.isConnectionChecked = false;
@@ -3566,7 +3566,7 @@ var adjustExporterGraphSpacing = function() {
                     $('.schm').css("display", "block");
                     $('.refreshBtn').unbind("click");
                     $('.refreshBtn.schm').unbind("click");
-                    $('.refreshBtn.schm,.refreshBtn').click(function () {
+                    $('.refreshBtn.schm,.refreshBtn').on('click',function () {
                         VoltDbUI.refreshSqlAndSchemaTab();
                     });
                     VoltDbUI.isSchemaTabLoading = false;

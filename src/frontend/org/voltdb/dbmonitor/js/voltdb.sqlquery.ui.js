@@ -94,7 +94,7 @@ $(document).ready(function () {
                 }
             });
             var popup = $(this)[0];
-            $("#btnQueryTimeoutConfigSave").unbind("click");
+            $("#btnQueryTimeoutConfigSave").off("click");
             $("#btnQueryTimeoutConfigSave").on("click", function(e){
                 if (!$("#formQueryTimeoutConfiguration").valid()) {
                     e.preventDefault();
@@ -123,12 +123,12 @@ $(document).ready(function () {
     $("#btnQuerySaveConfirmation").popup({
         afterOpen: function () {
             var popup = $(this)[0];
-            $("#btnQuerySaveOk").unbind("click");
+            $("#btnQuerySaveOk").off("click");
             $("#btnQuerySaveOk").on("click", function(){
                 popup.close();
             });
 
-            $("#btnQuerySaveCancel").unbind("click");
+            $("#btnQuerySaveCancel").off("click");
             $("#btnQuerySaveCancel").on("click", function () {
                 popup.close();
             });
@@ -174,7 +174,7 @@ $(document).ready(function () {
                 function (value) {
                     var arr = []
                     if(localStorage.queries != undefined){
-                        queries = $.parseJSON(localStorage.queries)
+                        queries = JSON.parse(localStorage.queries)
                         $.each(queries, function(key){
                             var keySplit = key.split('_')
                             keySplit.shift()
@@ -205,7 +205,7 @@ $(document).ready(function () {
         },
         afterOpen: function () {
             var popup = $(this)[0];
-            $("#btnSaveQueryOk").unbind("click");
+            $("#btnSaveQueryOk").off("click");
             $("#btnSaveQueryOk").on("click", function(e){
                 if(typeof(Storage) !== "undefined"){
                     if (!$("#formSaveQuery").valid()) {
@@ -220,7 +220,7 @@ $(document).ready(function () {
                 popup.close();
             });
 
-            $("#btnSaveQueryCancel").unbind("click");
+            $("#btnSaveQueryCancel").off("click");
             $("#btnSaveQueryCancel").on("click", function () {
                 popup.close();
             });
@@ -236,7 +236,7 @@ $(document).ready(function () {
         orgQueryData = "{}"
         query_localStorage = localStorage.queries
         if (query_localStorage != undefined){
-            queryData = $.parseJSON(query_localStorage)
+            queryData = JSON.parse(query_localStorage)
             orgQueryData = query_localStorage
         }
 
@@ -326,7 +326,7 @@ $(document).ready(function () {
     $("#btnMemoryError").popup({
         afterOpen: function () {
             var popup = $(this)[0];
-            $("#btnMemoryErrorOk").unbind("click");
+            $("#btnMemoryErrorOk").off("click");
             $("#btnMemoryErrorOk").on("click", function(){
                 popup.close();
             })
@@ -336,7 +336,7 @@ $(document).ready(function () {
     $("#btnHtmlSupport").popup({
         afterOpen: function () {
             var popup = $(this)[0];
-            $("#btnIsSupportedOk").unbind("click");
+            $("#btnIsSupportedOk").off("click");
             $("#btnIsSupportedOk").on("click", function(){
                 popup.close();
             })
@@ -358,7 +358,7 @@ $(document).ready(function () {
     $('#btnCloseTabConfirmation').popup({
         afterOpen: function () {
             var popup = $(this)[0];
-            $('#btnCloseTabOk').unbind('click');
+            $('#btnCloseTabOk').off('click');
             $('#btnCloseTabOk').on('click', function (e) {
                 var element_id = $('#closeTabConfirmation').data('id')
                 var id = element_id.split('-')[1]
@@ -388,7 +388,7 @@ $(document).ready(function () {
                 popup.close()
             });
 
-            $('#btnCloseTabCancel').unbind('click');
+            $('#btnCloseTabCancel').off('click');
             $('#btnCloseTabCancel').on('click', function (e) {
                 popup.close()
             });
@@ -401,7 +401,7 @@ $(document).ready(function () {
         var queryData = {}
         var sql_localStorage = localStorage.queries
         if(sql_localStorage != undefined){
-            queryData = $.parseJSON(sql_localStorage);
+            queryData = JSON.parse(sql_localStorage);
         }
         var keyName =  getKeyIndex(queryData, tabName) + '_' + tabName
         delete queryData[keyName]
@@ -442,7 +442,7 @@ $(document).ready(function () {
     $(".tab_contentSQL:first").show(); //Show first tab content
 
     //On Click Event
-    $("ul#tabSQL li").click(function () {
+    $("ul#tabSQL li").on('click',function () {
         $("ul#tabSQL li").removeClass("active"); //Remove any "active" class
         $(this).addClass("active"); //Add "active" class to selected tab
         $(".tab_contentSQL").hide(); //Hide all tab content
@@ -456,7 +456,7 @@ $(document).ready(function () {
     $(".tab_content_data:first").show(); //Show first tab content
 
     //On Click Event
-    $("ul#tabAnalysis li").click(function () {
+    $("ul#tabAnalysis li").on('click',function () {
         $("ul#tabAnalysis li").removeClass("active"); //Remove any "active" class
         $(this).addClass("active"); //Add "active" class to selected tab
         $(".tab_content_data").hide(); //Hide all tab content
@@ -470,7 +470,7 @@ $(document).ready(function () {
     $(".tab_content_procedure:first").show(); //Show first tab content
 
     //On Click Event
-    $("ul#ulProcedure li").click(function () {
+    $("ul#ulProcedure li").on('click',function () {
         $("ul#ulProcedure li").removeClass("active"); //Remove any "active" class
         $(this).addClass("active"); //Add "active" class to selected tab
         $(".tab_content_procedure").hide(); //Hide all tab content
@@ -674,7 +674,7 @@ $(document).ready(function () {
             var queryData = {}
 
             if(sql_localStorage != undefined){
-                unOrderedData = $.parseJSON(sql_localStorage)
+                unOrderedData = JSON.parse(sql_localStorage)
                 queryData = SQLQueryRender.getOrderedData(unOrderedData)
             }
 
@@ -688,7 +688,7 @@ $(document).ready(function () {
                 var ul = $tabs.find( "ul" );
                 html = '<li id="liNewQuery" title="New Query Tab"><a class="btnStudio plusBtn" id="new-query"><span>+</span></a></li>';
                 $(html).appendTo( ul );
-                $("#new-query").unbind('click')
+                $("#new-query").off('click')
                 $("#new-query").on('click', function() {
                     SQLQueryRender.createQueryTab()
                 });
@@ -698,7 +698,7 @@ $(document).ready(function () {
         this.getTabCounter = function(){
             localArray = []
             if(localStorage.queries != undefined){
-                $.each($.parseJSON(localStorage.queries), function(key){
+                $.each(JSON.parse(localStorage.queries), function(key){
                     localArray.push(key.split('_').splice(1).join())
                 })
             }
@@ -771,7 +771,7 @@ $(document).ready(function () {
             $('#querybox-'+tab_counter).text(tabQuery == undefined ? '' : tabQuery)
             SQLQueryRender.addQueryBtn(tab_counter)
 
-            $('#exportType-' + tab_counter).change(function () {
+            $('#exportType-' + tab_counter).on('change',function () {
                 var tab_id = $(this).attr('id').split('-')[1]
                 if ($('#exportType-'+ tab_id).val() == 'HTML') {
                     $('#resultHtml-'+ tab_id).css('display', 'block');
@@ -794,7 +794,7 @@ $(document).ready(function () {
             $('#resultCsv-'+ tab_counter).css('display', 'none');
             $('#resultMonospace-'+ tab_counter).css('display', 'none');
 
-            $("#new-query").unbind('click')
+            $("#new-query").off('click')
             $("#new-query").on('click', function() {
                 SQLQueryRender.createQueryTab()
                 tab_counter = tab_counter - 1
@@ -815,8 +815,8 @@ $(document).ready(function () {
                 }
             });
 
-            $('#close-tab-' + tab_counter).unbind('click')
-            $('#close-tab-' + tab_counter).click(function() {
+            $('#close-tab-' + tab_counter).off('click')
+            $('#close-tab-' + tab_counter).on('click',function() {
                 var element_id = $(this.parentElement).attr('id')
                 $('#closeTabConfirmation').data('id' , element_id )
                 $('#btnCloseTabConfirmation').trigger('click')
@@ -855,8 +855,8 @@ $(document).ready(function () {
                           '</ul>';
             $('#divQueryBtns').append(htmlBtn)
 
-            $('#runBTn-' + tab_id).unbind('click')
-            $('#runBTn-' + tab_id).click(function () {
+            $('#runBTn-' + tab_id).off('click')
+            $('#runBTn-' + tab_id).on('click',function () {
                 var queryTab = $($('#worktabs div.ui-tabs-panel')[$tabs.tabs('option','active')]);
 
                 if (queryTab.length == 1){
@@ -865,14 +865,14 @@ $(document).ready(function () {
                 }
             });
 
-            $('#clearQuery-' + tab_id).unbind('click')
-            $('#clearQuery-' + tab_id).click(function () {
+            $('#clearQuery-' + tab_id).off('click')
+            $('#clearQuery-' + tab_id).on('click',function () {
                 query_id = $(this).attr('id').split('-')[1]
                 $('#querybox-' + query_id).text('')
             });
 
-            $('#querySaveBtn-' + tab_id).unbind('click');
-            $('#querySaveBtn-' + tab_id).click(function(){
+            $('#querySaveBtn-' + tab_id).off('click');
+            $('#querySaveBtn-' + tab_id).on('click',function(){
                 var element = $("#worktabs .ui-tabs-panel:visible").attr("id");
                 var element_id = element.split('-')[1]
                 SQLQueryRender.orgQueryName = $('#qTab-' + element_id).find('a').text()
@@ -904,7 +904,7 @@ $(document).ready(function () {
         }
 
         this.saveConnectionKey = function (useAdminPort) {
-            var server = SQLQueryRender.server == null ? VoltDBConfig.GetDefaultServerNameForKey() : $.trim(SQLQueryRender.server);
+            var server = SQLQueryRender.server == null ? VoltDBConfig.GetDefaultServerNameForKey() : String.prototype.trim(SQLQueryRender.server);
             var user = SQLQueryRender.userName == '' ? null : SQLQueryRender.userName;
             var processNameSuffix = useAdminPort ? "" : "_CLIENTPORT";
             var processName = 'TABLE_INFORMATION' + processNameSuffix;
@@ -1199,7 +1199,7 @@ $(document).ready(function () {
             var value =  undefined
             var data = localStorage.getItem(name + "_" + VoltDBConfig.GetPortId())
             if(data != undefined)
-                value =  $.parseJSON(data)
+                value =  JSON.parse(data)
             return value == undefined ? value : value['value']
         }
 
@@ -1224,7 +1224,7 @@ function loadSQLQueryPage(serverName, portid, userName) {
         },
         afterOpen: function () {
             var popup = $(this)[0];
-            $("#btnQueryDatabasePausedErrorOk").unbind("click");
+            $("#btnQueryDatabasePausedErrorOk").off("click");
             $("#btnQueryDatabasePausedErrorOk").on("click", function () {
                 saveSessionCookie(sqlChangePortName, sqlPortForPausedDB.UseAdminPort);
                 VoltDBService.SetConnectionForSQLExecution(true);
@@ -1234,10 +1234,10 @@ function loadSQLQueryPage(serverName, portid, userName) {
                 var element = $("#worktabs .ui-tabs-panel:visible").attr("id");
                 var element_id = element.split('-')[1]
                 var btn_id = "#runBTn-" + element_id
-                $(btn_id).button().click();
+                $(btn_id).button().trigger('click');
             });
 
-            $("#btnQueryDatabasePausedErrorCancel").unbind("click");
+            $("#btnQueryDatabasePausedErrorCancel").off("click");
             $("#btnQueryDatabasePausedErrorCancel").on("click", function () {
                 SQLQueryRender.useAdminPortCancelled = true;
                 popup.close();
@@ -1250,7 +1250,7 @@ function loadSQLQueryPage(serverName, portid, userName) {
                 var element = $("#worktabs .ui-tabs-panel:visible").attr("id");
                 var element_id = element.split('-')[1]
                 var btn_id = "#runBTn-" + element_id
-                $(btn_id).button().click();
+                $(btn_id).button().trigger("click");
             }
         },
         closeContent: '',
@@ -1258,7 +1258,7 @@ function loadSQLQueryPage(serverName, portid, userName) {
     });
 
     // Export Type Change
-    $('#exportType').change(function () {
+    $('#exportType').on('change',function () {
         if ($('#exportType').val() == 'HTML') {
             $('#resultHtml').css('display', 'block');
             $('#resultCsv').css('display', 'none');
@@ -1276,7 +1276,7 @@ function loadSQLQueryPage(serverName, portid, userName) {
         }
     });
     // Clears Query
-    $('#clearQuery').click(function () {
+    $('#clearQuery').on('click',function () {
         $('#theQueryText').val('');
     });
 
