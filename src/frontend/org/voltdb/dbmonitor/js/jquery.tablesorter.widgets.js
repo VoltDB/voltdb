@@ -51,7 +51,7 @@
     /* IE7 needs JSON library for JSON.stringify - (http://caniuse.com/#search=json)
        if you need it, then include https://github.com/douglascrockford/JSON-js
     
-       $.parseJSON is not available is jQuery versions older than 1.4.1, using older
+       JSON.parse is not available is jQuery versions older than 1.4.1, using older
        versions will only allow storing information for one page at a time
     
        // *** Save data (JSON format only) ***
@@ -72,13 +72,13 @@
         url = window.location.pathname;
         try { ls = !!(localStorage.getItem); } catch (e) { }
         // *** get val ***
-        if ($.parseJSON) {
+        if (JSON.parse) {
             if (ls) {
-                v = $.parseJSON(localStorage[key] || '{}');
+                v = JSON.parse(localStorage[key] || '{}');
             } else {
                 k = document.cookie.split(/[;\s|=]/); // cookie
                 d = $.inArray(key, k) + 1; // add one to get from the key to the value
-                v = (d !== 0) ? $.parseJSON(k[d] || '{}') : {};
+                v = (d !== 0) ? JSON.parse(k[d] || '{}') : {};
             }
         }
         // allow val to be an empty string to 

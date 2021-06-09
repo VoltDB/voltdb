@@ -92,7 +92,7 @@ $(document).ready(function () {
         var savedData = getParameterByName("data");
 
         if (savedData != undefined && savedData != "") {
-            var json = jQuery.parseJSON(decodeURIComponent(savedData));
+            var json = JSON.parse(decodeURIComponent(savedData));
 
             if (json["DisplayPreferences"] != undefined && json["DisplayPreferences"] != "")
                 saveInLocalStorage("user-preferences", json["DisplayPreferences"]);

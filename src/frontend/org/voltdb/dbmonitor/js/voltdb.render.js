@@ -1030,8 +1030,9 @@ function alertNodeClicked(obj) {
                 schemaCatalogTableTypes[tableName]['TABLE_NAME'] = entry[tableNameIndex];
 
                 if (entry[remarksIndex] != null) {
-                    schemaCatalogTableTypes[tableName]['REMARKS'] = jQuery.parseJSON(entry[remarksIndex]).partitionColumn != null ? "PARTITIONED" : "REPLICATED";
-                    schemaCatalogTableTypes[tableName]['drEnabled'] = jQuery.parseJSON(entry[remarksIndex]).drEnabled;
+                    schemaCatalogTableTypes[tableName]['REMARKS'] = JSON.parse(entry[remarksIndex]).partitionColumn != null ? "PARTITIONED" : "REPLICATED";
+                    schemaCatalogTableTypes[tableName]["drEnabled"] =
+                      JSON.parse(entry[remarksIndex]).drEnabled;
                 } else {
                     schemaCatalogTableTypes[tableName]['REMARKS'] = "REPLICATED";
                 }
