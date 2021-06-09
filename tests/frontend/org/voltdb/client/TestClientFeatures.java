@@ -320,6 +320,132 @@ public class TestClientFeatures extends TestCase {
     }
 
     /**
+     * Nonblocking async mode. This test forces backpressure based on
+     * hitting the max outstanding transactions limit.
+     */
+    Object backpressureEvent = new Object();
+    boolean backpressureOn = false;
+
+    class NbCSL extends ClientStatusListenerExt {
+        @Override
+        public void backpressure(boolean status) {
+            synchronized (backpressureEvent) {
+                System.out.printf("Nonblocking async test: backpressure: %s -> %s%n", backpressureOn, status);
+                backpressureOn = status;
+                if (!status) { // backpressure removed
+                    backpressureEvent.notify();
+                }
+            }
+        }
+    }
+
+    CountDownLatch nbReady = new CountDownLatch(1);
+
+    class NbCallback implements ProcedureCallback {
+        @Override
+        public void clientCallback(ClientResponse clientResponse) throws Exception {
+            assertEquals(ClientResponse.SUCCESS, clientResponse.getStatus());
+            nbReady.countDown();
+        }
+    }
+
+    public void testNonblockingAsync() throws Exception {
+        NbCSL csl = new NbCSL();
+        NbCallback nbcb = new NbCallback();
+
+        ClientConfig config = new ClientConfig(null, null, csl);
+        config.setNonblockingAsync(); // default, 500 uS
+        config.setMaxOutstandingTxns(1); // ridiculously low for testing
+        config.setBackpressureQueueThresholds(1, 100_000); // 1 request, 100,000 bytes
+
+        // Validate that setters are setting
+        assertEquals(500_000, config.getNonblockingAsync());
+        assertEquals(1, config.getMaxOutstandingTxns());
+        assertEquals(1, config.getBackpressureQueueThresholds()[0]);
+        assertEquals(100_000, config.getBackpressureQueueThresholds()[1]);
+
+        // Connect is still synchronous
+        Client client = ClientFactory.createClient(config);
+        client.createConnection("localhost");
+
+        // Some common timeouts
+        final int shortCall = 10;
+        final int longCall = 1000;
+        final int waitTmo = 2 * longCall;
+
+        // We may be backpressured from connection setup; this is an artifact
+        // of testing with a low limit on outstanding requests. Use a throwaway
+        // request to clear it (we have to make a request because of how the
+        // implementation reports backpressure)
+        boolean b0 = client.callProcedure(nbcb, "ArbitraryDurationProc", shortCall);
+        if (b0) { // it was accepted, wait for it to finish
+            b0 = nbReady.await(waitTmo, TimeUnit.MILLISECONDS);
+            assertTrue("initial call did not complete", b0);
+        } else { // it was refused, wait for backpressure to clear
+            synchronized (backpressureEvent) {
+                if (backpressureOn) {
+                    backpressureEvent.wait(waitTmo);
+                }
+                assertFalse("initial backpressure did not clear", backpressureOn);
+            }
+        }
+
+        // Based on 1 outstanding txn max, expect 2nd call to be refused
+        // since 1st call takes 1 sec to complete
+        boolean b1 = client.callProcedure(nbcb, "ArbitraryDurationProc", longCall);
+        assertTrue("first call refused", b1);
+        boolean b2 = client.callProcedure(nbcb, "ArbitraryDurationProc", shortCall);
+        assertFalse("second call accepted", b2);
+
+        // Wait for no backpressure (first call completion) with time limit
+        // Note the test for backpressure initially being on assumes we can
+        // get here before the first call completes after 1 second.
+        synchronized (backpressureEvent) {
+            assertTrue("backpressure not on", backpressureOn);
+            backpressureEvent.wait(waitTmo); // no loop used; should be no spurious wakeups
+            assertFalse("backpressure still on", backpressureOn);
+        }
+
+        // Now we can send the second request
+        boolean b2a = client.callProcedure(nbcb, "ArbitraryDurationProc", shortCall);
+        assertTrue("second call refused", b2a);
+
+        // Wait on completion
+        client.drain();
+        client.close();
+    }
+
+    /**
+     * Nonblocking async mode incompatibility checks
+     */
+    public void testNonblockingVersusRateLimiting() throws Exception {
+
+        boolean gotExc1 = false;
+        ClientConfig config1 = new ClientConfig();
+        config1.setMaxTransactionsPerSecond(100_000);
+        try {
+            config1.setNonblockingAsync(250_000);
+        } catch (IllegalStateException ex) {
+            System.out.printf("setNonblockingAsync got expected exception: %s\n", ex.getMessage());
+            gotExc1 = true;
+        }
+        assertTrue("setNonblockingAsync succeeded, should have failed", gotExc1);
+        assertEquals(-1, config1.getNonblockingAsync());
+
+        boolean gotExc2 = false;
+        ClientConfig config2 = new ClientConfig();
+        config2.setNonblockingAsync(250_000);
+        try {
+            config2.setMaxTransactionsPerSecond(100_000);
+        } catch (IllegalStateException ex) {
+            System.out.printf("setMaxTransactionsPerSecond got expected exception: %s\n", ex.getMessage());
+            gotExc2 = true;
+        }
+        assertTrue("setMaxTransactionsPerSecond succeeded, should have failed", gotExc2);
+        assertEquals(250_000, config2.getNonblockingAsync());
+    }
+
+    /**
      * Verify a client can reconnect to a cluster that has been restarted.
      */
     public void testReconnect() throws Exception {
