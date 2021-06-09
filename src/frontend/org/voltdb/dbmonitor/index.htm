@@ -16,7 +16,6 @@
     <link href="css/theme.default.min.css" rel="stylesheet" />
     <link href="css/jquery.dataTables.css" rel="stylesheet" />
     <link href="css/jquery-ui.css" rel="stylesheet" />
-    <link href="css/layout.css" rel="stylesheet" />
     <link href="css/nv.d3.css" rel="stylesheet" />
     <link href="css/tablesorter.css" rel="stylesheet" />
     <link
@@ -26,14 +25,15 @@
       rel="stylesheet"
     />
     <link
-      href="css/bootstrap-responsive.css"
-      id="styleBootstrapResponsive"
+      href="css/theme.bootstrap.css"
+      id="styleThemeBootstrap"
       disabled
       rel="stylesheet"
     />
+    <link href="css/layout.css" rel="stylesheet" />
     <link
-      href="css/theme.bootstrap.css"
-      id="styleThemeBootstrap"
+      href="css/bootstrap-responsive.css"
+      id="styleBootstrapResponsive"
       disabled
       rel="stylesheet"
     />
@@ -163,7 +163,7 @@
             <div class="loading"></div>
           </div>
           <!-- Loading -->
-          <div class="container" id="containerMain">
+          <div class="container" id="containerMain" style="margin: 0 auto">
             <div class="clusterDetailsWrapper" id="clusterDetails">
               <div class="clusterDetailsContLeft" id="clusterDetailsLeft">
                 <h1 class="headText clusterIcon">
@@ -182,7 +182,7 @@
                 <div class="clear"></div>
               </div>
               <div class="clusterDetailsContRight" id="clusterDetailsRight">
-                <ul class="serverStat" id="serverStatSection">
+                <ul class="serverStat serverStat-ht" id="serverStatSection">
                   <li>Monitoring</li>
                   <li
                     class="activeServerName"
@@ -284,7 +284,11 @@
                 </div>
               </div>
             </div>
-            <div class="content displayPre" id="contentServer">
+            <div
+              class="content displayPre"
+              id="contentServer"
+              style="padding: 20px 20px 10px !important"
+            >
               <div class="leftShowhide">
                 <div id="GraphBlock" class="">
                   <h1 class="headText1">
@@ -506,7 +510,7 @@
                 <div class="menu_head expanded">
                   <h1 id="ShowHideBlock">Show/Hide Data</h1>
                 </div>
-                <div class="menu_body" style="display: block">
+                <div class="menu_body">
                   <div
                     id="divSPSection"
                     class="sPShowHide"
@@ -675,15 +679,18 @@
                       class="dataTables_wrapper no-footer"
                     >
                       <div class="tabs-filter-wrapperDR">
-                        <div class="drTitle icon-tables" id="dTTitle">
+                        <div class="drTitle icon-tables drT-title" id="dTTitle">
                           Database Tables
                         </div>
-                        <div class="filter">
+                        <div
+                          class="filter"
+                          style="display: flex; justify-content: space-between"
+                        >
                           <input
                             name="filter"
                             id="filterDT"
                             type="text"
-                            class="search-box"
+                            class="search-box search-ht"
                             onBlur=""
                             placeholder="Search Database Tables"
                           /><a
@@ -691,6 +698,7 @@
                             href="javascript:void(0)"
                             class="icon-search drIcon"
                             title="Search"
+                            style="height: 40px; left: 10px"
                             >search</a
                           >
                         </div>
@@ -1243,7 +1251,7 @@
           </div>
         </div>
         <!--Admin-->
-        <div id="admin" class="container contents">
+        <div id="admin" class="container contents" style="margin: 0 auto">
           <!-- Loading -->
           <div id="adminActionOverlay" style="display: none">
             <div class="loading"></div>

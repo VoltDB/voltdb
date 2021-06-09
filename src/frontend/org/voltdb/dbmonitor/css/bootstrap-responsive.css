@@ -99,6 +99,29 @@
   display: none !important;
 }
 
+.viewSelect {
+  display: flex;
+}
+
+.viewSelect label {
+  margin: 2px 10px 0 0;
+}
+
+.serverStat-ht li {
+  line-height: 31px !important;
+}
+
+.search-ht{
+  height: 40px !important;
+}
+
+.drT-title{
+  width: 130px !important;
+  height: 20px !important;
+  background-position-x: 0% !important;
+  background-position-y: -1046px !important;
+}
+
 @media print {
   .visible-print {
     display: inherit !important;
@@ -131,7 +154,10 @@
   .navbar-static-top .container,
   .navbar-fixed-top .container,
   .navbar-fixed-bottom .container {
-    width: 1170px;
+    width: 98% !important;
+  }
+  #containerMain {
+    width: 98% !important;
   }
   .span12 {
     width: 1170px;
