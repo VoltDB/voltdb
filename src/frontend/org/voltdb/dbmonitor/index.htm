@@ -37,10 +37,8 @@
       disabled
       rel="stylesheet"
     />
-    <!-- <script type="text/javascript" src="js/jquery-3.5.1.min.js"></script> -->
-    <script src="https://code.jquery.com/jquery-3.5.0.min.js"></script>
-    <script src="https://code.jquery.com/jquery-migrate-3.3.2.min.js"></script>
-    
+    <script type="text/javascript" src="js/jquery-3.5.1.min.js"></script>
+    <script type="text/javascript" src="js/jquery-ui.js"></script>
     <script type="text/javascript" src="js/d3.v3.min.js"></script>
     <script type="text/javascript" src="js/nv.d3.min(modified).js"></script>
     <script type="text/javascript" src="js/long.js"></script>
@@ -49,7 +47,9 @@
     <script type="text/javascript" src="js/selector.min.js"></script>
     <script type="text/javascript" src="js/jquery.cookie.js"></script>
     <script type="text/javascript" src="js/voltdb.config.js"></script>
-    <script type="application/javascript" src="js/jquery-ui.js"></script>
+    <script>
+      $.uiBackCompat = false;
+    </script>
     <script type="text/javascript" src="js/voltdb.core.js"></script>
     <script type="text/javascript" src="js/voltdb.service.js"></script>
     <script type="text/javascript" src="js/voltdb.render.js"></script>
@@ -199,7 +199,7 @@
               </div>
               <div class="clear"></div>
               <!-- Server List popup-->
-              <div id="popServerList" style="display: none">
+              <div id="popServerList">
                 <div class="slide-pop-wrapper">
                   <div class="slide-pop-title">
                     <div class="icon-server searchLeft">Servers</div>

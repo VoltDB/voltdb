@@ -107,7 +107,7 @@ $(document).ready(function () {
     var savedData = getParameterByName("data");
 
     if (savedData != undefined && savedData != "") {
-      var json = JSON.parse(decodeURIComponent(savedData));
+      var json = jQuery.parseJSON(decodeURIComponent(savedData));
 
       if (
         json["DisplayPreferences"] != undefined &&
@@ -153,10 +153,10 @@ $(document).ready(function () {
   }
 
   // Toogle Server popup
-  $("#btnPopServerList").on("click", function (event) {
+  $("#btnPopServerList").click(function (event) {
     $("#popServerSearch").val("");
     $("#popServerSearch").attr("placeholder", "Search Server");
-    $("#popServerSearch").trigger("keyup");
+    $("#popServerSearch").keyup();
     event.stopPropagation();
     if ($("#popServerList").css("display") == "none") {
       $(this).removeClass("showServers");
@@ -167,13 +167,14 @@ $(document).ready(function () {
     }
     $("#popServerList").toggle("slide", "", 1500);
 
-    $("#wrapper").on("click", function () {
-      if ($("#popServerList").css("display") == "block") {
-        $("#popServerList").hide();
-        $("#btnPopServerList").removeClass("hideServers");
-        $("#btnPopServerList").addClass("showServers");
-      }
-    });
+    // $("#wrapper").click(function () {
+    //     if ($('#popServerList').css('display') == 'block') {
+    //         $('#popServerList').hide();
+    //         $('#btnPopServerList').removeClass('hideServers');
+    //         $('#btnPopServerList').addClass('showServers');
+    //     }
+
+    // });
   });
 
   $("#popServerList").on("click", function (event) {
@@ -4528,7 +4529,7 @@ function RefreshServerUI() {
     $(".activeServerName").html(clickedServer).attr("title", clickedServer);
     saveCurrentServer(clickedServer);
 
-    $("#popServerList").toggle("slide", "", 1500);
+    // $('#popServerList').toggle('slide', '', 1500);
     $(this).parent().prevAll().removeClass("monitoring");
     $(this).parent().nextAll().removeClass("monitoring");
     $(this).parent().addClass("monitoring");
