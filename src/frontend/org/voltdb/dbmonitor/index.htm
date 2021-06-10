@@ -682,10 +682,7 @@
                         <div class="drTitle icon-tables drT-title" id="dTTitle">
                           Database Tables
                         </div>
-                        <div
-                          class="filter"
-                          style="display: flex; justify-content: space-between"
-                        >
+                        <div class="filter" style="display: flex; justify-content: space-between;">
                           <input
                             name="filter"
                             id="filterDT"
@@ -2328,7 +2325,9 @@
                           style="display: none"
                         ></div>
                       </td>
-                      <td><div id="txtDrMaster" class="drMasterOn"></div></td>
+                      <td>
+                        <div id="txtDrMaster" class="drMasterOn"></div>
+                      </td>
                       <td>
                         <a
                           id="btnEditDrMasterOk"
@@ -2744,6 +2743,7 @@
                     /></a>
                     <div class="clear"></div>
                   </h1>
+<<<<<<< HEAD
                 </div>
                 <svg
                   id="visualisationSuccessRate"
@@ -2770,6 +2770,34 @@
                   </h1>
                 </div>
                 <svg
+=======
+                </div>
+                <svg
+                  id="visualisationSuccessRate"
+                  width="100%"
+                  height="400"
+                ></svg>
+              </div>
+              <div id="chartFailureRate" class="chart left">
+                <div class="chartHeader">
+                  <h1>
+                    Failure Rate<span class="activeServerName" title=""></span>
+                    <a
+                      href="#"
+                      class="downloadBtnChart"
+                      onclick='downloadCSV(event, { filename: "failure-rate-data" }, "failureRate");'
+                    >
+                      <img
+                        class="downloadCls"
+                        src="images/downloadBtn.png"
+                        alt="download"
+                        title="Download data as CSV"
+                    /></a>
+                    <div class="clear"></div>
+                  </h1>
+                </div>
+                <svg
+>>>>>>> VMC-369
                   id="visualisationFailureRate"
                   width="100%"
                   height="400"
