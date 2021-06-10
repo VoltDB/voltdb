@@ -23,7 +23,6 @@ function resetpage() {
 }
 
 function navigate(hash) {
-  console.log(hash);
   if (hash.length == 0) hash = "#o";
   hash = hash.toLowerCase();
   const anchor = hash.substring(1);
@@ -63,13 +62,6 @@ function navigate(hash) {
   }
 }
 
-$("#o").on(
-  "click",
-  (function () {
-    console.log("Clicked");
-  })()
-);
-
 $(document).ready(function () {
   $("#o").find("br").remove(); //for removing br form id o
 
@@ -89,7 +81,10 @@ $(document).ready(function () {
 
   var timeOut = navigator.userAgent.indexOf("Firefox") >= 0 ? 20 : 1;
 
-  $(".catalogNav > li > a").on("click", function () {
+  $(document).on("click", ".catalogNav > li > a", function () {
+    var hash = $(this).attr("href");
+    window.location.hash = hash;
+    navigate(hash);
     setTimeout(function () {
       window.scrollTo(0, 0);
     }, timeOut);
@@ -308,7 +303,6 @@ $(document).ready(function () {
   navigate($(location).attr("hash"));
 
   $(window).on("hashchange", function () {
-    //detect hash change
     resetpage();
     navigate(window.location.hash);
   });
