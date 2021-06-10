@@ -165,7 +165,7 @@ $(document).ready(function () {
       $(this).removeClass("hideServers");
       $(this).addClass("showServers");
     }
-    $("#popServerList").toggle("slide", "", 1500);
+    $("#popServerList").toggle("slide", { direction: "right" }, 1500);
 
     // $("#wrapper").click(function () {
     //     if ($('#popServerList').css('display') == 'block') {
@@ -1023,7 +1023,7 @@ var loadPage = function (serverName, portid) {
           $("#btnPopServerList").addClass("showServers");
         }
 
-        $("#popServerList").toggle("slide", "", 1500);
+        $("#popServerList").toggle("slide", { direction: "right" }, 1500);
         $(this).parent().prevAll().removeClass("monitoring");
         $(this).parent().nextAll().removeClass("monitoring");
         $(this).parent().addClass("monitoring");
