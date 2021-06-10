@@ -1133,3 +1133,39 @@
   }
 }
 
+.searchLeft{
+    height: 30px;
+    padding-top: 14px;
+}
+
+.hasSubLabel a{
+  color: #08c !important; 
+  text-decoration: none !important;
+}
+
+.hasSubLabel a:hover, a:focus {
+    color: #005580 !important;
+    text-decoration: underline !important;
+}
+
+.icon-alert {
+  background: url('../images/glyphicons-halflings.png') no-repeat -134px -111px;
+  width: 12px;
+  height: 20px;
+  vertical-align: middle;
+  padding-top: 11px;
+  border-bottom: none;
+}
+
+.popupTitleStyle {
+  font-size: 14px;
+}
+
+.popup_close {
+  right: 5px;
+  top: 5px;
+}
+
+.addConfigHeader {
+  width: 200px;
+}
