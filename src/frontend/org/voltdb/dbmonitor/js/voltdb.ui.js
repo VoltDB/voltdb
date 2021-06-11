@@ -22,12 +22,22 @@ $(document).ready(function () {
     tmp.push(localStorage.key(i));
   }
 
+  var errCount = 0;
+
   for (var i = 0, len = tmp.length; i < len; i++) {
     var key = tmp[i];
     var value = localStorage[key];
     if (key != "queries" && key != "queryNameList" && key != "key") {
       if (value != undefined) {
-        var data = JSON.parse(value);
+        try{
+          var data = $.parseJSON(value);
+        }
+        catch(err){
+          console.log('JSON ERROR : ',key,value,err);
+          localStorage.removeItem(key);
+          errCount++;
+          continue;
+        }
       }
       if (!data.hasOwnProperty("time")) {
         if ($.cookie("sessionCookie") == undefined) {
@@ -57,10 +67,14 @@ $(document).ready(function () {
         key.indexOf("DataTables_tblDrMAster") > -1 ||
         key.indexOf("DataTables_tblDrReplica") > -1 ||
         key.indexOf("DataTables_tblCmdLog_") > -1
-      ) {
+      ){
         localStorage.removeItem(key);
       }
     }
+  }
+
+  if(errCount>0){
+    window.location.reload();
   }
 
   $.cookie("sessionCookie", "true");
