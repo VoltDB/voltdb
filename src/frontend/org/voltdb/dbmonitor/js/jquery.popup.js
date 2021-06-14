@@ -263,7 +263,7 @@
 		    
 		    var saveBtn = $("a[id='savePreference']");
 		    if (saveBtn != undefined) {
-		        saveBtn.unbind('click');
+				saveBtn.unbind('click');
 		        saveBtn.bind('click', function () {
 		            p.close();
 		            p.o.save();
