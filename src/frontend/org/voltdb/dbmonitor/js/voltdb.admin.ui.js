@@ -4573,7 +4573,7 @@ function loadAdminPage() {
             });
 
             $("#btnSaveSecUser").unbind("click");
-            $("#btnSaveSecUser").on("click", function () {
+            $(document).on("click","#btnSaveSecUser", function () {
                 var username = $('#txtOrgUser').val();
                 var newUsername = $('#txtUser').val();
                 var password = encodeURIComponent($('#txtPassword').val());
