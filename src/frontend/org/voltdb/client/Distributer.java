@@ -93,7 +93,8 @@ class Distributer {
     private static final long PING_HANDLE = Long.MAX_VALUE;
     private static final Long ASYNC_TOPO_HANDLE = PING_HANDLE - 1;
     private static final Long ASYNC_PROC_HANDLE = PING_HANDLE - 2;
-    private static final long MINIMUM_LONG_RUNNING_SYSTEM_CALL_TIMEOUT_MS = 30 * 60 * 1000;
+    private static final long MINIMUM_LONG_RUNNING_SYSTEM_CALL_TIMEOUT_NANOS = TimeUnit.MINUTES.toNanos(30);
+    private static final long ONE_SECOND_NANOS = TimeUnit.SECONDS.toNanos(1);
 
     // Would be private and final except: unit tests
     static int RESUBSCRIPTION_DELAY_MS = Integer.getInteger("RESUBSCRIPTION_DELAY_MS", 10000);
@@ -174,7 +175,7 @@ class Distributer {
                           int partitionParameterType) {
             this.multiPart = multiPart;
             this.readOnly = readOnly;
-            this.partitionParameter = multiPart? PARAMETER_NONE : partitionParameter;
+            this.partitionParameter = multiPart ? PARAMETER_NONE : partitionParameter;
             this.partitionParameterType = multiPart ? PARAMETER_NONE : partitionParameterType;
         }
     }
@@ -259,14 +260,6 @@ class Distributer {
             if (m_shutdown.get()) {
                 return;
             }
-            //Pre 4.1 clusters don't know about subscribe, don't stress over it.
-            if (response.getStatusString() != null &&
-                response.getStatusString().contains("@Subscribe was not found")) {
-                synchronized (Distributer.this) {
-                    m_subscriptionRequestPending = false;
-                }
-                return;
-            }
 
             //Fast path subscribing retry if the connection was lost before getting a response
             if (response.getStatus() == ClientResponse.CONNECTION_LOST ) {
@@ -329,7 +322,9 @@ class Distributer {
     }
 
     /**
-     * Handles timed-out procedure calls
+     * Handles timeout for procedure calls: runs periodically
+     * to check on outstanding calls. Sends pings to keep the
+     * connection alive.
      */
     private class CallExpiration implements Runnable {
         @Override
@@ -341,6 +336,7 @@ class Distributer {
                     connections.addAll(m_connections);
                 }
 
+                // current time
                 final long nowNanos = System.nanoTime();
 
                 // for each connection
@@ -348,16 +344,15 @@ class Distributer {
                     // check for connection age
                     final long sinceLastResponse = Math.max(1, nowNanos - c.m_lastResponseTimeNanos);
 
-                    // if outstanding ping and timeoutMS, close the connection
-                    if (c.m_outstandingPing && (sinceLastResponse > m_connectionResponseTimeoutNanos)) {
-                        // memoize why it's closing
+                    // if outstanding ping and timed out, close the connection
+                    if (c.m_outstandingPing && sinceLastResponse > m_connectionResponseTimeoutNanos) {
                         c.m_closeCause = DisconnectCause.TIMEOUT;
                         // this should trigger NodeConnection.stopping(..)
                         c.m_connection.unregister();
                     }
 
-                    // if 1/3 of the timeoutMS since last response, send a ping
-                    if ((!c.m_outstandingPing) && (sinceLastResponse > (m_connectionResponseTimeoutNanos / 3))) {
+                    // if 1/3 of the timeout since last response, send a ping
+                    if (!c.m_outstandingPing && sinceLastResponse > m_connectionResponseTimeoutNanos / 3) {
                         c.sendPing();
                     }
 
@@ -367,18 +362,15 @@ class Distributer {
                         final CallbackBookkeeping cb = e.getValue();
 
                         // if the timeout is expired, call the callback and remove the
-                        // bookeeping data
-                        final long deltaNanos = Math.max(1, nowNanos - cb.timestampNanos);
+                        // bookkeeping data
+                        final long deltaNanos = Math.max(1, nowNanos - cb.startNanos);
                         if (deltaNanos > cb.procedureTimeoutNanos) {
 
-                            //For expected long operations don't use the default timeout
-                            //unless it is > MINIMUM_LONG_RUNNING_SYSTEM_CALL_TIMEOUT_MS
-                            final boolean isLongOp = isLongOp(cb.name);
-                            if (isLongOp && (deltaNanos < TimeUnit.MILLISECONDS.toNanos(MINIMUM_LONG_RUNNING_SYSTEM_CALL_TIMEOUT_MS))) {
-                                continue;
+                            // For expected long operations don't use the default timeout
+                            // unless it exceeds our minimum timeout for long ops
+                            if (!isLongOp(cb.name) || deltaNanos >= MINIMUM_LONG_RUNNING_SYSTEM_CALL_TIMEOUT_NANOS) {
+                                c.handleTimedoutCallback(handle, nowNanos);
                             }
-
-                            c.handleTimedoutCallback(handle, nowNanos);
                         }
                     }
                 }
@@ -389,11 +381,10 @@ class Distributer {
     }
 
     /*
-     * Check if the proc name is a procedure that is expected to run long
-     * Make the minimum timeoutMS for certain long running system procedures
-     * higher than the default 2m.
-     * you can still set the default timeoutMS higher than even this value
-     *
+     * Check if the proc name is a procedure that is expected to run long.
+     * Make the minimum timeout for certain long running system procedures
+     * higher than the default 2 minutes.
+     * You can still set the default timeout higher than even this value.
      */
     private static boolean isLongOp(String procName) {
         if (procName.startsWith("@")) {
@@ -408,20 +399,19 @@ class Distributer {
      * Holds book-keeping data for in-progress transactpions.
      */
     private class CallbackBookkeeping {
-        public CallbackBookkeeping(long timestampNanos, ProcedureCallback callback, String name, long timeoutNanos, boolean ignoreBackpressure) {
+        public CallbackBookkeeping(long startNanos, ProcedureCallback callback, String name, long timeoutNanos, boolean ignoreBackpressure) {
             assert(callback != null);
-            this.timestampNanos = timestampNanos;
+            this.startNanos = startNanos;
             this.callback = callback;
             this.name = name;
             this.procedureTimeoutNanos = timeoutNanos;
             this.ignoreBackpressure = ignoreBackpressure;
         }
-        long timestampNanos;
-        //Timeout in ms 0 means use conenction specified procedure timeoutMS.
+        final long startNanos;
         final long procedureTimeoutNanos;
-        ProcedureCallback callback;
-        String name;
-        boolean ignoreBackpressure;
+        final ProcedureCallback callback;
+        final String name;
+        final boolean ignoreBackpressure;
     }
 
     /**
@@ -468,7 +458,7 @@ class Distributer {
          * or rate limits to transactions that should never be rejected, such as those submitted
          * from within a callback thread, or generated internally
          */
-        public void createWork(final long nowNanos, long handle, String name, ByteBuffer buffer,
+        public void createWork(final long startNanos, long handle, String name, ByteBuffer buffer,
               ProcedureCallback callback, boolean ignoreBackpressure, long timeoutNanos) {
             assert(callback != null);
             if (timeoutNanos == Distributer.USE_DEFAULT_CLIENT_TIMEOUT) {
@@ -478,30 +468,26 @@ class Distributer {
             // Do rate limiting or check for max outstanding related backpressure in
             // the rate limiter, which can block. If it blocks we can still get a timeout
             // exception, to give prompt timeouts.
-            long afterRateLimitNanos = 0;
             try {
-                afterRateLimitNanos = m_rateLimiter.prepareToSendTransaction(nowNanos, timeoutNanos,
-                                                                             ignoreBackpressure);
+                m_rateLimiter.prepareToSendTransaction(startNanos, timeoutNanos, ignoreBackpressure);
             } catch (TimeoutException | InterruptedException e) {
                 // We timed out waiting for permission to send the transaction out on the wire,
                 // due to max outstanding
-                afterRateLimitNanos = System.nanoTime();
-                long deltaNanos = Math.max(1, afterRateLimitNanos - nowNanos);
                 // TODO - this incorrectly results in decrementing an outstanding txn count that
                 // was never incremented (existing bug, not induced by current code changes)
-                invokeCallbackWithTimeout(name, callback, deltaNanos, afterRateLimitNanos, timeoutNanos, handle, ignoreBackpressure);
+                invokeCallbackWithTimeout(name, callback, startNanos, System.nanoTime(),
+                                          timeoutNanos, handle, ignoreBackpressure);
                 return;
             }
 
             // Now join common code to enqueue buffer, schedule timeout, etc.
-            createWorkCommon(nowNanos, handle, name, buffer, callback, ignoreBackpressure,
-                             timeoutNanos, afterRateLimitNanos);
+            createWorkCommon(startNanos, handle, name, buffer, callback, ignoreBackpressure, timeoutNanos);
         }
 
         /*
          * Create work, never blocking in rate limiter.
          */
-        public boolean createWorkNonblocking(final long nowNanos, long handle, String name, ByteBuffer buffer,
+        public boolean createWorkNonblocking(final long startNanos, long handle, String name, ByteBuffer buffer,
                                              ProcedureCallback callback, long timeoutNanos) {
             assert(callback != null);
             if (timeoutNanos == Distributer.USE_DEFAULT_CLIENT_TIMEOUT) {
@@ -517,21 +503,18 @@ class Distributer {
             }
 
             // Check rate limiting and max outstanding related backpressure. Does not
-            // block. Returns -1 instead of a timestamp if we would block. We need to sync
-            // on the distributer so that reporting backpressure on, and subsequent removal
-            // of backpressure by the rate limiter, occur in the right order.
-            long afterRateLimitNanos;
+            // block. We need to sync on the distributer so that reporting backpressure
+            // on, and subsequent removal of backpressure by the rate limiter, occur
+            // in the right order.
             synchronized (Distributer.this) {
-                afterRateLimitNanos = m_rateLimiter.prepareToSendTransactionNonblocking(nowNanos);
-                if (afterRateLimitNanos < 0) {
+                if (!m_rateLimiter.prepareToSendTransactionNonblocking()) {
                     reportBackpressure(true);
                     return false; // would block
                 }
             }
 
             // Now join common code to enqueue buffer, schedule timeout, etc.
-            createWorkCommon(nowNanos, handle, name, buffer, callback, false,
-                             timeoutNanos, afterRateLimitNanos);
+            createWorkCommon(startNanos, handle, name, buffer, callback, false, timeoutNanos);
             return true;
         }
 
@@ -539,21 +522,21 @@ class Distributer {
          * Common tail for the two 'create work' entry points.
          * Cannot fail to enqueue the transaction,
          */
-        private void createWorkCommon(final long nowNanos, long handle, String name, ByteBuffer buffer,
+        private void createWorkCommon(final long startNanos, long handle, String name, ByteBuffer buffer,
                                       ProcedureCallback callback, boolean ignoreBackpressure,
-                                      final long timeoutNanos, final long afterRateLimitNanos) {
+                                      final long timeoutNanos) {
             // Drain needs to know when all callbacks have been invoked
             final int callbacksToInvoke = m_callbacksToInvoke.incrementAndGet();
             assert(callbacksToInvoke >= 0);
 
             // Optimistically submit the task
             assert(!m_callbacks.containsKey(handle));
-            m_callbacks.put(handle, new CallbackBookkeeping(nowNanos, callback, name, timeoutNanos, ignoreBackpressure));
+            m_callbacks.put(handle, new CallbackBookkeeping(startNanos, callback, name, timeoutNanos, ignoreBackpressure));
 
-            // Schedule an individual timeout if necessary
+            // Schedule an individual timeout if necessary.
             // If it is a long op, don't bother scheduling a discrete timeout
-            if (timeoutNanos < TimeUnit.SECONDS.toNanos(1) && !isLongOp(name)) {
-                final long timeoutRemaining = nowNanos + timeoutNanos- afterRateLimitNanos;
+            if (timeoutNanos < ONE_SECOND_NANOS && !isLongOp(name)) {
+                final long timeoutRemaining = startNanos + timeoutNanos - System.nanoTime();
                 submitDiscreteTimeoutTask(handle, Math.max(0, timeoutRemaining));
             }
 
@@ -565,7 +548,8 @@ class Distributer {
                 return;
             }
 
-            // Check if the disconnect or expiration already handled the callback
+            // Not connected: notify client, but first check if the disconnect or
+            // expiration already handled the callback
             if (m_callbacks.remove(handle) != null) {
                 String msg = String.format("Connection to database host (%s) was lost before a response was received",
                                            m_connection.getHostnameAndIPAndPort());
@@ -581,7 +565,7 @@ class Distributer {
                 assert(remainingToInvoke >= 0);
 
                 // For bookkeeping, but it feels dishonest to call this here
-                m_rateLimiter.transactionResponseReceived(nowNanos, -1, ignoreBackpressure);
+                m_rateLimiter.transactionResponseReceived(System.nanoTime(), -1, ignoreBackpressure);
             }
         }
 
@@ -607,32 +591,37 @@ class Distributer {
 
         /*
          * Factor out the boilerplate involved in checking whether a timed out callback
-         * still exists and needs to be invoked, or has already been handled by another thread
+         * still exists and needs to be invoked, or has already been handled by another thread.
+         *
+         * @param handle client handle
+         * @param endNanos system time when timeout detected
          */
-        void handleTimedoutCallback(long handle, long nowNanos) {
-            //Callback doesn't have to be there, it may have already
-            //received a response or been expired by the periodic expiration task, or a discrete expiration task
+        private void handleTimedoutCallback(long handle, long endNanos) {
             final CallbackBookkeeping cb = m_callbacks.remove(handle);
-
-            //It was handled during the race
-            if (cb == null) {
-                return;
+            if (cb != null) {
+                invokeCallbackWithTimeout(cb.name, cb.callback, cb.startNanos, endNanos,
+                                          cb.procedureTimeoutNanos, handle, cb.ignoreBackpressure);
             }
-
-            final long deltaNanos = Math.max(1, nowNanos - cb.timestampNanos);
-            invokeCallbackWithTimeout(cb.name, cb.callback, deltaNanos, nowNanos, cb.procedureTimeoutNanos, handle, cb.ignoreBackpressure);
         }
 
         /*
-         * Factor out the boilerplate involved in invoking a callback with a timeout response
+         * Factor out the boilerplate involved in invoking a callback with a timeout response.
+         *
+         * @param procName procedure name
+         * @param callback the callback to invoke
+         * @param startNanos system time when call issued
+         * @param endNanos system time when timeout detected
+         * @param timeoutNanos requested timeout period
+         * @param handle client handle
+         * @param ignoreBackpressure flag from call
          */
-        void invokeCallbackWithTimeout(String procName,
-                                       ProcedureCallback callback,
-                                       long deltaNanos,
-                                       long nowNanos,
-                                       long timeoutNanos,
-                                       long handle,
-                                       boolean ignoreBackpressure) {
+        private void invokeCallbackWithTimeout(String procName,
+                                               ProcedureCallback callback,
+                                               long startNanos,
+                                               long endNanos,
+                                               long timeoutNanos,
+                                               long handle,
+                                               boolean ignoreBackpressure) {
             ClientResponseImpl r = new ClientResponseImpl(
                     ClientResponse.CONNECTION_TIMEOUT,
                     ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
@@ -640,6 +629,7 @@ class Distributer {
                     new VoltTable[0],
                     String.format("No response received in the allotted time (set to %d ms).",
                             TimeUnit.NANOSECONDS.toMillis(timeoutNanos)));
+            long deltaNanos = Math.max(1, endNanos - startNanos);
             r.setClientHandle(handle);
             r.setClientRoundtrip(deltaNanos);
             r.setClusterRoundtrip((int)TimeUnit.NANOSECONDS.toMillis(deltaNanos));
@@ -653,7 +643,7 @@ class Distributer {
             final int remainingToInvoke = m_callbacksToInvoke.decrementAndGet();
             assert(remainingToInvoke >= 0);
 
-            m_rateLimiter.transactionResponseReceived(nowNanos, -1, ignoreBackpressure);
+            m_rateLimiter.transactionResponseReceived(endNanos, -1, ignoreBackpressure);
             updateStatsForTimeout(procName, r.getClientRoundtripNanos(), r.getClusterRoundtrip());
         }
 
@@ -723,7 +713,8 @@ class Distributer {
          */
         @Override
         public void handleMessage(ByteBuffer buf, Connection c) {
-            long nowNanos = System.nanoTime();
+            final long endNanos = System.nanoTime();
+
             ClientResponseImpl response = new ClientResponseImpl();
             try {
                 response.initFromBuffer(buf);
@@ -733,7 +724,7 @@ class Distributer {
             }
 
             // track the timestamp of the most recent read on this connection
-            m_lastResponseTimeNanos = nowNanos;
+            m_lastResponseTimeNanos = endNanos;
 
             final long handle = response.getClientHandle();
 
@@ -787,8 +778,8 @@ class Distributer {
             }
             // handle a proper callback
             else {
-                final long callTimeNanos = stuff.timestampNanos;
-                final long deltaNanos = Math.max(1, nowNanos - callTimeNanos);
+                final long callTimeNanos = stuff.startNanos;
+                final long deltaNanos = Math.max(1, endNanos - callTimeNanos);
                 final ProcedureCallback cb = stuff.callback;
                 assert(cb != null);
                 final byte status = response.getStatus();
@@ -808,7 +799,7 @@ class Distributer {
                 }
 
                 int clusterRoundTrip = response.getClusterRoundtrip();
-                m_rateLimiter.transactionResponseReceived(nowNanos, clusterRoundTrip, stuff.ignoreBackpressure);
+                m_rateLimiter.transactionResponseReceived(endNanos, clusterRoundTrip, stuff.ignoreBackpressure);
                 updateStats(stuff.name, deltaNanos, clusterRoundTrip, abort, error, false);
                 response.setClientRoundtrip(deltaNanos);
                 assert(response.getHashes() == null) : "A determinism hash snuck into the client wire protocol";
@@ -1267,18 +1258,18 @@ class Distributer {
      * If this method returns 'false' then the callback has definitely not been
      * called with a ClientResponse.
      *
-     * @param invocation
-     * @param cb
-     * @param ignoreBackpressure If true the invocation will be queued even if there is backpressure
-     * @param nowNanos Current time in nanoseconds using System.nanoTime
-     * @param timeoutNanos nanoseconds from nowNanos where timeout should fire
+     * @param invocation procedure invocation
+     * @param cb client callback
+     * @param ignoreBackpressure if true the invocation will be queued even if there is backpressure
+     * @param startNanos time at which this client call was started
+     * @param timeoutNanos nanoseconds from startNanos where timeout should fire
      * @return True if the message was queued and false if the message was not queued due to backpressure
      * @throws NoConnectionsException (see above)
      */
     boolean queue(ProcedureInvocation invocation,
                   ProcedureCallback cb,
                   final boolean ignoreBackpressure,
-                  final long nowNanos,
+                  final long startNanos,
                   final long timeoutNanos) throws NoConnectionsException {
         assert(invocation != null);
         assert(cb != null);
@@ -1306,17 +1297,17 @@ class Distributer {
 
         // createWork may block in the rate limiter, and always queues
         // the invocaton before returning
-        cxn.createWork(nowNanos, invocation.getHandle(), invocation.getProcName(),
+        cxn.createWork(startNanos, invocation.getHandle(), invocation.getProcName(),
                        buf, cb, ignoreBackpressure, timeoutNanos);
         if (m_topologyChangeAware) {
             createConnectionsUponTopologyChange();
         }
         return true;
-  }
+    }
 
     boolean queueNonblocking(ProcedureInvocation invocation,
                              ProcedureCallback cb,
-                             final long nowNanos,
+                             final long startNanos,
                              final long timeoutNanos) throws NoConnectionsException {
         assert(invocation != null);
         assert(cb != null);
@@ -1340,7 +1331,7 @@ class Distributer {
             Throwables.propagate(e);
         }
 
-        boolean queued = cxn.createWorkNonblocking(nowNanos, invocation.getHandle(), invocation.getProcName(),
+        boolean queued = cxn.createWorkNonblocking(startNanos, invocation.getHandle(), invocation.getProcName(),
                                                    buf, cb, timeoutNanos);
         if (queued) {
             updateAffinityStats(statsData);
@@ -1356,8 +1347,9 @@ class Distributer {
      * Locates an un-backpressured connection for the above 'queue'
      * methods. Null return implies backpressure (and not ignored)
      *
-     * Synchronization is necessary to ensure that m_connections is not modified
-     * as well as to ensure that backpressure is reported correctly.
+     * Synchronization is necessary to ensure that m_connections is
+     * not modified, as well as to ensure that backpressure is
+     * reported correctly.
      *
      * Ordinarily, if there are no connections at all, an exception
      * will be thrown. If we are running topology-aware with automatic

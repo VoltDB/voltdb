@@ -186,8 +186,9 @@ class DDLGenerator(object):
                    partition_key=None,
                    metadata=False,
                    geocolumns=False,
-                   topic=False,
-                   export_target=None):
+                   topic_target=False,
+                   export_target=None,
+                   topic_key=False):
         sql = "CREATE STREAM " + name
 
         if partition_key:
@@ -197,23 +198,16 @@ class DDLGenerator(object):
 
         if export_target:
             sql += " EXPORT TO TARGET " + export_target
+        elif topic_target:
+            sql += " EXPORT TO TOPIC " + topic_target
+            if topic_key:
+                sql += " WITH KEY (" + topic_key + ") "
 
         sql += "\n(\n"
 
         sql += self._gen_common_cols(metadata, geocolumns)
 
         sql += ");"
-
-        return sql
-
-    def gen_topic(self, name,
-                   profile=None,):
-        sql = "CREATE TOPIC USING STREAM " + name
-
-        if profile:
-            sql += " PROFILE " + profile
-
-        sql += ";\n"
 
         return sql
 

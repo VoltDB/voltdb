@@ -99,8 +99,7 @@ public class ClientConfig {
     }
 
     /**
-     * <p>Configuration for a client with no authentication credentials that will
-     * work with a server with security disabled. Also specifies no status listener.</p>
+     * Configuration for a client with no authentication credentials.
      */
     public ClientConfig() {
         this("", "", true, (ClientStatusListenerExt) null, ClientAuthScheme.HASH_SHA256);
@@ -108,8 +107,8 @@ public class ClientConfig {
 
 
     /**
-     * <p>Configuration for a client that specifies authentication credentials. The username and
-     * password can be null or the empty string.</p>
+     * Configuration for a client that specifies cleartext authentication credentials.
+     * The username and password can be null or the empty string.
      *
      * @param username Cleartext username.
      * @param password Cleartext password.
@@ -119,48 +118,48 @@ public class ClientConfig {
     }
 
     /**
-     * <p>Configuration for a client that specifies authentication credentials. The username and
-     * password can be null or the empty string. Also specifies a status listener.</p>
+     * Configuration for a client that specifies cleartext authentication credentials.
+     * The username and password can be null or the empty string.
      *
      * @param username Cleartext username.
      * @param password Cleartext password.
      * @param listener {@link ClientStatusListenerExt} implementation to receive callbacks.
      */
     public ClientConfig(String username, String password, ClientStatusListenerExt listener) {
-        this(username,password,true,listener, ClientAuthScheme.HASH_SHA256);
+        this(username, password, true, listener, ClientAuthScheme.HASH_SHA256);
     }
 
     /**
-     * <p>Configuration for a client that specifies authentication credentials. The username and
-     * password can be null or the empty string. Also specifies a status listener.</p>
+     * Configuration for a client that specifies cleartext authentication credentials.
+     * The username and password can be null or the empty string.
      *
      * @param username Cleartext username.
      * @param password Cleartext password.
      * @param listener {@link ClientStatusListenerExt} implementation to receive callbacks.
-     * @param scheme Client password hash scheme
+     * @param scheme Client password hash scheme.
      */
     public ClientConfig(String username, String password, ClientStatusListenerExt listener, ClientAuthScheme scheme) {
-        this(username,password,true,listener, scheme);
+        this(username, password, true, listener, scheme);
     }
 
     /**
-     * <p>Configuration for a client that specifies authentication credentials. The username and
-     * password can be null or the empty string. Also specifies a status listener.</p>
+     * Configuration for a client that specifies authentication credentials, the password
+     * being optionally hashed prior to the call. The username and password can be null
+     * or the empty string.
      *
      * @param username Cleartext username.
-     * @param password A cleartext or hashed passowrd.
-     * @param listener {@link ClientStatusListenerExt} implementation to receive callbacks.
+     * @param password A cleartext or hashed password.
      * @param cleartext Whether the password is hashed.
+     * @param listener {@link ClientStatusListenerExt} implementation to receive callbacks.
      */
     public ClientConfig(String username, String password, boolean cleartext, ClientStatusListenerExt listener) {
         this(username, password, cleartext, listener, ClientAuthScheme.HASH_SHA256);
     }
 
     /**
-     * <p>Configuration for a client that specifies an already authenticated {@link Subject}.
-     * Also specifies a status listener.</p>
+     * Configuration for a client that specifies an already authenticated {@link Subject}.
      *
-     * @param subject an authenticated {@link Subject}
+     * @param subject an authenticated {@link Subject}.
      * @param listener {@link ClientStatusListenerExt} implementation to receive callbacks.
      */
     public ClientConfig(Subject subject, ClientStatusListenerExt listener) {
@@ -169,13 +168,14 @@ public class ClientConfig {
     }
 
     /**
-     * <p>Configuration for a client that specifies authentication credentials. The username and
-     * password can be null or the empty string. Also specifies a status listener.</p>
+     * Configuration for a client that specifies authentication credentials, the password
+     * being optionally hashed prior to the call. The username and password can be null
+     * or the empty string.
      *
      * @param username Cleartext username.
-     * @param password A cleartext or hashed passowrd.
-     * @param listener {@link ClientStatusListenerExt} implementation to receive callbacks.
+     * @param password A cleartext or hashed password.
      * @param cleartext Whether the password is hashed.
+     * @param listener {@link ClientStatusListenerExt} implementation to receive callbacks.
      * @param scheme Client password hash scheme
      */
     public ClientConfig(String username, String password, boolean cleartext, ClientStatusListenerExt listener, ClientAuthScheme scheme) {
@@ -209,52 +209,58 @@ public class ClientConfig {
     }
 
     /**
-     * <p>Set the timeout for procedure call. If the timeout expires before the call returns,
-     * the procedure callback will be called with status {@link ClientResponse#CONNECTION_TIMEOUT}.
-     * Synchronous procedures will throw an exception. If a response comes back after the
-     * expiration has triggered, then a callback method
-     * {@link ClientStatusListenerExt#lateProcedureResponse(ClientResponse, String, int)}
-     * will be called.</p>
-     *
-     * <p>Default value is 2 minutes if not set. Value of 0 means forever.</p>
-     *
-     * <p>Note that while specified in MS, this timeout is only accurate to within a second or so.</p>
+     * Set the timeout for procedure calls. The default timeout is 2 minutes. A zero
+     * or negative value indicates no timeout.
+     * <p>
+     * If the timeout expires before the procedure call could even be queued for
+     * transmission, because of backpressure:
+     * <ol>
+     * <li> Synchronous procedures will throw a {@link ProcCallException}. The response
+     * status will be {@link ClientResponse#GRACEFUL_FAILURE}.
+     * <li> Asynchronous procedures will return <code>false</code>.
+     * </ol>
+     * <p>
+     * If the timeout expires after the call is queued for transmission:
+     * <ol>
+     * <li> Synchronous procedures will throw a {@link ProcCallException}. The response
+     * status will be {@link ClientResponse#CONNECTION_TIMEOUT}.
+     * <li> Asynchronous procedures will invoke a callback. The response
+     * status will be {@link ClientResponse#CONNECTION_TIMEOUT}.
+     * </ol>
+     * <p>
+     * Note that while specified in mSec, this timeout is only accurate to within a second or so.
      *
      * @param ms Timeout value in milliseconds.
      */
     public void setProcedureCallTimeout(long ms) {
-        assert(ms >= 0);
-        if (ms < 0) ms = 0;
-        // 0 implies infinite, but use LONG_MAX to reduce branches to test
-        if (ms == 0) ms = Long.MAX_VALUE;
-        m_procedureCallTimeoutNanos = TimeUnit.MILLISECONDS.toNanos(ms);
+        m_procedureCallTimeoutNanos = ms > 0 ? TimeUnit.MILLISECONDS.toNanos(ms) : Long.MAX_VALUE;
     }
 
     /**
-     * <p>Set the timeout for reading from a connection. If a connection receives no responses,
-     * either from procedure calls or &amp;Pings, for the timeout time in milliseconds,
-     * then the connection will be assumed dead and the closed connection callback will
-     * be called.</p>
-     *
-     * <p>Default value is 2 minutes if not set. Value of 0 means forever.</p>
-     *
-     * <p>Note that while specified in MS, this timeout is only accurate to within a second or so.</p>
+     * Set the timeout for reading from a connection. If a connection receives no responses
+     * for the specified time interval, either from procedure calls or pings, then the connection
+     * will be assumed dead. Lost-connection callbacks will be executed, and in-progress
+     * requests will be completed.
+     * <p>
+     * The default timeout is 2 minutes. A zero or negative value indicates no timeout.
+     * <p>
+     * Note that while specified in mSec, this timeout is only accurate to within a second or so.
      *
      * @param ms Timeout value in milliseconds.
      */
     public void setConnectionResponseTimeout(long ms) {
-        assert(ms >= 0);
-        if (ms < 0) ms = 0;
-        // 0 implies infinite, but use LONG_MAX to reduce branches to test
-        if (ms == 0) ms = Long.MAX_VALUE;
-        m_connectionResponseTimeoutMS = ms;
+        m_connectionResponseTimeoutMS = ms > 0 ? ms : Long.MAX_VALUE;
     }
 
     /**
-     * <p>By default a single network thread is created and used to do IO and invoke callbacks.
-     * When set to true, Runtime.getRuntime().availableProcessors() / 2 threads are created.
-     * Multiple server connections are required for more threads to be involved, a connection
-     * is assigned exclusively to a connection.</p>
+     * Specifies that the client wants additional network threads.
+     * <p>
+     * By default a single network thread is created to do IO and invoke callbacks.
+     * When <code>heavyweight</code> is set to true, additional threads are
+     * created. This results in multiple connections to each server.
+     * <p>
+     * The number of network threads depends on the number of processors available.
+     * Specifically, there will be <code>Runtime.getRuntime().availableProcessors() / 2</code> threads.
      *
      * @param heavyweight Whether to create additional threads for high IO or
      * high processing workloads.
@@ -264,9 +270,8 @@ public class ClientConfig {
     }
 
     /**
-     * <p>Set the maximum number of outstanding requests that will be submitted before
-     * blocking. Similar to the number of concurrent connections in a traditional synchronous
-     * API. The default value is 3000.</p>
+     * Set the maximum number of outstanding requests that will be submitted before
+     * blocking. The default value is 3000.
      *
      * @param maxOutstanding The maximum outstanding transactions before calls to
      * {@link Client#callProcedure(ProcedureCallback, String, Object...)} will block
@@ -277,8 +282,8 @@ public class ClientConfig {
     }
 
     /**
-     * <p>Returns the maximum number of outstanding requests as settable by
-     * {@link setMaxOutstandingTxns}.</p>
+     * Returns the maximum number of outstanding requests as set by
+     * {@link #setMaxOutstandingTxns}.
      *
      * @return max outstanding transaction count
      */
@@ -287,44 +292,42 @@ public class ClientConfig {
     }
 
     /**
-     * <p>Set the maximum number of transactions that can be run in 1 second. Note this
-     * specifies a rate, not a ceiling. If the limit is set to 10, you can't send 10 in
-     * the first half of the second and 5 in the later half; the client will let you send
-     * about 1 transaction every 100ms. Default is {link Integer#MAX_VALUE}.</p>
+     * Set the maximum number of transactions that can be run in one second. Note this
+     * specifies a rate, not a ceiling. If the limit is set to 10, you can't send 5 in
+     * the first half of the second and 5 in the second half; the client will let you send
+     * about 1 transaction every 100ms. Default is {link Integer#MAX_VALUE}.
      *
-     * @param maxTxnsPerSecond Requested ceiling on rate of call in transaction per second.
+     * @param maxTxnsPerSecond Requested limit in transaction per second.
      */
     public void setMaxTransactionsPerSecond(int maxTxnsPerSecond) {
-        if (maxTxnsPerSecond < 1) {
-            throw new IllegalArgumentException(
-                    "Max TPS must be greater than 0, " + maxTxnsPerSecond + " was specified");
-        }
         if (m_nonblocking) {
             throw new IllegalStateException("Cannot set limit on TPS with non-blocking async");
         }
-        m_maxTransactionsPerSecond = maxTxnsPerSecond;
+        m_maxTransactionsPerSecond = Math.max(1, maxTxnsPerSecond);
     }
 
     /**
-     * <p>The default behavior for queueing of asynchronous procedure invocations is to block until
+     * Sets nonblocking mode for asynchronous procedure invocations.
+     * <p>
+     * The default behavior for queueing of asynchronous procedure invocations is to block until
      * it is possible to queue the invocation. If non-blocking async is configured, then an async
      * callProcedure will return immediately if it is not possible to queue the procedure
      * invocation due to backpressure. There is no effect on the synchronous variants of
-     * callProcedure.</p>
-     *
-     * <p>Performance is sometimes improved if the callProcedure is permitted to block
+     * callProcedure.
+     * <p>
+     * Performance is sometimes improved if the callProcedure is permitted to block
      * for a short while, say a few hundred microseconds, to ride out a short blip in
-     * backpressure. By default, this timeout is set to 500 microseconds.</p>
-     *
-     * <p>Not supported if rate-limiting has been configured by setMaxTransactionsPerSecond.</p>
+     * backpressure. By default, this timeout is set to 500 microseconds.
+     * <p>
+     * Not supported if rate-limiting has been configured by setMaxTransactionsPerSecond.
      */
     public void setNonblockingAsync() {
         setNonblockingAsync(DEFAULT_NONBLOCKING_ASYNC_TIMEOUT_NANOS);
     }
 
     /**
-     * <p>Variation on {@link setNonblockingAsync() setNonblockingAsync} with provision
-     * for user-supplied blocking time limit.</p>
+     * Sets nonblocking mode for asynchronous procedure invocations, with provision
+     * for user-supplied blocking time limit. See also {@link #setNonblockingAsync()}.
      *
      * @param blockingTimeout limit on blocking time, in nanoseconds; zero
      *        if immediate return is desired.
@@ -338,8 +341,8 @@ public class ClientConfig {
     }
 
     /**
-     * <p>Returns non-blocking async setting, as established by
-     * a prior {@link setNonblockingAsync}.
+     * Returns non-blocking async setting, as established by
+     * a prior {@link #setNonblockingAsync}.
      *
      * @return negative if non-blocking async is not enabled,
      *         otherwise the blocking timeout in nanoseconds.
@@ -349,15 +352,15 @@ public class ClientConfig {
     }
 
     /**
-     * <p>Set thresholds for backpressure reporting based on pending
-     * request count and pending byte count.</p>
+     * Set thresholds for backpressure reporting based on pending
+     * request count and pending byte count.
+     * <p>
+     * Reducing limit below current queue length will not cause
+     * backpressure indication until next callProcedure.
      *
-     * <p>Reducing limit below current queue length will not cause
-     * backpressure indication until next callProcedure.</p>
-     *
-     * @param reqLimit:  request limit, greater than 0 for actual
+     * @param reqLimit   request limit, greater than 0 for actual
      *                   limit, 0 to reset to default
-     * @param byteLimit: byte limit, greater than 0 for actual
+     * @param byteLimit  byte limit, greater than 0 for actual
      *                   limit, 0 to reset to default
      */
     public void setBackpressureQueueThresholds(int reqLimit, int byteLimit) {
@@ -366,8 +369,8 @@ public class ClientConfig {
     }
 
     /**
-     * <p>Get thresholds for backpressure reporting, as set by
-     * {@link setBackpressureQueueThresholds}.</p>
+     * Get thresholds for backpressure reporting, as set by
+     * {@link #setBackpressureQueueThresholds}.
      *
      * @return integer array: reqLimit, byteLimit, in that order.
      */
@@ -376,7 +379,9 @@ public class ClientConfig {
     }
 
     /**
-     * @deprecated client affinity is always {@code true}: transactions are always
+     * Enables or disables client affinity.
+     * <p>
+     * @deprecated client affinity is now always {@code true}: transactions are always
      * routed to the correct master partition improving latency and throughput.
      *
      * (Deprecated in v11.0, 2021-03-23)
@@ -388,13 +393,12 @@ public class ClientConfig {
     }
 
     /**
-     * <p>Configures the client so that it attempts to connect to all nodes in
-     * the cluster as they are discovered, and will reconnect if those connections fail.</p>
-     *
+     * Configures the client so that it attempts to connect to all nodes in
+     * the cluster as they are discovered, and will reconnect if those connections fail.
+     * Defaults to false.
+     * <p>
      * If the first connection attempt fails, then retries are made with
      * a fixed 10-second interval.
-     *
-     * <p>Defaults to false.</p>
      *
      * @param enabled Enable or disable the topology awareness feature.
      */
@@ -404,6 +408,8 @@ public class ClientConfig {
     }
 
     /**
+     * Controls whether reads are set to replicas.
+     * <p>
      * @deprecated no longer meaningful: reads are always sent
      * to the leader; sending to a replica would not have resulted
      * in better performance.
@@ -417,16 +423,15 @@ public class ClientConfig {
     }
 
     /**
-     * <p>Attempts to automatically reconnect to a node after connection loss,
+     * Attempts to automatically reconnect to a node after connection loss,
      * with retry until successful. The interval between retries is subject
      * to exponential backoff between user-supplied limits.
      * See {@link #setInitialConnectionRetryInterval}
      * and {@link #setMaxConnectionRetryInterval}.
-     * </p>
-     *
-     * <p>Topology-change-aware clients automatically attempt to reconnect
+     * <p>
+     * Topology-change-aware clients automatically attempt to reconnect
      * failed connections, regardless of whether enabled by this method.
-     * See {@link #setTopologyChangeAware}.</p>
+     * See {@link #setTopologyChangeAware}.
      *
      * @param on Enable or disable the reconnection feature. Default is off.
      */
@@ -435,10 +440,9 @@ public class ClientConfig {
     }
 
     /**
-     * <p>Set the initial connection retry interval for automatic reconnection.
+     * Set the initial connection retry interval for automatic reconnection.
      * This is the delay between the first and second reconnect attempts.
      * Only has an effect if reconnection on connection loss is enabled.
-     * </p>
      *
      * @param ms initial connection retry interval in milliseconds.
      */
@@ -447,11 +451,10 @@ public class ClientConfig {
     }
 
     /**
-     * <p>Set the maximum connection retry interval. After each reconnection
+     * Set the maximum connection retry interval. After each reconnection
      * failure, the interval before the next retry is doubled, but will never
-     * exceed this maximum.
-     * Only has an effect if reconnection on connection loss is enabled.
-     * </p>
+     * exceed this maximum. Only has an effect if reconnection on connection
+     * loss is enabled.
      *
      * @param ms max connection retry interval in milliseconds.
      */
@@ -460,7 +463,8 @@ public class ClientConfig {
     }
 
     /**
-     * <p>Enable Kerberos authentication with the provided subject credentials</p>
+     * Enable Kerberos authentication with the provided subject credentials.
+     *
      * @param subject Identity of the authenticated user.
      */
     public void enableKerberosAuthentication(final Subject subject) {
@@ -468,8 +472,8 @@ public class ClientConfig {
     }
 
     /**
-     * <p>Use the provided JAAS login context entry key to get the authentication
-     * credentials held by the caller<p>
+     * Enable Kerberos authentication, using the provided JAAS login context
+     * entry key to get the authentication credentials held by the caller.
      *
      * @param loginContextEntryKey JAAS login context config entry designation
      */
@@ -495,7 +499,7 @@ public class ClientConfig {
     }
 
     /**
-     * Configure trust store
+     * Configure trust store with specified path and password.
      *
      * @param pathToTrustStore file specification for the trust store
      * @param trustStorePassword trust store key file password
@@ -509,7 +513,7 @@ public class ClientConfig {
     }
 
     /**
-     * Configure trust store
+     * Configure trust store via a property file.
      *
      * @param propFN property file name containing trust store properties:
      * <ul>
@@ -530,12 +534,22 @@ public class ClientConfig {
         }
         String trustStore = props.getProperty(SSLConfiguration.TRUSTSTORE_CONFIG_PROP);
         String trustStorePassword = props.getProperty(SSLConfiguration.TRUSTSTORE_PASSWORD_CONFIG_PROP);
+        m_sslConfig = new SSLConfiguration.SslConfig(null, null, trustStore, trustStorePassword);
+    }
+
+    /**
+     * Configure trust store from default file with default password.
+     */
+    public void setTrustStoreConfigFromDefault() {
+        String trustStore = Constants.DEFAULT_TRUSTSTORE_RESOURCE;
+        String trustStorePassword = Constants.DEFAULT_TRUSTSTORE_PASSWD;
 
         m_sslConfig = new SSLConfiguration.SslConfig(null, null, trustStore, trustStorePassword);
     }
 
     /**
-     * Configure ssl from the provided properties file. if file is not provided we configure without keystore and truststore manager.
+     * Enables SSL with previously-configured trust store. If no call
+     * has been made to configure a trust store, we process without one.
      */
     public void enableSSL() {
         m_enableSSL = true;
@@ -544,10 +558,4 @@ public class ClientConfig {
         }
     }
 
-    public void setTrustStoreConfigFromDefault() {
-        String trustStore = Constants.DEFAULT_TRUSTSTORE_RESOURCE;
-        String trustStorePassword = Constants.DEFAULT_TRUSTSTORE_PASSWD;
-
-        m_sslConfig = new SSLConfiguration.SslConfig(null, null, trustStore, trustStorePassword);
-    }
 }

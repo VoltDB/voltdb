@@ -1058,7 +1058,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
             try {
                 int partition = -1;
-                if (catProc.getSinglepartition() && catProc.getPartitionparameter() == -1) {
+                if (catProc.getSinglepartition()
+                        && (catProc.getPartitionparameter() == -1 || response.getInvocation().hasPartitionDestination())) {
                     // Directed procedure running on partition
                     partition = response.getInvocation().getPartitionDestination();
                     assert partition != -1;

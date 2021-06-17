@@ -611,6 +611,11 @@ public class SystemInformation extends VoltSystemProcedure
         results.addRow("temptablesmaxsize", Integer.toString(sysSettings.getTemptablemaxsize()));
         results.addRow("querytimeout", Integer.toString(sysSettings.getQuerytimeout()));
 
+        // Add xdcr related information
+        if (cluster.getDrrole() != null) {
+            results.addRow("drrole", cluster.getDrrole());
+        }
+
         return results;
     }
 
