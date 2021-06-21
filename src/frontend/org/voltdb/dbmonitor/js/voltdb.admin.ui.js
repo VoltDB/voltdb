@@ -9,6 +9,61 @@ var editStates = {
 };
 var INT_MAX_VALUE = 2147483647;
 
+function getListOfRoles() {
+    // Got to figure out what roles are available.
+    console.log("Do my role parsing here!");
+    // Get schema...
+    schematext = "";
+    try {
+        var schematext = $("#d").find(".dataBlockContent pre").html();
+        console.log("Schema: " + schematext);
+    } catch (err) {
+      console.log( "Can't get schema: " + err);
+    }
+    
+    // Parse schema
+    var listOfRoles = ['ADMINISTRATOR','USER'];
+    var schemaLines = schematext.split("\n");
+    console.log("Schema has " + schemaLines.length + " lines.");
+    for (var i=0; i< schemaLines.length;i++) {
+        var l = schemaLines[i];
+        // Throw away comments
+        var pos = l.indexOf("--");
+        if (pos >= 0) schemaLines[i] = l.substring(0,pos);
+    }
+    schematext = schemaLines.join(" ");
+        // compress spaces, split statements
+    var statements = schematext.replace(/\s+/g, ' ').split(";");
+        
+    for (var j=0; j < statements.length;j++) {
+        var tokens = statements[j].trim().split(" ");
+        if (tokens.length > 2) {
+            if (tokens[0].toUpperCase() == "CREATE") {
+                if (tokens[1].toUpperCase() == "ROLE") {
+                    listOfRoles.push(tokens[2].toUpperCase());
+                }
+            }
+        }
+
+        
+    }
+    var r = "";
+    console.log(listOfRoles.length + " roles.");
+    for (var i=0;i<listOfRoles.length;i++) r += listOfRoles[i] + ", "; 
+    console.log("Roles: " + r);
+    return listOfRoles;
+
+}
+
+function rolehtml(){
+    var roles = getListOfRoles();
+    var role_options = "";
+    for (var i=0;i<roles.length;i++) {
+        role_options += '<option value="' + roles[i] + '">' + roles[i] + '</option>';
+    }
+    return role_options
+}
+
 function loadAdminPage() {
     adminClusterObjects = {
         btnClusterPause: $('#pauseConfirmation'),
@@ -4516,8 +4571,7 @@ function loadAdminPage() {
                                     '<td>Roles </td> ' +
                                     '<td>' +
                                         '<select id="selectRole">' +
-                                            '<option value="administrator" selected="selected">Administrator</option>' +
-                                            '<option value="user">User</option>' +
+                                            rolehtml() +
                                         '</select>  ' +
                                     '</td> ' +
                                     '<td>&nbsp;</td>' +
