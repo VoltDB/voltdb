@@ -54,7 +54,36 @@ import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtCommonTableScan;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.planner.parseinfo.StmtTableScan;
-import org.voltdb.plannodes.*;
+import org.voltdb.plannodes.AbstractJoinPlanNode;
+import org.voltdb.plannodes.AbstractOperationPlanNode;
+import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.AbstractReceivePlanNode;
+import org.voltdb.plannodes.AbstractScanPlanNode;
+import org.voltdb.plannodes.AggregatePlanNode;
+import org.voltdb.plannodes.CommonTablePlanNode;
+import org.voltdb.plannodes.DeletePlanNode;
+import org.voltdb.plannodes.HashAggregatePlanNode;
+import org.voltdb.plannodes.IndexScanPlanNode;
+import org.voltdb.plannodes.IndexSortablePlanNode;
+import org.voltdb.plannodes.IndexUseForOrderBy;
+import org.voltdb.plannodes.InsertPlanNode;
+import org.voltdb.plannodes.LimitPlanNode;
+import org.voltdb.plannodes.MaterializePlanNode;
+import org.voltdb.plannodes.MergeReceivePlanNode;
+import org.voltdb.plannodes.MigratePlanNode;
+import org.voltdb.plannodes.NestLoopPlanNode;
+import org.voltdb.plannodes.NodeSchema;
+import org.voltdb.plannodes.OrderByPlanNode;
+import org.voltdb.plannodes.PartialAggregatePlanNode;
+import org.voltdb.plannodes.ProjectionPlanNode;
+import org.voltdb.plannodes.ReceivePlanNode;
+import org.voltdb.plannodes.SchemaColumn;
+import org.voltdb.plannodes.SendPlanNode;
+import org.voltdb.plannodes.SeqScanPlanNode;
+import org.voltdb.plannodes.SwapTablesPlanNode;
+import org.voltdb.plannodes.UnionPlanNode;
+import org.voltdb.plannodes.UpdatePlanNode;
+import org.voltdb.plannodes.WindowFunctionPlanNode;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexType;
@@ -378,8 +407,6 @@ public class PlanAssembler {
 
         boolean contentDeterministic = plan.isContentDeterministic();
         if (parsedStmt instanceof ParsedInsertStmt && !(plan.isOrderDeterministic() && contentDeterministic)) {
-            ParsedInsertStmt parsedInsert = (ParsedInsertStmt)parsedStmt;
-            boolean targetHasLimitRowsTrigger = parsedInsert.targetTableHasLimitRowsTrigger();
             String contentDeterministicMsg = "";
             if (!contentDeterministic) {
                 contentDeterministicMsg = "  " + plan.nondeterminismDetail();
@@ -390,14 +417,6 @@ public class PlanAssembler {
                         "UPSERT statement manipulates data in a non-deterministic way.  "
                         + "Adding an ORDER BY clause to UPSERT INTO ... SELECT may address this issue."
                         + contentDeterministicMsg);
-            } else if (targetHasLimitRowsTrigger) {
-                throw new PlanningErrorException(
-                        "Order of rows produced by SELECT statement in INSERT INTO ... SELECT is "
-                        + "non-deterministic.  Since the table being inserted into has a row limit "
-                        + "trigger, the SELECT output must be ordered.  Add an ORDER BY clause "
-                        + "to address this issue."
-                        + contentDeterministicMsg
-                        );
             } else if (plan.hasLimitOrOffset()) {
                 throw new PlanningErrorException(
                         "INSERT statement manipulates data in a content non-deterministic way.  "

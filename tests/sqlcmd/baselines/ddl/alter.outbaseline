@@ -21,7 +21,6 @@ drop table dropable if exists;
 Command succeeded.
 
 create table dropable (
- limit partition rows 1,
  stable integer,
  constraint pk primary key (stable),
  altkey integer,
@@ -55,9 +54,6 @@ Command succeeded.
 alter table dropable drop primary key;
 Command succeeded.
 
-alter table dropable drop limit partition rows;
-Command succeeded.
-
 alter table addable alter column defaultable SET default -1;
 Command succeeded.
 
@@ -68,9 +64,6 @@ alter table addable add primary key ( stable );
 Command succeeded.
 
 alter table addable add unique ( altkey );
-Command succeeded.
-
-alter table addable add limit partition rows 1;
 Command succeeded.
 
 alter table addable add column added integer;

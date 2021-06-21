@@ -17,7 +17,11 @@
 
 package org.voltdb.planner;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
@@ -145,8 +149,7 @@ public class StatementPartitioning implements Cloneable {
 
     /** Most of the time DML on a replicated table for a plan that is executed
      * as single-partition is a bad idea, and the planner will refuse to do it.
-     * However, sometimes we want to bypass this rule; for example, when planning
-     * the DELETE statement executed when LIMIT PARTITION ROWS is about to be violated.
+     * However, sometimes we want to bypass this rule.
      * In this special case, the statement is being planned, for simplicity, as if for
      * single-partition execution, since it never requires a coordinator fragment,
      * but it will only ever be executed in the context of a replicated table MP insert
@@ -173,13 +176,6 @@ public class StatementPartitioning implements Cloneable {
 
     public static StatementPartitioning inferPartitioning() {
         return new StatementPartitioning(true, /* default to MP */ false);
-    }
-
-    /** See comment for m_singlePartitionReplicatedDMLAllowed, above. */
-    public static StatementPartitioning partitioningForRowLimitDelete() {
-        StatementPartitioning partitioning = forceSP();
-        partitioning.m_isReplicatedDmlToRunOnAllPartitions = true;
-        return partitioning;
     }
 
     public boolean isInferred() {

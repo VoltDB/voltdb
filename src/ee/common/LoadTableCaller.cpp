@@ -21,12 +21,12 @@ namespace voltdb {
 
 // Initialize all of the valid callers
 const LoadTableCaller LoadTableCaller::s_callers[] = {
-    LoadTableCaller(SNAPSHOT_REPORT_UNIQ_VIOLATIONS, true, false, true),
-    LoadTableCaller(SNAPSHOT_THROW_ON_UNIQ_VIOLATION, false, false, true),
-    LoadTableCaller(DR, true, false, true),
-    LoadTableCaller(BALANCE_PARTITIONS, true, false, true),
-    LoadTableCaller(CLIENT, false, true, false),
-    LoadTableCaller(INTERNAL, false, false, true)
+    LoadTableCaller(SNAPSHOT_REPORT_UNIQ_VIOLATIONS, true, false),
+    LoadTableCaller(SNAPSHOT_THROW_ON_UNIQ_VIOLATION, false, false),
+    LoadTableCaller(DR, true, false),
+    LoadTableCaller(BALANCE_PARTITIONS, true, false),
+    LoadTableCaller(CLIENT, false, true),
+    LoadTableCaller(INTERNAL, false, false)
 };
 
 }

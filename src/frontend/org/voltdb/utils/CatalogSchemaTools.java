@@ -349,18 +349,6 @@ public abstract class CatalogSchemaTools {
             skip_constraints.add(catalog_const);
         }
 
-        if (catalog_tbl.getTuplelimit() != Integer.MAX_VALUE) {
-            table_sb.append(add).append(spacer + "LIMIT PARTITION ROWS ").append(String.valueOf(catalog_tbl.getTuplelimit()));
-            String deleteStmt = CatalogUtil.getLimitPartitionRowsDeleteStmt(catalog_tbl);
-            if (deleteStmt != null) {
-                if (deleteStmt.endsWith(";")) {
-                    // StatementCompiler appends the semicolon, we don't want it here.
-                    deleteStmt = deleteStmt.substring(0, deleteStmt.length() - 1);
-                }
-                table_sb.append("\n" + spacer + spacer + "EXECUTE (").append(deleteStmt).append(")");
-            }
-        }
-
         if (viewQuery != null) {
             table_sb.append("\n) AS \n");
             table_sb.append(spacer).append(viewQuery).append(";\n");

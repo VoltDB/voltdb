@@ -19,7 +19,6 @@ VoltDB Features and Patterns
 - **Idempotent Processing**: Some of the input messages are duplicated, simulating real-life *at-least-once* delivery guarantees. This app uses VoltDB strong consistency to ignore redundant processing.
 - **Complex Calculations**: Computing standard deviation is reasonably complex math, and is enabled using strong consistency in VoltDB.
 - **Procedure Class Hierarchies**: The begin and end procedures inherit from a common base class that computes standard deviation for completed calls.
-- **Auto-Table Truncation**: The completed call record and the standard deviation tables are both set up to automatically remove tuples if they grow too large.
 
 Quickstart
 ---------------------------

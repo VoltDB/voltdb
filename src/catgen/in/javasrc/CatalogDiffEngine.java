@@ -461,19 +461,6 @@ public class CatalogDiffEngine {
     }
 
     /**
-     * @return true if the parameter is an instance of Statement owned
-     * by a table node.  This indicates that the Statement is the
-     * DELETE statement in a
-     *   LIMIT PARTITION ROWS <n> EXECUTE (DELETE ...)
-     * constraint.
-     */
-    static protected boolean isTableLimitDeleteStmt(final CatalogType catType) {
-        if (catType instanceof Statement && catType.getParent() instanceof Table)
-            return true;
-        return false;
-    }
-
-    /**
      * Check if an addition or deletion can be safely completed
      * in any database state.
      *
@@ -665,10 +652,6 @@ public class CatalogDiffEngine {
         }
 
         else if (suspect instanceof MaterializedViewInfo && ! m_inStrictMatViewDiffMode) {
-            return null;
-        }
-
-        else if (isTableLimitDeleteStmt(suspect)) {
             return null;
         }
 
@@ -1031,7 +1014,7 @@ public class CatalogDiffEngine {
         if (suspect instanceof Constraint && field.equals("index"))
             return null;
         if (suspect instanceof Table) {
-            if (field.equals("signature") || field.equals("tuplelimit")) {
+            if (field.equals("signature")) {
                 return null;
             }
             if (field.equals("topicName") && prevType != null) {
@@ -1155,10 +1138,6 @@ public class CatalogDiffEngine {
             }
         }
 
-        else if (isTableLimitDeleteStmt(suspect)) {
-            return null;
-        }
-
         // Also allow any field changes (that haven't triggered an early return already)
         // if they are found anywhere in these sub-trees.
 
@@ -1196,10 +1175,6 @@ public class CatalogDiffEngine {
             // allow topic property changes
             if (parent instanceof Topic && suspect instanceof Property) {
                 m_requiresNewExportGeneration = true;
-                return null;
-            }
-
-            if (isTableLimitDeleteStmt(parent)) {
                 return null;
             }
         }

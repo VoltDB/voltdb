@@ -354,7 +354,6 @@ public:
                                                                                                              replicatedTableHandle,
                                                                                                              false, -1,
                                                                                                              PERSISTENT, 0,
-                                                                                                             INT_MAX,
                                                                                                              95, true,
                                                                                                              true));
         }
@@ -376,7 +375,6 @@ public:
                                                                                                                    replicatedTableHandle,
                                                                                                                    false, -1,
                                                                                                                    PERSISTENT, 0,
-                                                                                                                   INT_MAX,
                                                                                                                    95, false,
                                                                                                                    true));
         }
@@ -2326,23 +2324,6 @@ TEST_F(DRBinaryLogTest, TruncateTable) {
     EXPECT_EQ(0, m_table->activeTupleCount());
     EXPECT_EQ(0, m_tableReplica->activeTupleCount());
 #endif
-}
-
-TEST_F(DRBinaryLogTest, IgnoreTableRowLimit) {
-    m_tableReplica->setTupleLimit(100);
-
-    const int total = 101;
-    int spHandle = 1;
-
-    for (int i = 1; i <= total; i++, spHandle++) {
-        beginTxn(m_engine, spHandle, spHandle, spHandle-1, spHandle);
-        insertTuple(m_table, prepareTempTuple(m_table, 42, i, "349508345.34583", "a thing", "a totally different thing altogether", i));
-        endTxn(m_engine, true);
-    }
-
-    flushAndApply(spHandle - 1);
-
-    EXPECT_EQ(101, m_tableReplica->activeTupleCount());
 }
 
 TEST_F(DRBinaryLogTest, MultiPartNoDataChange) {

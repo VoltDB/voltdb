@@ -312,8 +312,7 @@ protected:
                                     ReferenceSerializeOutput* uniqueViolationOutput,
                                     int32_t& serializedTupleCount,
                                     size_t& tupleCountPosition,
-                                    bool shouldDRStreamRow = false,
-                                    bool ignoreTupleLimit = true) { }
+                                    bool shouldDRStreamRow = false) { }
 
     // virtual block management functions
     virtual void nextFreeTuple(TableTuple* tuple) = 0;

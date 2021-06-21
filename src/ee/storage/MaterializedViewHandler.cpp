@@ -248,7 +248,7 @@ namespace voltdb {
         TableTuple tuple(viewContent->schema());
         while (ti.next(tuple)) {
             //* enable to debug */ std::cout << "DEBUG: inserting catchup tuple into " << m_destTable->name() << std::endl;
-            m_destTable->insertPersistentTuple(tuple, fallible, true);
+            m_destTable->insertPersistentTuple(tuple, fallible);
         }
 
         ec->cleanupAllExecutors();

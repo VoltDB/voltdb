@@ -73,13 +73,6 @@ public:
     }
 
     /**
-     * @return true if a tables tuple limit should be ignored
-     */
-    inline bool ignoreTupleLimit() const {
-        return m_ignoreTupleLimit;
-    }
-
-    /**
      * @return the expected column count of the table being loaded for the given schema
      */
     inline uint16_t getExpectedColumnCount(TupleSchema *schema) const {
@@ -126,17 +119,14 @@ private:
     const Id m_id;
     const bool m_returnUniqueViolations;
     const bool m_shouldDRStream;
-    const bool m_ignoreTupleLimit;
 
     /**
      * @param returnUniqueViolations If true any unique violations encountered will be returned to the caller if false
      *      then a unique constraint violation will be thrown
      * @param shouldDrStream If true any inserted tuples will be appended to the dr buffer if dr is enabled
-     * @param ignoreTupleLimit If true load table will allow a table to go beyond its tuple limit instead of throwing
      */
-    LoadTableCaller(Id id, bool returnUniqueViolations, bool shouldDRStream, bool ignoreTupleLimit) :
-        m_id(id), m_returnUniqueViolations(returnUniqueViolations), m_shouldDRStream(shouldDRStream),
-        m_ignoreTupleLimit(ignoreTupleLimit)
+    LoadTableCaller(Id id, bool returnUniqueViolations, bool shouldDRStream) :
+        m_id(id), m_returnUniqueViolations(returnUniqueViolations), m_shouldDRStream(shouldDRStream)
     {
         vassert(id >=0 && id < ID_COUNT);
     }

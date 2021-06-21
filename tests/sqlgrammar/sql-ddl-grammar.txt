@@ -41,12 +41,10 @@ column-defn-list        ::= {column-definition} [, {column-defn-list}] [, {colum
 column-definition       ::= {column-name} {column-type} [[DEFAULT {random-type-value}]] [NOT NULL] [[{index-type}]]
 
 constraint-defn-list    ::= {constraint-definition} [, {constraint-defn-list}]
-constraint-definition   ::= [CONSTRAINT {constraint-name}] {index-or-limit-defn}
+constraint-definition   ::= [CONSTRAINT {constraint-name}] {index-definition}
 
 index-type              ::= PRIMARY KEY | UNIQUE | ASSUMEUNIQUE
 index-definition        ::= {index-type} ({column-list})
-limit-definition        ::= LIMIT PARTITION ROWS {non-negative-int-value} [EXECUTE {delete-statement}]
-index-or-limit-defn     ::= {index-definition} | {limit-definition}
 
 ################################################################################
 # Grammar rules for ALTER TABLE statements:
@@ -64,7 +62,7 @@ default-or-null         ::= DEFAULT {random-type-value} | [NOT] NULL
 alter-table-drop        ::= ALTER TABLE {table-name} DROP {column-constraint-or-key}
 column-constraint-or-key::= COLUMN {column-name} [CASCADE] | \
                             CONSTRAINT {constraint-name} | \
-                            PRIMARY KEY | LIMIT PARTITION ROWS
+                            PRIMARY KEY
 
 ################################################################################
 # Grammar rules for all PARTITION statements, i.e., PARTITION TABLE and

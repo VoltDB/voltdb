@@ -97,7 +97,6 @@ PersistentTable::PersistentTable(int partitionColumn,
                                  char const* signature,
                                  bool isMaterialized,
                                  int tableAllocationTargetSize,
-                                 int tupleLimit,
                                  bool drEnabled,
                                  bool isReplicated,
                                  TableType tableType)
@@ -106,8 +105,6 @@ PersistentTable::PersistentTable(int partitionColumn,
     , m_iter(this, m_data.begin())
     , m_isMaterialized(isMaterialized)   // Other constructors are dependent on this one
     , m_allowNulls()
-    , m_tupleLimit(tupleLimit)
-    , m_purgeExecutorVector()
     , m_stats(this)
     , m_blocksNotPendingSnapshotLoad()
     , m_blocksPendingSnapshotLoad()
@@ -525,13 +522,6 @@ void PersistentTable::truncateTable(VoltDBEngine* engine) {
         }
     }
 
-    // If there is a purge fragment on the old table, pass it on to the new one
-    if (hasPurgeFragment()) {
-        vassert(! emptyTable->hasPurgeFragment());
-        boost::shared_ptr<ExecutorVector> evPtr = getPurgeExecutorVector();
-        emptyTable->swapPurgeExecutorVector(evPtr);
-    }
-
     if (m_shadowStream != nullptr) {
         m_shadowStream->moveWrapperTo(emptyTable->m_shadowStream);
         engine->setStreamTableByName(m_name, emptyTable->m_shadowStream);
@@ -767,13 +757,7 @@ bool PersistentTable::insertTuple(TableTuple& source) {
     return true;
 }
 
-TableTuple PersistentTable::insertPersistentTuple(TableTuple& source, bool fallible, bool ignoreTupleLimit) {
-    if (!ignoreTupleLimit && fallible && visibleTupleCount() >= m_tupleLimit) {
-        std::ostringstream str;
-        str << "Table " << m_name << " exceeds table maximum row count " << m_tupleLimit;
-        throw ConstraintFailureException(this, source, str.str());
-    }
-
+TableTuple PersistentTable::insertPersistentTuple(TableTuple& source, bool fallible) {
     //
     // First get the next free tuple
     // This will either give us one from the free slot list, or
@@ -1687,7 +1671,7 @@ void PersistentTable::loadTuplesForLoadTable(SerializeInputBE &serialInput, Pool
         // exceptions should be thrown in the try-block is pretty
         // daring and likely not correct.
         processLoadedTuple(target, uniqueViolationOutput, serializedTupleCount, tupleCountPosition,
-                           caller.shouldDrStream(), caller.ignoreTupleLimit());
+                           caller.shouldDrStream());
     }
 
     //If unique constraints are being handled, write the length/size of constraints that occured
@@ -1711,14 +1695,8 @@ void PersistentTable::processLoadedTuple(TableTuple& tuple,
                                          ReferenceSerializeOutput* uniqueViolationOutput,
                                          int32_t& serializedTupleCount,
                                          size_t& tupleCountPosition,
-                                         bool shouldDRStreamRows,
-                                         bool ignoreTupleLimit) {
+                                         bool shouldDRStreamRows) {
     try {
-        if (!ignoreTupleLimit && visibleTupleCount() >= m_tupleLimit) {
-            std::ostringstream str;
-            str << "Table " << m_name << " exceeds table maximum row count " << m_tupleLimit;
-            throw ConstraintFailureException(this, tuple, str.str(), (! uniqueViolationOutput) ? &m_surgeon : NULL);
-        }
         insertTupleCommon(tuple, tuple, true, shouldDRStreamRows, !uniqueViolationOutput);
     } catch (ConstraintFailureException& e) {
         if ( ! uniqueViolationOutput) {

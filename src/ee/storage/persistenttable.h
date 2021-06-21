@@ -332,7 +332,7 @@ public:
     // ------------------------------------------------------------------
     void deleteTupleForSchemaChange(TableTuple& target);
 
-    TableTuple insertPersistentTuple(TableTuple& source, bool fallible, bool ignoreTupleLimit = false);
+    TableTuple insertPersistentTuple(TableTuple& source, bool fallible);
 
     /// This is not used in any production code path -- it is a convenient wrapper used by tests.
     bool updateTuple(TableTuple& targetTupleToUpdate, TableTuple& sourceTupleWithNewValues) {
@@ -437,8 +437,6 @@ public:
     // This is a testability feature not intended for use in product logic.
     int visibleTupleCount() const { return m_tupleCount - m_invisibleTuplesPendingDeleteCount; }
 
-    int tupleLimit() const { return m_tupleLimit; }
-
     UndoQuantumReleaseInterest *getReplicatedInterest() { return &m_releaseReplicated; }
     UndoQuantumReleaseInterest *getDummyReplicatedInterest() { return &m_releaseDummyReplicated; }
 
@@ -457,7 +455,6 @@ public:
     // for test purpose
     void setDR(bool flag) { m_drEnabled = (flag && !m_isMaterialized); }
 
-    void setTupleLimit(int32_t newLimit) { m_tupleLimit = newLimit; }
     void setTableType(TableType tableType) { m_tableType = tableType; }
     bool isPersistentTableEmpty() const {
         // The narrow usage of this function (while updating the catalog)
@@ -500,31 +497,6 @@ public:
             m_tableForStreamIndexing->decrementRefcount();
             m_tableForStreamIndexing = NULL;
         }
-    }
-
-    /**
-     * Returns true if this table has a fragment that may be executed
-     * when the table's row limit will be exceeded.
-     */
-    bool hasPurgeFragment() const {
-        return m_purgeExecutorVector.get() != NULL;
-    }
-
-    /**
-     * Sets the purge executor vector for this table to method
-     * argument (Using swap instead of reset so that ExecutorVector
-     * may remain a forward-declared incomplete type here)
-     */
-    void swapPurgeExecutorVector(boost::shared_ptr<ExecutorVector> ev) {
-        m_purgeExecutorVector.swap(ev);
-    }
-
-    /**
-     * Returns the purge executor vector for this table
-     */
-    boost::shared_ptr<ExecutorVector> getPurgeExecutorVector() {
-        vassert(hasPurgeFragment());
-        return m_purgeExecutorVector;
     }
 
     std::pair<TableIndex const*, uint32_t> getUniqueIndexForDR();
@@ -588,7 +560,6 @@ private:
     // Zero allocation size uses defaults.
     PersistentTable(int partitionColumn, char const* signature, bool isMaterialized,
             int tableAllocationTargetSize = 0,
-            int tuplelimit = INT_MAX,
             bool drEnabled = false,
             bool isReplicated = false,
             TableType tableType = PERSISTENT);
@@ -702,8 +673,7 @@ private:
                                     ReferenceSerializeOutput* uniqueViolationOutput,
                                     int32_t& serializedTupleCount,
                                     size_t& tupleCountPosition,
-                                    bool shouldDRStreamRows = false,
-                                    bool ignoreTupleLimit = true);
+                                    bool shouldDRStreamRows = false);
 
     enum LookupType {
         LOOKUP_BY_VALUES,
@@ -769,13 +739,6 @@ private:
     const bool m_isMaterialized;
 
     std::vector<bool> m_allowNulls;
-
-    // table row count limit
-    int m_tupleLimit;
-
-    // Executor vector to be executed when imminent insert will exceed
-    // tuple limit
-    boost::shared_ptr<ExecutorVector> m_purgeExecutorVector;
 
     // STATS
     PersistentTableStats m_stats;

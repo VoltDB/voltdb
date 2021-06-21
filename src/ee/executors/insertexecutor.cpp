@@ -127,33 +127,8 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode, const ExecutorVector
     // The defaults are purposely ignored in favor of existing column values
     // for the UPDATE subcase of an UPSERT.
     m_node->initTupleWithDefaultValues(m_engine, &m_memoryPool, fieldsExplicitlySet, tuple, m_nowFields);
-    m_hasPurgeFragment = persistentTarget ? persistentTarget->hasPurgeFragment() : false;
 
     return true;
-}
-
-void InsertExecutor::executePurgeFragmentIfNeeded(PersistentTable** ptrToTable) {
-    PersistentTable* table = *ptrToTable;
-    int tupleLimit = table->tupleLimit();
-    int numTuples = table->visibleTupleCount();
-
-    // Note that the number of tuples may be larger than the limit.
-    // This can happen we data is redistributed after an elastic
-    // rejoin for example.
-    if (numTuples >= tupleLimit) {
-        // Next insert will fail: run the purge fragment
-        // before trying to insert.
-        m_engine->executePurgeFragment(table);
-
-        // If the purge fragment did a truncate table, then the old
-        // table is still around for undo purposes, but there is now a
-        // new empty table we can insert into.  Update the caller's table
-        // pointer to use it.
-        //
-        // The plan node will go through the table catalog delegate to get
-        // the correct instance of PersistentTable.
-        *ptrToTable = static_cast<PersistentTable*>(m_node->getTargetTable());
-    }
 }
 
 bool InsertExecutor::p_execute_init_internal(const TupleSchema *inputSchema,
@@ -328,14 +303,6 @@ void InsertExecutor::p_execute_tuple_internal(TableTuple &tuple) {
         // so fall through to the "insert" logic
     }
 
-    // try to put the tuple into the target table
-    if (m_hasPurgeFragment) {
-        executePurgeFragmentIfNeeded(&m_persistentTable);
-        // purge fragment might have truncated the table, and
-        // refreshed the persistent table pointer.  Make sure to
-        // use it when doing the insert below.
-        m_targetTable = m_persistentTable;
-    }
     m_targetTable->insertTuple(m_templateTuple);
     VOLT_TRACE("Target table:\n%s\n", m_targetTable->debug().c_str());
     // successfully inserted

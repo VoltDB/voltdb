@@ -73,9 +73,6 @@ public class TestSqlCmdInterface
                 "create procedure named4butforgotas drop table dummy;" +
                 "create procedure named5         as create table dummy;" +
                 "create procedure named6         as upsert into dummy values(1);" +
-                "create table valid7    ( yes integer, limit partition rows 3 execute (delete from valid where yes = -1));" +
-                "create table garbled8    yes integer, limit partition rows 3 execute (delete from valid where yes = -1));" +
-                "create table garbled9  ( yes integer, limit partition rows 3 execute  delete from valid where yes = -1 );" +
                 "create table garbled10 ( yes integer,                        execute (delete from valid where yes = -1));" +
                 "create table garbled11 ( yes integer,                                 delete from valid where yes = -1 );" +
                 "";
@@ -83,7 +80,7 @@ public class TestSqlCmdInterface
         // Extra whitespace is just for human readability.
         raw = raw.replaceAll("\\s+", " ");
         String expected = raw.replaceAll("\\s*;\\s*", ";");
-        assertThis(raw, expected, 11, ID);
+        assertThis(raw, expected, 8, ID);
     }
 
      // 3) To test 2 select statements which are separated by one or more semicolons

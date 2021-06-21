@@ -124,43 +124,24 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                         " %s_WITH_EXTERNAL_ASSUME_UNIQUE_ID " +
                         " ON %s_WITH_EXTERNAL_ASSUME_UNIQUE (ID);\n",
             },
-
             { "_WITH_EXTERNAL_NONUNIQUE", // 13
                 "",
                 " CREATE INDEX %s_WITH_EXTERNAL_NONUNIQUE ON %s_WITH_EXTERNAL_NONUNIQUE (ID);\n",
             },
-
             { "_WITH_ANONYMOUS_ALTPK", // 14
                 ", PRIMARY KEY (NONID)\n",
                 "",
             },
-
-            { "_WITH_NAMED_LIMIT_ROWS_100", // 15
-                ", CONSTRAINT %s_NAMED LIMIT PARTITION ROWS 100\n",
-                "",
-            },
-            { "_WITH_ANONYMOUS_LIMIT_ROWS_100", // 16
-                ", LIMIT PARTITION ROWS 100\n",
-                "",
-            },
-            { "_WITH_NAMED_LIMIT_ROWS_1000", // 17
-                ", CONSTRAINT %s_NAMED LIMIT PARTITION ROWS 1000\n",
-                "",
-            },
-            { "_WITH_ANONYMOUS_LIMIT_ROWS_1000", // 18
-                ", LIMIT PARTITION ROWS 1000\n",
-                "",
-            },
-            { "_WITH_PARTIAL_INDEX", // 19
+            { "_WITH_PARTIAL_INDEX", // 15
                 "",
                 " CREATE INDEX %s_WITH_PARTIAL_INDEX ON %s_WITH_PARTIAL_INDEX (ID) WHERE ID > 0;\n",
             },
-            { "_WITH_ALT_PARTITIONING", // 1
+            { "_WITH_ALT_PARTITIONING", // 16
                 "",
                 " PARTITION TABLE %s_WITH_ALT_PARTITIONING ON COLUMN NONID;",
             },
-            { "_WITH_MANY_FEATURES", // 20
-              ", PRIMARY KEY (ID), UNIQUE (NONID, NAME), LIMIT PARTITION ROWS 1000",
+            { "_WITH_MANY_FEATURES", // 17
+              ", PRIMARY KEY (ID), UNIQUE (NONID, NAME),",
               " CREATE INDEX %s_WITH_MANY_FEATURES ON %s_WITH_MANY_FEATURES (NONID / 2); "
               + "CREATE INDEX %s_PARTIAL_WITH_MANY_FEATURES ON %s_WITH_MANY_FEATURES (NONID / 3) WHERE NONID > 1000;",
             }
@@ -838,9 +819,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                         (ii == 6 && jj == 7) || (ii == 7 && jj == 6) ||
                         (ii == 9 && jj == 10) || (ii == 10 && jj == 9) ||
                         (ii == 9 && jj == 11) || (ii == 11 && jj == 9) ||
-                        (ii == 10 && jj == 11) || (ii == 11 && jj == 10) ||
-                        (ii == 15 && jj == 16) || (ii == 16 && jj == 15) ||
-                        (ii == 17 && jj == 18) || (ii == 18 && jj == 17)) {
+                        (ii == 10 && jj == 11) || (ii == 11 && jj == 10)) {
 
                     VoltTable[] results;
 

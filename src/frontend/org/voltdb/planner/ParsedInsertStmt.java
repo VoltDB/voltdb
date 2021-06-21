@@ -33,7 +33,6 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.FunctionExpression;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
-import org.voltdb.utils.CatalogUtil;
 
 /**
  *
@@ -223,15 +222,6 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
     public boolean isOrderDeterministicInSpiteOfUnorderedSubqueries() {
         assert(getSubselectStmt() != null);
         return getSubselectStmt().isOrderDeterministicInSpiteOfUnorderedSubqueries();
-    }
-
-    /**
-     * Returns true if the table being inserted into has a trigger executed
-     * when row limit is met
-     */
-    public boolean targetTableHasLimitRowsTrigger() {
-        assert(m_tableList.size() == 1);
-        return CatalogUtil.getLimitPartitionRowsDeleteStmt(m_tableList.get(0)) != null;
     }
 
     @Override

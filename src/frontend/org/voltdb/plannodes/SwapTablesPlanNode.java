@@ -28,7 +28,16 @@ import java.util.stream.Collectors;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
-import org.voltdb.catalog.*;
+import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.CatalogType;
+import org.voltdb.catalog.Column;
+import org.voltdb.catalog.ColumnRef;
+import org.voltdb.catalog.Constraint;
+import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Index;
+import org.voltdb.catalog.MaterializedViewHandlerInfo;
+import org.voltdb.catalog.MaterializedViewInfo;
+import org.voltdb.catalog.Table;
 import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.PlanNodeType;
@@ -494,10 +503,6 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
 
         if (theTable.getIsreplicated() != otherTable.getIsreplicated()) {
             failureMessage.addReason("one table is partitioned and the other is not");
-        }
-
-        if (theTable.getTuplelimit() != otherTable.getTuplelimit()) {
-            failureMessage.addReason("the tables differ in the LIMIT PARTITION ROWS constraint");
         }
 
         if ((theTable.getMaterializer() != null ||

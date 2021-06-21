@@ -1513,12 +1513,7 @@ bool VoltDBEngine::processCatalogAdditions(int64_t timestamp, bool updateReplica
                 // call above should rebuild them all anyway
                 continue;
             }
-            //
-            // Same schema, but TUPLE_LIMIT may change.
-            // Because there is no table rebuilt work next, no special need to take care of
-            // the new tuple limit.
-            //
-            persistentTable->setTupleLimit(catalogTable->tuplelimit());
+
             //////////////////////////////////////////
             // find all of the indexes to add
             //////////////////////////////////////////
@@ -2290,28 +2285,6 @@ void VoltDBEngine::initMaterializedViewsAndLimitDeletePlans(bool updateReplicate
         PersistentTable *persistentTable = dynamic_cast<PersistentTable*>(table);
         if (persistentTable != NULL) {
             initMaterializedViews(catalogTable, persistentTable, updateReplicated);
-            if (catalogTable->tuplelimitDeleteStmt().size() > 0) {
-                auto stmt = catalogTable->tuplelimitDeleteStmt().begin()->second;
-                std::string const& b64String = stmt->fragments().begin()->second->plannodetree();
-                std::string jsonPlan = getTopend()->decodeBase64AndDecompress(b64String);
-                ConditionalExecuteWithMpMemory useMpMemoryIfReplicated(updateReplicated);
-                boost::shared_ptr<ExecutorVector> vec = ExecutorVector::fromJsonPlan(this, jsonPlan, -1);
-                const std::vector<AbstractExecutor*>& execs = vec->getExecutorList();
-                // Since purge executors are only called from insert, there is no need to coordinate
-                // the execution of the delete across sites because we are already running on the lowest
-                // site during insert::p_execute. Disabling the replicated flag will avoid the inner
-                // coordination.
-                for(AbstractExecutor* exec : execs) {
-                    exec->disableReplicatedFlag();
-                }
-                persistentTable->swapPurgeExecutorVector(vec);
-            } else {
-                ConditionalExecuteWithMpMemory useMpMemoryIfReplicated(updateReplicated);
-                // get rid of the purge fragment from the persistent
-                // table if it has been removed from the catalog
-                boost::shared_ptr<ExecutorVector> nullPtr;
-                persistentTable->swapPurgeExecutorVector(nullPtr);
-            }
         } else {
             auto streamedTable = dynamic_cast<StreamedTable*>(table);
             vassert(streamedTable);
@@ -3027,30 +3000,6 @@ void VoltDBEngine::executeTask(TaskType taskType, ReferenceSerializeInputBE &tas
     default:
         throwFatalException("Unknown task type %d", taskType);
     }
-}
-
-void VoltDBEngine::executePurgeFragment(PersistentTable* table) {
-    boost::shared_ptr<ExecutorVector> pev = table->getPurgeExecutorVector();
-
-    // Push a new frame onto the stack for this executor vector
-    // to report its tuples modified.  We don't want to actually
-    // send this count back to the client---too confusing.  Just
-    // throw it away.
-    m_executorContext->pushNewModifiedTupleCounter();
-    pev->setupContext(m_executorContext);
-
-    try {
-        m_executorContext->executeExecutors(0);
-    } catch (const SerializableEEException &e) {
-        // restore original DML statement state.
-        m_currExecutorVec->setupContext(m_executorContext);
-        m_executorContext->popModifiedTupleCounter();
-        throw;
-    }
-
-    // restore original DML statement state.
-    m_currExecutorVec->setupContext(m_executorContext);
-    m_executorContext->popModifiedTupleCounter();
 }
 
 void VoltDBEngine::addToTuplesModified(int64_t amount) {

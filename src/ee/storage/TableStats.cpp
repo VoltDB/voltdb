@@ -38,8 +38,6 @@ vector<string> TableStats::generateTableStatsColumnNames() {
     columnNames.push_back("TUPLE_ALLOCATED_MEMORY");
     columnNames.push_back("TUPLE_DATA_MEMORY");
     columnNames.push_back("STRING_DATA_MEMORY");
-    columnNames.push_back("TUPLE_LIMIT");
-    columnNames.push_back("PERCENT_FULL");
     columnNames.push_back("DR");
     columnNames.push_back("EXPORT");
     return columnNames;
@@ -83,18 +81,6 @@ void TableStats::populateTableStatsSchema(vector<ValueType> &types, vector<int32
     // STRING_DATA_MEMORY
     types.push_back(ValueType::tBIGINT);
     columnLengths.push_back(NValue::getTupleStorageSize(ValueType::tBIGINT));
-    allowNull.push_back(false);
-    inBytes.push_back(false);
-
-    // TUPLE_LIMIT
-    types.push_back(ValueType::tINTEGER);
-    columnLengths.push_back(NValue::getTupleStorageSize(ValueType::tINTEGER));
-    allowNull.push_back(false);
-    inBytes.push_back(false);
-
-    // PERCENT_FULL
-    types.push_back(ValueType::tINTEGER);
-    columnLengths.push_back(NValue::getTupleStorageSize(ValueType::tINTEGER));
     allowNull.push_back(false);
     inBytes.push_back(false);
 
@@ -164,7 +150,6 @@ void TableStats::updateStatsTuple(TableTuple *tuple) {
     tuple->setNValue( StatsSource::m_columnName2Index["TABLE_NAME"], m_tableName);
     tuple->setNValue( StatsSource::m_columnName2Index["TABLE_TYPE"], m_tableType);
     int64_t tupleCount = m_table->activeTupleCount();
-    int tupleLimit = m_table->tupleLimit();
     // This overflow is unlikely (requires 2 terabytes of allocated string memory)
     int64_t allocated_tuple_mem_kb = m_table->allocatedTupleMemory() / 1024;
     int64_t occupied_tuple_mem_kb = 0;
@@ -198,15 +183,6 @@ void TableStats::updateStatsTuple(TableTuple *tuple) {
             ValueFactory::getBigIntValue(occupied_tuple_mem_kb));
     tuple->setNValue(StatsSource::m_columnName2Index["STRING_DATA_MEMORY"],
             ValueFactory::getBigIntValue(string_data_mem_kb));
-
-    bool hasTupleLimit = tupleLimit == INT_MAX ? false : true;
-    tuple->setNValue(StatsSource::m_columnName2Index["TUPLE_LIMIT"],
-            hasTupleLimit ? ValueFactory::getIntegerValue(tupleLimit): ValueFactory::getNullValue());
-    int32_t percentage = 0;
-    if (hasTupleLimit && tupleLimit > 0) {
-        percentage = static_cast<int32_t> (ceil(static_cast<double>(tupleCount) * 100.0 / tupleLimit));
-    }
-    tuple->setNValue(StatsSource::m_columnName2Index["PERCENT_FULL"],ValueFactory::getIntegerValue(percentage));
 
     string isDR = "false";
     string isExport = "false";

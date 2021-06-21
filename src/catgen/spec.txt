@@ -173,21 +173,19 @@ begin Table                                  "A table (relation) in the database
   MaterializedViewHandlerInfo* mvHandlerInfo "Only on result table of a materialized view"
   Table? materializer                        "If this is a materialized view, this field stores the source table"
   string signature                           "Catalog version independent signature of the table consisting of name and schema"
-  int tuplelimit                             "A maximum number of rows in a table"
+  removed tuplelimit                         "Removed: A maximum number of rows in a table"
   bool isDRed                                "Is this table DRed?"
-  Statement* tuplelimitDeleteStmt            "Delete statement to execute if tuple limit will be exceeded"
+  removed tuplelimitDeleteStmt               "Removed: Delete statement to execute if tuple limit will be exceeded"
   TimeToLive* timeToLive                     "Time to live"
   int tableType                              "Types: no stream(persistent), view-only stream, stream with target, persistent table for export and migration"
   string migrationTarget                     "The target where the data are migrated to"
   string topicName                           "Associated topic for stream"
   string topicKeyColumnNames                 "List of topic key column names"
   string topicValueColumnNames               "List of topic value column names"
-  // Fields which were once part of topic streams but were replaced by topic objects in the catalog
-  removed isTopic                         "Replaced by topicName not being empty"
-  removed topicProfile                    "Moved to topic class"
-  removed topicFormat                     "Moved to topic class"
-  removed topicAllowedRoleNames           "Moved to topic class"
-
+  removed isTopic                            "Replaced by topicName not being empty"
+  removed topicProfile                       "Removed"
+  removed topicFormat                        "Moved to topic deployment config"
+  removed topicAllowedRoleNames              "Moved to topic deployment config"
 end
 
 begin Topic                                  "A topic in the database"
