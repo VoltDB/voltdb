@@ -1169,3 +1169,12 @@
 .addConfigHeader {
   width: 200px;
 }
+
+.icon-confirmation {
+  background: url('../images/glyphicons-halflings.png') no-repeat 10px -112px;
+  width: 8px;
+  height: 18px;
+  vertical-align: middle;
+  padding-top: 11px;
+  border-bottom: none;
+}
