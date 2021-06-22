@@ -1100,7 +1100,7 @@ $(document).ready(function () {
       var server =
         SQLQueryRender.server == null
           ? VoltDBConfig.GetDefaultServerNameForKey()
-          : String.prototype.trim(SQLQueryRender.server);
+          : SQLQueryRender.server.trim();
       var user = SQLQueryRender.userName == "" ? null : SQLQueryRender.userName;
       var processNameSuffix = useAdminPort ? "" : "_CLIENTPORT";
       var processName = "TABLE_INFORMATION" + processNameSuffix;
