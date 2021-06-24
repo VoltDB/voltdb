@@ -3840,7 +3840,7 @@ generateProcedureDate { float:right;padding-right: 85px;}
     border: 1px solid #ccc;
     font: medium -moz-fixed;
     font: -webkit-small-control;
-    height: 170px;
+    height: 170px !important;
     overflow: auto;
     padding: 2px;
     resize: vertical;
