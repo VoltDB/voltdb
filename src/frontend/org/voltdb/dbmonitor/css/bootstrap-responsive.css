@@ -1178,3 +1178,8 @@
   padding-top: 11px;
   border-bottom: none;
 }
+
+.hasSubLabel a:hover, a:focus {
+  color: white !important;
+  text-decoration: none !important;
+}
