@@ -3414,18 +3414,6 @@ public abstract class CatalogUtil {
 
     }
 
-    /** Given a table, return the DELETE statement that can be executed
-     * by a LIMIT PARTITION ROWS constraint, or NULL if there isn't one. */
-    public static String getLimitPartitionRowsDeleteStmt(Table table) {
-        CatalogMap<Statement> map = table.getTuplelimitdeletestmt();
-        if (map.isEmpty()) {
-            return null;
-        }
-
-        assert (map.size() == 1);
-        return map.iterator().next().getSqltext();
-    }
-
     /**
      * Add default configuration to DR conflicts export target if deployment file doesn't have the configuration
      *

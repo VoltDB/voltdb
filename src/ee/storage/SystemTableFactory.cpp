@@ -28,7 +28,7 @@ PersistentTable* SystemTableFactory::createTable(char const *name, TupleSchema *
     vassert(partitionColumn >= 0 && partitionColumn < columnNames.size());
 
     Table *table = TableFactory::getPersistentTable(0, name, schema, columnNames, nullptr, false, partitionColumn,
-            TableType::PERSISTENT, 0, INT_MAX, m_compactionThreshold, false, false);
+            TableType::PERSISTENT, 0, m_compactionThreshold, false, false);
     return dynamic_cast<PersistentTable*>(table);
 }
 

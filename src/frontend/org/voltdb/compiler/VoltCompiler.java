@@ -45,15 +45,12 @@ import java.util.regex.Pattern;
 
 import javax.xml.bind.JAXBException;
 
-import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.hsqldb_voltpatches.HSQLInterface;
-import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltcore.TransactionIdManager;
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.Pair;
 import org.voltdb.CatalogContext;
 import org.voltdb.ProcedurePartitionData;
 import org.voltdb.RealVoltDB;
@@ -1124,15 +1121,7 @@ public class VoltCompiler {
             // When A/A is enabled, create an export table for every DR table to log possible conflicts
             ddlcompiler.loadAutogenExportTableSchema(db, previousDBIfAny, whichProcs, m_isXDCR);
             sqlNodes.forEach(node -> {
-                final Pair<SchemaPlus, Pair<Statement, VoltXMLElement>> r = CreateTableUtils.addTable(node, hsql, db);
-                if (r.getSecond() != null) {
-                    final Statement stmt = r.getSecond().getFirst();
-                    final VoltXMLElement elm = r.getSecond().getSecond();
-                    ddlcompiler.getLimitDeleteStmtToXmlEntries().put(stmt, elm);
-//                } else {      // TODO: explicitly left CREATE INDEX switch off till we resolve all CatalogDiff errors
-//                  // First, need to make tests/testprocs/org/voltdb_testprocs/regressionsuites/matviewprocs/matviewsuite-ddl.sql work.
-//                    final SchemaPlus sc = CreateIndexUtils.run(node, previousDBIfAny, db);
-                }
+                CreateTableUtils.addTable(node, db);
             });
             ddlcompiler.compileToCatalog(db, m_isXDCR); // NOTE: this is the place catalog gets added for create table.
 
@@ -1170,29 +1159,11 @@ public class VoltCompiler {
             // add extra classes from the DDL
             m_addedClasses = voltDdlTracker.m_extraClassses.toArray(new String[0]);
             addExtraClasses(jarOutput);
-
-            compileRowLimitDeleteStmts(db, hsql, ddlcompiler.getLimitDeleteStmtToXmlEntries());
         } catch (Throwable ex) {
             ddlcompiler.restoreSavedFunctions();
             throw ex;
         }
         ddlcompiler.clearSavedFunctions();
-    }
-
-    private void compileRowLimitDeleteStmts(
-            Database db, HSQLInterface hsql, Map<Statement, VoltXMLElement> deleteStmtXmlEntries)
-            throws VoltCompilerException {
-        for (Map.Entry<Statement, VoltXMLElement> entry : deleteStmtXmlEntries.entrySet()) {
-            Statement stmt = entry.getKey();
-            VoltXMLElement xml = entry.getValue();
-
-            // choose DeterminismMode.FASTER for determinism, and rely on the planner to error out
-            // if we generated a plan that is content-non-deterministic.
-            StatementCompiler.compileStatementAndUpdateCatalog(
-                    this, hsql, db, m_estimates, stmt, xml, stmt.getSqltext(),
-                    null, // no user-supplied join order
-                    DeterminismMode.FASTER, StatementPartitioning.partitioningForRowLimitDelete(), false);
-        }
     }
 
     /**
@@ -1387,9 +1358,6 @@ public class VoltCompiler {
         }
 
         // Other checks
-        if (table.getTuplelimit() != Integer.MAX_VALUE) {
-            throw new VoltCompilerException("Streams cannot have row limits configured");
-        }
         if (table.getIndexes().size() > 0) {
             compilerLog.error("While configuring " + what + ", stream " + table + " has indexes defined. " +
                     "Streams can't have indexes (including primary keys).");

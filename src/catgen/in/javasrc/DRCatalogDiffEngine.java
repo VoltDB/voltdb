@@ -182,7 +182,6 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
             return null;
         } else if (remoteType instanceof Table) {
             if ("estimatedtuplecount".equals(field) ||
-                    "tuplelimit".equals(field) ||
                     "tableType".equals(field)) {
                 return null;
             }
@@ -200,8 +199,6 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
                 "matviewsource".equals(field)) {
                 return null;
             }
-        } else if (isTableLimitDeleteStmt(remoteType)) {
-            return null;
         } else if ((remoteType instanceof Index && isUniqueIndex(remoteType) == isUniqueIndex(localType))
                 || (remoteType instanceof ColumnRef && !isUniqueIndexColumn(remoteType))) {
             return null;

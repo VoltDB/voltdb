@@ -108,21 +108,8 @@ class InsertExecutor : public AbstractExecutor {
     bool m_hasStreamView = false;
     bool m_isUpsert = false;
     bool m_sourceIsPartitioned = false;
-    bool m_hasPurgeFragment = false;
 
  private:
-
-    /** If the table is at or over its tuple limit, this method
-     * executes the purge fragment for the table.  Returns true if
-     * nothing went wrong (regardless of whether the purge
-     * fragment was executed) and false otherwise.
-     *
-     * The purge fragment might perform a truncate table,
-     * in which case the persistent table object we're inserting
-     * into might change.  Passing a pointer-to-pointer allows
-     * the callee to update the persistent table pointer.
-     */
-    void executePurgeFragmentIfNeeded(PersistentTable** table);
 
     /**
      * Return false iff all the work is done in init.  Inserting

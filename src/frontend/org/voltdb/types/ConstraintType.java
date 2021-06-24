@@ -32,6 +32,8 @@ public enum ConstraintType {
     PRIMARY_KEY  (4),
     NOT_NULL     (5),
     PARTITIONING (6),
+    // Note: LIMIT is not supported but the constraint remains
+    // to preserve the value of the constraint following.
     LIMIT        (7),
     NUMERIC      (8);
 

@@ -78,7 +78,7 @@ public:
         voltdb::CatalogId databaseId, char const* name, TupleSchema* schema,
         const std::vector<std::string> &columnNames, char *signature, bool tableIsMaterialized = false,
         int partitionColumn = 0, // defaults provided for ease of testing.
-        TableType tableType = PERSISTENT, int tableAllocationTargetSize = 0, int tuplelimit = INT_MAX,
+        TableType tableType = PERSISTENT, int tableAllocationTargetSize = 0,
         int32_t compactionThreshold = 95, bool drEnabled = false, bool isReplicated = false);
 
     static StreamedTable* getStreamedTableForTest(

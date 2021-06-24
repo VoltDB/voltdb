@@ -721,7 +721,6 @@ DISTRIBUTION
     <exec dir='examples/voter' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
     <exec dir='examples/voltkv' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
     <exec dir='examples/windowing' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
-    <exec dir='examples/windowing-with-ddl' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
     <exec dir='examples/fraud-detection' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
 
     <!-- build the jars for the tutorials -->
@@ -839,7 +838,6 @@ DISTRIBUTION
             <include name="examples/voltkv/run.sh"/>
             <include name="examples/voter/run.sh"/>
             <include name="examples/windowing/run.sh"/>
-            <include name="examples/windowing-with-ddl/run.sh"/>
             <include name="examples/fraud-detection/run.sh"/>
             <include name="bin/sqlcmd"/>
         </fileset>
@@ -975,7 +973,6 @@ CLEANING
   <exec dir='examples/voltkv' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
   <exec dir='examples/voter' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
   <exec dir='examples/windowing' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
-  <exec dir='examples/windowing-with-ddl' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
   <exec dir='examples/fraud-detection' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
 
   <exec dir='doc/tutorials/helloworld' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
@@ -2149,8 +2146,6 @@ TEST CASES
     <samplecheck app="voter" />
     <echo>checking windowing</echo>
     <samplecheck app="windowing" />
-    <echo>checking windowing-with-ddl</echo>
-    <samplecheck app="windowing-with-ddl" />
 </target>
 
 <target name='sqlcoverage' depends="ee,compile"

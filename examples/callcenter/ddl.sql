@@ -23,11 +23,7 @@ CREATE TABLE completedcalls
   start_ts TIMESTAMP NOT NULL,
   end_ts TIMESTAMP NOT NULL,
   duration INTEGER NOT NULL,
-  PRIMARY KEY (call_id, agent_id, phone_no),
-  LIMIT PARTITION ROWS 82500
-    EXECUTE (DELETE FROM completedcalls
-             WHERE end_ts < dateadd(minute, -5, now)
-             ORDER BY end_ts, call_id, agent_id, phone_no LIMIT 1500)
+  PRIMARY KEY (call_id, agent_id, phone_no)
 );
 PARTITION TABLE completedcalls ON COLUMN agent_id;
 
@@ -43,10 +39,7 @@ CREATE TABLE stddevbyagent
   sumk BIGINT NOT NULL,
   qk FLOAT NOT NULL,
   stddev FLOAT NOT NULL,
-  PRIMARY KEY (curdate, agent_id),
-  LIMIT PARTITION ROWS 1000000
-    EXECUTE (DELETE FROM stddevbyagent
-             ORDER BY curdate, agent_id asc LIMIT 1500)
+  PRIMARY KEY (curdate, agent_id)
 );
 PARTITION TABLE stddevbyagent ON COLUMN agent_id;
 

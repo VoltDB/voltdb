@@ -348,9 +348,7 @@ CREATE TABLE capr
 , tmstmp     timestamp            NOT NULL
 , value      varbinary(1048576) NOT NULL
 , CONSTRAINT PK_id_cr PRIMARY KEY (p,id)
-, LIMIT PARTITION ROWS 10 EXECUTE (
-    DELETE FROM CAPR WHERE tmstmp < NOW
-) );
+);
 
 CREATE TABLE capp
 (
@@ -359,9 +357,7 @@ CREATE TABLE capp
 , tmstmp     timestamp            NOT NULL
 , value      varbinary(1048576) NOT NULL
 , CONSTRAINT PK_id_cp PRIMARY KEY (p,id)
-, LIMIT PARTITION ROWS 10 EXECUTE (
-    DELETE FROM CAPP WHERE tmstmp < NOW
-) );
+);
 PARTITION TABLE capp ON COLUMN p;
 
 -- import table partitioned

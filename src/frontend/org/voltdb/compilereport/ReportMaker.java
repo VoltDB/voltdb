@@ -139,10 +139,6 @@ public class ReportMaker {
                 sb.append(StringUtils.join(procs, ", "));
                 sb.append("</p>");
             }
-            if (annotation.statementsThatUseThis.size() > 0) {
-                assert(annotation.statementsThatUseThis.size() == 1);
-                sb.append("<p>Used by the LIMIT PARTITION ROWS Statement</p>");
-            }
         }
 
         sb.append("</td></tr>\n");
@@ -278,18 +274,6 @@ public class ReportMaker {
         }
         sb.append("</td>");
 
-        // column 6: has tuple limit
-        sb.append("<td>");
-        if (table.getTuplelimit() != Integer.MAX_VALUE) {
-            tag(sb, "info", String.valueOf(table.getTuplelimit()));
-            if (CatalogUtil.getLimitPartitionRowsDeleteStmt(table) != null) {
-                sb.append("<small>enforced by DELETE statement</small>");
-            }
-        } else {
-            tag(sb, null, "No-limit");
-        }
-        sb.append("</td>");
-
         sb.append("</tr>\n");
 
         // BUILD THE DROPDOWN FOR THE DDL / INDEXES DETAIL
@@ -327,37 +311,6 @@ public class ReportMaker {
                 }
                 sb.append(StringUtils.join(procs, ", "));
                 sb.append("</p>");
-            }
-        }
-
-        // LIMIT PARTITION ROW statement may also use the index in this table, prepare the information for report
-        if (! table.getTuplelimitdeletestmt().isEmpty()) {
-            assert(table.getTuplelimitdeletestmt().size() == 1);
-            Statement stmt = table.getTuplelimitdeletestmt().iterator().next();
-
-            for (String tableDotIndexPair : stmt.getIndexesused().split(",")) {
-                if (tableDotIndexPair.length() == 0) {
-                    continue;
-                }
-                String parts[] = tableDotIndexPair.split("\\.", 2);
-                assert(parts.length == 2);
-                if (parts.length != 2) {
-                    continue;
-                }
-                String tableName = parts[0];
-                String indexName = parts[1];
-                if (! table.getTypeName().equals(tableName)) {
-                    continue;
-                }
-
-                Index i = table.getIndexes().get(indexName);
-                assert(i != null);
-                IndexAnnotation ia = (IndexAnnotation) i.getAnnotation();
-                if (ia == null) {
-                    ia = new IndexAnnotation();
-                    i.setAnnotation(ia);
-                }
-                ia.statementsThatUseThis.add(stmt);
             }
         }
 

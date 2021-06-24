@@ -42,13 +42,13 @@ public class TestDRCatalogDiffs {
     public void testHappyPath() throws Exception {
         String masterSchema =
                 "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER, C3 VARCHAR(50) NOT NULL, " +
-                "PRIMARY KEY (C1), LIMIT PARTITION ROWS 100 EXECUTE (DELETE FROM T1 WHERE C1 < 50));\n" +
+                "PRIMARY KEY (C1));\n" +
                 "PARTITION TABLE T1 ON COLUMN C1;\n" +
                 "CREATE UNIQUE INDEX foo ON T1 (C3, C1);\n" +
                 "DR TABLE T1;";
         String replicaSchema =
                 "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER, C3 VARCHAR(50) NOT NULL, " +
-                "PRIMARY KEY (C1), LIMIT PARTITION ROWS 100 EXECUTE (DELETE FROM T1 WHERE C1 < 50));\n" +
+                "PRIMARY KEY (C1));\n" +
                 "PARTITION TABLE T1 ON COLUMN C1;\n" +
                 "CREATE UNIQUE INDEX foo ON T1 (C3, C1);\n" +
                 "DR TABLE T1;";
@@ -209,141 +209,6 @@ public class TestDRCatalogDiffs {
         CatalogDiffEngine diff = runCatalogDiff(masterSchema, false, replicaSchema, false);
         assertFalse(diff.supported());
         assertTrue(diff.errors().contains("field partitioncolumn in schema object Table{T1}"));
-    }
-
-    @Test
-    public void testExtraRowLimitOnReplica() throws Exception {
-        String masterSchema =
-                "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL);\n" +
-                "PARTITION TABLE T1 ON COLUMN C1;\n" +
-                "DR TABLE T1;";
-        String replicaSchema =
-                "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL, LIMIT PARTITION ROWS 100);\n" +
-                "PARTITION TABLE T1 ON COLUMN C1;\n" +
-                "DR TABLE T1;";
-
-        CatalogDiffEngine diff = runCatalogDiff(masterSchema, false, replicaSchema, false);
-        assertTrue(diff.errors(), diff.supported());
-    }
-
-    @Test
-    public void testMissingRowLimitOnReplica() throws Exception {
-        String masterSchema =
-                "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL, LIMIT PARTITION ROWS 100);\n" +
-                "PARTITION TABLE T1 ON COLUMN C1;\n" +
-                "DR TABLE T1;";
-        String replicaSchema =
-                "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL);\n" +
-                "PARTITION TABLE T1 ON COLUMN C1;\n" +
-                "DR TABLE T1;";
-
-        CatalogDiffEngine diff = runCatalogDiff(masterSchema, false, replicaSchema, false);
-        assertTrue(diff.errors(), diff.supported());
-    }
-
-    @Test
-    public void testDifferentRowLimit() throws Exception {
-        String masterSchema =
-                "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL, LIMIT PARTITION ROWS 50);\n" +
-                "PARTITION TABLE T1 ON COLUMN C1;\n" +
-                "DR TABLE T1;";
-        String replicaSchema =
-                "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL, LIMIT PARTITION ROWS 100);\n" +
-                "PARTITION TABLE T1 ON COLUMN C1;\n" +
-                "DR TABLE T1;";
-
-        CatalogDiffEngine diff = runCatalogDiff(masterSchema, false, replicaSchema, false);
-        assertTrue(diff.errors(), diff.supported());
-    }
-
-    @Test
-    public void testAddedDeletePolicyOnReplica() throws Exception {
-        String masterSchema =
-                "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL, LIMIT PARTITION ROWS 100);\n" +
-                "PARTITION TABLE T1 ON COLUMN C1;\n" +
-                "DR TABLE T1;";
-        String replicaSchema =
-                "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL, LIMIT PARTITION ROWS 100 EXECUTE (DELETE FROM T1 WHERE C1 > 50));\n" +
-                "PARTITION TABLE T1 ON COLUMN C1;\n" +
-                "DR TABLE T1;";
-
-        CatalogDiffEngine diff = runCatalogDiff(masterSchema, false, replicaSchema, false);
-        assertTrue(diff.errors(), diff.supported());
-    }
-
-    @Test
-    public void testMissingDeletePolicyOnReplica() throws Exception {
-        String masterSchema =
-                "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL, LIMIT PARTITION ROWS 100 EXECUTE (DELETE FROM T1 WHERE C1 > 50));\n" +
-                "PARTITION TABLE T1 ON COLUMN C1;\n" +
-                "DR TABLE T1;";
-        String replicaSchema =
-                "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL, LIMIT PARTITION ROWS 100);\n" +
-                "PARTITION TABLE T1 ON COLUMN C1;\n" +
-                "DR TABLE T1;";
-
-        CatalogDiffEngine diff = runCatalogDiff(masterSchema, false, replicaSchema, false);
-        assertTrue(diff.errors(), diff.supported());
-    }
-
-    @Test
-    public void testDifferentDeletePolicy() throws Exception {
-        String masterSchema =
-                "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL, LIMIT PARTITION ROWS 100 EXECUTE (DELETE FROM T1 WHERE C1 > 50));\n" +
-                "PARTITION TABLE T1 ON COLUMN C1;\n" +
-                "DR TABLE T1;";
-        String replicaSchema =
-                "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL, LIMIT PARTITION ROWS 100 EXECUTE (DELETE FROM T1 WHERE C2 > 50));\n" +
-                "PARTITION TABLE T1 ON COLUMN C1;\n" +
-                "DR TABLE T1;";
-
-        CatalogDiffEngine diff = runCatalogDiff(masterSchema, false, replicaSchema, false);
-        assertTrue(diff.errors(), diff.supported());
-    }
-
-    @Test
-    public void testDeletePolicyWithDifferentWhereClauseConstant() throws Exception {
-        String masterSchema =
-                "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL, LIMIT PARTITION ROWS 100 EXECUTE (DELETE FROM T1 WHERE C1 > 50));\n" +
-                "PARTITION TABLE T1 ON COLUMN C1;\n" +
-                "DR TABLE T1;";
-        String replicaSchema =
-                "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL, LIMIT PARTITION ROWS 100 EXECUTE (DELETE FROM T1 WHERE C1 > 100));\n" +
-                "PARTITION TABLE T1 ON COLUMN C1;\n" +
-                "DR TABLE T1;";
-
-        CatalogDiffEngine diff = runCatalogDiff(masterSchema, false, replicaSchema, false);
-        assertTrue(diff.errors(), diff.supported());
-    }
-
-    @Test
-    public void testDeletePolicyWithDifferentWhereClauseOperator() throws Exception {
-        String masterSchema =
-                "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL, LIMIT PARTITION ROWS 100 EXECUTE (DELETE FROM T1 WHERE C1 > 50));\n" +
-                "PARTITION TABLE T1 ON COLUMN C1;\n" +
-                "DR TABLE T1;";
-        String replicaSchema =
-                "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL, LIMIT PARTITION ROWS 100 EXECUTE (DELETE FROM T1 WHERE C1 = 50));\n" +
-                "PARTITION TABLE T1 ON COLUMN C1;\n" +
-                "DR TABLE T1;";
-
-        CatalogDiffEngine diff = runCatalogDiff(masterSchema, false, replicaSchema, false);
-        assertTrue(diff.errors(), diff.supported());
-    }
-
-    @Test
-    public void testDifferentRowLimitWithSameDeletePolicy() throws Exception {
-        String masterSchema =
-                "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL, LIMIT PARTITION ROWS 100 EXECUTE (DELETE FROM T1 WHERE C1 > 50));\n" +
-                "PARTITION TABLE T1 ON COLUMN C1;\n" +
-                "DR TABLE T1;";
-        String replicaSchema =
-                "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL, LIMIT PARTITION ROWS 50 EXECUTE (DELETE FROM T1 WHERE C1 > 50));\n" +
-                "PARTITION TABLE T1 ON COLUMN C1;\n" +
-                "DR TABLE T1;";
-
-        CatalogDiffEngine diff = runCatalogDiff(masterSchema, false, replicaSchema, false);
-        assertTrue(diff.errors(), diff.supported());
     }
 
     @Test

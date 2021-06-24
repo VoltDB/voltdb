@@ -557,13 +557,6 @@ public class TestDDLCompiler extends TestCase {
                 // assumeunique index
                 "CREATE STREAM FOO (D1 INTEGER, D2 INTEGER, VAL1 INTEGER, VAL2 INTEGER, " +
                 "CONSTRAINT IDX_TEST1 ASSUMEUNIQUE (D1));\n",
-                // with limit
-                "CREATE STREAM FOO (D1 INTEGER, D2 INTEGER, VAL1 INTEGER, VAL2 INTEGER, " +
-                "LIMIT PARTITION ROWS 100);\n",
-                // with limit and execute
-                "CREATE STREAM FOO (D1 INTEGER, D2 INTEGER, VAL1 INTEGER, VAL2 INTEGER, " +
-                "LIMIT PARTITION ROWS 100 EXECUTE (\n" +
-                "  DELETE FROM FOO WHERE D1 > 100));\n",
         };
 
         VoltCompiler compiler = new VoltCompiler(false);
@@ -750,7 +743,7 @@ public class TestDDLCompiler extends TestCase {
 
         VoltCompiler compiler = new VoltCompiler(true);
         File schemaFile = VoltProjectBuilder.writeStringToTempFile(
-        "CREATE TABLE T (D1 INTEGER NOT NULL, D2 INTEGER, D3 VARCHAR(32), VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER, PRIMARY KEY (D1), LIMIT PARTITION ROWS 1000);\n" +
+        "CREATE TABLE T (D1 INTEGER NOT NULL, D2 INTEGER, D3 VARCHAR(32), VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER, PRIMARY KEY (D1));\n" +
         "DR TABLE T;\n" +
         "PARTITION TABLE T ON COLUMN D1;\n");
         String schemaPath = schemaFile.getPath();

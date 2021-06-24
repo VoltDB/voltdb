@@ -404,8 +404,6 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
                 "                 POINT   GEOGRAPHY_POINT, " +
                 "                 POLYGON GEOGRAPHY, " +
                 "                 PRIMARY KEY (ID, VCHAR, VARBIN), " +
-                "                 LIMIT PARTITION ROWS 6 EXECUTE " +
-                "                 (DELETE FROM ENG12834_R7 ORDER BY ID, VCHAR, VARBIN LIMIT 3) " +
                 "); " +
                 "CREATE TABLE ENG_13059_R1 ( " +
                 "        ID      INTEGER DEFAULT 0 NOT NULL PRIMARY KEY, " +

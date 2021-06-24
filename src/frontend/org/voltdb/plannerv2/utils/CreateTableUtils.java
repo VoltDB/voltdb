@@ -17,24 +17,17 @@
 
 package org.voltdb.plannerv2.utils;
 
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Stream;
 
-import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql.SqlBasicCall;
 import org.apache.calcite.sql.SqlBinaryStringLiteral;
 import org.apache.calcite.sql.SqlCharStringLiteral;
 import org.apache.calcite.sql.SqlDataTypeSpec;
-import org.apache.calcite.sql.SqlDelete;
-import org.apache.calcite.sql.SqlFunction;
-import org.apache.calcite.sql.SqlFunctionCategory;
 import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlLiteral;
@@ -45,23 +38,17 @@ import org.apache.calcite.sql.ddl.SqlColumnDeclaration;
 import org.apache.calcite.sql.ddl.SqlColumnDeclarationWithExpression;
 import org.apache.calcite.sql.ddl.SqlCreateTable;
 import org.apache.calcite.sql.ddl.SqlKeyConstraint;
-import org.apache.calcite.sql.ddl.SqlLimitPartitionRowsConstraint;
-import org.apache.calcite.sql.dialect.VoltSqlDialect;
-import org.hsqldb_voltpatches.HSQLInterface;
-import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
-import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.catalog.TimeToLive;
 import org.voltdb.compiler.DDLCompiler;
 import org.voltdb.compilereport.TableAnnotation;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.plannerv2.ColumnTypes;
-import org.voltdb.plannerv2.VoltSchemaPlus;
 import org.voltdb.utils.CatalogSchemaTools;
 import org.voltdb.utils.CatalogUtil;
 
@@ -247,78 +234,6 @@ public class CreateTableUtils {
     }
 
     /**
-     * Helper function
-     * @param sql Calcite SQL node under inspection
-     * @param init accumulator
-     * @return collected SQL function calls in the Calcite SQL node
-     */
-    private static List<SqlBasicCall> collectFilterFunctions(SqlNode sql, List<SqlBasicCall> init) {
-        if (sql instanceof SqlBasicCall) {
-            final SqlBasicCall call = (SqlBasicCall) sql;
-            init.add(call);
-            call.getOperandList().forEach(op -> collectFilterFunctions(op, init));
-        }
-        return init;
-    }
-
-    /**
-     * Collect all SQL function calls contained inside DELETE statement of LIMIT PARTITION ROWS constraint.
-     * @param delete the DELETE statement of LIMIT PARTITION ROWS constraint
-     * @return a list of all SQL function calls in the DELETE statement.
-     */
-    private static List<SqlBasicCall> collectFilterFunctions(SqlDelete delete) {
-        final SqlNode condition = delete.getCondition();
-        if (condition == null) {
-            return Collections.emptyList();
-        } else {
-            return collectFilterFunctions(condition, new ArrayList<>());
-        }
-    }
-
-    /**
-     * Add a LIMIT PARTITION ROWS constraint to table, as in
-     * CREATE TABLE foo(i int, .., LIMIT PARTITION ROWS 1000 EXECUTE(DELETE FROM foo WHERE i > 500));
-     * @param t Source table for the constraint
-     * @param hsql HSQL session. We should eventually get rid of this; but the call stack is deeply winded how it is
-     *             passed down and used.
-     * @param constraint Calcite constraint for LIMIT PARTITION ROWS
-     * @return values necessary to pass down to the call chain to do the actual settings for the constraint.
-     */
-    private static Pair<Statement, VoltXMLElement> addLimitPartitionRowsConstraint(
-            Table t, HSQLInterface hsql, SqlLimitPartitionRowsConstraint constraint) {
-        final SqlDelete delete = constraint.getDelStmt();
-        final String sql = delete.toSqlString(VoltSqlDialect.DEFAULT).toString().replace('\n', ' ');
-        CalciteUtils.exceptWhen(! delete.getTargetTable().toString().equals(t.getTypeName()),
-                "Error: the source table (%s) of DELETE statement of LIMIT PARTITION constraint (%s) " +
-                                "does not match the table being created (%s)",
-                        delete.getTargetTable().toString(), t.getTypeName(), sql);
-        collectFilterFunctions(delete).stream().flatMap(call -> {
-            if (call.getOperator() instanceof SqlFunction &&
-                    ((SqlFunction) call.getOperator()).getFunctionType() == SqlFunctionCategory.USER_DEFINED_FUNCTION) {
-                final SqlFunction function = (SqlFunction) call.getOperator();
-                return Stream.of(function.getSqlIdentifier().getSimple());
-            } else {
-                return Stream.empty();
-            }
-        }).findAny().ifPresent(name ->
-                CalciteUtils.except(String.format(
-                        "Error: Table %s has invalid DELETE statement for LIMIT PARTITION ROWS constraint: " +
-                                "user defined function calls are not supported: \"%s\"",
-                        t.getTypeName(), name.toLowerCase())));
-        t.setTuplelimit(constraint.getRowCount());
-        final Statement stmt = t.getTuplelimitdeletestmt().add("limit_delete");
-        stmt.setSqltext(sql);
-        try { // Note: this ugliness came from how StatementCompiler.compileStatementAndUpdateCatalog()
-            // does its bidding; and from how HSQLInterface.getXMLCompiledStatement() needs the HSQL session
-            // for its work.
-            return Pair.of(stmt, hsql.getXMLCompiledStatement(sql));
-        } catch (HSQLInterface.HSQLParseException ex) {
-            CalciteUtils.except(ex.getMessage());
-            return null;
-        }
-    }
-
-    /**
      * Set table annotation
      * @param t source table
      */
@@ -334,21 +249,16 @@ public class CreateTableUtils {
     /**
      * API to use for CREATE TABLE ddl stmt.
      * @param node Calcite SqlNode for parsed CREATE TABLE stmt
-     * @param hsql HSQL session used for LIMIT PARTITION ROWS constraint
      * @param db catalog database object to insert created table
-     * @return brand new SchemaPlus object containing the table, together with all other pre-existing catalog objects
-     * found in the database; and arguments needed by DDLCompiler.addTableToCatalog() method as this API's only caller.
      */
-    public static Pair<SchemaPlus, Pair<Statement, VoltXMLElement>> addTable(
-            SqlNode node, HSQLInterface hsql, Database db) {
+    public static void addTable(SqlNode node, Database db) {
         if (node.getKind() != SqlKind.CREATE_TABLE) {           // for now, only partially support CREATE TABLE stmt
-            return Pair.of(VoltSchemaPlus.from(db), null);
+            return;
         }
         final List<SqlNode> nameAndColListAndQuery = ((SqlCreateTable) node).getOperandList();
         final String tableName = nameAndColListAndQuery.get(0).toString();
         final SqlNodeList nodeTableList = (SqlNodeList) nameAndColListAndQuery.get(1);
         final Table t = db.getTables().add(tableName);
-        t.setTuplelimit(Integer.MAX_VALUE);
         t.setIsreplicated(true);
 
         final int numCols = nodeTableList.getList().size();
@@ -358,7 +268,6 @@ public class CreateTableUtils {
         final AtomicInteger index = new AtomicInteger(0);
         final SortedMap<Integer, VoltType> columnTypes = new TreeMap<>();
         final Map<String, Index> indexMap = new HashMap<>();
-        Pair<Statement, VoltXMLElement> limitRowCatalogUpdate = null;
         for (SqlNode col : nodeTableList) {
             switch (col.getKind()) {
                 case PRIMARY_KEY:        // PKey and Unique are treated almost in the same way, except naming and table constraint type.
@@ -393,9 +302,6 @@ public class CreateTableUtils {
                         indexMap.put(indexName, indexConstraint);
                     }
                     break;
-                case LIMIT_PARTITION_ROWS:
-                    limitRowCatalogUpdate = addLimitPartitionRowsConstraint(t, hsql, (SqlLimitPartitionRowsConstraint) col);
-                    break;
                 case COLUMN_DECL:
                     rowSize += addColumn(new SqlColumnDeclarationWithExpression((SqlColumnDeclaration) col),
                             t, tableName, index, columnTypes);
@@ -409,6 +315,5 @@ public class CreateTableUtils {
         t.setSignature(CatalogUtil.getSignatureForTable(tableName, columnTypes));
         procTTLStmt(t, ((SqlCreateTable) node).getTtlConstraint());
         addAnnotation(t);
-        return Pair.of(VoltSchemaPlus.from(db), limitRowCatalogUpdate);
     }
 }

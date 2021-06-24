@@ -272,13 +272,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // If using this somewhere new, consider if you're being lazy.
         void updateExecutorContextUndoQuantumForTest();
 
-        // If an insert will fail due to row limit constraint and user
-        // has defined a delete action to make space, this method
-        // executes the corresponding fragment.
-        //
-        // Returns ENGINE_ERRORCODE_SUCCESS on success
-        void executePurgeFragment(PersistentTable* table);
-
         // -------------------------------------------------
         // Dependency Transfer Functions
         // -------------------------------------------------

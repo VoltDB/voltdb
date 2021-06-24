@@ -38,17 +38,12 @@ import org.junit.Test;
 import org.voltdb.AdhocDDLTestBase;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.Configuration;
-import org.voltdb.catalog.Catalog;
-import org.voltdb.catalog.CatalogDiffEngine;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.RegressionSuite;
-import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;
 
 public class TestDDLFeatures extends AdhocDDLTestBase {
@@ -379,20 +374,6 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
         }
         assertTrue("Shouldn't violate ASSUMEUNIQUE constraint", threw);
 
-        // Test for T16
-        assertTrue(findTableInSystemCatalogResults("T16"));
-        resp = m_client.callProcedure("T16.insert", 1);
-        assertEquals(resp.getResults()[0].getRowCount(), 1);
-
-        threw = false;
-        try {
-            m_client.callProcedure("T16.insert", 2);
-        } catch (ProcCallException pce) {
-            pce.printStackTrace();
-            threw = true;
-        }
-        assertTrue("Shouldn't violate LIMIT PARTITION ROW constraint", threw);
-
         // Test for T21
         assertTrue(findTableInSystemCatalogResults("T21"));
         assertEquals(indexedColumnCount("T21"), 3);
@@ -426,20 +407,6 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
         assertTrue(findTableInSystemCatalogResults("T19"));
         resp = m_client.callProcedure("T19.insert", 1, 2);
         assertEquals(resp.getResults()[0].getRowCount(), 1);
-
-        // Test for T20
-        assertTrue(findTableInSystemCatalogResults("T20"));
-        resp = m_client.callProcedure("T20.insert", 1);
-        assertEquals(resp.getResults()[0].getRowCount(), 1);
-
-        threw = false;
-        try {
-            m_client.callProcedure("T20.insert", 2);
-        } catch (ProcCallException pce) {
-            pce.printStackTrace();
-            threw = true;
-        }
-        assertTrue("Shouldn't violate LIMIT PARTITION ROW constraint", threw);
     }
 
     @Test
@@ -674,20 +641,6 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
         assertTrue("Shouldn't violate UNIQUE constraint", threw);
         assertEquals(indexedColumnCount("T35"), 1);
 
-        // Test for T35A
-        assertTrue(findTableInSystemCatalogResults("T35A"));
-        resp = m_client.callProcedure("T35A.insert", 1);
-        assertEquals(resp.getResults()[0].getRowCount(), 1);
-
-        threw = false;
-        try {
-            m_client.callProcedure("T35A.insert", 1);
-        } catch (ProcCallException pce) {
-            threw = true;
-        }
-        assertFalse("Shouldn't violate LIMIT PARTITION ROWS constraint", threw);
-        assertEquals(indexedColumnCount("T35A"), 0);
-
         // Test for T36
         assertTrue(findTableInSystemCatalogResults("T36"));
         resp = m_client.callProcedure("T36.insert", 1);
@@ -729,21 +682,6 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
         }
         assertFalse("Shouldn't violate UNIQUE constraint", threw);
         assertEquals(indexedColumnCount("T38"), 0);
-
-        // Test for T39
-        assertTrue(findTableInSystemCatalogResults("T39"));
-        resp = m_client.callProcedure("T39.insert", 1);
-        assertEquals(resp.getResults()[0].getRowCount(), 1);
-
-        threw = false;
-        try {
-            m_client.callProcedure("T39.insert", 2);
-        } catch (ProcCallException pce) {
-            pce.printStackTrace();
-            threw = true;
-        }
-        assertFalse("Shouldn't violate LIMIT PARTITION ROW constraint", threw);
-        assertEquals(indexedColumnCount("T39"), 0);
     }
 
     @Test
@@ -806,21 +744,6 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
             threw = true;
         }
         assertTrue("Shouldn't violate ASSUMEUNIQUE constraint", threw);
-
-        // Test for T43
-        assertTrue(findTableInSystemCatalogResults("T43"));
-        resp = m_client.callProcedure("T43.insert", 1);
-        assertEquals(resp.getResults()[0].getRowCount(), 1);
-
-        threw = false;
-        try {
-            m_client.callProcedure("T43.insert", 2);
-        } catch (ProcCallException pce) {
-            threw = true;
-        }
-        assertTrue("Shouldn't violate LIMIT PARTITION ROW constraint", threw);
-        assertEquals(indexedColumnCount("T43"), 0);
-
     }
 
     @Test

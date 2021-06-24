@@ -43,7 +43,6 @@ import org.voltdb.task.TaskScope;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.IndexType;
 import org.voltdb.types.VoltDecimalHelper;
-import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.InMemoryJarfile;
 
 public class JdbcDatabaseMetaDataGenerator
@@ -324,11 +323,6 @@ public class JdbcDatabaseMetaDataGenerator
                     if (type.equals("VIEW")) {
                         jsObj.put(JSON_SOURCE_TABLE, table.getMaterializer().getTypeName());
                     }
-                }
-
-                String deleteStmt = CatalogUtil.getLimitPartitionRowsDeleteStmt(table);
-                if (deleteStmt != null) {
-                    jsObj.put(JSON_LIMIT_PARTITION_ROWS_DELETE_STMT, deleteStmt);
                 }
 
                 if (table.getIsdred()) {

@@ -416,7 +416,7 @@ Table* TableCatalogDelegate::constructTableFromCatalog(catalog::Database const& 
     Table* table = TableFactory::getPersistentTable(
             databaseId, tableName.c_str(), schema, columnNames, m_signatureHash,
             m_materialized, partitionColumnIndex, m_tableType, tableAllocationTargetSize,
-            catalogTable.tuplelimit(), m_compactionThreshold, drEnabled, isReplicated);
+            m_compactionThreshold, drEnabled, isReplicated);
     PersistentTable* persistentTable = dynamic_cast<PersistentTable*>(table);
     if ( ! persistentTable) {
         vassert(pkeyIndexId.empty());

@@ -84,13 +84,6 @@ public class TestSystemCatalogSuite extends RegressionSuite {
                 json.get("partitionColumn").equals("A1") &&
                 json.get("sourceTable").equals("AA_T"));
 
-        results.advanceRow();
-        assertEquals("CC_T_WITH_EXEC_DELETE", results.get("TABLE_NAME", VoltType.STRING));
-        json = new JSONObject((String)results.get("REMARKS", VoltType.STRING));
-        assertTrue(json != null && json.length() == 2 &&
-                json.get("limitPartitionRowsDeleteStmt").equals("DELETE FROM CC_T_WITH_EXEC_DELETE WHERE A1=0;") &&
-                json.get("partitionColumn").equals("A1"));
-
         assertEquals(false, results.advanceRow());
     }
 
@@ -225,14 +218,8 @@ public class TestSystemCatalogSuite extends RegressionSuite {
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addLiteralSchema("CREATE TABLE AA_T(A1 INTEGER NOT NULL, A2 INTEGER, PRIMARY KEY(A1)); " +
                                  "CREATE VIEW BB_V(A1, S) AS SELECT A1, COUNT(*) FROM AA_T GROUP BY A1; " +
-                                 "CREATE TABLE CC_T_WITH_EXEC_DELETE "
-                                 + "(A1 INTEGER NOT NULL, "
-                                 + " A2 INTEGER, "
-                                 + "LIMIT PARTITION ROWS 5 "
-                                 + "EXECUTE (DELETE FROM CC_T_WITH_EXEC_DELETE WHERE A1 = 0));"
-                                 + "DR TABLE AA_T;");
+                                 "DR TABLE AA_T;");
         project.addPartitionInfo("AA_T", "A1");
-        project.addPartitionInfo("CC_T_WITH_EXEC_DELETE", "A1");
         project.addStmtProcedure("InsertA", "INSERT INTO AA_T VALUES(?,?);", "AA_T.A1: 0");
 
         LocalCluster lcconfig = new LocalCluster("getclusterinfo-cluster.jar", 2, 2, 1,

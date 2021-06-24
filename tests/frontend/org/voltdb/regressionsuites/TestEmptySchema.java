@@ -54,7 +54,7 @@ public class TestEmptySchema extends RegressionSuite
 
         // Even running should be an improvement (ENG-4645), but do something just to be sure
         // Also, check to be sure we get a full schema for the table and index stats
-        ColumnInfo[] expectedSchema = new ColumnInfo[15];
+        ColumnInfo[] expectedSchema = new ColumnInfo[13];
         expectedSchema[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
         expectedSchema[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
         expectedSchema[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
@@ -66,10 +66,8 @@ public class TestEmptySchema extends RegressionSuite
         expectedSchema[8] = new ColumnInfo("TUPLE_ALLOCATED_MEMORY", VoltType.BIGINT);
         expectedSchema[9] = new ColumnInfo("TUPLE_DATA_MEMORY", VoltType.BIGINT);
         expectedSchema[10] = new ColumnInfo("STRING_DATA_MEMORY", VoltType.BIGINT);
-        expectedSchema[11] = new ColumnInfo("TUPLE_LIMIT", VoltType.INTEGER);
-        expectedSchema[12] = new ColumnInfo("PERCENT_FULL", VoltType.INTEGER);
-        expectedSchema[13] = new ColumnInfo("DR", VoltType.STRING);
-        expectedSchema[14] = new ColumnInfo("EXPORT", VoltType.STRING);
+        expectedSchema[11] = new ColumnInfo("DR", VoltType.STRING);
+        expectedSchema[12] = new ColumnInfo("EXPORT", VoltType.STRING);
         VoltTable expectedTable = new VoltTable(expectedSchema);
 
         VoltTable[] results = client.callProcedure("@Statistics", "TABLE", 0).getResults();

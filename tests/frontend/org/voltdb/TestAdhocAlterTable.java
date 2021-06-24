@@ -612,39 +612,6 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
             }
             System.out.println(results);
             assertEquals(1, results.getRowCount());
-            results.advanceRow();
-            Long limit = results.getLong("TUPLE_LIMIT");
-            assertTrue(results.wasNull());
-            try {
-                m_client.callProcedure("@AdHoc",
-                        "alter table foo add limit partition rows 10;");
-            }
-            catch (ProcCallException pce) {
-                fail("Should be able to alter partition row limit: " + pce.toString());
-            }
-            do {
-                results = m_client.callProcedure("@Statistics", "TABLE", 0).getResults()[0];
-                results.advanceRow();
-                limit = results.getLong("TUPLE_LIMIT");
-            }
-            while (results.wasNull());
-            System.out.println(results);
-            assertEquals(10L, (long)limit);
-
-            try {
-                m_client.callProcedure("@AdHoc",
-                        "alter table foo drop limit partition rows;");
-            }
-            catch (ProcCallException pce) {
-                fail("Should be able to drop partition row limit: " + pce.toString());
-            }
-            do {
-                results = m_client.callProcedure("@Statistics", "TABLE", 0).getResults()[0];
-                results.advanceRow();
-                limit = results.getLong("TUPLE_LIMIT");
-            }
-            while (!results.wasNull());
-            System.out.println(results);
         }
         finally {
             teardownSystem();
@@ -1005,8 +972,6 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
             VoltTable indexes = m_client.callProcedure("@Statistics", "INDEX", 0).getResults()[0];
             VoltTable tables = null;
             assertEquals(0, indexes.getRowCount());
-            m_client.callProcedure("@AdHoc",
-                    "alter table FOO add constraint blarg LIMIT PARTITION ROWS 10;");
             // and an ASSUMEUNIQUE constraint (custom VoltDB constraint)
             m_client.callProcedure("@AdHoc",
                     "alter table FOO add constraint blerg ASSUMEUNIQUE(VAL);");
@@ -1019,8 +984,6 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
             // Only one host, one site/host, should only be one row in returned result
             indexes.advanceRow();
             assertEquals(1, indexes.getLong("IS_UNIQUE"));
-            tables.advanceRow();
-            assertEquals(10, tables.getLong("TUPLE_LIMIT"));
 
             // ENG-7242 - check that VoltDB constraints are preserved across alter table
             try {
@@ -1034,15 +997,6 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
                 fail("ALTER TABLE shouldn't drop ASSUMEUNIQUE from constraint blerg");
             }
 
-            // ENG-7242 - check the row limits on the table
-            // Spin until stats updates the table
-            do {
-                tables = m_client.callProcedure("@Statistics", "TABLE", 0).getResults()[0];
-            }
-            while (tables.getColumnCount() == 3);
-            tables.advanceRow();
-            assertEquals(10, tables.getLong("TUPLE_LIMIT"));
-
             // Make sure we can drop a named one (can't drop unnamed at the moment, haha)
             m_client.callProcedure("@AdHoc",
                     "alter table FOO drop constraint blerg;");
@@ -1052,10 +1006,6 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
                 tables = m_client.callProcedure("@Statistics", "TABLE", 0).getResults()[0];
             }
             while (indexes.getRowCount() != 0);
-            // Check row limits again...if we failed to copy it on the first alter table,
-            // it's definitely going to be bad here
-            tables.advanceRow();
-            assertEquals(10, tables.getLong("TUPLE_LIMIT"));
         }
         finally {
             teardownSystem();

@@ -11,7 +11,6 @@ select * from addable;
 
 drop table dropable if exists;
 create table dropable (
- limit partition rows 1,
  stable integer,
  constraint pk primary key (stable),
  altkey integer,
@@ -40,4 +39,3 @@ create table migratable migrate to target tar (id int);
 select * from migratable where not migrating;
 
 drop table migratable;
-
