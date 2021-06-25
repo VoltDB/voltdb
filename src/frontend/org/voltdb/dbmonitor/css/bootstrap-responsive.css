@@ -1179,7 +1179,21 @@
   border-bottom: none;
 }
 
-.hasSubLabel a:hover, a:focus {
-  color: white !important;
+#nav .hasSubLabel a:hover, a:focus {
+  color: #fff !important;
+  text-decoration: none !important;
+}
+
+.overviewTbl a:focus {
+  color: #005580 !important;
+  text-decoration: underline !important;
+}
+
+a.editOk, a.editCancel {
+  color: #fff !important;
+}
+
+a:hover.editOk, a:hover.editCancel {
+  color: #fff !important;
   text-decoration: none !important;
 }

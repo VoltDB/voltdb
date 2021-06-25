@@ -2753,7 +2753,7 @@ td.queryTimeOut span.unit {
     cursor: pointer;
     padding: 4px 6px;
     text-align: center;
-    color: #FFFFFF;
+    color: #FFFFFF !important;
     font: 12px Arial, Helvetica, sans-serif;
     text-shadow: none;
     text-decoration: none;
@@ -2763,7 +2763,7 @@ td.queryTimeOut span.unit {
 .editOk:hover,
 .editCancel:hover {
     background-color: #76bd1d;
-    color: #fff;
+    color: #fff !important;
 }
 .editOk,
 .editCancel {
@@ -4272,7 +4272,7 @@ ul#shutdownMsg li {
         cursor: pointer;
         padding: 4px 6px;
         text-align: center;
-        color: #FFFFFF;
+        color: #FFFFFF !important;
         font: 12px Arial, Helvetica, sans-serif;
         text-shadow: none;
         text-decoration: none;
@@ -4282,7 +4282,7 @@ ul#shutdownMsg li {
     .editOk:hover,
     .editCancel:hover {
         background-color: #76bd1d;
-        color: #fff;
+        color: #fff !important;
     }
     .editOkIcon {} .editCancelIcon {} .restoreRadio {
         border: 1px solid #CCCCCC;
