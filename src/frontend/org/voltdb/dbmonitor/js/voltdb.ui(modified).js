@@ -1153,7 +1153,7 @@ var loadPage = function (serverName, portid) {
 
         afterOpen: function () {
           $("#StopConfirmOK").unbind("click");
-          $("#StopConfirmOK").on("click", function () {
+          $(document).on("click", "#StopConfirmOK", function () {
             //API Request
             try {
               voltDbRenderer.stopServer(
@@ -1184,7 +1184,7 @@ var loadPage = function (serverName, portid) {
           });
 
           $("#StopConfirmCancel").unbind("click");
-          $("#StopConfirmCancel").on("click", function () {
+          $(document).on("click", "#StopConfirmCancel", function () {
             popup.close();
           });
         },

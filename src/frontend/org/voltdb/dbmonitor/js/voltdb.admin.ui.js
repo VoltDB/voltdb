@@ -11,12 +11,10 @@ var INT_MAX_VALUE = 2147483647;
 
 function getListOfRoles() {
     // Got to figure out what roles are available.
-    console.log("Do my role parsing here!");
     // Get schema...
     schematext = "";
     try {
         var schematext = $("#d").find(".dataBlockContent pre").html();
-        console.log("Schema: " + schematext);
     } catch (err) {
       console.log( "Can't get schema: " + err);
     }
@@ -24,7 +22,6 @@ function getListOfRoles() {
     // Parse schema
     var listOfRoles = ['ADMINISTRATOR','USER'];
     var schemaLines = schematext.split("\n");
-    console.log("Schema has " + schemaLines.length + " lines.");
     for (var i=0; i< schemaLines.length;i++) {
         var l = schemaLines[i];
         // Throw away comments
@@ -48,9 +45,7 @@ function getListOfRoles() {
         
     }
     var r = "";
-    console.log(listOfRoles.length + " roles.");
     for (var i=0;i<listOfRoles.length;i++) r += listOfRoles[i] + ", "; 
-    console.log("Roles: " + r);
     return listOfRoles;
 
 }
@@ -3235,7 +3230,7 @@ function loadAdminPage() {
             });
 
             $("#btnSaveConfigOk").unbind("click");
-            $("#btnSaveConfigOk").on("click", function () {
+            $(document).on("click", "#btnSaveConfigOk", function () {
                 var adminConfigurations = VoltDbAdminConfig.getLatestRawAdminConfigurations();
                 if ($("#expotSaveConfigText").data("status") == "delete") {
                     adminConfigurations["export"].configuration.splice(editId * 1, 1);
@@ -3586,7 +3581,7 @@ function loadAdminPage() {
             });
 
             $("#btnSaveImportConfigOk").unbind("click");
-            $("#btnSaveImportConfigOk").on("click", function () {
+            $(document).on("click", "#btnSaveImportConfigOk", function () {
                 var adminConfigurations = VoltDbAdminConfig.getLatestRawAdminConfigurations();
                 if ($("#importSaveConfigText").data("status") == "delete") {
                     adminConfigurations["import"].configuration.splice(editId * 1, 1);
