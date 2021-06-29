@@ -1609,6 +1609,7 @@ ul.topRightList li a:hover {
 .blockWrapper {
     margin-bottom: 20px;
     margin-top: 3px;
+    height: auto !important;
 }
 .objectExplorer {
     float: left;
