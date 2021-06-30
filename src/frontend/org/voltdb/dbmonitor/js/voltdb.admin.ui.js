@@ -565,7 +565,7 @@ function loadAdminPage() {
             parent.find(".labelCollapsed").toggleClass("labelExpanded");
 
             //Handle export configuration
-            if ($(this).text() == "Export") {
+            if ($(this).text().trim() == "Export") {
                 //If parent is closed, then hide export configuration
                 if (!parent.find('td:first-child > a').hasClass('labelExpanded')) {
                     adminEditObjects.exportConfiguration.hide();
@@ -578,7 +578,7 @@ function loadAdminPage() {
             }
 
             //Handle import configuration
-            if ($(this).text() == "Import") {
+            if ($(this).text().trim() == "Import") {
                 //If parent is closed, then hide export configuration
                 if (!parent.find('td:first-child > a').hasClass('labelExpanded')) {
                     adminEditObjects.importConfiguration.hide();
@@ -589,7 +589,7 @@ function loadAdminPage() {
             }
 
             //Handle import configuration
-            if ($(this).text() == "Advanced") {
+            if ($(this).text().trim() == "Advanced") {
                 //If parent is closed, then hide export configuration
                 if (!parent.find('td:first-child > a').hasClass('labelExpanded')) {
                     adminEditObjects.diskLimitConfiguration.hide();
