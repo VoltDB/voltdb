@@ -41,6 +41,11 @@ else()
 endif()
 cmake_minimum_required(VERSION 2.6.4)
 
+find_program(CCACHE_PROGRAM ccache)
+if(CCACHE_PROGRAM)
+    set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${CCACHE_PROGRAM}")
+endif()
+
 if (COMMAND set_up_hermetic_build)
   set_up_hermetic_build()
 endif()

@@ -49,6 +49,12 @@
 #
 ########################################################################
 CMAKE_MINIMUM_REQUIRED (VERSION 2.8.11 FATAL_ERROR)
+
+find_program(CCACHE_PROGRAM ccache)
+if(CCACHE_PROGRAM)
+    set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${CCACHE_PROGRAM}")
+endif()
+
 PROJECT(VoltDB_EE)
 
 include(${CMAKE_SOURCE_DIR}/tools/VoltDB.cmake)

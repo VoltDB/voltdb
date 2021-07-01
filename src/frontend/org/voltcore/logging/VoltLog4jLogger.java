@@ -236,11 +236,16 @@ public class VoltLog4jLogger implements CoreVoltLogger {
         rootLogger.removeAppender(oap.getName());
         rootLogger.addAppender(nap);
 
-        File oldFH = new File(oap.getFile());
-        if (oldFH.exists() && oldFH.isFile() && oldFH.length() == 0L && oldFH.delete()) {
-            File oldDH = oldFH.getParentFile();
-            if (oldDH.list().length == 0) {
-                oldDH.delete();
+        if (oap.getFile() != null) {
+            File oldFH = new File(oap.getFile());
+            if (oldFH.exists() && oldFH.isFile() && oldFH.length() == 0L && oldFH.delete()) {
+                File oldDH = oldFH.getParentFile();
+                if (oldDH != null) {
+                    String[] files = oldDH.list();
+                    if (files != null && files.length == 0) {
+                        oldDH.delete();
+                    }
+                }
             }
         }
 
