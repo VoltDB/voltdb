@@ -3580,7 +3580,7 @@ function loadAdminPage() {
                 $("#saveImportConfigConfirmation").show();
             });
 
-            $("#btnSaveImportConfigOk").unbind("click");
+            $(document).off("click","#btnSaveImportConfigOk");
             $(document).on("click", "#btnSaveImportConfigOk", function () {
                 var adminConfigurations = VoltDbAdminConfig.getLatestRawAdminConfigurations();
                 if ($("#importSaveConfigText").data("status") == "delete") {
