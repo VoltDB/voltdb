@@ -49,6 +49,18 @@ except ImportError as e:
     pyjks_available = False
     pyjks_exception = e
 
+logger = None
+
+def use_logging():
+    import logging
+    global logger
+    logger = logging.getLogger()
+
+def error(text):
+    if logger:
+        logger.error(text)
+    else:
+        print(text)
 
 decimal.getcontext().prec = 38
 
@@ -113,7 +125,7 @@ class ReadBuffer(object):
         try:
             values = struct.unpack_from(format, self._buf, self._off)
         except struct.error as e:
-            print(('Exception unpacking %d bytes using format "%s": %s' % (size, format, str(e))))
+            error('Exception unpacking %d bytes using format "%s": %s' % (size, format, str(e)))
             raise e
         self.shift(size)
         return values
@@ -229,7 +241,7 @@ class FastSerializer:
                 if ssl_available:
                     self.socket = self.__wrap_socket(ss)
                 else:
-                    print("ERROR: To use SSL functionality please install the Python ssl module.")
+                    error("ERROR: To use SSL functionality please install the Python ssl module.")
                     raise ssl_exception
             else:
                 self.socket = ss
@@ -238,7 +250,7 @@ class FastSerializer:
             try:
                 self.socket.connect(ai[4])
             except Exception:
-                print("ERROR: Failed to connect to %s port %s" % (ai[4][0], ai[4][1]))
+                error("ERROR: Failed to connect to %s port %s" % (ai[4][0], ai[4][1]))
                 raise
             #if self.usessl:
             #    print 'Cipher suite: ' + str(self.socket.cipher())
@@ -378,7 +390,7 @@ class FastSerializer:
 
     def __convert_jks_files(self, ss, jks_config):
         if not pyjks_available:
-            print("To use Java KeyStore please install the 'pyjks' module")
+            error("To use Java KeyStore please install the 'pyjks' module")
             raise pyjks_exception
 
         def write_pem(der_bytes, type, f):
@@ -482,7 +494,7 @@ class FastSerializer:
         try:
             self.bufferForRead()
         except IOError as e:
-            print("ERROR: Connection failed. Please check that the host, port, and ssl settings are correct.")
+            error("ERROR: Connection failed. Please check that the host, port, and ssl settings are correct.")
             raise e
         except socket.timeout:
             raise RuntimeError("Authentication timed out after %d seconds."
@@ -508,7 +520,7 @@ class FastSerializer:
                     try:
                         self.bufferForRead()
                     except IOError as e:
-                        print("ERROR: Connection failed. Please check that the host, port, and ssl settings are correct.")
+                        error("ERROR: Connection failed. Please check that the host, port, and ssl settings are correct.")
                         raise e
                     except socket.timeout:
                         raise RuntimeError("Authentication timed out after %d seconds."
@@ -524,7 +536,7 @@ class FastSerializer:
                 try:
                     self.bufferForRead()
                 except IOError as e:
-                    print("ERROR: Connection failed. Please check that the host, port, and ssl settings are correct.")
+                    error("ERROR: Connection failed. Please check that the host, port, and ssl settings are correct.")
                     raise e
                 except socket.timeout:
                     raise RuntimeError("Authentication timed out after %d seconds."
@@ -558,9 +570,9 @@ class FastSerializer:
                 self.kerberosprinciple = str(default_cred.name)
                 retval = True
             else:
-                print("ERROR: Kerberos principal found but login expired.")
+                error("ERROR: Kerberos principal found but login expired.")
         except gssapi.raw.misc.GSSError as e:
-            print("ERROR: unable to find default principal from Kerberos cache.")
+            error("ERROR: unable to find default principal from Kerberos cache.")
         return retval
 
     def setInputByteOrder(self, bom):
@@ -590,7 +602,7 @@ class FastSerializer:
 
     def flush(self):
         if self.socket is None:
-            print("ERROR: not connected to server.")
+            error("ERROR: not connected to server.")
             exit(-1)
 
         if self.dump_file != None:
@@ -601,7 +613,7 @@ class FastSerializer:
 
     def bufferForRead(self):
         if self.socket is None:
-            print("ERROR: not connected to server.")
+            error("ERROR: not connected to server.")
             exit(-1)
 
         # fully buffer a new length preceded message from socket
@@ -626,14 +638,14 @@ class FastSerializer:
 
     def read(self, type):
         if type not in self.READER:
-            print("ERROR: can't read wire type(%d) yet." % (type))
+            error("ERROR: can't read wire type(%d) yet." % (type))
             exit(-2)
 
         return self.READER[type]()
 
     def write(self, type, value):
         if type not in self.WRITER:
-            print("ERROR: can't write wire type(%d) yet." % (type))
+            error("ERROR: can't write wire type(%d) yet." % (type))
             exit(-2)
 
         return self.WRITER[type](value)
@@ -644,7 +656,7 @@ class FastSerializer:
 
     def writeWireType(self, type, value):
         if type not in self.WRITER:
-            print("ERROR: can't write wire type(%d) yet." % (type))
+            error("ERROR: can't write wire type(%d) yet." % (type))
             exit(-2)
 
         self.writeByte(type)
@@ -664,7 +676,7 @@ class FastSerializer:
 
     def readArray(self, type):
         if type not in self.ARRAY_READER:
-            print("ERROR: can't read wire type(%d) yet." % (type))
+            error("ERROR: can't read wire type(%d) yet." % (type))
             exit(-2)
 
         return self.ARRAY_READER[type]()
@@ -680,7 +692,7 @@ class FastSerializer:
             return
 
         if type not in self.ARRAY_READER:
-            print("ERROR: Unsupported date type (%d)." % (type))
+            error("ERROR: Unsupported date type (%d)." % (type))
             exit(-2)
 
         # serialize arrays of bytes as larger values to support
@@ -695,7 +707,7 @@ class FastSerializer:
 
     def writeWireTypeArray(self, type, array):
         if type not in self.ARRAY_READER:
-            print("ERROR: can't write wire type(%d) yet." % (type))
+            error("ERROR: can't write wire type(%d) yet." % (type))
             exit(-2)
 
         self.writeByte(type)
@@ -1517,7 +1529,7 @@ class VoltException:
         else:
             for i in range(0, self.length - 3 - 2 - self.message_len):
                 fser.readByte()
-            print("Python client deserialized unknown VoltException.")
+            error("Python client deserialized unknown VoltException.")
 
     def __str__(self):
         msgstr = "VoltException: type: %s\n" % self.typestr
