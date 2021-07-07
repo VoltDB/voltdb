@@ -120,7 +120,7 @@ $(document).ready(function () {
     cssChildRow: "tablesorter-childRow",
   });
 
-  $(".tableL1").on(".togglex", "click", function () {
+  $(".tableL1").on("click", ".togglex", function () {
     const id = $(this).attr("id");
     const topPage = id.split("-")[0];
     const dropDownId = "#" + id + "--dropdown";
@@ -147,7 +147,7 @@ $(document).ready(function () {
     return false;
   });
 
-  $(".tableL2").on(".togglex", "click", function () {
+  $(".tableL2").on("click", ".togglex", function () {
     const id = $(this).attr("id");
 
     console.log("l2click: " + id);
@@ -188,7 +188,7 @@ $(document).ready(function () {
     },
   });
 
-  $(".tableL3").on(".togglex", "click", function () {
+  $(".tableL3").on("click", ".togglex", function () {
     const id = $(this).attr("id");
     const topPage = id.split("-")[0];
     const dropDownId = "#" + id + "--dropdown";
@@ -214,7 +214,7 @@ $(document).ready(function () {
     cssChildRow: "tablesorter-childRow",
   });
 
-  $(".tableL4").on(".togglex", "click", function () {
+  $(".tableL4").on("click", ".togglex", function () {
     const id = $(this).attr("id");
     const topPage = id.split("-")[0];
     const dropDownId = "#" + id + "--dropdown";
