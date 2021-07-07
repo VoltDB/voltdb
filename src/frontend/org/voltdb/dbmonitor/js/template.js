@@ -296,7 +296,7 @@ $(document).ready(function () {
       "data:text/csv;charset=utf-8," + encodeURIComponent(content)
     );
     dl.setAttribute("download", "ddl.sql");
-    dl.trigger("click");
+    dl.click();
   });
 
   resetpage();
