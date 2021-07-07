@@ -180,6 +180,11 @@
 #                           static libraries and includes.
 ########################################################################
 
+find_program(CCACHE_PROGRAM ccache)
+if(CCACHE_PROGRAM)
+    set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${CCACHE_PROGRAM}")
+endif()
+
 CMAKE_MINIMUM_REQUIRED (VERSION 2.8.11 FATAL_ERROR)
 PROJECT(VoltDB)
 INCLUDE(ExternalProject)

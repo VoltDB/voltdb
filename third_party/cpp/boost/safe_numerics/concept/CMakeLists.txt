@@ -1,6 +1,12 @@
 ####################
 # add include headers to IDE
 
+
+find_program(CCACHE_PROGRAM ccache)
+if(CCACHE_PROGRAM)
+    set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${CCACHE_PROGRAM}")
+endif()
+
 set(USE_FOLDERS TRUE)
 
 file(GLOB include_files

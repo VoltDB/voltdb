@@ -52,6 +52,11 @@ else()
 endif()
 cmake_minimum_required(VERSION 2.6.4)
 
+find_program(CCACHE_PROGRAM ccache)
+if(CCACHE_PROGRAM)
+    set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${CCACHE_PROGRAM}")
+endif()
+
 if (POLICY CMP0063) # Visibility
   cmake_policy(SET CMP0063 NEW)
 endif (POLICY CMP0063)
