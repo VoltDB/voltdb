@@ -2933,6 +2933,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     void collectLocalNetworkMetadata() {
         boolean threw = false;
+        boolean isDebug = hostLog.isDebugEnabled();
         JSONStringer stringer = new JSONStringer();
         try {
             stringer.object();
@@ -2944,26 +2945,36 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
              * marshal them into JSON. Always put the ipv4 address first
              * so that the export client will use it
              */
-
             if (m_config.m_externalInterface.equals("")) {
+                hostLog.info("Enumerating interfaces");
                 LinkedList<NetworkInterface> interfaces = new LinkedList<>();
                 try {
                     Enumeration<NetworkInterface> intfEnum = NetworkInterface.getNetworkInterfaces();
                     while (intfEnum.hasMoreElements()) {
                         NetworkInterface intf = intfEnum.nextElement();
-                        if (intf.isLoopback() || !intf.isUp()) {
+                        if (isDebug) {
+                            hostLog.debug("Found interface " + intf);
+                        }
+                        if (intf.isLoopback()) {
+                            hostLog.debug("Skipping loopback interface");
+                            continue;
+                        }
+                        if (!intf.isUp()) {
+                            hostLog.debug("Interface is not up");
                             continue;
                         }
                         interfaces.offer(intf);
                     }
                 } catch (SocketException e) {
+                    hostLog.error("Exception from NetworkInterface.getNetworkInterfaces()", e);
                     throw new RuntimeException(e);
                 }
 
                 if (interfaces.isEmpty()) {
+                    hostLog.warn("Found no interfaces, so using 'localhost'");
                     stringer.value("localhost");
                 } else {
-
+                    boolean skippedLocal = false;
                     boolean addedIp = false;
                     while (!interfaces.isEmpty()) {
                         NetworkInterface intf = interfaces.poll();
@@ -2973,12 +2984,27 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         while (inetAddrs.hasMoreElements()) {
                             InetAddress addr = inetAddrs.nextElement();
                             if (addr instanceof Inet6Address) {
-                                inet6addr = (Inet6Address)addr;
-                                if (inet6addr.isLinkLocalAddress()) {
-                                    inet6addr = null;
+                                Inet6Address temp = (Inet6Address)addr;
+                                if (temp.isLinkLocalAddress()) {
+                                    hostLog.info("Ignoring link-local address " + temp);
+                                    skippedLocal = true;
+                                } else {
+                                    inet6addr = temp;
+                                    if (isDebug) {
+                                        hostLog.debug("Found IPv6 address " + inet6addr);
+                                    }
                                 }
                             } else if (addr instanceof Inet4Address) {
-                                inet4addr = (Inet4Address)addr;
+                                Inet4Address temp = (Inet4Address)addr;
+                                if (temp.isLinkLocalAddress()) {
+                                    hostLog.info("Ignoring link-local address " + temp);
+                                    skippedLocal = true;
+                                } else {
+                                    inet4addr = temp;
+                                    if (isDebug) {
+                                        hostLog.debug("Found IPv4 address " + inet4addr);
+                                    }
+                                }
                             }
                         }
                         if (inet4addr != null) {
@@ -2991,10 +3017,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         }
                     }
                     if (!addedIp) {
+                        hostLog.warn("Did not find any usable address on any active interface, so using 'localhost'");
+                        if (skippedLocal) {
+                            hostLog.warn("A link-local address was found but was ignored");
+                        }
                         stringer.value("localhost");
                     }
                 }
             } else {
+                hostLog.info("Using external interface " + m_config.m_externalInterface);
                 stringer.value(m_config.m_externalInterface);
             }
         } catch (Exception e) {
@@ -3003,6 +3034,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
         try {
             if (threw) {
+                hostLog.warn("Previous error encountered: using 'localhost'");
                 stringer = new JSONStringer();
                 stringer.object();
                 stringer.key("interfaces").array();
