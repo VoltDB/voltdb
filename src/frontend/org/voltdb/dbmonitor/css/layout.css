@@ -4804,3 +4804,15 @@ table.dataTable {top:0;}
     margin-bottom: 0px !important;
   }
 
+  #tabSQL a:focus {
+    color: #000 !important;
+  }
+
+  .headText1 a:focus {
+      color: #000 !important;
+  }
+
+  .headText1 a:hover {
+      color: #000 !important;
+  }
+
