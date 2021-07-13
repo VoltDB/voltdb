@@ -9,6 +9,56 @@ var editStates = {
 };
 var INT_MAX_VALUE = 2147483647;
 
+function getListOfRoles() {
+    // Got to figure out what roles are available.
+    // Get schema...
+    schematext = "";
+    try {
+        var schematext = $("#d").find(".dataBlockContent pre").html();
+    } catch (err) {
+      console.log( "Can't get schema: " + err);
+    }
+    
+    // Parse schema
+    var listOfRoles = ['ADMINISTRATOR','USER'];
+    var schemaLines = schematext.split("\n");
+    for (var i=0; i< schemaLines.length;i++) {
+        var l = schemaLines[i];
+        // Throw away comments
+        var pos = l.indexOf("--");
+        if (pos >= 0) schemaLines[i] = l.substring(0,pos);
+    }
+    schematext = schemaLines.join(" ");
+        // compress spaces, split statements
+    var statements = schematext.replace(/\s+/g, ' ').split(";");
+        
+    for (var j=0; j < statements.length;j++) {
+        var tokens = statements[j].trim().split(" ");
+        if (tokens.length > 2) {
+            if (tokens[0].toUpperCase() == "CREATE") {
+                if (tokens[1].toUpperCase() == "ROLE") {
+                    listOfRoles.push(tokens[2].toUpperCase());
+                }
+            }
+        }
+
+        
+    }
+    var r = "";
+    for (var i=0;i<listOfRoles.length;i++) r += listOfRoles[i] + ", "; 
+    return listOfRoles;
+
+}
+
+function rolehtml(){
+    var roles = getListOfRoles();
+    var role_options = "";
+    for (var i=0;i<roles.length;i++) {
+        role_options += '<option value="' + roles[i] + '">' + roles[i] + '</option>';
+    }
+    return role_options
+}
+
 function loadAdminPage() {
     adminClusterObjects = {
         btnClusterPause: $('#pauseConfirmation'),
@@ -515,7 +565,7 @@ function loadAdminPage() {
             parent.find(".labelCollapsed").toggleClass("labelExpanded");
 
             //Handle export configuration
-            if ($(this).text() == "Export") {
+            if ($(this).text().trim() == "Export") {
                 //If parent is closed, then hide export configuration
                 if (!parent.find('td:first-child > a').hasClass('labelExpanded')) {
                     adminEditObjects.exportConfiguration.hide();
@@ -528,7 +578,7 @@ function loadAdminPage() {
             }
 
             //Handle import configuration
-            if ($(this).text() == "Import") {
+            if ($(this).text().trim() == "Import") {
                 //If parent is closed, then hide export configuration
                 if (!parent.find('td:first-child > a').hasClass('labelExpanded')) {
                     adminEditObjects.importConfiguration.hide();
@@ -539,7 +589,7 @@ function loadAdminPage() {
             }
 
             //Handle import configuration
-            if ($(this).text() == "Advanced") {
+            if ($(this).text().trim() == "Advanced") {
                 //If parent is closed, then hide export configuration
                 if (!parent.find('td:first-child > a').hasClass('labelExpanded')) {
                     adminEditObjects.diskLimitConfiguration.hide();
@@ -3180,7 +3230,7 @@ function loadAdminPage() {
             });
 
             $("#btnSaveConfigOk").unbind("click");
-            $("#btnSaveConfigOk").on("click", function () {
+            $(document).on("click", "#btnSaveConfigOk", function () {
                 var adminConfigurations = VoltDbAdminConfig.getLatestRawAdminConfigurations();
                 if ($("#expotSaveConfigText").data("status") == "delete") {
                     adminConfigurations["export"].configuration.splice(editId * 1, 1);
@@ -3530,8 +3580,8 @@ function loadAdminPage() {
                 $("#saveImportConfigConfirmation").show();
             });
 
-            $("#btnSaveImportConfigOk").unbind("click");
-            $("#btnSaveImportConfigOk").on("click", function () {
+            $(document).off("click","#btnSaveImportConfigOk");
+            $(document).on("click", "#btnSaveImportConfigOk", function () {
                 var adminConfigurations = VoltDbAdminConfig.getLatestRawAdminConfigurations();
                 if ($("#importSaveConfigText").data("status") == "delete") {
                     adminConfigurations["import"].configuration.splice(editId * 1, 1);
@@ -4516,8 +4566,7 @@ function loadAdminPage() {
                                     '<td>Roles </td> ' +
                                     '<td>' +
                                         '<select id="selectRole">' +
-                                            '<option value="administrator" selected="selected">Administrator</option>' +
-                                            '<option value="user">User</option>' +
+                                            rolehtml() +
                                         '</select>  ' +
                                     '</td> ' +
                                     '<td>&nbsp;</td>' +
@@ -4573,7 +4622,7 @@ function loadAdminPage() {
             });
 
             $("#btnSaveSecUser").unbind("click");
-            $("#btnSaveSecUser").on("click", function () {
+            $(document).on("click","#btnSaveSecUser", function () {
                 var username = $('#txtOrgUser').val();
                 var newUsername = $('#txtUser').val();
                 var password = encodeURIComponent($('#txtPassword').val());

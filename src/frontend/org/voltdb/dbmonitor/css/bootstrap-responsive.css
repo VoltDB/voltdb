@@ -99,6 +99,29 @@
   display: none !important;
 }
 
+.viewSelect {
+  display: flex;
+}
+
+.viewSelect label {
+  margin: 2px 10px 0 0;
+}
+
+.serverStat-ht li {
+  line-height: 31px !important;
+}
+
+.search-ht{
+  height: 40px !important;
+}
+
+.drT-title{
+  width: 130px !important;
+  height: 20px !important;
+  background-position-x: 0% !important;
+  background-position-y: -1046px !important;
+}
+
 @media print {
   .visible-print {
     display: inherit !important;
@@ -131,7 +154,10 @@
   .navbar-static-top .container,
   .navbar-fixed-top .container,
   .navbar-fixed-bottom .container {
-    width: 1170px;
+    width: 98% !important;
+  }
+  #containerMain {
+    width: 98% !important;
   }
   .span12 {
     width: 1170px;
@@ -1107,3 +1133,67 @@
   }
 }
 
+.searchLeft{
+    height: 30px;
+    padding-top: 14px;
+}
+
+.hasSubLabel a{
+  color: #08c !important; 
+  text-decoration: none !important;
+}
+
+.hasSubLabel a:hover, a:focus {
+    color: #005580 !important;
+    text-decoration: underline !important;
+}
+
+.icon-alert {
+  background: url('../images/glyphicons-halflings.png') no-repeat -134px -111px;
+  width: 12px;
+  height: 20px;
+  vertical-align: middle;
+  padding-top: 11px;
+  border-bottom: none;
+}
+
+.popupTitleStyle {
+  font-size: 14px;
+}
+
+.popup_close {
+  right: 5px;
+  top: 5px;
+}
+
+.addConfigHeader {
+  width: 200px;
+}
+
+.icon-confirmation {
+  background: url('../images/glyphicons-halflings.png') no-repeat 10px -112px;
+  width: 8px;
+  height: 18px;
+  vertical-align: middle;
+  padding-top: 11px;
+  border-bottom: none;
+}
+
+#nav .hasSubLabel a:hover, a:focus {
+  color: #fff !important;
+  text-decoration: none !important;
+}
+
+.overviewTbl a:focus {
+  color: #005580 !important;
+  text-decoration: underline !important;
+}
+
+a.editOk, a.editCancel {
+  color: #fff !important;
+}
+
+a:hover.editOk, a:hover.editCancel {
+  color: #fff !important;
+  text-decoration: none !important;
+}

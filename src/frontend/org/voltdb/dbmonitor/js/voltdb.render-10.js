@@ -175,7 +175,7 @@ function alertNodeClicked(obj) {
                 }
             });
 
-            $('#username').keypress(function (e) {
+            $('#username').on('keypress',function (e) {
                 var key = e.which;
                 if (key == 13) { // the enter key code
                     $("#LoginBtn").trigger("click");
@@ -183,13 +183,14 @@ function alertNodeClicked(obj) {
                 }
                 return true;
             });
-            $('#password').keypress(function (e) {
-                var key = e.which;
-                if (key == 13) { // the enter key code
-                    $("#LoginBtn").trigger("click");
-                    return false;
-                }
-                return true;
+            $("#password").on("keypress", function (e) {
+              var key = e.which;
+              if (key == 13) {
+                // the enter key code
+                $("#LoginBtn").trigger("click");
+                return false;
+              }
+              return true;
             });
 
             var username = (VoltDbUI.getCookie("username") != undefined) ? VoltDbUI.getCookie("username") : "";
@@ -862,7 +863,7 @@ function alertNodeClicked(obj) {
 
                 if (!$("#loginWarningPopup").is(":visible")) {
                     $("#loginWarningPopupMsg").text("Security settings have been changed. You no longer have permission to view this page.");
-                    $("#loginWarnPopup").click();
+                    $("#loginWarnPopup").trigger('click');
                 }
                 return;
             } else if (connection.Metadata['@SystemInformation_OVERVIEW'] == null) {
@@ -1029,8 +1030,9 @@ function alertNodeClicked(obj) {
                 schemaCatalogTableTypes[tableName]['TABLE_NAME'] = entry[tableNameIndex];
 
                 if (entry[remarksIndex] != null) {
-                    schemaCatalogTableTypes[tableName]['REMARKS'] = jQuery.parseJSON(entry[remarksIndex]).partitionColumn != null ? "PARTITIONED" : "REPLICATED";
-                    schemaCatalogTableTypes[tableName]['drEnabled'] = jQuery.parseJSON(entry[remarksIndex]).drEnabled;
+                    schemaCatalogTableTypes[tableName]['REMARKS'] = JSON.parse(entry[remarksIndex]).partitionColumn != null ? "PARTITIONED" : "REPLICATED";
+                    schemaCatalogTableTypes[tableName]["drEnabled"] =
+                      JSON.parse(entry[remarksIndex]).drEnabled;
                 } else {
                     schemaCatalogTableTypes[tableName]['REMARKS'] = "REPLICATED";
                 }
@@ -3108,17 +3110,17 @@ function alertNodeClicked(obj) {
 
 //Navigation responsive
 $(function () {
-    $('#toggleMenu').click(function () {
+    $('#toggleMenu').on('click',function () {
         $("#nav").slideToggle('slow');
         $("#nav").css('left', '0');
-        $("#nav ul li").click(function () {
-            $("#nav").css('display', 'none');
-            $(window).resize();
+        $("#nav ul li").on("click", function () {
+          $("#nav").css("display", "none");
+          $(window).trigger("resize");
         });
     });
 });
 
-$(window).resize(function () {
+$(window).on('resize',function () {
     var windowWidth = $(window).width();
     if (windowWidth > 699) {
         $("#nav").css('display', 'block');

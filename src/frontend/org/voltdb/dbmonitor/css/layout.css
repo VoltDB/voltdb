@@ -1609,6 +1609,7 @@ ul.topRightList li a:hover {
 .blockWrapper {
     margin-bottom: 20px;
     margin-top: 3px;
+    height: auto !important;
 }
 .objectExplorer {
     float: left;
@@ -2753,7 +2754,7 @@ td.queryTimeOut span.unit {
     cursor: pointer;
     padding: 4px 6px;
     text-align: center;
-    color: #FFFFFF;
+    color: #FFFFFF !important;
     font: 12px Arial, Helvetica, sans-serif;
     text-shadow: none;
     text-decoration: none;
@@ -2763,7 +2764,7 @@ td.queryTimeOut span.unit {
 .editOk:hover,
 .editCancel:hover {
     background-color: #76bd1d;
-    color: #fff;
+    color: #fff !important;
 }
 .editOk,
 .editCancel {
@@ -3840,7 +3841,7 @@ generateProcedureDate { float:right;padding-right: 85px;}
     border: 1px solid #ccc;
     font: medium -moz-fixed;
     font: -webkit-small-control;
-    height: 170px;
+    height: 170px !important;
     overflow: auto;
     padding: 2px;
     resize: vertical;
@@ -4272,7 +4273,7 @@ ul#shutdownMsg li {
         cursor: pointer;
         padding: 4px 6px;
         text-align: center;
-        color: #FFFFFF;
+        color: #FFFFFF !important;
         font: 12px Arial, Helvetica, sans-serif;
         text-shadow: none;
         text-decoration: none;
@@ -4282,7 +4283,7 @@ ul#shutdownMsg li {
     .editOk:hover,
     .editCancel:hover {
         background-color: #76bd1d;
-        color: #fff;
+        color: #fff !important;
     }
     .editOkIcon {} .editCancelIcon {} .restoreRadio {
         border: 1px solid #CCCCCC;
@@ -4798,3 +4799,28 @@ table.dataTable {top:0;}
   overflow: auto;
   height: 250px;
 }
+
+  .tabs-filter-wrapperDR {
+    margin-bottom: 0px !important;
+  }
+
+  #tabSQL a:focus {
+    color: #000 !important;
+  }
+
+  .headText1 a:focus {
+      color: #000 !important;
+  }
+
+  .headText1 a:hover {
+      color: #000 !important;
+  }
+
+  #tabAnalysis a:focus {
+    color: #000 !important;
+    }
+
+#schema a:focus{
+    color: #000 !important;
+}
+
