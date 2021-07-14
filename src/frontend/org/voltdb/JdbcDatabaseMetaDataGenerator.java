@@ -535,7 +535,7 @@ public class JdbcDatabaseMetaDataGenerator
             for ( String field : group.getFields()) {
                 if((Boolean)group.getField(field)) {
                     permissions.append(sep).append(field);
-                   sep = ",";
+                    sep = ",";
                 }
             }
             results.addRow(group.getTypeName(),
