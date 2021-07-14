@@ -514,16 +514,12 @@ public class JdbcDatabaseMetaDataGenerator
 
     VoltTable getUsers() {
         VoltTable results = new VoltTable(USER_SCHEMA);
-        for (User user : m_database.getUsers())
-        {
+        for (User user : m_database.getUsers()) {
             StringBuilder roles = new StringBuilder();
-            boolean st=true;
+            String sep = "";
             for (GroupRef role : user.getGroups()) {
-                if(!st) {
-                   roles.append(',');
-                }
-                roles.append(role.getTypeName());
-                st = false;
+                roles.append(sep).append(role.getTypeName());
+                sep = ",";
             }
             results.addRow(user.getTypeName(),
                            roles.toString());
@@ -533,17 +529,13 @@ public class JdbcDatabaseMetaDataGenerator
 
     VoltTable getRoles() {
         VoltTable results = new VoltTable(ROLE_SCHEMA);
-        for (Group group : m_database.getGroups())
-        {
+        for (Group group : m_database.getGroups()) {
             StringBuilder permissions = new StringBuilder();
-            boolean st=true;
+            String sep = "";
             for ( String field : group.getFields()) {
-                if(!st) {
-                    permissions.append(',');
-                }
                 if((Boolean)group.getField(field)) {
-                    permissions.append(field);
-                    st = false;
+                    permissions.append(sep).append(field);
+                   sep = ",";
                 }
             }
             results.addRow(group.getTypeName(),
