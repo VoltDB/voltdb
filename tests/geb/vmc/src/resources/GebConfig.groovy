@@ -30,6 +30,9 @@ import org.openqa.selenium.ie.InternetExplorerDriver
 import org.openqa.selenium.phantomjs.PhantomJSDriver
 import org.openqa.selenium.safari.SafariDriver
 
+import org.openqa.selenium.chrome.ChromeOptions
+import org.openqa.selenium.remote.DesiredCapabilities
+
 // Returns the specified project property value, if it is defined; otherwise,
 // returns the specified default value
 def getProjectPropertyOrDefaultValue(String projectPropertyName, Object defaultValue) {
@@ -53,9 +56,33 @@ environments {
         driver = { new FirefoxDriver() }
     }
 
+/*
+* As of 2018, phantomjs support is deprecated in favor of "headless" chrome or firefox.
+* You start headless Chrome by setting options.
+* The run.sh converts "--headless" to an environment variable so we can
+* run chrome in either mode.
+*/
+
     chrome {
-        driver = { new ChromeDriver() }
+        def isHeadless = System.getenv("HEADLESS");
+        if(isHeadless == "TRUE") {
+            ChromeOptions options = new ChromeOptions()
+            DesiredCapabilities capabilities = DesiredCapabilities.chrome()
+            /*
+            String chromiumPath = "/usr/bin/chromium-browser"
+            String macChromePath = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+            def chromiumBinary = new File(chromiumPath)
+            def isAgent = chromiumBinary.exists()
+            def macChromeBinary = new File(macChromePath)
+            */
+            options.addArguments("headless")
+            capabilities.setCapability(ChromeOptions.CAPABILITY, options)
+            driver = { new ChromeDriver(capabilities) }
+         } else {
+            driver = { new ChromeDriver() }
+        };
     }
+
 
     ie {
         driver = { new InternetExplorerDriver() }

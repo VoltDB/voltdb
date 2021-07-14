@@ -373,6 +373,7 @@ run-test-tools
 FIRST_ARGS=
 MIDDLE_ARGS=
 LAST_ARGS=
+
 while [[ -n "$1" ]]; do
     CMD="$1"
     FOUND_RERUN_TASKS=false
@@ -394,6 +395,11 @@ while [[ -n "$1" ]]; do
             elif [[ "$2" == "--importer" ]] || [[ "$2" == "-importer" ]]; then
                 # "--importer" is short for "-Pimporter=true"
                 FIRST_ARGS="${FIRST_ARGS} -Pimporter=true"
+            elif [[ "$2" == "--headless" ]] || [[ "$2" == "-headless" ]]; then
+                # Changes the meaning of the browser selection
+                export HEADLESS="TRUE"
+                # HEADLESS=true
+
             elif [[ "$2" == --* ]]; then
                 LAST_ARGS="${LAST_ARGS} $2"
                 if [[ "$item" == "--rerun-tasks" ]]; then
@@ -410,6 +416,7 @@ while [[ -n "$1" ]]; do
         if [[ -z "${MIDDLE_ARGS}" ]]; then
             MIDDLE_ARGS=" chrome"
         fi
+
         # Make sure the "--rerun-tasks" arg is included, if not specified explicitly
         if [[ "$FOUND_RERUN_TASKS" == false ]]; then
             LAST_ARGS="${LAST_ARGS} --rerun-tasks"
