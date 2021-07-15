@@ -2459,6 +2459,15 @@ function alertNodeClicked(obj) {
             });
         };
 
+        var check_hostid = function (hostId) {
+            $.each(VoltDbAdminConfig.servers, function(id,val){
+                if (val['hostId'] == hostId){
+                    return true;
+                }
+            });
+            return false;
+        };
+
         var getAdminServerList = function () {
             var htmlServerListHtml = "";
             var serverDetails;
@@ -2471,8 +2480,7 @@ function alertNodeClicked(obj) {
                 var count = 0;
                 var stopperServerCount = 0;
                 if ((VoltDbAdminConfig.servers != "" || VoltDbAdminConfig.servers != null || VoltDbAdminConfig.servers != undefined)
-                    && VoltDbAdminConfig.servers.length > 0) {
-
+                    && VoltDbAdminConfig.servers.length > 0 && check_hostid(hostId)) {
                     $.each(VoltDbAdminConfig.servers, function (id, value) {
                         {
                             if (value.serverName != serverInfo['HOSTNAME'] && count == VoltDbAdminConfig.servers.length - 1) {
@@ -2498,8 +2506,10 @@ function alertNodeClicked(obj) {
                     });
 
                 } else {
-                    serverDetails = new VoltDbAdminConfig.server(hostId, serverInfo['HOSTNAME'], serverInfo['CLUSTERSTATE'], serverInfo['IPADDRESS']);
-                    VoltDbAdminConfig.servers[count] = serverDetails;
+                    var hostname = serverInfo['HOSTNAME'];
+                    serverDetails = new VoltDbAdminConfig.server(hostId, hostname, serverInfo['CLUSTERSTATE'], serverInfo['IPADDRESS']);
+                    VoltDbAdminConfig.servers.push(serverDetails);
+                    count++;
                 }
             };
 
