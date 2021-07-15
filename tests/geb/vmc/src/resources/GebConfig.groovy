@@ -31,6 +31,7 @@ import org.openqa.selenium.phantomjs.PhantomJSDriver
 import org.openqa.selenium.safari.SafariDriver
 
 import org.openqa.selenium.chrome.ChromeOptions
+import org.openqa.selenium.firefox.FirefoxOptions
 import org.openqa.selenium.remote.DesiredCapabilities
 
 // Returns the specified project property value, if it is defined; otherwise,
@@ -52,29 +53,31 @@ waiting {
 
 environments {
 
-    firefox {
-        driver = { new FirefoxDriver() }
-    }
-
 /*
 * As of 2018, phantomjs support is deprecated in favor of "headless" chrome or firefox.
-* You start headless Chrome by setting options.
+* You start headless Chrome and Firefox by setting options.
 * The run.sh converts "--headless" to an environment variable so we can
 * run chrome in either mode.
 */
+
+    firefox {
+        def isHeadless = System.getenv("HEADLESS");
+        if(isHeadless == "TRUE") {
+            FirefoxOptions options = new FirefoxOptions()
+            DesiredCapabilities capabilities = DesiredCapabilities.firefox()
+            options.addArguments("-headless")
+            //capabilities.setCapability(FirefoxOptions.CAPABILITY, options)
+            driver = { new FirefoxDriver(options) }
+         } else {
+           driver = { new FirefoxDriver() }
+        }
+    }
 
     chrome {
         def isHeadless = System.getenv("HEADLESS");
         if(isHeadless == "TRUE") {
             ChromeOptions options = new ChromeOptions()
             DesiredCapabilities capabilities = DesiredCapabilities.chrome()
-            /*
-            String chromiumPath = "/usr/bin/chromium-browser"
-            String macChromePath = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-            def chromiumBinary = new File(chromiumPath)
-            def isAgent = chromiumBinary.exists()
-            def macChromeBinary = new File(macChromePath)
-            */
             options.addArguments("headless")
             capabilities.setCapability(ChromeOptions.CAPABILITY, options)
             driver = { new ChromeDriver(capabilities) }
