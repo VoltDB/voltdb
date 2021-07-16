@@ -108,6 +108,8 @@ public class VoltDBKafkaPartitioner extends DefaultPartitioner {
             urls = configs.getList(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG);
             useDefault = true;
         }
+
+        boolean connected = false;
         for (String connection : urls) {
             if (useDefault) {
                 HostAndPort url = HostAndPort.fromString(connection);
@@ -115,9 +117,14 @@ public class VoltDBKafkaPartitioner extends DefaultPartitioner {
             }
             try {
                 m_client.createConnection(connection);
+                connected = true;
             } catch (IOException e) {
-                throw new KafkaException("Failed to create connections to VoltDB cluster", e);
+                String fmt = "Failed to open connection to VoltDB host at %s: %s";
+                LOG.warning(String.format(fmt, connection, e.getMessage()));
             }
+        }
+        if (!connected) {
+            throw new KafkaException(String.format("Failed to connect to any VoltDB host in %s", urls));
         }
     }
 
@@ -139,7 +146,7 @@ public class VoltDBKafkaPartitioner extends DefaultPartitioner {
             // There could be a window within which a topic is created and immediately dropped so that the topic
             // is not found. Or the topic is not created.
             if (entry == null) {
-                throw new KafkaException(String.format("Topic % is not found.", topic));
+                throw new KafkaException(String.format("Topic %s is not found.", topic));
             }
         }
 

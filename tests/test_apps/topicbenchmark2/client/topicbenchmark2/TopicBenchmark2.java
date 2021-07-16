@@ -71,10 +71,16 @@ import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ClientStatusListenerExt;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.client.ProcedureCallback;
+import org.voltdb.client.ClientStatusListenerExt.AutoConnectionStatus;
+import org.voltdb.client.ClientStatusListenerExt.DisconnectCause;
 import org.voltdb.client.topics.VoltDBKafkaPartitioner;
 import org.voltdb.serdes.FieldDescription;
+import org.voltdb.utils.MiscUtils;
 
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -266,6 +272,27 @@ public class TopicBenchmark2 {
         }
     }
 
+    private class StatusListener extends ClientStatusListenerExt {
+
+        @Override
+        public void uncaughtException(ProcedureCallback callback, ClientResponse resp, Throwable e) {
+            exitWithException("Uncaught exception in procedure callback ", new Exception(e));
+
+        }
+
+        @Override
+        public void connectionCreated(String hostname, int port, AutoConnectionStatus status) {
+            log.info(String.format("Connection to %s:%d created: %s",
+                    hostname, port, status));
+        }
+
+        @Override
+        public void connectionLost(String hostname, int port, int connectionsLeft, DisconnectCause cause) {
+            log.warn(String.format("Connection to %s:%d lost (%d connections left): %s",
+                    hostname, port, connectionsLeft, cause));
+        }
+    }
+
     /**
      * Clean way of exiting from an exception
      * @param message   Message to accompany the exception
@@ -281,7 +308,7 @@ public class TopicBenchmark2 {
         if (stackTrace) {
             e.printStackTrace();
         }
-        System.exit(-1);
+        System.exit(1);
     }
 
     /**
@@ -292,10 +319,9 @@ public class TopicBenchmark2 {
     TopicBenchmark2(TopicBenchConfig config) {
         this.m_config = config;
         if (!m_config.usekafka) {
-            ClientConfig clientConfig = new ClientConfig();
+            ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
             clientConfig.setReconnectOnConnectionLoss(true);
             clientConfig.setTopologyChangeAware(true);
-            clientConfig.setClientAffinity(true);
             m_client = ClientFactory.createClient(clientConfig);
         }
 
@@ -436,27 +462,44 @@ public class TopicBenchmark2 {
      * Connect to a single server.
      *
      * @param server hostname:port or just hostname (hostname can be ip).
+     * @return {@code true} if connected
      */
-    void connectToOneServer(String server) {
+    boolean connectToOneServer(String server) {
         try {
             m_client.createConnection(server);
         }
         catch (IOException e) {
-            log.info("Connection to " + server + " failed");
-            return;
+            log.info("Connection to " + server + " failed: " + e);
+            return false;
         }
         log.info("Connected to VoltDB node at: " + server);
+        return true;
     }
 
     /**
      * @param servers A comma separated list of servers using the hostname:port
-     * syntax (where :port is optional).
+     * syntax (where :port is optional). Exits if unable to connect to any host.
+     *
      * @throws InterruptedException if anything bad happens with the threads.
      */
     void connect(String servers) throws InterruptedException {
         String[] serverArray = servers.split(",");
-        log.info("Connecting to VoltDB Server..." + serverArray[0]);
-        connectToOneServer(serverArray[0]);
+        ArrayList<String> voltServers = new ArrayList<>();
+        for (String server : serverArray) {
+            if (!StringUtils.isBlank(server)) {
+                voltServers.add(server);
+            }
+        }
+
+        boolean connected = false;
+        for (String voltServer : voltServers) {
+            log.info("Connecting to VoltDB node at: " + voltServer);
+            connected |= connectToOneServer(voltServer);
+        }
+        if (!connected) {
+            log.error("Failed to connect to any VoltDB host in " + voltServers);
+            System.exit(1);
+        }
     }
 
     /**
@@ -1037,7 +1080,7 @@ public class TopicBenchmark2 {
 
         if (m_failedInserts.get() != 0) {
             log.error("Test client failed");
-            System.exit(-1);
+            System.exit(1);
         } else {
             log.info("Test client finished successfully");
             System.exit(0);
