@@ -1152,7 +1152,7 @@ var loadPage = function (serverName, portid) {
         content: "#stopConfirmationPop",
 
         afterOpen: function () {
-          $("#StopConfirmOK").unbind("click");
+          $(document).off("click", "#StopConfirmOK");
           $(document).on("click", "#StopConfirmOK", function () {
             //API Request
             try {
