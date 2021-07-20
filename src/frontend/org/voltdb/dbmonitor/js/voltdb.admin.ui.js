@@ -3913,8 +3913,8 @@ function loadAdminPage() {
                 $("#saveConfigConfirmation").show();
             });
 
-            $("#btnSaveDiskLimitOk").unbind("click");
-            $("#btnSaveDiskLimitOk").on("click", function () {
+            $(document).off("click", "#btnSaveDiskLimitOk");
+            $(document).on("click", "#btnSaveDiskLimitOk", function () {
 
 
                 var adminConfigurations = VoltDbAdminConfig.getLatestRawAdminConfigurations();

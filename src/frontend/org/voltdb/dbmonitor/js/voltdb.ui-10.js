@@ -1177,7 +1177,7 @@ var loadPage = function (serverName, portid) {
                 }
               );
             } catch (error) {
-              /*Ignore error.*/
+              console.log(error);
             }
             //Close the popup
             $($(this).siblings()[0]).trigger("click");
