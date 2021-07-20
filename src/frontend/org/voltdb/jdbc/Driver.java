@@ -42,13 +42,15 @@ public class Driver implements java.sql.Driver
     public static final String JDBC_PROP_FILE_ENV = "VOLTDB_JDBC_PROPERTIES";
     public static final String JDBC_PROP_FILE_PROP = "voltdb.jdbcproperties";
     public static final String DEFAULT_PROP_FILENAME = "voltdb.properties";
+
+    public static final String SSL_PROP= "ssl";
+    public static final String TRUSTSTORE_CONFIG_PROP = "truststore";
+    public static final String TRUSTSTORE_PASSWORD_PROP = "truststorepassword";
+    public static final String KERBEROS_CONFIG_PROP = "kerberos";
+    public static final String TOPOLOGY_CHANGE_AWARE = "topologychangeaware";
+
     //Driver URL prefix.
     private static final String URL_PREFIX = "jdbc:voltdb:";
-
-    static final String SSL_PROP= "ssl";
-    static final String TRUSTSTORE_CONFIG_PROP = "truststore";
-    static final String TRUSTSTORE_PASSWORD_PROP = "truststorepassword";
-    static final String KERBEROS_CONFIG_PROP = "kerberos";
 
     // Static so it's unit-testable, yes, lazy me
     static String[] getServersFromURL(String url) {
@@ -144,6 +146,7 @@ public class Driver implements java.sql.Driver
                 String truststorePath = null;
                 String truststorePassword = null;
                 String kerberosConfig = null;
+                boolean topologyChangeAware = false;
 
                 for (Enumeration<?> e = info.propertyNames(); e.hasMoreElements();)
                 {
@@ -177,6 +180,9 @@ public class Driver implements java.sql.Driver
                             kerberosConfig = value.trim();
                         }
                     }
+                    else if (key.toLowerCase().equals(TOPOLOGY_CHANGE_AWARE)){
+                        topologyChangeAware = Boolean.valueOf(value);
+                    }
                     // else - unknown; ignore
                 }
                 SSLConfiguration.SslConfig sslConfig = null;
@@ -187,7 +193,7 @@ public class Driver implements java.sql.Driver
                 // Return JDBC connection wrapper for the client
                 return  new JDBC4Connection(JDBC4ClientConnectionPool.get(servers, user, password,
                                                                           heavyweight, maxoutstandingtxns, reconnectOnConnectionLoss, sslConfig,
-                                                                          kerberosConfig),
+                                                                          kerberosConfig, topologyChangeAware),
                                             info);
 
             } catch (Exception x) {

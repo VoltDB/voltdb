@@ -436,7 +436,7 @@ public class ClientConfig {
      * @param on Enable or disable the reconnection feature. Default is off.
      */
     public void setReconnectOnConnectionLoss(boolean on) {
-        this.m_reconnectOnConnectionLoss = on;
+        this.m_reconnectOnConnectionLoss |= on;
     }
 
     /**
