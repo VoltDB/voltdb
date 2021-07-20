@@ -308,6 +308,7 @@
                             try {
                                 onCompleteHandler[0](onCompleteHandler[1], success);
                             } catch (x) {
+                                console.log(x)
                                 console.log(x.message);
                             }
                         }
