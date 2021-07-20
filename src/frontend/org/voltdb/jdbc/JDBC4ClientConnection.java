@@ -591,7 +591,7 @@ public class JDBC4ClientConnection implements Closeable {
      * @return array of VoltTable results
      * @throws IOException
      *             If the files cannot be serialized
-     * @throws NoConnectionException
+     * @throws NoConnectionsException
      * @throws ProcCallException
      */
     public ClientResponse updateApplicationCatalog(File catalogPath, File deploymentPath)

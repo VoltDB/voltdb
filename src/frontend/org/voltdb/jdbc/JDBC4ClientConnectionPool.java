@@ -148,7 +148,7 @@ public class JDBC4ClientConnectionPool {
      *            config is null
      * @param kerberosConfig
      *            Uses specified JAAS file entry id for kerberos authentication if set.
-     * @param topolgyChangeAware
+     * @param topologyChangeAware
      *      make client aware of changes in topology.
      * @return the client connection object the caller should use to post requests.
      * @see #get(String[] servers, String user, String password, boolean isHeavyWeight, int
@@ -157,7 +157,7 @@ public class JDBC4ClientConnectionPool {
     public static JDBC4ClientConnection get(String[] servers, String user, String password, boolean isHeavyWeight,
                                             int maxOutstandingTxns, boolean reconnectOnConnectionLoss,
                                             SSLConfiguration.SslConfig sslConfig, String kerberosConfig,
-                                            boolean topolgyChangeAware) throws Exception {
+                                            boolean topologyChangeAware) throws Exception {
         String clientConnectionKeyBase = getClientConnectionKeyBase(servers, user, password,
                 isHeavyWeight, maxOutstandingTxns, reconnectOnConnectionLoss);
         String clientConnectionKey = clientConnectionKeyBase;
@@ -167,7 +167,7 @@ public class JDBC4ClientConnectionPool {
                 ClientConnections.put(clientConnectionKey, new JDBC4ClientConnection(
                         clientConnectionKeyBase, clientConnectionKey, servers, user,
                         password, isHeavyWeight, maxOutstandingTxns, reconnectOnConnectionLoss,
-                        sslConfig, kerberosConfig, topolgyChangeAware));
+                        sslConfig, kerberosConfig, topologyChangeAware));
             return ClientConnections.get(clientConnectionKey).use();
         }
     }
