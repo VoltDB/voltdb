@@ -47,7 +47,7 @@ public class Driver implements java.sql.Driver
     public static final String TRUSTSTORE_CONFIG_PROP = "truststore";
     public static final String TRUSTSTORE_PASSWORD_PROP = "truststorepassword";
     public static final String KERBEROS_CONFIG_PROP = "kerberos";
-    public static final String TOPOLOGY_CHANGE_AWARE = "topologychangeaware";
+    public static final String TOPOLOGY_CHANGE_AWARE_PROP = "topologychangeaware";
 
     //Driver URL prefix.
     private static final String URL_PREFIX = "jdbc:voltdb:";
@@ -180,7 +180,7 @@ public class Driver implements java.sql.Driver
                             kerberosConfig = value.trim();
                         }
                     }
-                    else if (key.toLowerCase().equals(TOPOLOGY_CHANGE_AWARE)){
+                    else if (key.toLowerCase().equals(TOPOLOGY_CHANGE_AWARE_PROP)){
                         topologyChangeAware = Boolean.valueOf(value);
                     }
                     // else - unknown; ignore
