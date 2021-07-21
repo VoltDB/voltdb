@@ -331,21 +331,8 @@ public interface Client {
      * Write a single line of comma-separated values to the file specified.
      * Used mainly for collecting results from benchmarks.
      * <p>
-     * The format of this output is subject to change between versions
-     * <p>
-     * Format:
-     * <ol>
-     * <li>Timestamp (ms) of creation of the given {@link ClientStats} instance, stats.</li>
-     * <li>Duration from first procedure call within the given {@link ClientStats} instance
-     *    until this call in ms.</li>
-     * <li>1-percentile round trip latency estimate in ms.</li>
-     * <li>Max measure round trip latency in ms.</li>
-     * <li>95-percentile round trip latency estimate in ms.</li>
-     * <li>99-percentile round trip latency estimate in ms.</li>
-     * <li>99.9-percentile round trip latency estimate in ms.</li>
-     * <li>99.99-percentile round trip latency estimate in ms.</li>
-     * <li>99.999-percentile round trip latency estimate in ms.</li>
-     * </ol>
+     * The format of this output is subject to change between versions.
+     * See {@link #writeSummaryCSV(ClientStats, String)} for the format.
      *
      * @param statsRowName give the client stats row an identifiable name.
      * @param stats {@link ClientStats} instance with relevant stats.
@@ -355,23 +342,26 @@ public interface Client {
     public void writeSummaryCSV(String statsRowName, ClientStats stats, String path) throws IOException;
 
     /**
-     * Write a single line of comma separated values to the file specified.
+     * Write a single line of comma-separated values to the file specified.
      * Used mainly for collecting results from benchmarks.
      * <p>
-     * The format of this output is subject to change between versions
-     * <p>
-     * Format:
+     * The format of this output is subject to change between versions.
+     * As of V11.0 there are 13 fields. The format is:
      * <ol>
      * <li>Timestamp (ms) of creation of the given {@link ClientStats} instance, stats.</li>
      * <li>Duration from first procedure call within the given {@link ClientStats} instance
      *    until this call in ms.</li>
-     * <li>1-percentile round trip latency estimate in ms.</li>
-     * <li>Max measure round trip latency in ms.</li>
+     * <li>Count of invocations completed.</li>
+     * <li>Minimum round trip latency estimate in ms.</li>
+     * <li>Maximum round trip latency estimate in ms.</li>
      * <li>95-percentile round trip latency estimate in ms.</li>
      * <li>99-percentile round trip latency estimate in ms.</li>
      * <li>99.9-percentile round trip latency estimate in ms.</li>
      * <li>99.99-percentile round trip latency estimate in ms.</li>
      * <li>99.999-percentile round trip latency estimate in ms.</li>
+     * <li>Count of invocation errors.</li>
+     * <li>Count of invocation aborts.</li>
+     * <li>Count of invocation timeouts.</li>
      * </ol>
      *
      * @param stats {@link ClientStats} instance with relevant stats.
