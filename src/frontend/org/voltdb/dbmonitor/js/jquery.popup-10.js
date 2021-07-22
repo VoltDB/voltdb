@@ -290,7 +290,7 @@
       var closeBtn = $(".closeBtn");
       if (closeBtn != undefined) {
         closeBtn.unbind("click");
-        $(document).on("click", closeBtn, function () {
+        $(document).on("click", ".closeBtn", function () {
           $(".restoreConfirmation").hide();
           $(".restoreInfo").show();
           p.close();
