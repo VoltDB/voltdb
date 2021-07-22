@@ -1131,6 +1131,11 @@ public final class ClientImpl implements Client {
     }
 
     @Override
+    public boolean isTopologyChangeAwareEnabled() {
+        return m_topologyChangeAware;
+    }
+
+    @Override
     public ClientResponseWithPartitionKey[] callAllPartitionProcedure(String procedureName, Object... params)
             throws IOException, ProcCallException {
         CountDownLatch latch = new CountDownLatch(1);

@@ -63,12 +63,11 @@ public class ClientConfig {
     long m_procedureCallTimeoutNanos = DEFAULT_PROCEDURE_TIMEOUT_NANOS;
     long m_connectionResponseTimeoutMS = DEFAULT_CONNECTION_TIMEOUT_MS;
     Subject m_subject = null;
-    boolean m_reconnectOnConnectionLoss = false;
-    private boolean m_reconnectIsSet = false;
-    boolean m_topologyChangeAware = false;
+    boolean m_reconnectOnConnectionLoss;
     long m_initialConnectionRetryIntervalMS = DEFAULT_INITIAL_CONNECTION_RETRY_INTERVAL_MS;
     long m_maxConnectionRetryIntervalMS = DEFAULT_MAX_CONNECTION_RETRY_INTERVAL_MS;
     SslConfig m_sslConfig;
+    boolean m_topologyChangeAware = false;
     boolean m_enableSSL = false;
     String m_sslPropsFile = null;
     boolean m_nonblocking = false;
@@ -394,26 +393,6 @@ public class ClientConfig {
     }
 
     /**
-     * Attempts to automatically reconnect to a node after connection loss,
-     * with retry until successful. The interval between retries is subject
-     * to exponential backoff between user-supplied limits.
-     * See {@link #setInitialConnectionRetryInterval}
-     * and {@link #setMaxConnectionRetryInterval}.
-     * <p>
-     * Topology-change-aware clients automatically attempt to reconnect
-     * failed connections, regardless of whether enabled by this method.
-     * See {@link #setTopologyChangeAware}.
-     *
-     * @param on Enable or disable the reconnection feature. Default is off.
-     */
-    public void setReconnectOnConnectionLoss(boolean on) {
-        this.m_reconnectOnConnectionLoss = on;
-        this.m_reconnectIsSet = true;
-        // topology change aware make sense only if reconnectOnConnection is also true.
-        this.m_topologyChangeAware &= on;
-    }
-
-    /**
      * Configures the client so that it attempts to connect to all nodes in
      * the cluster as they are discovered, and will reconnect if those connections fail.
      * Defaults to false.
@@ -424,14 +403,8 @@ public class ClientConfig {
      * @param enabled Enable or disable the topology awareness feature.
      */
     public void setTopologyChangeAware(boolean enabled) {
-        // topology change aware can be set only if reconnect is true.
-        if( m_reconnectIsSet ) {
-            m_topologyChangeAware = enabled && m_reconnectOnConnectionLoss;
-        }
-        else {
-            m_topologyChangeAware = enabled;
-            m_reconnectOnConnectionLoss |= enabled;
-        }
+        m_topologyChangeAware = enabled;
+        m_reconnectOnConnectionLoss |= enabled;
     }
 
     /**
@@ -447,6 +420,23 @@ public class ClientConfig {
      */
     @Deprecated
     public void setSendReadsToReplicasByDefault(boolean on) {
+    }
+
+    /**
+     * Attempts to automatically reconnect to a node after connection loss,
+     * with retry until successful. The interval between retries is subject
+     * to exponential backoff between user-supplied limits.
+     * See {@link #setInitialConnectionRetryInterval}
+     * and {@link #setMaxConnectionRetryInterval}.
+     * <p>
+     * Topology-change-aware clients automatically attempt to reconnect
+     * failed connections, regardless of whether enabled by this method.
+     * See {@link #setTopologyChangeAware}.
+     *
+     * @param on Enable or disable the reconnection feature. Default is off.
+     */
+    public void setReconnectOnConnectionLoss(boolean on) {
+        this.m_reconnectOnConnectionLoss = on;
     }
 
     /**

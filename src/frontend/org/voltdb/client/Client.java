@@ -328,6 +328,17 @@ public interface Client {
     public boolean isAutoReconnectEnabled();
 
     /**
+     * Tell whether Client if topologyChangeAware is enabled. If it is on,
+     * Client will be able to find an alternative server to re-connect automatically.
+     * This option should be initialized along with "autoConnect"
+     *
+     * @see public boolean isAutoReconnectEnabled()
+     *
+     * @return true if the client wants to use topologyChangeAware feature.
+     */
+    public boolean isTopologyChangeAwareEnabled();
+
+    /**
      * Write a single line of comma-separated values to the file specified.
      * Used mainly for collecting results from benchmarks.
      * <p>

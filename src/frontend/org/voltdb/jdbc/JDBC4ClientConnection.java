@@ -248,9 +248,8 @@ public class JDBC4ClientConnection implements Closeable {
         config = new ClientConfig(user, password);
         config.setHeavyweight(isHeavyWeight);
         config.setMaxOutstandingTxns(maxOutstandingTxns);
+        config.setReconnectOnConnectionLoss(reconnectOnConnectionLoss);
         config.setTopologyChangeAware(topologyChangeAware);
-
-        this.config.setReconnectOnConnectionLoss(reconnectOnConnectionLoss);
 
         if (enableSSL) {
             if (sslConfig.trustStorePath != null && sslConfig.trustStorePath.trim().length() > 0) {
