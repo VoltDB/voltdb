@@ -158,8 +158,8 @@ public final class ClientImpl implements Client {
                                         m_sslContext);
         m_distributer.addClientStatusListener(m_listener);
 
-        m_autoReconnect = config.m_reconnectOnConnectionLoss;
         m_topologyChangeAware = config.m_topologyChangeAware;
+        m_autoReconnect = config.m_reconnectOnConnectionLoss | m_topologyChangeAware;
 
         m_distributer.setTopologyChangeAware(m_topologyChangeAware, m_autoReconnect);
         if (m_topologyChangeAware) {

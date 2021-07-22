@@ -322,8 +322,11 @@ public interface Client {
      * Tell whether Client has turned on the auto-reconnect feature. If it is on,
      * Client will pause instead of stop when all connections to the server are lost,
      * and will resume after connections are restored.
+     * <p>
+     * This will always return true in topology-change-aware clients.
      *
      * @return true if the client wants to use auto-reconnect feature.
+     * @see ClientConfig#setTopologyChangeAware
      */
     public boolean isAutoReconnectEnabled();
 

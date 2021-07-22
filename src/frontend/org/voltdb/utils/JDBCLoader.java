@@ -342,6 +342,7 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
         AutoReconnectListener listener = new AutoReconnectListener();
         if (m_config.stopondisconnect) {
             c_config = new ClientConfig(m_config.user, m_config.password, null);
+            // the following setting is ignored because getClient subsequently sets topo-change-aware
             c_config.setReconnectOnConnectionLoss(false);
         } else {
             c_config = new ClientConfig(m_config.user, m_config.password, listener);
