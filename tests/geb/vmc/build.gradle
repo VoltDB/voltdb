@@ -55,9 +55,9 @@ def getProjectPropertyOrDefaultValue(String projectPropertyName, Object defaultV
 dependencies {
     def gebVersion = getProjectPropertyOrDefaultValue("gebVersion", "0.12.2")
     def spockVersion = getProjectPropertyOrDefaultValue("spockVersion", "0.7-groovy-2.0")
-    def seleniumVersion = getProjectPropertyOrDefaultValue("seleniumVersion", "2.53.0")
+    def seleniumVersion = getProjectPropertyOrDefaultValue("seleniumVersion", "3.14.0")
     def phantomjsVersion = getProjectPropertyOrDefaultValue("phantomjsVersion", "1.2.1")
-    def htmlunitVersion = getProjectPropertyOrDefaultValue("htmlunitVersion", "2.21")
+    def htmlunitVersion = getProjectPropertyOrDefaultValue("htmlunitVersion", "2.50.0")
 
     // GEB & Spock & Selenium
     testCompile "org.gebish:geb-spock:$gebVersion"

@@ -2,16 +2,19 @@ Automated Tests of the VMC (VoltDB Management Center), Using GEB
 ================================================================
 
 This file describes the GEB automated tests of the VMC (VoltDB Management
-Center), which is the new web UI, replacing the old Web Studio. These automated
-tests are believed to provide more than the level of coverage of the old
-GEB tests of Web Studio, in the, now deleted, ../studioWeb/ directory.
-
-To run these tests of the VMC:
+Center), which is VoltDB's web management console. To run these tests of the VMC:
 
 1. Download and install OR build from source VoltDB, either the community
 or pro version.
 
-2. Launch a (backgrounded) VoltDB server. The easiest way to do that, for VMC
+2. Download and install the web browser and/or web driver you want to use for the tests. 
+Currently, the tests support Chrome and Firefox. You will need both the browser 
+itself and its webdriver: chromedriver for Chrome and geckodriver for Firefox. For 
+example, to use Chrome, download the chromedriver as described in:  <br>
+    https://github.com/SeleniumHQ/selenium/wiki/ChromeDriver  <br>
+(mainly, make sure it's in a directory included in the system PATH).
+
+3. Launch a (backgrounded) VoltDB server. The easiest way to do that, for VMC
 testing purposes, is from the voltdb/tests/geb/vmc/ directory, via this command:
 <pre>
     ./run.sh server
@@ -19,7 +22,7 @@ testing purposes, is from the voltdb/tests/geb/vmc/ directory, via this command:
 You may use the server-pro option, if you want to run the pro version of VoltDB.
 Or, you may start up and run against some other VoltDB server, if you prefer.
 
-3. From the voltdb/tests/geb/vmc/ directory, launch the all-in-one install/run
+4. From the voltdb/tests/geb/vmc/ directory, launch the all-in-one install/run
 script for the automated tests:
 <pre>
     ./run.sh tests --debug --basic
@@ -34,12 +37,11 @@ specified, the default value of 'chrome' is used:
 <pre>
     ./gradlew -PdebugPrint=true chrome --tests=*BasicTest* --rerun-tasks
 </pre>
-(Using 'chrome' or 'chromeTest' here is equivalent.) Note that, to use Chrome,
-you will first need to download the Chrome Driver, as described in:  <br>
-    https://github.com/SeleniumHQ/selenium/wiki/ChromeDriver  <br>
-(mainly, make sure it's in a directory included in the system PATH).
+(Using 'chrome' or 'chromeTest' here is equivalent.) If you are running the 
+tests remotely or in Jenkins, you need to run in "headless" mode -- without 
+a display. To do this, add "--headless" to the command line.
 
-4. Scan the console output for highlighted FAILED messages or failed test
+5. Scan the console output for highlighted FAILED messages or failed test
 counts and/or browse the test result summary rooted in:  <br>
     voltdb/tests/geb/vmc/build/reports/chromeTest/tests/index.html  <br>
 or, if you used PhantomJS / Ghost Driver:  <br>
@@ -51,29 +53,33 @@ or, if you used Internet Explorer (IE):  <br>
 or, if you used Safari:  <br>
     voltdb/tests/geb/vmc/build/reports/safariTest/tests/index.html  <br>
 
-5. Stop the backgrounded server:
+6. Stop the backgrounded server:
     ./run.sh shutdown
 (Or, use "voltadmin shutdown" or "kill %1" - or "kill <whatever your actual
 background job number(s) may be>").
 
-6. If you prefer, you may do all of the above (after download), using:
+7. If you prefer, you may do all of the above (after download), using:
     ./run.sh all --debug --basic
 
-To add to or modify the existing tests:
+Adding to or Modifying Existing Tests
+=====================================
 
-1. To add additional SQL queries to be run in the VMC, add additional lines to
+To add additional SQL queries to be run in the VMC, add additional lines to
 the file voltdb/tests/geb/vmc/src/resources/sqlQueries.txt; the format is
 JSON-based, and the specific format should be fairly self-explanatory, by
 looking at existing tests. Make sure the new tests clean up after themselves,
 and can be run twice in a row; for example, any new tables that are Created
 should also be Dropped.
-2. More substantial changes to the tests can be made in the
+
+More substantial changes to the tests can be made in the
 voltdb/tests/geb/vmc/src/pages/ and voltdb/tests/geb/vmc/src/tests/
 directories, which contain most of the actual Groovy / GEB code.
-3. For more info on GEB, see:  <br>
+
+For more info on GEB, see:  <br>
     http://www.gebish.org  <br>
     http://www.gebish.org/manual/current/  <br>
 (especially the latter).
+
 For more info on Spock (which is also used), see:  <br>
     http://spockframework.github.io/spock/docs/  <br>
     https://code.google.com/p/spock/wiki/SpockBasics  <br>
@@ -82,13 +88,7 @@ For more info on Spock (which is also used), see:  <br>
 
 Periodically, it is useful to update the (default) version of Selenium being
 used by these tests, in order to support the latest version of Firefox, or
-other browsers.
-(This used to be necessary frequently, when running on the Firefox browser,
-because each version of Selenium supported only a narrow group of Firefox
-versions; however, since support for native events was removed in Selenium
-2.45.0, and in Firefox versions around the same time, this is less of an
-issue.)
-To do this:
+other browsers. To do this:
 
 1. Check the most recent version of Selenium (with Java) in:  <br>
     http://www.seleniumhq.org/download/  <br>
