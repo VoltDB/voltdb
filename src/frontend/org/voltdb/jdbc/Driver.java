@@ -194,7 +194,6 @@ public class Driver implements java.sql.Driver
                 if (enableSSL) {
                     sslConfig = new SSLConfiguration.SslConfig(null, null, truststorePath, truststorePassword);
                 }
-                reconnectOnConnectionLoss |= topologyChangeAware;
 
                 // Return JDBC connection wrapper for the client
                 return  new JDBC4Connection(JDBC4ClientConnectionPool.get(servers, user, password,

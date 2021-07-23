@@ -34,6 +34,7 @@ import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
 import org.voltdb.regressionsuites.RegressionSuite;
 
+import javax.validation.constraints.AssertTrue;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -102,6 +103,9 @@ public class TestJDBCTopologyAware extends RegressionSuite
             fail("Connection creation shouldn't fail: " + e.getMessage());
         }
 
+        assertTrue(((JDBC4Connection)conn).NativeConnection.getClient().isAutoReconnectEnabled() &&
+                   ((JDBC4Connection)conn).NativeConnection.getClient().isTopologyChangeAwareEnabled()     );
+
         try {
             Client client = ClientFactory.createClient();
             client.createConnection("localhost", m_config.port(0));
@@ -169,6 +173,9 @@ public class TestJDBCTopologyAware extends RegressionSuite
             e.printStackTrace();
             fail("Connection creation shouldn't fail: " + e.getMessage());
         }
+
+        assertTrue(((JDBC4Connection)conn).NativeConnection.getClient().isAutoReconnectEnabled() &&
+                !((JDBC4Connection)conn).NativeConnection.getClient().isTopologyChangeAwareEnabled()     );
 
         try {
             Client client = ClientFactory.createClient();
