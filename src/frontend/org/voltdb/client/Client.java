@@ -335,7 +335,7 @@ public interface Client {
      * Client will be able to find an alternative server to re-connect automatically.
      * This option should be initialized along with "autoConnect"
      *
-     * @see public boolean isAutoReconnectEnabled()
+     * @see #isAutoReconnectEnabled()
      *
      * @return true if the client wants to use topologyChangeAware feature.
      */
