@@ -466,6 +466,7 @@ public class CSVLoader implements BulkLoaderErrorHandler {
         AutoReconnectListener listener = new AutoReconnectListener();
         if (config.stopondisconnect) {
             c_config = new ClientConfig(config.user, config.password, null);
+            // the following setting is ignored because getClient sets topo-change-aware
             c_config.setReconnectOnConnectionLoss(false);
         } else {
             c_config = new ClientConfig(config.user, config.password, listener);

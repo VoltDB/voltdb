@@ -241,6 +241,7 @@ public class KafkaLoader implements ImporterLifecycle {
         AutoReconnectListener listener = new AutoReconnectListener();
         if (m_cliOptions.stopondisconnect) {
             clientConfig = new ClientConfig(m_cliOptions.user, m_cliOptions.password, null);
+            // the following setting is ignored because getClient sets topo-change-aware
             clientConfig.setReconnectOnConnectionLoss(false);
         } else {
             clientConfig = new ClientConfig(m_cliOptions.user, m_cliOptions.password, listener);

@@ -383,7 +383,7 @@ public class ClientConfig {
      * <p>
      * @deprecated client affinity is now always {@code true}: transactions are always
      * routed to the correct master partition improving latency and throughput.
-     *
+     * <p>
      * (Deprecated in v11.0, 2021-03-23)
      *
      * @param on unused
@@ -404,7 +404,6 @@ public class ClientConfig {
      */
     public void setTopologyChangeAware(boolean enabled) {
         m_topologyChangeAware = enabled;
-        m_reconnectOnConnectionLoss |= enabled;
     }
 
     /**
@@ -413,7 +412,7 @@ public class ClientConfig {
      * @deprecated no longer meaningful: reads are always sent
      * to the leader; sending to a replica would not have resulted
      * in better performance.
-     *
+     * <p>
      * (Deprecated in v11.0, 2021-04-16)
      *
      * @param on unused
@@ -429,6 +428,7 @@ public class ClientConfig {
      * See {@link #setInitialConnectionRetryInterval}
      * and {@link #setMaxConnectionRetryInterval}.
      * <p>
+     * This method is ignored in topology-change-aware clients.
      * Topology-change-aware clients automatically attempt to reconnect
      * failed connections, regardless of whether enabled by this method.
      * See {@link #setTopologyChangeAware}.
