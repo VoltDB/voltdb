@@ -1197,3 +1197,7 @@ a:hover.editOk, a:hover.editCancel {
   color: #fff !important;
   text-decoration: none !important;
 }
+
+#addDiskLimitWrapper.configWrapper {
+  width: auto !important;
+}
