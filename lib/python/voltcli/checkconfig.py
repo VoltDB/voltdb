@@ -90,8 +90,8 @@ def test_os_release(output):
         if distro:
             osId, osName, osVersion = distro
             if osId == 'ubuntu':
-                supported = osVersion in ['16.04', '18.04']
-                note = 'needs 16.04/18.04'
+                supported = osVersion in ['16.04', '18.04', '20.04']
+                note = 'needs 16.04/18.04/20.04'
             elif osId in ['centos', 'redhat', 'rhel']:
                 supported = version_number(osVersion, 0) >= 7
                 note = 'needs 7.0 or later'
