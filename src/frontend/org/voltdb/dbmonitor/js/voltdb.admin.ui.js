@@ -3710,8 +3710,8 @@ function loadAdminPage() {
                  '        <div class="addConfigProperWrapper">' +
                  '            <table id="tblAddNewFeature" width="100%" cellpadding="0" cellspacing="0" class="addConfigProperTbl">' +
                  '                <tr class="headerFeature">' +
-                 '                    <th width="53%">Name</th>' +
-                 '                    <th align="right" width="37%">Value</th>' +
+                 '                    <th width="50%">Name</th>' +
+                 '                    <th align="right" width="14%">Value</th>' +
                  '                    <th align="right" width="14%">Unit</th>' +
                  '                    <th width="5%">Delete</th>' +
                  '                </tr>' +
@@ -3746,10 +3746,10 @@ function loadAdminPage() {
                     '       <label id="error_' + nameId + '" class="error duplicateError" style="display: none;"></label>' +
                     '   </td>' +
                     '   <td>' +
-                    '       <input size="15" id="' + valueId + '" name="' + valueId + '" class="newFeatureValue newFeature" type="text">' +
+                    '       <input size="15" id="' + valueId + '" name="' + valueId + '" class="newFeatureValue newFeature" type="text" style="width:auto;">' +
                     '       <label id="errorValueDL' + count + '" for="' + valueId + '" class="error" style="display: none;"></label>' +
                     '   </td>' +
-                     '   <td><select id="' + unitId + '" name="' + unitId + '" class="newFeatureUnit newFeature"><option>GB</option><option>%</option></select>' +
+                     '   <td><select id="' + unitId + '" name="' + unitId + '" class="newFeatureUnit newFeature" style="width:auto;"><option>GB</option><option>%</option></select>' +
                     '       <label id="errorValueUnit' + count + '" for="' + unitId + '" class="error" style="display: none;"></label>' +
                     '   </td>' +
                     '   <td><div class="securityDelete" id="deleteFirstFeature" onclick="deleteRow(this)"></div></td>' +
@@ -3788,10 +3788,10 @@ function loadAdminPage() {
                             '       <label id="error_' + nameId + '" class="error" style="display: none;"></label>' +
                             '   </td>' +
                             '   <td>' +
-                            '       <input size="15" id="' + valueId + '" name="' + valueId + '" class="newFeatureValue newFeature" type="text">' +
+                            '       <input size="15" id="' + valueId + '" name="' + valueId + '" class="newFeatureValue newFeature" type="text" style="width:auto;">' +
                             '       <label id="errorValueDL' + count + '" for="' + valueId + '" class="error" style="display: none;"></label>' +
                             '   </td>' +
-                            '   <td><select id="' + unitId + '" name="' + unitId + '" class="newFeatureUnit newFeature"><option>GB</option><option>%</option></select>' +
+                            '   <td><select id="' + unitId + '" name="' + unitId + '" class="newFeatureUnit newFeature" style="width:auto;"><option>GB</option><option>%</option></select>' +
                             '       <label id="errorValueUnit' + count + '" for="' + unitId + '" class="error" style="display: none;"></label>' +
                             '   </td>' +
                             '   <td><div class="securityDelete" id="deleteFirstFeature" onclick="deleteRow(this)"></div></td>' +
@@ -4621,7 +4621,7 @@ function loadAdminPage() {
                 popup.close();
             });
 
-            $("#btnSaveSecUser").unbind("click");
+            $(document).off("click", "#btnSaveSecUser");
             $(document).on("click","#btnSaveSecUser", function () {
                 var username = $('#txtOrgUser').val();
                 var newUsername = $('#txtUser').val();
