@@ -204,7 +204,6 @@ class RateLimiter {
      *    avoid incrementing the semaphore we did not decrement.
      *
      * When ignoreBackpressure is true, timeoutNanos has no effect.
-     * TODO - this may be a bug.
      *
      * @param startNanos The time as measured when the call is made.
      * @param timeoutNanos Limit on time waiting for permission to send
@@ -217,11 +216,6 @@ class RateLimiter {
         if (m_doesRateLimiting) {
             long timestampNanos = startNanos; // updated if we block
             while (!rateWithinLimit(timestampNanos, ignoreBackpressure)) {
-
-                // timed out? (TODO - surely this is required ?)
-                //if (timestampNanos - startNanos >= timeoutNanos) {
-                //    throw new TimeoutException("timed out in rate limiter");
-                //}
 
                 // If the rate is above target, pause for the smallest time possible
                 // (we specify 1 ms, but actual delay depends on scheduling granularity)

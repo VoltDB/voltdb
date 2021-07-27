@@ -292,10 +292,21 @@ public class ClientConfig {
     }
 
     /**
-     * Set the maximum number of transactions that can be run in one second. Note this
-     * specifies a rate, not a ceiling. If the limit is set to 10, you can't send 5 in
-     * the first half of the second and 5 in the second half; the client will let you send
-     * about 1 transaction every 100ms. Default is {link Integer#MAX_VALUE}.
+     * Set a limit on the number of transactions that can be executed per second.
+     * This operates by stalling the client so as to keep the rate from exceeding
+     * the target limit.
+     * <p>
+     * Usage notes:
+     * <p>
+     * The limit should be less than 1,073,741,823 (half of <code>Integer.MAX_VALUE</code>);
+     * larger values disable rate-limiting. The default is <code>Integer.MAX_VALUE</code>.
+     * <p>
+     * Transactions will not be timed out while they are stalled waiting for
+     * the average rate to permit transmission.
+     * <p>
+     * You cannot use <code>setMaxTransactionsPerSecond</code> when
+     * <code>setNonblockingAsync</code> is in effect, since rate-limiting
+     * potntially needs to block.
      *
      * @param maxTxnsPerSecond Requested limit in transaction per second.
      */
