@@ -306,7 +306,7 @@ public class ClientConfig {
      * <p>
      * You cannot use <code>setMaxTransactionsPerSecond</code> when
      * <code>setNonblockingAsync</code> is in effect, since rate-limiting
-     * potntially needs to block.
+     * potentially needs to block.
      *
      * @param maxTxnsPerSecond Requested limit in transaction per second.
      */
