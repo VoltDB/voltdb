@@ -149,7 +149,7 @@ public class JDBC4ClientConnectionPool {
      * @param kerberosConfig
      *            Uses specified JAAS file entry id for kerberos authentication if set.
      * @param topologyChangeAware
-     *      make client aware of changes in topology.
+     *            make client aware of changes in topology.
      * @return the client connection object the caller should use to post requests.
      * @see #get(String[] servers, String user, String password, boolean isHeavyWeight, int
      *      maxOutstandingTxns, boolean reconnectOnConnectionLoss)

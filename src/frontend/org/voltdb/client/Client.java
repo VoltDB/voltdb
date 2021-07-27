@@ -331,9 +331,10 @@ public interface Client {
     public boolean isAutoReconnectEnabled();
 
     /**
-     * Tell whether Client if topologyChangeAware is enabled. If it is on,
-     * Client will be able to find an alternative server to re-connect automatically.
-     * This option should be initialized along with "autoConnect"
+     * Tell whether Client has turned on the topologyChangeAware feature. If it is on,
+     * Client attempts to connect to all nodes in the cluster as they are discovere
+     * re-connect automatically.
+     * This option, when turned on, also enables the
      *
      * @see #isAutoReconnectEnabled()
      *
