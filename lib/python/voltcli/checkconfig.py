@@ -61,7 +61,7 @@ def _check_segmentation_offload():
         generic-receive-offload settings
     """
     results = []
-    tokenDevs = subprocess.Popen("ip link | grep -B 1 ether", stdout=subprocess.PIPE, shell=True).stdout.read().decode("utf-8").split('\n')[:-1][0::2]
+    tokenDevs = subprocess.Popen("ip link | grep -B 1 ether | grep -E -v '^--'", stdout=subprocess.PIPE, shell=True).stdout.read().decode("utf-8").split('\n')[:-1][0::2]
     for d in [x.split(':') for x in tokenDevs]:
         if len(d) < 2:
             continue
