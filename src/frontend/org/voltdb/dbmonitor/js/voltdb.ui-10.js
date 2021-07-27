@@ -1172,6 +1172,15 @@ var loadPage = function (serverName, portid) {
                     );
                   } else {
                     $("#errorLabel").text(statusString);
+                    var popup = new $.Popup({
+                      content: "divStopServerError",
+                      afterOpen: function() {
+                        $(document).off("click","#A2");
+                        $(document).on("click","#A2",function(){
+                          popup.close();
+                        });
+                      }
+                    });
                     popup.open("#divStopServerError", undefined, srcElement);
                   }
                 }
