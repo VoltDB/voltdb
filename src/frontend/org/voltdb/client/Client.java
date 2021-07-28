@@ -266,11 +266,13 @@ public interface Client {
     /**
      * Blocks the current thread until there is no more backpressure,
      * or there are no more connections to the database
+     * <p>
+     * This method may be used to block execution after one of the async
+     * <code>callProceedure</code> methods has returned <code>false</code>,
+     * indicating that the procedure could not be queued.
      *
-     * @deprecated This method is untested and has questionable utility.
      * @throws InterruptedException if this blocking call is interrupted.
      */
-    @Deprecated
     public void backpressureBarrier() throws InterruptedException;
 
     /**
