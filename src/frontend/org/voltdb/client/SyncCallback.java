@@ -18,6 +18,7 @@
 package org.voltdb.client;
 
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 
 /**
  * <p>A utility class that allows a client to queue a stored procedure invocation asynchronously and then poll
@@ -53,6 +54,22 @@ public final class SyncCallback extends AbstractProcedureArgumentCacher implemen
      */
     public boolean checkForResponse() {
         return m_lock.tryAcquire();
+    }
+
+    /**
+     * <p>poll method that checks for the response to the invocation associated with this callback.
+     * The timeout in millisecond indicates how long you wish to wait for a response. if no response is
+     * received after this you can waitForResponse or ignore depending on how caller wishes to handle.
+     * Call getResponse to retrieve the response or result() to retrieve the just the results.</p>
+     * @param timeout timeout in milliseconds
+     * @return True if the response is available, false otherwise
+     */
+    public boolean checkForResponse(long timeout) {
+        try {
+            return m_lock.tryAcquire(timeout, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException e) {
+            return false;
+        }
     }
 
     /**
