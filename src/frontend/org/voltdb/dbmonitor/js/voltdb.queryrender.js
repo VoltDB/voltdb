@@ -308,7 +308,7 @@ function QueryUI(queryTab) {
         var query_id = this.QueryTab[0].id.split('-')[1]
         var target = $('.queryResult-' + query_id);
         var format = $('#exportType-' + query_id).val();
-
+        
         var dataSource = VoltDbUI.getCookie('connectionkey') == undefined ? '' : VoltDbUI.getCookie('connectionkey');
         if (!VoltDBCore.connections.hasOwnProperty(dataSource)) {
             $(target).html('Connect to a datasource first.');

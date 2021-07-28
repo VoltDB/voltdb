@@ -1047,16 +1047,21 @@ $(document).ready(function () {
       $("#divQueryBtns").append(htmlBtn);
 
       $("#runBTn-" + tab_id).off("click");
-      $("#runBTn-" + tab_id).on("click", function () {
+
+      $("#runBTn-" + tab_id).on("click", function () {        
         var queryTab = $(
           $("#worktabs div.ui-tabs-panel")[$tabs.tabs("option", "active")]
         );
-
+        if(queryTab.text().split(' ')[0] === 'exec'){
+          VoltDbUI.refreshSqlAndSchemaTab();
+        }
         if (queryTab.length == 1) {
           var queryUI = new QueryUI(
             $($("#worktabs div.ui-tabs-panel")[$tabs.tabs("option", "active")])
           );
-          queryUI.execute();
+          setTimeout(()=>{
+            queryUI.execute();
+          },100)
         }
       });
 
