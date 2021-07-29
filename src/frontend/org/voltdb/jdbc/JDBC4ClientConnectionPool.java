@@ -45,8 +45,6 @@ public class JDBC4ClientConnectionPool {
      *
      * @param servers
      *            the list of VoltDB servers to connect to.
-     * @param port
-     *            the VoltDB native protocol port to connect to (usually 21212).
      * @param user
      *            the user name to use when connecting to the server(s).
      * @param password
@@ -72,7 +70,7 @@ public class JDBC4ClientConnectionPool {
      */
     public static JDBC4ClientConnection get(String[] servers, String user,
             String password, boolean isHeavyWeight, int maxOutstandingTxns, boolean reconnectOnConnectionLoss) throws Exception {
-        return get(servers, user, password, isHeavyWeight, maxOutstandingTxns, reconnectOnConnectionLoss, null, null);
+        return get(servers, user, password, isHeavyWeight, maxOutstandingTxns, reconnectOnConnectionLoss, null, null, false);
     }
 
     /**
@@ -80,8 +78,6 @@ public class JDBC4ClientConnectionPool {
      *
      * @param servers
      *            the list of VoltDB servers to connect to.
-     * @param port
-     *            the VoltDB native protocol port to connect to (usually 21212).
      * @param user
      *            the user name to use when connecting to the server(s).
      * @param password
@@ -110,12 +106,58 @@ public class JDBC4ClientConnectionPool {
      * @param kerberosConfig
      *            Uses specified JAAS file entry id for kerberos authentication if set.
      * @return the client connection object the caller should use to post requests.
-     * @see #get(String servers, int port, String user, String password, boolean isHeavyWeight, int
-     *      maxOutstandingTxns, reconnectOnConnectionLoss)
+     * @see #get(String[] servers, String user, String password, boolean isHeavyWeight, int
+     *      maxOutstandingTxns, boolean reconnectOnConnectionLoss)
      */
     public static JDBC4ClientConnection get(String[] servers, String user, String password, boolean isHeavyWeight,
                                             int maxOutstandingTxns, boolean reconnectOnConnectionLoss,
                                             SSLConfiguration.SslConfig sslConfig, String kerberosConfig) throws Exception {
+        return get(servers, user, password, isHeavyWeight, maxOutstandingTxns, reconnectOnConnectionLoss,
+                   sslConfig, kerberosConfig, false);
+    }
+
+    /**
+     * Gets a client connection to the given VoltDB server(s).
+     *
+     * @param servers
+     *            the list of VoltDB servers to connect to.
+     * @param user
+     *            the user name to use when connecting to the server(s).
+     * @param password
+     *            the password to use when connecting to the server(s).
+     * @param isHeavyWeight
+     *            the flag indicating callback processes on this connection will be heavy (long
+     *            running callbacks). By default the connection only allocates one background
+     *            processing thread to process callbacks. If those callbacks run for a long time,
+     *            the network stack can get clogged with pending responses that have yet to be
+     *            processed, at which point the server will disconnect the application, thinking it
+     *            died and is not reading responses as fast as it is pushing requests. When the flag
+     *            is set to 'true', an additional 2 processing thread will deal with processing
+     *            callbacks, thus mitigating the issue.
+     * @param maxOutstandingTxns
+     *            the number of transactions the client application may push against a specific
+     *            connection before getting blocked on back-pressure. By default the connection
+     *            allows 3,000 open transactions before preventing the client from posting more
+     *            work, thus preventing server fire-hosing. In some cases however, with very fast,
+     *            small transactions, this limit can be raised.
+     * @param reconnectOnConnectionLoss
+     *            Attempts to reconnect to a node with retry after connection loss
+     * @param sslConfig
+     *            Contains properties - trust store path and password, key store path and password,
+     *            used for connecting with server over SSL. For unencrypted connection, passed in ssl
+     *            config is null
+     * @param kerberosConfig
+     *            Uses specified JAAS file entry id for kerberos authentication if set.
+     * @param topologyChangeAware
+     *            make client aware of changes in topology.
+     * @return the client connection object the caller should use to post requests.
+     * @see #get(String[] servers, String user, String password, boolean isHeavyWeight, int
+     *      maxOutstandingTxns, boolean reconnectOnConnectionLoss)
+     */
+    public static JDBC4ClientConnection get(String[] servers, String user, String password, boolean isHeavyWeight,
+                                            int maxOutstandingTxns, boolean reconnectOnConnectionLoss,
+                                            SSLConfiguration.SslConfig sslConfig, String kerberosConfig,
+                                            boolean topologyChangeAware) throws Exception {
         String clientConnectionKeyBase = getClientConnectionKeyBase(servers, user, password,
                 isHeavyWeight, maxOutstandingTxns, reconnectOnConnectionLoss);
         String clientConnectionKey = clientConnectionKeyBase;
@@ -125,7 +167,7 @@ public class JDBC4ClientConnectionPool {
                 ClientConnections.put(clientConnectionKey, new JDBC4ClientConnection(
                         clientConnectionKeyBase, clientConnectionKey, servers, user,
                         password, isHeavyWeight, maxOutstandingTxns, reconnectOnConnectionLoss,
-                        sslConfig, kerberosConfig));
+                        sslConfig, kerberosConfig, topologyChangeAware));
             return ClientConnections.get(clientConnectionKey).use();
         }
     }

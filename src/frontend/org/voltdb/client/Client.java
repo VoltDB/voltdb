@@ -328,9 +328,19 @@ public interface Client {
      * This will always return true in topology-change-aware clients.
      *
      * @return true if the client wants to use auto-reconnect feature.
-     * @see ClientConfig#setTopologyChangeAware
+     * @see #isTopologyChangeAwareEnabled()
      */
     public boolean isAutoReconnectEnabled();
+
+    /**
+     * Tell whether Client has turned on the topologyChangeAware feature. If it is on,
+     * Client attempts to connect to all nodes in the cluster as they are discovered,
+     * and will automatically try to reconnect failed connections.
+     *
+     * @return true if the client wants to use topologyChangeAware feature.
+     * @see #isAutoReconnectEnabled()
+     */
+    public boolean isTopologyChangeAwareEnabled();
 
     /**
      * Write a single line of comma-separated values to the file specified.
