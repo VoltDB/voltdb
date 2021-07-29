@@ -36,6 +36,9 @@ import org.voltdb.catalog.Index;
 import org.voltdb.catalog.ProcParameter;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
+import org.voltdb.catalog.User;
+import org.voltdb.catalog.Group;
+import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.Task;
 import org.voltdb.catalog.TaskParameter;
 import org.voltdb.catalog.Topic;
@@ -72,6 +75,16 @@ public class JdbcDatabaseMetaDataGenerator
                           new ColumnInfo("SELF_REFERENCING_COL_NAME", VoltType.STRING),
                           new ColumnInfo("REF_GENERATION", VoltType.STRING)
                          };
+
+    static public final ColumnInfo[] USER_SCHEMA = new ColumnInfo[] {
+        new ColumnInfo("USER", VoltType.STRING),
+        new ColumnInfo("ROLES", VoltType.STRING)
+    };
+
+    static public final ColumnInfo[] ROLE_SCHEMA = new ColumnInfo[] {
+        new ColumnInfo("ROLE", VoltType.STRING),
+        new ColumnInfo("PERMISSIONS", VoltType.STRING)
+    };
 
     static public final ColumnInfo[] COLUMN_SCHEMA =
         new ColumnInfo[] {
@@ -248,6 +261,14 @@ public class JdbcDatabaseMetaDataGenerator
         else if (selector.equalsIgnoreCase("COLUMNS"))
         {
             result = getColumns();
+        }
+        else if (selector.equalsIgnoreCase("ROLES"))
+        {
+            result = getRoles();
+        }
+        else if (selector.equalsIgnoreCase("USERS"))
+        {
+            result = getUsers();
         }
         else if (selector.equalsIgnoreCase("INDEXINFO"))
         {
@@ -490,6 +511,39 @@ public class JdbcDatabaseMetaDataGenerator
         }
         return is_nullable;
     }
+
+    VoltTable getUsers() {
+        VoltTable results = new VoltTable(USER_SCHEMA);
+        for (User user : m_database.getUsers()) {
+            StringBuilder roles = new StringBuilder();
+            String sep = "";
+            for (GroupRef role : user.getGroups()) {
+                roles.append(sep).append(role.getTypeName());
+                sep = ",";
+            }
+            results.addRow(user.getTypeName(),
+                           roles.toString());
+        }
+        return results;
+    }
+
+    VoltTable getRoles() {
+        VoltTable results = new VoltTable(ROLE_SCHEMA);
+        for (Group group : m_database.getGroups()) {
+            StringBuilder permissions = new StringBuilder();
+            String sep = "";
+            for ( String field : group.getFields()) {
+                if((Boolean)group.getField(field)) {
+                    permissions.append(sep).append(field);
+                    sep = ",";
+                }
+            }
+            results.addRow(group.getTypeName(),
+                           permissions.toString());
+        }
+        return results;
+    }
+
 
     VoltTable getColumns()
     {

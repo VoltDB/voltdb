@@ -61,6 +61,32 @@ public class TestSystemCatalogSuite extends RegressionSuite {
         fail("Invalid selector should have resulted in a ProcCallException but didn't");
     }
 
+    public void testUserSelector() throws IOException, ProcCallException, JSONException {
+        Client client = getClient();
+        VoltTable results = client.callProcedure("@SystemCatalog", "USERS").getResults()[0];
+
+        results.advanceRow();
+        assertEquals("bob", results.get("USER", VoltType.STRING));
+        assertEquals("user", results.get("ROLES", VoltType.STRING));
+
+        results.advanceRow();
+        assertEquals("John", results.get("USER", VoltType.STRING));
+        assertEquals("administrator,user", results.get("ROLES", VoltType.STRING));
+    }
+
+    public void testRoleSelector() throws IOException, ProcCallException, JSONException {
+        Client client = getClient();
+        VoltTable results = client.callProcedure("@SystemCatalog", "ROLES").getResults()[0];
+
+        results.advanceRow();
+        assertEquals("administrator", results.get("ROLE", VoltType.STRING));
+        assertEquals("admin,defaultproc,defaultprocread,sql,sqlread,allproc", results.get("PERMISSIONS", VoltType.STRING));
+
+        results.advanceRow();
+        assertEquals("user", results.get("ROLE", VoltType.STRING));
+        assertEquals("defaultproc,defaultprocread,sql,sqlread,allproc", results.get("PERMISSIONS", VoltType.STRING));
+    }
+
     public void testTablesSelector() throws IOException, ProcCallException, JSONException
     {
         Client client = getClient();
@@ -221,6 +247,10 @@ public class TestSystemCatalogSuite extends RegressionSuite {
                                  "DR TABLE AA_T;");
         project.addPartitionInfo("AA_T", "A1");
         project.addStmtProcedure("InsertA", "INSERT INTO AA_T VALUES(?,?);", "AA_T.A1: 0");
+        project.addUsers( new VoltProjectBuilder.UserInfo[]{
+            new VoltProjectBuilder.UserInfo("John", "ChangeMe",new String[] {"administrator","user"}),
+            new VoltProjectBuilder.UserInfo("bob", "ChangeMe",new String[] {"user"})
+        });
 
         LocalCluster lcconfig = new LocalCluster("getclusterinfo-cluster.jar", 2, 2, 1,
                                                BackendTarget.NATIVE_EE_JNI);
