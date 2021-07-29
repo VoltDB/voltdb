@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -23,14 +23,11 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.voltcore.logging.VoltLogger;
-
 /**
  * This listener allows to reconnect to a single server with retry after connection loss by
  * running a daemon thread that retries connection until success with a simple limited exponential backoff.
  */
 public class ReconnectStatusListener extends ClientStatusListenerExt {
-    private static final VoltLogger LOG = new VoltLogger("HOST");
 
     private final ExecutorService executor = Executors.newCachedThreadPool(new ThreadFactory() {
         @Override
@@ -65,8 +62,6 @@ public class ReconnectStatusListener extends ClientStatusListenerExt {
 
     @Override
     public void connectionLost(final String hostname, final int port, int connectionsLeft, DisconnectCause cause) {
-        LOG.warn(String.format("Connection to VoltDB node at: %s:%d was lost.", hostname, port));
-
         executor.execute(new Runnable() {
             @Override
             public void run() {
@@ -100,11 +95,8 @@ public class ReconnectStatusListener extends ClientStatusListenerExt {
         while (m_shouldContinue.get()) {
             try {
                 m_client.createConnection(hostname, port);
-                LOG.info(String.format("Connected to VoltDB node at %s:%d.", hostname, port));
                 break;
             } catch (Exception e) {
-                LOG.warn(String.format("Connection to VoltDB node at %s:%d failed - retrying in %d second(s).",
-                        hostname, port, TimeUnit.MILLISECONDS.toSeconds(sleep)));
                 try {
                     Thread.sleep(sleep);
                 } catch (Exception ignored) {

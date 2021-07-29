@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -153,7 +153,6 @@ public class TestClientClose extends TestCase {
 
     private boolean checkThreadsAllExist() {
         boolean haveReverseDNSLookups = false;
-        boolean haveAsyncLogger = false;
         boolean haveEstTimeUpdater = false;
         boolean haveClientReaper = false;
         Map<Thread, StackTraceElement[]> stMap = Thread.getAllStackTraces();
@@ -167,15 +166,13 @@ public class TestClientClose extends TestCase {
             String threadName = t.getName();
             if (threadName.contains("Reverse DNS lookups")) {
                 haveReverseDNSLookups = true;
-            } else if (threadName.contains("Async Logger")) {
-                haveAsyncLogger = true;
             } else if (threadName.contains("Estimated Time Updater")) {
                 haveEstTimeUpdater = true;
             } else if (threadName.contains("VoltDB Client Reaper Thread")) {
                 haveClientReaper = true;
             }
         }
-        return haveReverseDNSLookups && haveAsyncLogger && haveEstTimeUpdater && haveClientReaper;
+        return haveReverseDNSLookups && haveEstTimeUpdater && haveClientReaper;
     }
 
     private int assertThreadsAllDead(int totalTimeout) throws InterruptedException {
@@ -192,8 +189,7 @@ public class TestClientClose extends TestCase {
             if (threadName.contains("VoltDB Client Reaper Thread")) {
                 numClientReaper++;
             }
-            if (threadName.contains("Reverse DNS lookups") || threadName.contains("Async Logger")
-                    || threadName.contains("Estimated Time Updater")) {
+            if (threadName.contains("Reverse DNS lookups") || threadName.contains("Estimated Time Updater")) {
                 long timeout = timeoutAt - System.currentTimeMillis();
                 if (timeout > 0) {
                     t.join(timeout);

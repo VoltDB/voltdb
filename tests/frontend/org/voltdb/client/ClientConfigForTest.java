@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,61 +23,62 @@
 
 package org.voltdb.client;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.ClientResponseImpl;
 
 /**
  * {@link ClientStatusListenerExt} implementation that just logs the
- * output of all calls.
+ * output of all calls for testing.  Logging is by prints to standard
+ * output, so this shows up in junit console output.
+ *
+ * @see ClientStatusListenerExt
  */
 public class ClientConfigForTest extends ClientConfig {
 
-    static final VoltLogger log = new VoltLogger("HOST");
-
     static class LoggingCSL extends ClientStatusListenerExt {
 
-        /* (non-Javadoc)
-         * @see org.voltdb.client.ClientStatusListenerExt#connectionLost(java.lang.String, int)
-         */
         @Override
-        public void connectionLost(String hostname, int port, int connectionsLeft,
-                ClientStatusListenerExt.DisconnectCause cause) {
-            log.info(String.format("ClientConfigForTest reports connection lost due to %s at host %s:%d with %d connections left",
-                    cause.toString(), hostname, port, connectionsLeft));
+        public void connectionCreated(String hostname, int port, ClientStatusListenerExt.AutoConnectionStatus status) {
+            if (status == ClientStatusListenerExt.AutoConnectionStatus.SUCCESS) {
+                print("connection created to host %s:%d", hostname, port);
+            } else {
+                print("connection failure to host %s:%d because %s", hostname, port, status);
+            }
         }
 
-        /* (non-Javadoc)
-         * @see org.voltdb.client.ClientStatusListenerExt#backpressure(boolean)
-         */
+        @Override
+        public void connectionLost(String hostname, int port, int connectionsLeft, ClientStatusListenerExt.DisconnectCause cause) {
+            print("connection lost to host %s:%d lost due to %s; %d connections left",
+                  hostname, port, cause, connectionsLeft);
+        }
+
         @Override
         public void backpressure(boolean status) {
-            /*
-             * Commented out because it is pretty noisy and not very informative.
-             */
-            //log.info(String.format("ClientConfigForTest reports new backpressure status: %b", status));
+            // Commented out because it is pretty noisy and not very informative.
+            // print("new backpressure status: %b", status);
         }
 
-        /* (non-Javadoc)
-         * @see org.voltdb.client.ClientStatusListenerExt#uncaughtException(org.voltdb.client.ProcedureCallback, org.voltdb.client.ClientResponse, java.lang.Throwable)
-         */
         @Override
         public void uncaughtException(ProcedureCallback callback, ClientResponse r, Throwable e) {
-            log.info(String.format("ClientConfigForTest reports uncaught exception in callback: %s",
-                    callback != null ? callback.getClass().getSimpleName() : "null"));
-            log.info(((ClientResponseImpl) r).toJSONString());
-            log.info(e);
+            print("uncaught exception in callback %s", callback != null ? callback.getClass().getSimpleName() : "null");
+            print(((ClientResponseImpl) r).toJSONString());
+            print(e.toString());
         }
 
-        /* (non-Javadoc)
-         * @see org.voltdb.client.ClientStatusListenerExt#lateProcedureResponse(org.voltdb.client.ClientResponse, java.lang.String, int)
-         */
         @Override
         public void lateProcedureResponse(ClientResponse r, String hostname, int port) {
-            log.info(String.format("ClientConfigForTest reports late procedure response from %s:%d",
-                    hostname, port));
-            log.info(((ClientResponseImpl) r).toJSONString());
+            print("late procedure response from %s:%d", hostname, port);
+            print(((ClientResponseImpl) r).toJSONString());
         }
 
+        private void print(String msg, Object... args) {
+            if (args.length != 0) { // no args, then plain print (no prefix)
+                msg = "ClientConfigForTest reports " + String.format(msg, args);
+            }
+            else if (msg == null) {
+                msg = "<null>";
+            }
+            System.out.println(msg);
+        }
     }
 
     public ClientConfigForTest() {
