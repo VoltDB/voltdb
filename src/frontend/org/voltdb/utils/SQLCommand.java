@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -63,6 +63,7 @@ import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.client.UpdateApplicationCatalog;
 import org.voltdb.compiler.DDLParserCallback;
 import org.voltdb.parser.SQLLexer;
 import org.voltdb.parser.SQLParser;
@@ -1083,7 +1084,7 @@ public class SQLCommand {
                     if (objectParams[1] != null) {
                         depfile = new File((String)objectParams[1]);
                     }
-                    printDdlResponse(m_client.updateApplicationCatalog(catfile, depfile));
+                    printDdlResponse(UpdateApplicationCatalog.update(m_client, catfile, depfile));
 
                     // Need to update the stored procedures after a catalog change (could have added/removed SPs!).  ENG-3726
                     loadStoredProcedures(Procedures, Classlist);

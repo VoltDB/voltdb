@@ -42,6 +42,7 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
+import org.voltdb.client.UpdateApplicationCatalog;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.export.ExportDataProcessor;
@@ -784,7 +785,6 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         cluster.shutDown();
     }
 
-    @SuppressWarnings("deprecation")
     @Test
     public void testRejoinWithCatalogUpdate() throws Exception {
         //Reset the VoltFile prefix that may have been set by previous tests in this suite
@@ -844,7 +844,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         Thread.sleep(100);
 
         // catalog update to increase the catalog version
-        response = client.updateApplicationCatalog(
+        response = UpdateApplicationCatalog.update(client,
                 new File(Configuration.getPathToCatalogForTest("newddl.jar")),
                 new File(pathToOtherDeployment));
         assertEquals(ClientResponse.SUCCESS, response.getStatus());

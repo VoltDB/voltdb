@@ -32,6 +32,7 @@ import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.UpdateApplicationCatalog;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
@@ -73,7 +74,8 @@ public class TestExportV2SuitePro extends TestExportBaseSocketExport {
         // add a new table
         final String newCatalogURL = Configuration.getPathToCatalogForTest("export-ddl-addedtable.jar");
         final String deploymentURL = Configuration.getPathToCatalogForTest("export-ddl-addedtable.xml");
-        final ClientResponse callProcedure = client.updateApplicationCatalog(new File(newCatalogURL),
+        final ClientResponse callProcedure = UpdateApplicationCatalog.update(client,
+                                                                             new File(newCatalogURL),
                                                                              new File(deploymentURL));
         assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
 

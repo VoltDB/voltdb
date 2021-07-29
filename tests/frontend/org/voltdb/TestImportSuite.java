@@ -42,6 +42,7 @@ import org.apache.log4j.net.SocketAppender;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.UpdateApplicationCatalog;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
@@ -450,7 +451,7 @@ public class TestImportSuite extends RegressionSuite {
         VoltProjectBuilder projectBuilder = generateVoltProject(true, false, true);
         File deploymentFilePath = new File(projectBuilder.compileDeploymentOnly(null, 1, 4, 0, 0));
         deploymentFilePath.deleteOnExit();
-        ClientResponse response = m_client.updateApplicationCatalog(null, deploymentFilePath);
+        ClientResponse response = UpdateApplicationCatalog.update(m_client, null, deploymentFilePath);
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
 
         try {
@@ -525,7 +526,7 @@ public class TestImportSuite extends RegressionSuite {
         System.out.println("Deployment file " + (includeImporters ? "with" : "without") + " importers, " +
                 (unrelatedChange ? "with" : "without") + " command logs written to " + deploymentFilePath.getCanonicalPath());
         deploymentFilePath.deleteOnExit();
-        ClientResponse response = m_client.updateApplicationCatalog(null, deploymentFilePath);
+        ClientResponse response = UpdateApplicationCatalog.update(m_client, null, deploymentFilePath);
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
     }
 

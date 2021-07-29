@@ -35,6 +35,7 @@ import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.client.UpdateApplicationCatalog;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
@@ -92,8 +93,8 @@ public class TestExportSuite extends TestExportBaseSocketExport {
         // now drop the no-nulls table
         final String newCatalogURL = Configuration.getPathToCatalogForTest("export-ddl-sans-nonulls.jar");
         final String deploymentURL = Configuration.getPathToCatalogForTest("export-ddl-sans-nonulls.xml");
-        final ClientResponse callProcedure = client.updateApplicationCatalog(new File(newCatalogURL),
-                new File(deploymentURL));
+        final ClientResponse callProcedure =
+            UpdateApplicationCatalog.update(client, new File(newCatalogURL), new File(deploymentURL));
         assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
 
         client = getClient();

@@ -47,6 +47,7 @@ import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.client.UpdateApplicationCatalog;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.MiscUtils;
 
@@ -148,7 +149,7 @@ public class TestMockUpdateApplicationCatalog {
         new File(tempjarURL).renameTo(new File(newCatalogURL));
 
         try {
-            m_client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL));
+            UpdateApplicationCatalog.update(m_client, new File(newCatalogURL), new File(deploymentURL));
             fail("Update catalog should fail with version error.");
         } catch (ProcCallException e) {
             assertTrue(e.getMessage().contains("NoClassDefFoundError"));

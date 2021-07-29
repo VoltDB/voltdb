@@ -34,6 +34,7 @@ import org.junit.Test;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.client.UpdateApplicationCatalog;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.InMemoryJarfile;
@@ -151,7 +152,7 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
         int timeout = getHeartbeatTimeout();
         assertEquals(org.voltcore.common.Constants.DEFAULT_HEARTBEAT_TIMEOUT_SECONDS, timeout);
         ClientResponse results =
-            m_client.updateApplicationCatalog(null, new File(m_pathToOtherDeployment));
+            UpdateApplicationCatalog.update(m_client, null, new File(m_pathToOtherDeployment));
         assertEquals(ClientResponse.SUCCESS, results.getStatus());
         timeout = getHeartbeatTimeout();
         assertEquals(6, timeout);
@@ -167,7 +168,7 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
     void verifyMasterWithUAC() throws Exception
     {
         // UAC should work.
-        ClientResponse results = m_client.updateApplicationCatalog(new File(m_pathToCatalog), null);
+        ClientResponse results = UpdateApplicationCatalog.update(m_client, new File(m_pathToCatalog), null);
         assertEquals(ClientResponse.SUCCESS, results.getStatus());
         assertTrue(findTableInSystemCatalogResults("FOO"));
 
@@ -229,7 +230,7 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
         assertFalse(findTableInSystemCatalogResults("FOO"));
         boolean threw = false;
         try {
-            m_client.updateApplicationCatalog(new File(m_pathToCatalog), null);
+            UpdateApplicationCatalog.update(m_client, new File(m_pathToCatalog), null);
         }
         catch (ProcCallException pce) {
             threw = true;
@@ -302,7 +303,7 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
             assertFalse(findTableInSystemCatalogResults("FOO"));
             boolean threw = false;
             try {
-                m_client.updateApplicationCatalog(new File(m_pathToCatalog), null);
+                UpdateApplicationCatalog.update(m_client, new File(m_pathToCatalog), null);
             }
             catch (ProcCallException pce) {
                 threw = true;
@@ -313,7 +314,7 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
             // deployment-only UAC should succeed
             threw = false;
             try {
-                m_client.updateApplicationCatalog(null, new File(m_pathToOtherReplicaDeployment));
+                UpdateApplicationCatalog.update(m_client, null, new File(m_pathToOtherReplicaDeployment));
             }
             catch (ProcCallException pce) {
                 threw = true;
@@ -376,7 +377,7 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
             assertFalse(findTableInSystemCatalogResults("FOO"));
             boolean threw = false;
             try {
-                m_client.updateApplicationCatalog(new File(m_pathToCatalog), null);
+                UpdateApplicationCatalog.update(m_client, new File(m_pathToCatalog), null);
             }
             catch (ProcCallException pce) {
                 threw = true;
@@ -388,7 +389,7 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
             // deployment-only UAC should fail
             threw = false;
             try {
-                m_client.updateApplicationCatalog(null, new File(m_pathToOtherReplicaDeployment));
+                UpdateApplicationCatalog.update(m_client, null, new File(m_pathToOtherReplicaDeployment));
             }
             catch (ProcCallException pce) {
                 threw = true;

@@ -315,23 +315,5 @@ public class ClientConnection implements Closeable
     {
         Client.backpressureBarrier();
     }
-
-    /**
-     * Synchronously invokes UpdateApplicationCatalog procedure. Blocks until a
-     * result is available. A {@link ProcCallException} is thrown if the
-     * response is anything other then success.
-     *
-     * @param catalogPath Path to the catalog jar file.
-     * @param deploymentPath Path to the deployment file
-     * @return array of VoltTable results
-     * @throws IOException If the files cannot be serialized
-     * @throws NoConnectionException
-     * @throws ProcCallException
-     */
-    public ClientResponse updateApplicationCatalog(File catalogPath, File deploymentPath)
-    throws IOException, NoConnectionsException, ProcCallException
-    {
-        return Client.updateApplicationCatalog(catalogPath, deploymentPath);
-    }
 }
 

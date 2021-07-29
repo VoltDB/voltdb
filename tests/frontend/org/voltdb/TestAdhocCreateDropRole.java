@@ -35,6 +35,7 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.client.UpdateApplicationCatalog;
 import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb.compiler.DeploymentBuilder.UserInfo;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -108,7 +109,7 @@ public class TestAdhocCreateDropRole extends AdhocDDLTestBase {
                     {new UserInfo("user", "user", new String[] {"NEWROLE"})});
             dbuilder.writeXML(pathToDeployment);
             try {
-                adminClient.updateApplicationCatalog(null, new File(pathToDeployment));
+                UpdateApplicationCatalog.update(adminClient, null, new File(pathToDeployment));
             }
             catch (ProcCallException pce) {
                 pce.printStackTrace();
@@ -145,7 +146,7 @@ public class TestAdhocCreateDropRole extends AdhocDDLTestBase {
             }
 
             try {
-                adminClient.updateApplicationCatalog(null, new File(pathToDeployment));
+                UpdateApplicationCatalog.update(adminClient, null, new File(pathToDeployment));
             }
             catch (ProcCallException pce) {
                 pce.printStackTrace();
@@ -261,7 +262,7 @@ public class TestAdhocCreateDropRole extends AdhocDDLTestBase {
             dbuilder.writeXML(pathToDeployment);
             threw = false;
             try {
-                adminClient.updateApplicationCatalog(null, new File(pathToDeployment));
+                UpdateApplicationCatalog.update(adminClient, null, new File(pathToDeployment));
             }
             catch (ProcCallException pce) {
                 pce.printStackTrace();

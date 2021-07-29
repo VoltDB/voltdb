@@ -37,6 +37,7 @@ import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.SyncCallback;
+import org.voltdb.client.UpdateApplicationCatalog;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.InMemoryJarfile;
@@ -91,8 +92,8 @@ public class TestConcurrentUpdateCatalog {
 
         SyncCallback cb1 = new SyncCallback();
         SyncCallback cb2 = new SyncCallback();
-        client.updateApplicationCatalog(cb1, new File(newCatalogURL1), new File(deploymentURL));
-        client.updateApplicationCatalog(cb2, new File(newCatalogURL2), new File(deploymentURL));
+        UpdateApplicationCatalog.update(client, cb1, new File(newCatalogURL1), new File(deploymentURL));
+        UpdateApplicationCatalog.update(client, cb2, new File(newCatalogURL2), new File(deploymentURL));
 
         checkResults(cb1, cb2);
     }

@@ -39,6 +39,7 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
+import org.voltdb.client.UpdateApplicationCatalog;
 import org.voltdb.compiler.CatalogUpgradeTools;
 import org.voltdb.utils.MiscUtils;
 
@@ -111,7 +112,7 @@ public class TestCatalogUpdateAutoUpgradeSuite extends RegressionSuite {
         File tweakedJarFile = new File(tweakedJarPath);
         try {
             try {
-                VoltTable[] results = client.updateApplicationCatalog(
+                VoltTable[] results = UpdateApplicationCatalog.update(client,
                         tweakedJarFile, new File(upgradeCatalogXMLPath)).getResults();
                 assertTrue(results.length == 1);
                 boolean found = watcher.waitForString();
@@ -142,7 +143,7 @@ public class TestCatalogUpdateAutoUpgradeSuite extends RegressionSuite {
         File tweakedJarFile = new File(tweakedJarPath);
         try {
             try {
-                client.updateApplicationCatalog(
+                UpdateApplicationCatalog.update(client,
                         tweakedJarFile, new File(upgradeCatalogXMLPath)).getResults();
                 fail("Expect ProcCallException");
             }
@@ -174,7 +175,7 @@ public class TestCatalogUpdateAutoUpgradeSuite extends RegressionSuite {
         File tweakedJarFile = new File(tweakedJarPath);
         try {
             try {
-                VoltTable[] results = client.updateApplicationCatalog(
+                VoltTable[] results = UpdateApplicationCatalog.update(client,
                         tweakedJarFile, new File(upgradeCatalogXMLPath)).getResults();
                 assertTrue(results.length == 1);
                 boolean found = watcher.waitForString();
@@ -208,7 +209,7 @@ public class TestCatalogUpdateAutoUpgradeSuite extends RegressionSuite {
         File tweakedJarFile = new File(tweakedJarPath);
         try {
             try {
-                client.updateApplicationCatalog(
+                UpdateApplicationCatalog.update(client,
                         tweakedJarFile, new File(upgradeCatalogXMLPath)).getResults();
                 fail("Expect ProcCallException");
             }

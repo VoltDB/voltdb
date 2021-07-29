@@ -33,6 +33,7 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.SyncCallback;
+import org.voltdb.client.UpdateApplicationCatalog;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.export.ExportDataProcessor;
@@ -82,7 +83,7 @@ public class TestExportRowLengthLimit extends RegressionSuite {
         Client client = this.getClient();
 
         SyncCallback cb2 = new SyncCallback();
-        client.updateApplicationCatalog(cb2, null, new File(project.getPathToDeployment()));
+        UpdateApplicationCatalog.update(client, cb2, null, new File(project.getPathToDeployment()));
         cb2.waitForResponse();
         assertEquals(ClientResponse.SUCCESS, cb2.getResponse().getStatus());
 

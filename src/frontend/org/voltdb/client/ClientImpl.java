@@ -51,7 +51,6 @@ import org.voltdb.client.VoltBulkLoader.BulkLoaderFailureCallBack;
 import org.voltdb.client.VoltBulkLoader.BulkLoaderState;
 import org.voltdb.client.VoltBulkLoader.BulkLoaderSuccessCallback;
 import org.voltdb.client.VoltBulkLoader.VoltBulkLoader;
-import org.voltdb.common.Constants;
 import org.voltdb.utils.Encoder;
 
 
@@ -527,52 +526,6 @@ public final class ClientImpl implements Client {
         }
 
         return true;
-    }
-
-    /**
-     * Serializes catalog and deployment file for UpdateApplicationCatalog.
-     * Catalog is serialized into byte array, deployment file is serialized into
-     * string.
-     *
-     * @param catalogPath
-     * @param deploymentPath
-     * @return Parameters that can be passed to UpdateApplicationCatalog
-     */
-    private Object[] getUpdateCatalogParams(File catalogPath, File deploymentPath)
-    throws IOException {
-        Object[] params = new Object[2];
-        if (catalogPath != null) {
-            params[0] = ClientUtils.fileToBytes(catalogPath);
-        }
-        else {
-            params[0] = null;
-        }
-        if (deploymentPath != null) {
-            params[1] = new String(ClientUtils.fileToBytes(deploymentPath), Constants.UTF8ENCODING);
-        }
-        else {
-            params[1] = null;
-        }
-        return params;
-    }
-
-    /**
-     * Update application catalog. Deprecated in client API but still
-     * used elsewhere in VoltDB.
-     */
-    @Override
-    public ClientResponse updateApplicationCatalog(File catalogPath, File deploymentPath)
-    throws IOException, ProcCallException {
-        Object[] params = getUpdateCatalogParams(catalogPath, deploymentPath);
-        return callProcedure("@UpdateApplicationCatalog", params);
-    }
-
-    @Override
-    public boolean updateApplicationCatalog(ProcedureCallback callback,
-                                            File catalogPath,
-                                            File deploymentPath) throws IOException {
-        Object[] params = getUpdateCatalogParams(catalogPath, deploymentPath);
-        return callProcedure(callback, "@UpdateApplicationCatalog", params);
     }
 
     /**

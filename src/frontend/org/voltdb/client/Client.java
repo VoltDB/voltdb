@@ -197,46 +197,6 @@ public interface Client {
     throws IOException;
 
     /**
-     * Synchronously invokes the UpdateApplicationCatalog procedure. Blocks
-     * until a result is available. A {@link ProcCallException} is thrown if the
-     * response is anything other than success.
-     * <p>
-     * @deprecated
-     * You can still call the UpdateApplicationCatalog system procedure directly,
-     * using the {@link #callProcedure(String, Object...)} family of methods.
-     *
-     * @param catalogPath Path to the catalog jar file.
-     * @param deploymentPath Path to the deployment file.
-     * @return {@link ClientResponse} instance of procedure call results.
-     * @throws IOException If the files cannot be serialized or if there is a Java network error.
-     * @throws NoConnectionsException if this {@link Client} instance is not connected to any servers.
-     * @throws ProcCallException on any VoltDB specific failure.
-     */
-    @Deprecated
-    public ClientResponse updateApplicationCatalog(File catalogPath, File deploymentPath)
-    throws IOException, NoConnectionsException, ProcCallException;
-
-    /**
-     * Asynchronously invokes the UpdateApplicationCatalog procedure. Does not
-     * guarantee that the invocation is actually queued. Check the return value
-     * to determine if queuing actually took place.
-     * <p>
-     * @deprecated
-     * You can still call the UpdateApplicationCatalog system procedure directly,
-     * using the {@link #callProcedure(ProcedureCallback, String, Object...)} family of methods.
-     *
-     * @param callback ProcedureCallback that will be invoked with procedure results.
-     * @param catalogPath Path to the catalog jar file.
-     * @param deploymentPath Path to the deployment file.
-     * @return <code>true</code> if the procedure was queued and <code>false</code> otherwise.
-     * @throws IOException If the files cannot be serialized or if there is a Java network error.
-     * @throws NoConnectionsException if this {@link Client} instance is not connected to any servers.
-     */
-    @Deprecated
-    public boolean updateApplicationCatalog(ProcedureCallback callback, File catalogPath, File deploymentPath)
-    throws IOException, NoConnectionsException;
-
-    /**
      * Synchronously invokes the UpdateClasses procedure. Blocks until a
      * result is available. A {@link ProcCallException} is thrown if the
      * response is anything other than success.

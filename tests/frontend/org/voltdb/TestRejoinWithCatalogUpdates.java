@@ -33,6 +33,7 @@ import org.junit.Test;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
+import org.voltdb.client.UpdateApplicationCatalog;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.utils.MiscUtils;
@@ -138,7 +139,7 @@ public class TestRejoinWithCatalogUpdates extends RejoinTestBase {
             File deployment = new File(Configuration.getPathToCatalogForTest("rejoin.xml"));
 
             VoltTable[] results =
-                client.updateApplicationCatalog(newCatalog, deployment).getResults();
+                UpdateApplicationCatalog.update(client, newCatalog, deployment).getResults();
             assertTrue(results.length == 1);
 
             client.close();
@@ -183,7 +184,7 @@ public class TestRejoinWithCatalogUpdates extends RejoinTestBase {
                 client.createConnection("localhost", cluster.port(0));
 
                 VoltTable[] results =
-                    client.updateApplicationCatalog(newCatalog, deployment).getResults();
+                    UpdateApplicationCatalog.update(client, newCatalog, deployment).getResults();
                 assertTrue(results.length == 1);
                 client.close();
             }

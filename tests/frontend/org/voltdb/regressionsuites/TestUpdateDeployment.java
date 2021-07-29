@@ -41,6 +41,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ClientUtils;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.SyncCallback;
+import org.voltdb.client.UpdateApplicationCatalog;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
@@ -187,7 +188,7 @@ public class TestUpdateDeployment extends RegressionSuite {
             deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.xml");
             // Mix in various ways to specify no catalog.  Make sure the client convenience method
             // works with a null file.
-            results = client.updateApplicationCatalog(null, new File(deploymentURL)).getResults();
+            results = UpdateApplicationCatalog.update(client, null, new File(deploymentURL)).getResults();
             assertTrue(results.length == 1);
             Thread.sleep(5000);
 
@@ -202,7 +203,7 @@ public class TestUpdateDeployment extends RegressionSuite {
             // Make sure you can disable snapshots
             //
             deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.xml");
-            results = client.updateApplicationCatalog(null, new File(deploymentURL)).getResults();
+            results = UpdateApplicationCatalog.update(client, null, new File(deploymentURL)).getResults();
             assertTrue(results.length == 1);
             for (File f : m_config.listFiles(new File("/tmp/snapshotdir2"))) {
                 f.delete();
@@ -219,7 +220,7 @@ public class TestUpdateDeployment extends RegressionSuite {
             // Test that we can enable snapshots
             //
             deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-enable_snapshot.xml");
-            results = client.updateApplicationCatalog(null, new File(deploymentURL)).getResults();
+            results = UpdateApplicationCatalog.update(client, null, new File(deploymentURL)).getResults();
             assertTrue(results.length == 1);
             Thread.sleep(5000);
 
@@ -234,7 +235,7 @@ public class TestUpdateDeployment extends RegressionSuite {
             // Turn snapshots off so that we can clean up
             //
             deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.xml");
-            results = client.updateApplicationCatalog(null, new File(deploymentURL)).getResults();
+            results = UpdateApplicationCatalog.update(client, null, new File(deploymentURL)).getResults();
             assertTrue(results.length == 1);
             Thread.sleep(1000);
 
@@ -272,11 +273,11 @@ public class TestUpdateDeployment extends RegressionSuite {
         String deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-addtable.xml");
         // Asynchronously attempt consecutive catalog update and deployment update
         SyncCallback cb1 = new SyncCallback();
-        client.updateApplicationCatalog(cb1,
+        UpdateApplicationCatalog.update(client, cb1,
                 new File(newCatalogURL), null);
         // Then, update the users in the deployment
         SyncCallback cb2 = new SyncCallback();
-        client.updateApplicationCatalog(cb2, null, new File(deploymentURL));
+        UpdateApplicationCatalog.update(client, cb2, null, new File(deploymentURL));
         cb1.waitForResponse();
         cb2.waitForResponse();
 
@@ -327,7 +328,7 @@ public class TestUpdateDeployment extends RegressionSuite {
         String deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-change_schema_update.xml");
         // Try to change the schem setting
         SyncCallback cb = new SyncCallback();
-        client.updateApplicationCatalog(cb, null, new File(deploymentURL));
+        UpdateApplicationCatalog.update(client, cb, null, new File(deploymentURL));
         cb.waitForResponse();
         assertEquals(ClientResponse.UNSUPPORTED_DYNAMIC_CHANGE, cb.getResponse().getStatus());
         System.out.println(cb.getResponse().getStatusString());
@@ -345,7 +346,7 @@ public class TestUpdateDeployment extends RegressionSuite {
         String deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-security-no-users.xml");
         // Try to change the schem setting
         SyncCallback cb = new SyncCallback();
-        client.updateApplicationCatalog(cb, null, new File(deploymentURL));
+        UpdateApplicationCatalog.update(client, cb, null, new File(deploymentURL));
         cb.waitForResponse();
         assertEquals(ClientResponse.GRACEFUL_FAILURE, cb.getResponse().getStatus());
         System.out.println(cb.getResponse().getStatusString());
@@ -382,7 +383,7 @@ public class TestUpdateDeployment extends RegressionSuite {
 
         // Try to change the schem setting
         SyncCallback cb = new SyncCallback();
-        client.updateApplicationCatalog(cb, null, new File(project.getPathToDeployment()));
+        UpdateApplicationCatalog.update(client, cb, null, new File(project.getPathToDeployment()));
         cb.waitForResponse();
         assertEquals(ClientResponse.GRACEFUL_FAILURE, cb.getResponse().getStatus());
         System.out.println(cb.getResponse().getStatusString());
@@ -400,7 +401,7 @@ public class TestUpdateDeployment extends RegressionSuite {
         String deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-bad-username.xml");
         // Try to change the schem setting
         SyncCallback cb = new SyncCallback();
-        client.updateApplicationCatalog(cb, null, new File(deploymentURL));
+        UpdateApplicationCatalog.update(client, cb, null, new File(deploymentURL));
         cb.waitForResponse();
         assertEquals(ClientResponse.GRACEFUL_FAILURE, cb.getResponse().getStatus());
         System.out.println(cb.getResponse().getStatusString());
@@ -417,7 +418,7 @@ public class TestUpdateDeployment extends RegressionSuite {
         String deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-bad-masked-password.xml");
         // Try to change schema setting
         SyncCallback cb = new SyncCallback();
-        client.updateApplicationCatalog(cb, null, new File(deploymentURL));
+        UpdateApplicationCatalog.update(client, cb, null, new File(deploymentURL));
         cb.waitForResponse();
         assertEquals(ClientResponse.GRACEFUL_FAILURE, cb.getResponse().getStatus());
         assertTrue(cb.getResponse().getStatusString().contains("Unable to update deployment configuration"));
@@ -431,7 +432,7 @@ public class TestUpdateDeployment extends RegressionSuite {
         String deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-change-sitesperhost.xml");
         // Try to change schema setting
         SyncCallback cb = new SyncCallback();
-        client.updateApplicationCatalog(cb, null, new File(deploymentURL));
+        UpdateApplicationCatalog.update(client, cb, null, new File(deploymentURL));
         cb.waitForResponse();
         assertEquals(ClientResponse.UNSUPPORTED_DYNAMIC_CHANGE, cb.getResponse().getStatus());
         assertTrue(cb.getResponse().getStatusString().contains("Unable to update deployment configuration"));
