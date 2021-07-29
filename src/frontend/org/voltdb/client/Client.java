@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import org.voltdb.client.VoltBulkLoader.BulkLoaderFailureCallBack;
 import org.voltdb.client.VoltBulkLoader.BulkLoaderSuccessCallback;
@@ -157,6 +158,43 @@ public interface Client {
      */
     public boolean callProcedureWithTimeout(ProcedureCallback callback, int queryTimeout, String procName, Object... parameters)
     throws IOException, NoConnectionsException;
+
+    /**
+     * Synchronously invoke a procedure call, blocking until a result is available,
+     * with caller-specified procedure timeout.
+     *
+     * @param batchTimeout procedure invocation batch timeout (milliseconds)
+     * @param procName class name (not qualified by package) of the procedure to execute.
+     * @param clientTimeout timeout for the procedure
+     * @param unit TimeUnit of procedure timeout
+     * @param parameters vararg list of procedure's parameter values.
+     * @return ClientResponse for execution.
+     */
+    public ClientResponse callProcedureWithClientTimeout(int batchTimeout,
+                                                         String procName,
+                                                         long clientTimeout,
+                                                         TimeUnit unit,
+                                                         Object... parameters)
+    throws IOException, NoConnectionsException, ProcCallException;
+
+    /**
+     * Asynchronously invoke a procedure call with specified batch and query timeouts.
+     *
+     * @param callback TransactionCallback that will be invoked with procedure results.
+     * @param batchTimeout procedure invocation batch timeout (in milliseconds)
+     * @param procName class name (not qualified by package) of the procedure to execute.
+     * @param clientTimeout query timeout
+     * @param clientTimeoutUnit units for query timeout
+     * @param parameters vararg list of procedure's parameter values.
+     * @return True if the procedure was queued and false otherwise
+     */
+    public boolean callProcedureWithClientTimeout(ProcedureCallback callback,
+                                                  int batchTimeout,
+                                                  String procName,
+                                                  long clientTimeout,
+                                                  TimeUnit clientTimeoutUnit,
+                                                  Object... parameters)
+    throws IOException;
 
     /**
      * Synchronously invokes the UpdateApplicationCatalog procedure. Blocks

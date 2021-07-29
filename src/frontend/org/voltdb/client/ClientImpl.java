@@ -247,8 +247,6 @@ public final class ClientImpl implements Client {
      * Synchronously invoke a procedure call blocking until a result is available,
      * with caller-specified procedure timeout.
      *
-     * NOTE: not in Client interface. WHY?
-     *
      * @param batchTimeout procedure invocation batch timeout.
      * @param procName class name (not qualified by package) of the procedure to execute.
      * @param clientTimeout timeout for the procedure
@@ -256,6 +254,7 @@ public final class ClientImpl implements Client {
      * @param parameters vararg list of procedure's parameter values.
      * @return ClientResponse for execution.
      */
+    @Override
     public ClientResponse callProcedureWithClientTimeout(int batchTimeout,
                                                          String procName,
                                                          long clientTimeout,
@@ -342,8 +341,6 @@ public final class ClientImpl implements Client {
     /**
      * Asynchronously invoke a procedure call with specified batch and query timeouts.
      *
-     * NOTE: not in Client interface. WHY?
-     *
      * @param callback TransactionCallback that will be invoked with procedure results.
      * @param batchTimeout procedure invocation batch timeout.
      * @param procName class name (not qualified by package) of the procedure to execute.
@@ -352,6 +349,7 @@ public final class ClientImpl implements Client {
      * @param parameters vararg list of procedure's parameter values.
      * @return True if the procedure was queued and false otherwise
      */
+    @Override
     public boolean callProcedureWithClientTimeout(ProcedureCallback callback,
                                                   int batchTimeout,
                                                   String procName,

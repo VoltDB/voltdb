@@ -31,7 +31,6 @@ import org.voltdb.BackendTarget;
 import org.voltdb.ProcedurePartitionData;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
-import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -442,7 +441,7 @@ public class TestFailuresSuite extends RegressionSuite {
         }
 
         try {
-            ((ClientImpl)client).callProcedureWithClientTimeout(100, "PartitionedSelect", 100, TimeUnit.MILLISECONDS);
+            client.callProcedureWithClientTimeout(100, "PartitionedSelect", 100, TimeUnit.MILLISECONDS);
         }
         catch (ProcCallException e) {
             m_fatalFailure = true;

@@ -32,8 +32,8 @@ import java.util.concurrent.TimeUnit;
 import org.junit.Test;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.BatchTimeoutOverrideType;
+import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
-import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -68,7 +68,7 @@ public class TestAdhocCompilerException extends AdhocDDLTestBase
             try {
                 // Ten seconds should be long enough to detect a hang.
                 String toxicDDL = AdHocNTBase.DEBUG_EXCEPTION_DDL + ";";
-                ((ClientImpl)m_client).callProcedureWithClientTimeout(
+                m_client.callProcedureWithClientTimeout(
                         BatchTimeoutOverrideType.NO_TIMEOUT, "@AdHoc", 10, TimeUnit.SECONDS, toxicDDL);
             }
             catch (ProcCallException pce) {
@@ -92,13 +92,13 @@ public class TestAdhocCompilerException extends AdhocDDLTestBase
 
     private void tryOldClientWithValidDDL() throws Exception
     {
-        tryValidDDL((ClientImpl)m_client);
+        tryValidDDL(m_client);
     }
 
     private void tryNewClientWithValidDDL() throws Exception
     {
         // For fun see if a client can connect.
-        ClientImpl client = (ClientImpl)ClientFactory.createClient();
+        Client client = ClientFactory.createClient();
         try {
             client.createConnection("localhost");
             tryValidDDL(client);
@@ -113,7 +113,7 @@ public class TestAdhocCompilerException extends AdhocDDLTestBase
 
     static int validDDLAttempt = 0;
 
-    private void tryValidDDL(ClientImpl client) throws Exception
+    private void tryValidDDL(Client client) throws Exception
     {
         validDDLAttempt++;
         String tableName = String.format("FOO%d", validDDLAttempt);
