@@ -3242,7 +3242,8 @@ function alertNodeClicked(obj) {
                   hostId,
                   serverInfo["HOSTNAME"],
                   serverInfo["CLUSTERSTATE"],
-                  serverInfo["IPADDRESS"]
+                  serverInfo["IPADDRESS"],
+                  serverInfo["HTTPPORT"]
                 );
                 VoltDbAdminConfig.servers[iteratorCount] = serverDetails;
 
@@ -3270,7 +3271,8 @@ function alertNodeClicked(obj) {
             hostId,
             hostname,
             serverInfo["CLUSTERSTATE"],
-            serverInfo["IPADDRESS"]
+            serverInfo["IPADDRESS"],
+            serverInfo["HTTPPORT"]
           );
           VoltDbAdminConfig.servers.push(serverDetails);
           count++;
@@ -3340,21 +3342,30 @@ function alertNodeClicked(obj) {
         VoltDbAdminConfig.servers != null ||
         VoltDbAdminConfig.servers != undefined
       ) {
+        var count = 0;
         $.each(VoltDbAdminConfig.servers, function (id, val) {
-          if (
-            (val.serverName != null ||
-              val.serverName != "" ||
-              val.serverName != undefined) &&
-            val.serverState == "RUNNING"
-          ) {
-            className =
-              voltDbRenderer.currentHost == val.serverName
-                ? "disableServer"
-                : "shutdown";
-            currentServerRowClass =
-              voltDbRenderer.currentHost == val.serverName
-                ? "activeHostMonitoring"
-                : "activeHost";
+          if (val.serverState == "PAUSED" || val.serverState == "MISSING"){
+            count++ ;
+          }
+        });
+        var con = true;
+        if (count >= parseInt($("#kSafety").text())){
+          con = false;
+        }
+        $.each(VoltDbAdminConfig.servers, function (id, val) {
+          console.log(val);
+          if ((val.serverName != null || val.serverName != "" || val.serverName != undefined) && val.serverState == "RUNNING") {
+            if (voltDbRenderer.currentHost != val.serverName && con) {
+              className = "shutdown";
+              currentServerColumnClass = "shutdownServer";
+            }else{
+              className = "disableServer";
+              currentServerColumnClass = "shutdownServer stopDisable";
+            }
+            if (location.port == val.httpPort){
+              className = "disableServer";
+              currentServerColumnClass = "shutdownServer stopDisable";
+            }
             currentServerColumnClass =
               voltDbRenderer.currentHost == val.serverName
                 ? "shutdownServer stopDisable"
@@ -3364,7 +3375,7 @@ function alertNodeClicked(obj) {
               '<tr class="' +
                 currentServerRowClass +
                 '"><td class="configLabel" width="40%"><a class="serNameTruncate" href="#" >' +
-                val.serverName +
+                val.serverName + "-" + val.hostId +
                 "</a></td>" +
                 "<td  align='center' >" +
                 val.ipAddress +
@@ -3382,16 +3393,12 @@ function alertNodeClicked(obj) {
                 currentServerColumnClass +
                 '">Stop</span></a></td></tr>'
             );
-          } else if (
-            (val.serverName != null ||
-              val.serverName != "" ||
-              val.serverName != undefined) &&
-            val.serverState == "PAUSED"
-          ) {
-            className =
-              voltDbRenderer.currentHost == val.serverName
-                ? "disableServer"
-                : "shutdown";
+          } else if ((val.serverName != null || val.serverName != "" || val.serverName != undefined) && val.serverState == "PAUSED") {
+            if (voltDbRenderer.currentHost != val.serverName && con) {
+              className = "shutdown";
+            }else{
+              className = "disableServer";
+            }
             currentServerRowClass =
               voltDbRenderer.currentHost == val.serverName
                 ? "activeHostMonitoring"
@@ -3402,7 +3409,7 @@ function alertNodeClicked(obj) {
               '<tr class="' +
                 currentServerRowClass +
                 '"><td class="configLabel" width="40%"><a class="serNameTruncate" href="#" >' +
-                val.serverName +
+                val.serverName + "-" + val.hostId +
                 "</a></td>" +
                 "<td  align='center' >" +
                 val.ipAddress +
@@ -3418,15 +3425,10 @@ function alertNodeClicked(obj) {
                 currentServerColumnClass +
                 '">Paused</span></a></td></tr>'
             );
-          } else if (
-            (val.serverName != null ||
-              val.serverName != "" ||
-              val.serverName != undefined) &&
-            val.serverState == "JOINING"
-          ) {
+          } else if ((val.serverName != null || val.serverName != "" || val.serverName != undefined) && val.serverState == "JOINING") {
             htmlServerListHtml = htmlServerListHtml.concat(
               '<tr><td class="configLabel" width="40%"><a class="serNameTruncate" href="#">' +
-                val.serverName +
+                val.serverName + "-" + val.hostId +
                 "</a></td>" +
                 "<td  align='center' >" +
                 val.ipAddress +
@@ -3434,15 +3436,10 @@ function alertNodeClicked(obj) {
                 '<td align="right"><a href="javascript:void(0);" class="shutdownDisabled">' +
                 "<span>Stop</span></a></td></tr>"
             );
-          } else if (
-            val.serverName != null ||
-            val.serverName != "" ||
-            val.serverName != undefined ||
-            val.serverState == "MISSING"
-          ) {
+          } else if (val.serverName != null || val.serverName != "" || val.serverName != undefined || val.serverState == "MISSING") {
             htmlServerListHtml = htmlServerListHtml.concat(
               '<tr><td class="configLabel" width="40%"><a class="serNameTruncate" href="#">' +
-                val.serverName +
+                val.serverName + "-" + val.hostId + 
                 "</a></td>" +
                 "<td  align='center' >" +
                 val.ipAddress +
@@ -3453,7 +3450,7 @@ function alertNodeClicked(obj) {
                 val.serverName +
                 '" class="disableServer"  id="stopServer_' +
                 val.serverName +
-                ' onclick="VoltDbUI.openPopup(this);">' +
+                '" onclick="VoltDbUI.openPopup(this);">' +
                 '<span class="shutdownServer stopDisable">Stop</span></a></td></tr>'
             );
           }
