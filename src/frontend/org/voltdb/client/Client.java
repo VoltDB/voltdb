@@ -341,45 +341,31 @@ public interface Client {
     public boolean isTopologyChangeAwareEnabled();
 
     /**
-     * Write a single line of comma-separated values to the file specified.
+     * Append a single line of comma-separated values to the file specified.
      * Used mainly for collecting results from benchmarks.
      * <p>
-     * The format of this output is subject to change between versions.
-     * See {@link #writeSummaryCSV(ClientStats, String)} for the format.
+     * This is a convenience method that calls through to
+     * {@link ClientStatsUtil#writeSummaryCSV(String,ClientStats,String)},
+     * which you should see for details of the output format.
      *
-     * @param statsRowName give the client stats row an identifiable name.
-     * @param stats {@link ClientStats} instance with relevant stats.
-     * @param path Path to write to, passed to {@link FileWriter#FileWriter(String)}.
-     * @throws IOException on any file write error.
+     * @param statsRowName give the client stats row an identifiable name
+     * @param stats {@link ClientStats} instance with relevant stats
+     * @param path path of CSV file
+     * @throws IOException on any file write error
      */
     public void writeSummaryCSV(String statsRowName, ClientStats stats, String path) throws IOException;
 
     /**
-     * Write a single line of comma-separated values to the file specified.
+     * Append a single line of comma separated values to the file specified.
      * Used mainly for collecting results from benchmarks.
-     * <p>
-     * The format of this output is subject to change between versions.
-     * As of V11.0 there are 13 fields. The format is:
-     * <ol>
-     * <li>Timestamp (ms) of creation of the given {@link ClientStats} instance, stats.</li>
-     * <li>Duration from first procedure call within the given {@link ClientStats} instance
-     *    until this call in ms.</li>
-     * <li>Count of invocations completed.</li>
-     * <li>Minimum round trip latency estimate in ms.</li>
-     * <li>Maximum round trip latency estimate in ms.</li>
-     * <li>95-percentile round trip latency estimate in ms.</li>
-     * <li>99-percentile round trip latency estimate in ms.</li>
-     * <li>99.9-percentile round trip latency estimate in ms.</li>
-     * <li>99.99-percentile round trip latency estimate in ms.</li>
-     * <li>99.999-percentile round trip latency estimate in ms.</li>
-     * <li>Count of invocation errors.</li>
-     * <li>Count of invocation aborts.</li>
-     * <li>Count of invocation timeouts.</li>
-     * </ol>
+     *<p>
+     * This is a convenience method that calls through to
+     * {@link ClientStatsUtil#writeSummaryCSV(ClientStats,String)},
+     * which you should see for details of the output format.
      *
-     * @param stats {@link ClientStats} instance with relevant stats.
-     * @param path Path to write to, passed to {@link FileWriter#FileWriter(String)}.
-     * @throws IOException on any file write error.
+     * @param stats {@link ClientStats} instance with relevant stats
+     * @param path path of CSV file
+     * @throws IOException on any file write error
      */
     public void writeSummaryCSV(ClientStats stats, String path) throws IOException;
 

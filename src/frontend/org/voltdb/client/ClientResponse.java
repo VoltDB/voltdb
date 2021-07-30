@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -106,6 +106,13 @@ public interface ClientResponse {
      * a graceful failure.
      */
     public static final byte UNSUPPORTED_DYNAMIC_CHANGE = -13;
+
+    /**
+     * Status code indicating that the transaction failed in the client before it
+     * was sent to the VoltDB server. This can happen when requests time out before
+     * transmission, perhaps due to being queued awaiting send permits.
+     */
+    public static final byte TXN_NOT_SENT = -14;
 
     /**
      * Default value for the user specified app status code field

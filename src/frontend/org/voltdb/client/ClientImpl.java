@@ -18,7 +18,6 @@
 package org.voltdb.client;
 
 import java.io.File;
-import java.io.FileWriter;
 import java.io.InterruptedIOException;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -1013,29 +1012,9 @@ public final class ClientImpl implements Client {
     @Override
     public void writeSummaryCSV(String statsRowName, ClientStats stats, String path) throws IOException {
         // don't do anything (be silent) if empty path
-        if (path == null || path.length() == 0) {
-            return;
+        if (path != null && !path.isEmpty()) {
+            ClientStatsUtil.writeSummaryCSV(statsRowName, stats, path);
         }
-
-        FileWriter fw = new FileWriter(path, true);
-        if (statsRowName != null && ! statsRowName.isEmpty()) {
-            fw.append(statsRowName).append(",");
-        }
-        fw.append(String.format("%d,%d,%d,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%d,%d,%d\n",
-                stats.getStartTimestamp(),
-                stats.getDuration(),
-                stats.getInvocationsCompleted(),
-                stats.kPercentileLatencyAsDouble(0.0),
-                stats.kPercentileLatencyAsDouble(1.0),
-                stats.kPercentileLatencyAsDouble(0.95),
-                stats.kPercentileLatencyAsDouble(0.99),
-                stats.kPercentileLatencyAsDouble(0.999),
-                stats.kPercentileLatencyAsDouble(0.9999),
-                stats.kPercentileLatencyAsDouble(0.99999),
-                stats.getInvocationErrors(),
-                stats.getInvocationAborts(),
-                stats.getInvocationTimeouts()));
-        fw.close();
     }
 
     // Hidden method to check if Hashinator is initialized.
