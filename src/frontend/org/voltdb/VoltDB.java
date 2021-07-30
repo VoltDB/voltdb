@@ -974,7 +974,7 @@ public class VoltDB {
                     referToDocAndExit();
                 }
                 if (!configCFH.equals(optCFH)) {
-                    hostLog.fatal("In startup mode you may only specify " + deploymentFH + " for deployment, You specified: " + optCFH);
+                    hostLog.fatal("In startup mode you may only specify " + deploymentFH + " for deployment, you specified: " + optCFH);
                     referToDocAndExit();
                 }
             } else {
@@ -982,7 +982,8 @@ public class VoltDB {
             }
 
             if (!inzFH.exists() || !inzFH.isFile() || !inzFH.canRead()) {
-                hostLog.fatal("Specified directory is not a VoltDB initialized root");
+                hostLog.fatal(String.format("Specified directory '%s' is not a VoltDB initialized root",
+                                            m_voltdbRoot.getAbsolutePath()));
                 referToDocAndExit();
             }
 
