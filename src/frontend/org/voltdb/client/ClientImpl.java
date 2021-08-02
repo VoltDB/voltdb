@@ -35,7 +35,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.logging.Logger;
 
 import com.google_voltpatches.common.net.HostAndPort;
 import io.netty.handler.ssl.SslContext;
@@ -59,7 +58,6 @@ import org.voltdb.utils.Encoder;
  *  responses.
  */
 public final class ClientImpl implements Client {
-    private static final Logger LOG = Logger.getLogger(ClientImpl.class.getName());
 
     // Global instance of null callback for performance (we only need one)
     private static final ProcedureCallback NULL_CALLBACK = new NullCallback();
