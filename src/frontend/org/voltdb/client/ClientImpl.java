@@ -61,9 +61,6 @@ import org.voltdb.utils.Encoder;
 public final class ClientImpl implements Client {
     private static final Logger LOG = Logger.getLogger(ClientImpl.class.getName());
 
-    // Time to wait before retrying a failed connection attempt
-    private static final int CONNECTION_RETRY_DELAY_SEC = 10;
-
     // Global instance of null callback for performance (we only need one)
     private static final ProcedureCallback NULL_CALLBACK = new NullCallback();
 
@@ -83,6 +80,10 @@ public final class ClientImpl implements Client {
 
     // True for any kind of automatic reconnect.
     private final boolean m_autoReconnect;
+
+    // Time (in msec) between reconnect attempts
+    private final long m_reconnectDelay;
+    private final long m_reconnectMaxDelay;
 
     // For reconnect on connection loss (null if not enabled
     // or if running in topology-change-aware mode).
@@ -158,6 +159,8 @@ public final class ClientImpl implements Client {
 
         m_topologyChangeAware = config.m_topologyChangeAware;
         m_autoReconnect = config.m_reconnectOnConnectionLoss | m_topologyChangeAware;
+        m_reconnectDelay = config.m_initialConnectionRetryIntervalMS;
+        m_reconnectMaxDelay = config.m_maxConnectionRetryIntervalMS;
 
         m_distributer.setTopologyChangeAware(m_topologyChangeAware, m_autoReconnect);
         if (m_topologyChangeAware) {
@@ -169,9 +172,7 @@ public final class ClientImpl implements Client {
         }
 
         if (m_autoReconnect && !m_topologyChangeAware) {
-            m_reconnectStatusListener = new ReconnectStatusListener(this,
-                                                                    config.m_initialConnectionRetryIntervalMS,
-                                                                    config.m_maxConnectionRetryIntervalMS);
+            m_reconnectStatusListener = new ReconnectStatusListener(this, m_reconnectDelay, m_reconnectMaxDelay);
             m_distributer.addClientStatusListener(m_reconnectStatusListener);
         } else {
             m_reconnectStatusListener = null;
@@ -805,8 +806,9 @@ public final class ClientImpl implements Client {
          * Failure: schedule a retry.
          * @param failCount - non-zero if retry needed
          * @param first - determines which task to requeue
+         * @param retry - the number of previous retries
          */
-        void retryConnectionCreationIfNeeded(int failCount, boolean first) {
+        void retryConnectionCreationIfNeeded(int failCount, boolean first, int retry) {
             if (failCount == 0) {
                 try {
                     m_distributer.setCreateConnectionsUponTopologyChangeComplete();
@@ -816,11 +818,23 @@ public final class ClientImpl implements Client {
             } else if (m_isShutdown) {
                 notifyAutoConnectFailure(null, AutoConnectionStatus.UNABLE_TO_CONNECT);
             } else if (first) {
-                m_ex.schedule(new FirstConnectionTask(this, connectionTaskCount), CONNECTION_RETRY_DELAY_SEC, TimeUnit.SECONDS);
+                m_ex.schedule(new FirstConnectionTask(this, connectionTaskCount, retry+1), reconnectDelay(retry+1), TimeUnit.MILLISECONDS);
             } else if (connectionTaskCount.get() < 2) { // TODO: why 2? current task has decremented count, so count is only count of queued
                 // if there are tasks in the queue, do not need schedule again since all the tasks do the same job
-                m_ex.schedule(new CreateConnectionTask(this, connectionTaskCount), CONNECTION_RETRY_DELAY_SEC, TimeUnit.SECONDS);
+                m_ex.schedule(new CreateConnectionTask(this, connectionTaskCount, retry+1), reconnectDelay(retry+1), TimeUnit.MILLISECONDS);
             }
+        }
+
+        /*
+         * Calculate delay before n'th (n>0) reconnection attempt,
+         * doubling at each retry, up to a maximum delay.
+         */
+        long reconnectDelay(int n) {
+            long delay = m_reconnectDelay;
+            for (int i=1; delay<m_reconnectMaxDelay && i<n; i++) {
+                delay = Math.min(delay * 2, m_reconnectMaxDelay);
+            }
+            return delay;
         }
 
         /**
@@ -828,14 +842,14 @@ public final class ClientImpl implements Client {
          * and make connections (called from Distributer)
          */
         public void createConnectionsUponTopologyChange() {
-            m_ex.execute(new CreateConnectionTask(this, connectionTaskCount));
+            m_ex.execute(new CreateConnectionTask(this, connectionTaskCount, 0));
         }
 
         /**
          * We have no connections; make the first one
          */
         public void createAnyConnection() {
-            m_ex.execute(new FirstConnectionTask(this, connectionTaskCount));
+            m_ex.execute(new FirstConnectionTask(this, connectionTaskCount, 0));
         }
     }
 
@@ -846,10 +860,12 @@ public final class ClientImpl implements Client {
     private class CreateConnectionTask implements Runnable {
         final InternalClientStatusListener listener;
         final AtomicInteger connectionTaskCount;
+        final int retryCount;
 
-        CreateConnectionTask(InternalClientStatusListener listener, AtomicInteger connectionTaskCount) {
+        CreateConnectionTask(InternalClientStatusListener listener, AtomicInteger connectionTaskCount, int retryCount) {
             this.listener = listener;
             this.connectionTaskCount = connectionTaskCount;
+            this.retryCount = retryCount;
             connectionTaskCount.incrementAndGet();
         }
 
@@ -878,7 +894,7 @@ public final class ClientImpl implements Client {
                 failCount++;
             } finally {
                 connectionTaskCount.decrementAndGet();
-                listener.retryConnectionCreationIfNeeded(failCount, false);
+                listener.retryConnectionCreationIfNeeded(failCount, false, retryCount);
             }
         }
     }
@@ -894,10 +910,12 @@ public final class ClientImpl implements Client {
         final InternalClientStatusListener listener;
         final AtomicInteger connectionTaskCount;
         final LinkedHashSet<HostAndPort> targets;
+        final int retryCount;
 
-        FirstConnectionTask(InternalClientStatusListener listener, AtomicInteger connectionTaskCount ) {
+        FirstConnectionTask(InternalClientStatusListener listener, AtomicInteger connectionTaskCount, int retryCount) {
             this.listener = listener;
             this.connectionTaskCount = connectionTaskCount;
+            this.retryCount = retryCount;
             synchronized (m_connectHistory) {
                 targets = new LinkedHashSet<>(m_connectHistory);
                 m_newConnectEpoch = true; // discard old history in successful completion
@@ -925,7 +943,7 @@ public final class ClientImpl implements Client {
             }
             finally {
                 connectionTaskCount.decrementAndGet();
-                listener.retryConnectionCreationIfNeeded(failCount, true);
+                listener.retryConnectionCreationIfNeeded(failCount, true, retryCount);
             }
         }
     }

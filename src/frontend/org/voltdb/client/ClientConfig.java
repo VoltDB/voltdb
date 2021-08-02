@@ -408,8 +408,10 @@ public class ClientConfig {
      * the cluster as they are discovered, and will reconnect if those connections fail.
      * Defaults to false.
      * <p>
-     * If the first connection attempt fails, then retries are made with
-     * a fixed 10-second interval.
+     * The interval between retries is subject to exponential backoff
+     * between user-supplied limits.
+     * See {@link #setInitialConnectionRetryInterval}
+     * and {@link #setMaxConnectionRetryInterval}.
      *
      * @param enabled Enable or disable the topology awareness feature.
      */
@@ -439,13 +441,16 @@ public class ClientConfig {
      * See {@link #setInitialConnectionRetryInterval}
      * and {@link #setMaxConnectionRetryInterval}.
      * <p>
-     * This method is ignored in topology-change-aware clients.
-     * Topology-change-aware clients automatically attempt to reconnect
-     * failed connections, regardless of whether enabled by this method.
-     * See {@link #setTopologyChangeAware}.
-     *
+     * @deprecated prefer using a topology-change-aware client, which
+     * provides more automatic handling of connections to VoltDB cluster
+     * nodes.
+     * <p>
+     * (Deprecated in v11.1, 2021-07-30)
+      *
      * @param on Enable or disable the reconnection feature. Default is off.
+     * @see #setTopologyChangeAware(boolean)
      */
+    @Deprecated
     public void setReconnectOnConnectionLoss(boolean on) {
         this.m_reconnectOnConnectionLoss = on;
     }
@@ -453,7 +458,6 @@ public class ClientConfig {
     /**
      * Set the initial connection retry interval for automatic reconnection.
      * This is the delay between the first and second reconnect attempts.
-     * Only has an effect if reconnection on connection loss is enabled.
      *
      * @param ms initial connection retry interval in milliseconds.
      */
@@ -464,8 +468,7 @@ public class ClientConfig {
     /**
      * Set the maximum connection retry interval. After each reconnection
      * failure, the interval before the next retry is doubled, but will never
-     * exceed this maximum. Only has an effect if reconnection on connection
-     * loss is enabled.
+     * exceed this maximum.
      *
      * @param ms max connection retry interval in milliseconds.
      */
