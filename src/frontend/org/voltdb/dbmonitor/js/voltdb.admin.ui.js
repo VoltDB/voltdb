@@ -59,7 +59,47 @@ function rolehtml(){
     return role_options
 }
 
+function check_kubernetes(server,port){
+    uri = "http://"+server+":"+port+"/api/1.0/?Procedure=@SystemInformation";
+    con = false;
+    $.get(uri,
+        function (data, textStatus, jqXHR) {  // success callback
+            if (textStatus == "success"){
+                data = data["results"][0]["data"];
+                $.each(data,function(id,val){
+                    if (val[1] == "KUBERNETES") {
+                        con = val[2];
+                    }
+                });
+            }
+        });
+    return con;
+}
+
 function loadAdminPage() {
+    if (check_kubernetes($(location).attr("hostname"),$(location).attr("port"))){
+        console.log('Running in kubernetes');
+    }else{
+        var htmlcontent = "";
+        htmlcontent = htmlcontent.concat(
+            '<div class="kubernetes-content">'+
+            '<div class="kubernetes-logo"></div>' + 
+            '<p>kubernetes</p>' +
+            '<p>Managed by kubernetes</p>'+
+            '</div>'
+        )
+        $(".adminLeft").html(htmlcontent);
+        $("#securityEdit").remove();
+        $("#autoSnapshotEdit").remove();
+        $("#addNewConfigLink").remove();
+        $("#addNewImportConfigLink").remove();
+        $("#snmpEdit").remove();
+        $("#btnEditHrtTimeOut").remove();
+        $("#btnEditQueryTimeout").remove();
+        $("#btnDeleteMemory").remove();
+        $("#btnEditMemorySize").remove();
+        $("#btnEditDiskLimit").remove();
+    }
     adminClusterObjects = {
         btnClusterPause: $('#pauseConfirmation'),
         btnClusterResume: $('#resumeConfirmation'),

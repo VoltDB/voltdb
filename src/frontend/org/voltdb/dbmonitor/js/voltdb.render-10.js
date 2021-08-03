@@ -3353,7 +3353,6 @@ function alertNodeClicked(obj) {
           con = false;
         }
         $.each(VoltDbAdminConfig.servers, function (id, val) {
-          console.log(val);
           if ((val.serverName != null || val.serverName != "" || val.serverName != undefined) && val.serverState == "RUNNING") {
             if (voltDbRenderer.currentHost != val.serverName && con) {
               className = "shutdown";

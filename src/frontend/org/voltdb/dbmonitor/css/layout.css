@@ -4824,3 +4824,9 @@ table.dataTable {top:0;}
     color: #000 !important;
 }
 
+.kubernetes-logo {
+    background-image: url("../images/kubernetes.png");
+    height: 80px;
+    background-size: contain;
+    background-repeat: no-repeat;
+}
