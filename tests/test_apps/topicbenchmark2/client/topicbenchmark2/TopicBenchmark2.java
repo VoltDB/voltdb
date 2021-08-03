@@ -64,6 +64,7 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.serialization.LongDeserializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
+import org.apache.kafka.common.errors.FencedInstanceIdException;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
@@ -304,7 +305,7 @@ public class TopicBenchmark2 {
 
     void exitWithException(String message, Exception e, boolean stackTrace) {
         log.error(message);
-        log.info(e.getLocalizedMessage());
+        log.info(String.format("Exit with exception: %s", e));
         if (stackTrace) {
             e.printStackTrace();
         }
@@ -689,8 +690,21 @@ public class TopicBenchmark2 {
                 }
             }
         }
+        catch (FencedInstanceIdException e) {
+            // Static members can get fenced exception in the window where the server didn't
+            // persist the latest membership updates before going down. Ignore this error as the
+            // group should continue polling and the members should eventually reconnect.
+            if (m_config.staticmembers) {
+                log.warn(String.format(
+                        "Group %s thread %d ignoring fenced exception for static member, retrying ...",
+                        groupId, thId));
+            }
+            else {
+                exitWithException("Group " + groupId + " thread " + thId + " fenced polling from topic", e, true);
+            }
+        }
         catch (Exception e) {
-            exitWithException("Group " + groupId + " thread " + thId + " failed polling from topic\n", e, true);
+            exitWithException("Group " + groupId + " thread " + thId + " failed polling from topic", e, true);
         }
         return false;
     }
@@ -794,7 +808,7 @@ public class TopicBenchmark2 {
             producer.close();
         }
         catch (Exception e) {
-            exitWithException("Producer thread " + thId + " failed inserting into topic\n", e, true);
+            exitWithException("Producer thread " + thId + " failed inserting into topic", e, true);
         }
     }
 
