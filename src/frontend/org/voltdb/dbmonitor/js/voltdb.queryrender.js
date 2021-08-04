@@ -395,7 +395,6 @@ function QueryUI(queryTab) {
             // user correct their ddl grammar. Angle-bracketed place-holders were being
             // rendered as invisible meaningless html tags.
             // See http://stackoverflow.com/questions/18749591/encode-html-entities-in-javascript#18750001
-            console.log(response.statusstring);
             var encodedStatus = response.statusstring.replace(/[\u00A0-\u9999<>\&]/gim,
                 function (i) { return '&#' + i.charCodeAt(0) + ';'; });
             if (encodedStatus.indexOf("PrepareStatement error:")>=0){

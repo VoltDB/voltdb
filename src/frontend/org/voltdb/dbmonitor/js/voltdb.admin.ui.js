@@ -78,12 +78,10 @@ function check_kubernetes(server,port){
 
 function loadAdminPage() {
     if (check_kubernetes($(location).attr("hostname"),$(location).attr("port"))){
-        console.log('Running in kubernetes');
-    }else{
         var htmlcontent = "";
         htmlcontent = htmlcontent.concat(
             '<div class="kubernetes-content">'+
-            '<div class="kubernetes-logo"><p class="kubernetes-title">kubernetes</p><p class="kubernetes-subtitle">Managed by kubernetes</p></div>' + 
+            '<div class="kubernetes-logo"><p class="kubernetes-title">Managed by Kubernetes</p><p class="kubernetes-subtitle">Use Helm to manage and administer your cluster</p></div>' + 
             '</div>'
         )
         $(".adminLeft").html(htmlcontent);
