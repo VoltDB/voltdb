@@ -83,9 +83,7 @@ function loadAdminPage() {
         var htmlcontent = "";
         htmlcontent = htmlcontent.concat(
             '<div class="kubernetes-content">'+
-            '<div class="kubernetes-logo"></div>' + 
-            '<p>kubernetes</p>' +
-            '<p>Managed by kubernetes</p>'+
+            '<div class="kubernetes-logo"><p class="kubernetes-title">kubernetes</p><p class="kubernetes-subtitle">Managed by kubernetes</p></div>' + 
             '</div>'
         )
         $(".adminLeft").html(htmlcontent);
