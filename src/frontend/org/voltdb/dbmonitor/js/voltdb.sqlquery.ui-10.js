@@ -80,11 +80,11 @@ $(document).ready(function () {
     var mouseup = new CustomEvent("mouseup", { bubbles: true });
     var gutter = document.querySelector(".gutter-horizontal");
 
-    mousemove.clientX = gutter.getBoundingClientRect().left;
+    mousemove.clientX = gutter === null? '' : gutter.getBoundingClientRect().left;
 
-    gutter.dispatchEvent(mousedown);
-    gutter.dispatchEvent(mousemove);
-    gutter.dispatchEvent(mouseup);
+    gutter === null? '' : gutter.dispatchEvent(mousedown);
+    gutter === null? '' : gutter.dispatchEvent(mousemove);
+    gutter === null? '' : gutter.dispatchEvent(mouseup);
   };
 
   $("#bntTimeoutSetting").popup({
