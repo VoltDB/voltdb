@@ -1790,7 +1790,7 @@ TEST CASES
              1. ensure a result xml file got written
              2. ensure no whacky processes were stranded -->
         <exec executable="/usr/bin/env">
-            <arg value="python" />
+            <arg value="python3" />
             <arg value="${base.dir}/tools/junit-post-process.py" />
             <arg value="--testname=${testname}" />
             <arg value="--outputpath=${build.testoutput.dir}" />
@@ -1949,7 +1949,7 @@ TEST CASES
         <mkdir dir='${build.testoutput.dir}' />
         <mkdir dir='${build.dir}/testoutput-archive/' />
         <exec executable="/usr/bin/env" failonerror='true'>
-            <arg value="python" />
+            <arg value="python3" />
             <arg value="${base.dir}/tools/junit-pre-process.py" />
             <arg value="--archivepath=${build.dir}/testoutput-archive/" />
             <arg value="--outputpath=${build.testoutput.dir}" />

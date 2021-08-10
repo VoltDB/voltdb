@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # 1. make sure all test cases leave junit results
 # 2. make sure no processes are stranded (fail and kill if so)
@@ -135,7 +135,7 @@ if __name__ == "__main__":
     # collect stranded procs that shouldn't be stranded (and kill them)
     failures = []
     for proc in procs:
-        #print proc
+        #print(proc)
         if proc.processType in ["VoltDB server process", "JUnit Test Runner process"]:
             # a test was stranded
             logging.error("Found blacklisted process: %s" % (proc))

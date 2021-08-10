@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # if the testoutput directory isn't clear, archive it and clear it
 
