@@ -25,7 +25,7 @@
         settings && settings.content ? settings.content : $(this).attr("href");
 
     $(document).on("click.popup", selector, function (e) {
-      // e.preventDefault();
+      //e.preventDefault();
       popup.open(content, undefined, this);
     });
 
@@ -222,7 +222,7 @@
       var loginBtn = $("input[id='LoginBtn']");
       if (loginBtn != undefined) {
         loginBtn.unbind("click");
-        loginBtn.bind("click", function () {
+        $(document).on("click", "input[id='LoginBtn']", function () {
           p.o.login(function () {
             p.close();
           });
@@ -232,7 +232,7 @@
       var serverUnavailableBtn = $("a[id='serverUnavailableBtn']");
       if (serverUnavailableBtn != undefined) {
         serverUnavailableBtn.unbind("click");
-        serverUnavailableBtn.bind("click", function () {
+        $(document).on("click", "a[id='serverUnavailableBtn']", function () {
           p.o.autoLogin(function () {
             p.close();
           });
@@ -242,7 +242,7 @@
       var errorMsgBtn = $("a[id='btnOk']");
       if (errorMsgBtn != undefined) {
         errorMsgBtn.unbind("click");
-        errorMsgBtn.bind("click", function () {
+        $(document).on("click", "a[id='btnOk']", function () {
           p.close();
         });
       }
@@ -250,7 +250,7 @@
       var btnSaveSnapshotStatus = $("a[id='btnSaveSnapshotStatus']");
       if (btnSaveSnapshotStatus != undefined) {
         btnSaveSnapshotStatus.unbind("click");
-        btnSaveSnapshotStatus.bind("click", function () {
+        $(document).on("click", "a[id='btnSaveSnapshotStatus']", function () {
           p.close();
         });
       }
@@ -258,7 +258,7 @@
       var cancelBtn = $("a[id='btnCancel']");
       if (cancelBtn != undefined) {
         cancelBtn.unbind("click");
-        cancelBtn.bind("click", function (e) {
+        $(document).on("click", "a[id='btnCancel']", function (e) {
           p.close();
           e.preventDefault();
         });
@@ -278,7 +278,7 @@
       var serverShutdownBtn = $("a[id=btnServerShutdownOk]");
       if (serverShutdownBtn != undefined) {
         serverShutdownBtn.unbind("click");
-        serverShutdownBtn.bind("click", function (e) {
+        $(document).on("click", "a[id=btnServerShutdownOk]", function (e) {
           e.preventDefault();
           p.o.closeDialog();
           VoltDBCore.isServerConnected = true;
@@ -290,7 +290,7 @@
       var closeBtn = $(".closeBtn");
       if (closeBtn != undefined) {
         closeBtn.unbind("click");
-        closeBtn.bind("click", function () {
+        $(document).on("click", ".closeBtn", function () {
           $(".restoreConfirmation").hide();
           $(".restoreInfo").show();
           p.close();
@@ -300,7 +300,7 @@
       var dRPartitionWarningBtn = $("a[id=btnDrPartitionWarning]");
       if (dRPartitionWarningBtn != undefined) {
         dRPartitionWarningBtn.unbind("click");
-        dRPartitionWarningBtn.bind("click", function (e) {
+        $(document).on("click", "a[id=btnDrPartitionWarning]", function (e) {
           e.preventDefault();
           p.close();
         });

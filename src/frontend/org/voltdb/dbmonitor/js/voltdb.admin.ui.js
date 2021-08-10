@@ -8,6 +8,7 @@ var editStates = {
     ShowLoading: 2
 };
 var INT_MAX_VALUE = 2147483647;
+var kubernetes_con;
 
 function getListOfRoles() {
     // Got to figure out what roles are available.
@@ -59,7 +60,43 @@ function rolehtml(){
     return role_options
 }
 
+function check_kubernetes(server,port){
+    uri = "http://"+server+":"+port+"/api/1.0/?Procedure=@SystemInformation";
+    con = false;
+    $.get(uri,
+        function (data, textStatus, jqXHR) {  // success callback
+            if (textStatus == "success"){
+                data = data["results"][0]["data"];
+                $.each(data,function(id,val){
+                    if (val[1] == "KUBERNETES") {
+                        con = val[2];
+                    }
+                });
+            }
+        });
+    return con;
+}
+
 function loadAdminPage() {
+    kubernetes_con = check_kubernetes($(location).attr("hostname"),$(location).attr("port"));
+    if (kubernetes_con){
+        var htmlcontent = "";
+        htmlcontent = htmlcontent.concat(
+            '<div class="kubernetes-content">'+
+            '<div class="kubernetes-logo"><p class="kubernetes-title">Managed by Kubernetes</p><p class="kubernetes-subtitle">Use Helm to manage and administer your cluster</p></div>' + 
+            '</div>'
+        )
+        $(".adminLeft").html(htmlcontent);
+        $("#securityEdit").remove();
+        $("#autoSnapshotEdit").remove();
+        $("#addNewConfigLink").remove();
+        $("#addNewImportConfigLink").remove();
+        $("#snmpEdit").remove();
+        $("#btnEditHrtTimeOut").remove();
+        $("#btnEditQueryTimeout").remove();
+        $("#btnDeleteMemory").remove();
+        $("#btnEditMemorySize").remove();
+    }
     adminClusterObjects = {
         btnClusterPause: $('#pauseConfirmation'),
         btnClusterResume: $('#resumeConfirmation'),
@@ -3710,8 +3747,8 @@ function loadAdminPage() {
                  '        <div class="addConfigProperWrapper">' +
                  '            <table id="tblAddNewFeature" width="100%" cellpadding="0" cellspacing="0" class="addConfigProperTbl">' +
                  '                <tr class="headerFeature">' +
-                 '                    <th width="53%">Name</th>' +
-                 '                    <th align="right" width="37%">Value</th>' +
+                 '                    <th width="50%">Name</th>' +
+                 '                    <th align="right" width="14%">Value</th>' +
                  '                    <th align="right" width="14%">Unit</th>' +
                  '                    <th width="5%">Delete</th>' +
                  '                </tr>' +
@@ -3746,10 +3783,10 @@ function loadAdminPage() {
                     '       <label id="error_' + nameId + '" class="error duplicateError" style="display: none;"></label>' +
                     '   </td>' +
                     '   <td>' +
-                    '       <input size="15" id="' + valueId + '" name="' + valueId + '" class="newFeatureValue newFeature" type="text">' +
+                    '       <input size="15" id="' + valueId + '" name="' + valueId + '" class="newFeatureValue newFeature" type="text" style="width:auto;">' +
                     '       <label id="errorValueDL' + count + '" for="' + valueId + '" class="error" style="display: none;"></label>' +
                     '   </td>' +
-                     '   <td><select id="' + unitId + '" name="' + unitId + '" class="newFeatureUnit newFeature"><option>GB</option><option>%</option></select>' +
+                     '   <td><select id="' + unitId + '" name="' + unitId + '" class="newFeatureUnit newFeature" style="width:auto;"><option>GB</option><option>%</option></select>' +
                     '       <label id="errorValueUnit' + count + '" for="' + unitId + '" class="error" style="display: none;"></label>' +
                     '   </td>' +
                     '   <td><div class="securityDelete" id="deleteFirstFeature" onclick="deleteRow(this)"></div></td>' +
@@ -3788,10 +3825,10 @@ function loadAdminPage() {
                             '       <label id="error_' + nameId + '" class="error" style="display: none;"></label>' +
                             '   </td>' +
                             '   <td>' +
-                            '       <input size="15" id="' + valueId + '" name="' + valueId + '" class="newFeatureValue newFeature" type="text">' +
+                            '       <input size="15" id="' + valueId + '" name="' + valueId + '" class="newFeatureValue newFeature" type="text" style="width:auto;">' +
                             '       <label id="errorValueDL' + count + '" for="' + valueId + '" class="error" style="display: none;"></label>' +
                             '   </td>' +
-                            '   <td><select id="' + unitId + '" name="' + unitId + '" class="newFeatureUnit newFeature"><option>GB</option><option>%</option></select>' +
+                            '   <td><select id="' + unitId + '" name="' + unitId + '" class="newFeatureUnit newFeature" style="width:auto;"><option>GB</option><option>%</option></select>' +
                             '       <label id="errorValueUnit' + count + '" for="' + unitId + '" class="error" style="display: none;"></label>' +
                             '   </td>' +
                             '   <td><div class="securityDelete" id="deleteFirstFeature" onclick="deleteRow(this)"></div></td>' +
@@ -3913,8 +3950,8 @@ function loadAdminPage() {
                 $("#saveConfigConfirmation").show();
             });
 
-            $("#btnSaveDiskLimitOk").unbind("click");
-            $("#btnSaveDiskLimitOk").on("click", function () {
+            $(document).off("click", "#btnSaveDiskLimitOk");
+            $(document).on("click", "#btnSaveDiskLimitOk", function () {
 
 
                 var adminConfigurations = VoltDbAdminConfig.getLatestRawAdminConfigurations();
@@ -4621,7 +4658,7 @@ function loadAdminPage() {
                 popup.close();
             });
 
-            $("#btnSaveSecUser").unbind("click");
+            $(document).off("click", "#btnSaveSecUser");
             $(document).on("click","#btnSaveSecUser", function () {
                 var username = $('#txtOrgUser').val();
                 var newUsername = $('#txtUser').val();
@@ -5090,11 +5127,12 @@ function loadAdminPage() {
         this.exportTypes = [];
         this.isSaveSnapshot = false;
 
-        this.server = function (hostIdvalue, serverNameValue, serverStateValue, ipAddress) {
+        this.server = function (hostIdvalue, serverNameValue, serverStateValue, ipAddress, HTTPPORT) {
             this.hostId = hostIdvalue;
             this.serverName = serverNameValue;
             this.serverState = serverStateValue;
             this.ipAddress = ipAddress;
+            this.httpPort = HTTPPORT;
         };
 
         this.stoppedServer = function (hostIdvalue, serverNameValue) {
@@ -5497,8 +5535,10 @@ function loadAdminPage() {
 
                 var content = '';
 
-                content = '<a id="btnEditDiskLimit" href="javascript:void(0)" onclick="editDiskLimit(1)" class="edit" title="Edit">&nbsp;</a>' +
+                if (!kubernetes_con){
+                    content = '<a id="btnEditDiskLimit" href="javascript:void(0)" onclick="editDiskLimit(1)" class="edit" title="Edit">&nbsp;</a>' +
                     '<div id="loadingDiskLimit" class="loading-small loadExport" style="display: none;"></div>';
+                }
 
                 result += '<tr class="child-row-6 subLabelRow parentprop" id="row-60">' +
                        '   <td class="configLabel" id="diskLimit" onclick="toggleProperties(this);" title="Click to expand/collapse" style="cursor: pointer;">' +
@@ -5540,14 +5580,16 @@ function loadAdminPage() {
                         '   </td>' +
                         '   <td align="right">' +
                         '   </td>' +
-                        '<td>&nbsp</td>' +
-                          '   <td><a id="btnEditDiskLimit" href="javascript:void(0)" onclick="editDiskLimit(1)" class="edit" title="Edit">&nbsp;</a>' +
-                        '<div id="loadingDiskLimit" class="loading-small loadExport" style="display: none;"></div></td>' +
-                          '</tr>' +
+                        '<td>&nbsp</td>';
+                if(!kubernetes_con){
+                    result += '   <td><a id="btnEditDiskLimit" href="javascript:void(0)" onclick="editDiskLimit(1)" class="edit" title="Edit">&nbsp;</a>' +
+                    '<div id="loadingDiskLimit" class="loading-small loadExport" style="display: none;"></div></td>';
+                }
+                result += '</tr>' +
                         '<tr class="childprop-row-60 subLabelRow" ' + style + '>' +
-                            '<td width="67%" class="configLabel" colspan="3">&nbsp &nbsp &nbsp No features available.</td>' +
-                            '<td width="33%">&nbsp</td>' +
-                            '</tr>';
+                        '<td width="67%" class="configLabel" colspan="3">&nbsp &nbsp &nbsp No features available.</td>' +
+                        '<td width="33%">&nbsp</td>' +
+                        '</tr>';
             }
 
             $('#diskLimitConfiguration').html(result);
@@ -5563,10 +5605,16 @@ function loadAdminPage() {
             var tableHeader = '<table width="100%" cellpadding="0" cellspacing="0" class="secTbl">' +
                 '<tr>' +
                 '<th>Username</th>' +
-                '<th>Role</th>' +
+                '<th>Role</th>';
+            if (!kubernetes_con){
+                tableHeader = tableHeader.concat(
                 '<th>&nbsp</th>' +
-                '<th><a href="#addUserPopup" id="addNewUserLink1" onclick="addUser(-1)" class="plusAdd" title="Add User">&nbsp;</a></th>' +
-                '</tr>';
+                '<th><a href="#addUserPopup" id="addNewUserLink1" onclick="addUser(-1)" class="plusAdd" title="Add User">&nbsp;</a></th>'
+                )
+            }
+            tableHeader = tableHeader.concat(
+                '</tr>'
+            )
             var tableFooter = '</table>';
             if (userData != undefined) {
                 for (var i = 0; i < userData.length; i++) {
@@ -5576,9 +5624,11 @@ function loadAdminPage() {
                     result += '<tr>' +
                         '<td>' + userName + '</td>' +
                         '<td>' + formatDisplayName(role) + '</td>' +
-                        '<td>&nbsp</td>' +
-                        '<td><a  href="javascript:void(0)" class="edit" title="Edit" onclick="addUser(1,\'' + userName + '\',\'' + role + '\');">&nbsp;</a></td>' +
-                        '</tr>';
+                        '<td>&nbsp</td>';
+                    if (!kubernetes_con){
+                        result += '<td><a  href="javascript:void(0)" class="edit" title="Edit" onclick="addUser(1,\'' + userName + '\',\'' + role + '\');">&nbsp;</a></td>';
+                    }
+                    result += '</tr>';
                 }
             }
             $('#UsersList').html(tableHeader + result + tableFooter);

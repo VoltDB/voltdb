@@ -85,6 +85,9 @@
     <script src="js/jquery.dataTables.min.js"></script>
     <script src="js/jqueryDatatablePlugins.js"></script>
     <script src="js/sha256.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@700&display=swap" rel="stylesheet">
   </head>
   <body>
     <iframe
@@ -4072,8 +4075,9 @@
     </div>
     <!--Update error Popup-->
     <!-- POPUP StopServerErrorPopup-->
-    <div id="divStopServerError" style="display: none">
-      <div class="overlay-title icon-alert">Stop Error</div>
+    <div id="divStopServerError" style="display: none;">
+      <div class="overlay-title icon-alert"></div>
+      <span class="popupTitleStyle">Stop Error</span>
       <div class="clear"></div>
       <div class="overlay-content resizeCon">
         <p id="errorLabel" class="txt-bold resizeRestore">
@@ -4183,7 +4187,7 @@
     <!--Add Import Configuration Popup-->
     <div id="addDiskLimitPopup" style="display: none">
       <div id="addDiskLimitInnerPopup">
-        <div class="overlay-title icon-alert">
+        <div class="overlay-title">
           <div id="addDiskLimitHeader" class="addConfigHeader">
             Add Disk Limit
           </div>
