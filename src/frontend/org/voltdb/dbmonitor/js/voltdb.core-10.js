@@ -8,8 +8,8 @@
         this.isLoginVerified = false;
         this.authorization = null;
         DbConnection = function (aServer, aPort, aAdmin, aUser, aPassword, aIsHashPassword, aProcess) {
-            this.server = aServer == null ? 'localhost' : $.trim(aServer);
-            this.port = aPort == null ? '8080' : $.trim(aPort);
+            this.server = aServer == null ? 'localhost' : aServer.trim();
+            this.port = aPort == null ? '8080' : aPort.trim();
             this.admin = (aAdmin == true || aAdmin == "true");
             this.user = (aUser == '' || aUser == 'null') ? null : aUser;
             this.password = (aPassword === '' || aPassword === 'null') ? null : (aIsHashPassword == false ? aPassword : null);
@@ -308,6 +308,7 @@
                             try {
                                 onCompleteHandler[0](onCompleteHandler[1], success);
                             } catch (x) {
+                                console.log(x)
                                 console.log(x.message);
                             }
                         }
@@ -452,12 +453,15 @@
             conn.BeginExecute('@Statistics', ['TABLE', 0], function (response) {
                 try {
                     clearTimeout(timeout);
-                    if (response.status == 1) {
+                    if(response == undefined){
+                        callback(false, response, isLoginTest);
+                    }
+                    else if (response.status == 1) {
                         VoltDBCore.isLoginVerified = true;
                         callback(true, response, isLoginTest);
                     } else if(response.status == 401){
                         callback(true, response, isLoginTest);
-                    }else{
+                    }else {
                         callback(false, response, isLoginTest);
                     }
                 } catch (x) {
@@ -720,14 +724,16 @@ jQuery.extend({
                     callback(data, host);
                 },
                 error: function (e) {
-                    console.log(e.message);
+                    e.hasOwnProperty('message')? console.log(e.message) : '';
                 },
                 statusCode:{
                     401: function(jqXHR, textStatus, errorThrown){
                         var data = jqXHR.responseJSON;
                         callback(data, (jqXHR.getResponseHeader("Host") != null ? jqXHR.getResponseHeader("Host").split(":")[0] : "-1"))
-                        if (data.statusstring.includes("kerberos")){
+                        if(data != undefined){
+                            if(data.statusstring.includes("kerberos")){
                             console.log('Failed to authenticate to the server via Kerberos. Please check the configuration of your client/browser')
+                            }
                         }
 
                     }

@@ -308,7 +308,7 @@ function QueryUI(queryTab) {
         var query_id = this.QueryTab[0].id.split('-')[1]
         var target = $('.queryResult-' + query_id);
         var format = $('#exportType-' + query_id).val();
-
+        
         var dataSource = VoltDbUI.getCookie('connectionkey') == undefined ? '' : VoltDbUI.getCookie('connectionkey');
         if (!VoltDBCore.connections.hasOwnProperty(dataSource)) {
             $(target).html('Connect to a datasource first.');
@@ -397,6 +397,9 @@ function QueryUI(queryTab) {
             // See http://stackoverflow.com/questions/18749591/encode-html-entities-in-javascript#18750001
             var encodedStatus = response.statusstring.replace(/[\u00A0-\u9999<>\&]/gim,
                 function (i) { return '&#' + i.charCodeAt(0) + ';'; });
+            if (encodedStatus.indexOf("PrepareStatement error:")>=0){
+                encodedStatus = encodedStatus.slice(0, -3) + ')';
+            }
             target.append('<span class="errorValue">Error: ' + encodedStatus + '\r\n</span>');
         }
     }

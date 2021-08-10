@@ -1152,7 +1152,7 @@ var loadPage = function (serverName, portid) {
         content: "#stopConfirmationPop",
 
         afterOpen: function () {
-          $("#StopConfirmOK").unbind("click");
+          $(document).off("click", "#StopConfirmOK");
           $(document).on("click", "#StopConfirmOK", function () {
             //API Request
             try {
@@ -1172,12 +1172,21 @@ var loadPage = function (serverName, portid) {
                     );
                   } else {
                     $("#errorLabel").text(statusString);
+                    var popup = new $.Popup({
+                      content: "divStopServerError",
+                      afterOpen: function() {
+                        $(document).off("click","#A2");
+                        $(document).on("click","#A2",function(){
+                          popup.close();
+                        });
+                      }
+                    });
                     popup.open("#divStopServerError", undefined, srcElement);
                   }
                 }
               );
             } catch (error) {
-              /*Ignore error.*/
+              console.log(error);
             }
             //Close the popup
             $($(this).siblings()[0]).trigger("click");

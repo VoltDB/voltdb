@@ -2269,6 +2269,7 @@ ul.adminClusterList li a.shutdown {
 .adminRight {
     float: right;
     padding-top: 5px;
+    margin-top: 10px;
 }
 .adminMode {
     float: left;
@@ -4824,3 +4825,23 @@ table.dataTable {top:0;}
     color: #000 !important;
 }
 
+.kubernetes-logo {
+    background-image: url("../images/kubernetes.png");
+    height: 60px;
+    background-size: contain;
+    background-repeat: no-repeat;
+}
+
+.kubernetes-title {
+    margin-left: 5rem;
+    font-size: 2.2rem;
+    font-weight: 700;
+    padding-top: 0.1rem;
+    font-family: 'Ubuntu', sans-serif !important;
+}
+
+.kubernetes-subtitle {
+    margin-left: 5rem;
+    padding-top: 0.3rem;
+    font-size: 1rem;
+}
