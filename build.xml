@@ -1477,10 +1477,10 @@ NATIVE EE STUFF
 -->
 
 <target name='catalog' depends="buildinfo" description="Generate catalog source code.">
-    <exec dir="${src.catalog.dir}" executable='python' failonerror='true'>
+    <exec dir="${src.catalog.dir}" executable='python3' failonerror='true'>
         <arg line="catalog.py"/>
     </exec>
-    <exec dir="${src.catalog.dir}" executable='python' failonerror='true'>
+    <exec dir="${src.catalog.dir}" executable='python3' failonerror='true'>
         <arg line="install.py"/>
     </exec>
 
@@ -1638,7 +1638,7 @@ LICENSING
 -->
 
 <target name='licensecheck' description="make sure all source files have approved licenses">
-    <exec dir='.' executable='python' failonerror='true'>
+    <exec dir='.' executable='python3' failonerror='true'>
         <arg line="tools/licensescheck.py" />
         <arg line="${voltpro}"/>
     </exec>
@@ -1657,7 +1657,7 @@ TEST CASES
     <property name='echoserver.command' value="java
     -classpath ${classpath} -server -Xmx256m -ea
     org.voltdb.messaging.EchoServer" />
-    <exec dir='tests/scripts/' executable='python' failonerror='true'>
+    <exec dir='tests/scripts/' executable='python3' failonerror='true'>
         <arg line="Testvoltdbclient.py"/>
         <arg line='"${echoserver.command}"'/>
     </exec>

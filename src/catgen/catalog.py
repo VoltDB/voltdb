@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # This file is part of VoltDB.
 # Copyright (C) 2008-2020 VoltDB Inc.
@@ -19,6 +19,10 @@
 """
 VoltDB catalog code generator.
 """
+
+# inject ./catalog_utils into search path
+import sys
+sys.path[1:1] = [ sys.path[0] + '/catalog_utils' ]
 
 from catalog_utils import *
 from string import Template
@@ -80,7 +84,7 @@ def genjava( classes, javaOnlyClasses, prepath, postpath, package ):
         clsname = cls.name
         javapath = postpath + "/" + clsname + '.java'
         #ensure_relative_path_exists(postpath + "/" + pkgdir)
-        f = file( javapath, 'w' )
+        f = open( javapath, 'w' )
         if not f:
             raise OSError("Can't create file %s for writing" % javapath)
         write = writer( f )
@@ -336,7 +340,7 @@ def gencpp( classes, javaOnlyClasses, prepath, postpath ):
         # WRITE THE HEADER FILE
         ##########
 
-        f = file( postpath + "/" + clsname.lower() + ".h", 'w' )
+        f = open( postpath + "/" + clsname.lower() + ".h", 'w' )
         write = writer( f )
 
         write (gpl_header)
@@ -419,7 +423,7 @@ def gencpp( classes, javaOnlyClasses, prepath, postpath ):
         # WRITE THE CPP FILE
         ##########
 
-        f = file( postpath + "/" + clsname.lower() + ".cpp", 'w' )
+        f = open( postpath + "/" + clsname.lower() + ".cpp", 'w' )
         write = writer( f )
 
         write (gpl_header)
@@ -560,7 +564,7 @@ def main():
     cpp_prepath = 'in/cppsrc'
     java_prepath = 'in/javasrc'
     java_postpath = 'out/javasrc'
-    f =  file( specpath )
+    f =  open( specpath )
     classes, javaOnlyClasses = parse( f.read(), debug )
     genjava( classes, javaOnlyClasses, java_prepath, java_postpath, javapkg )
     gencpp( classes, javaOnlyClasses, cpp_prepath, cpp_postpath )

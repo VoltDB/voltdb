@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 import datetime, os, sys, re, string
 
@@ -41,10 +41,10 @@ def verifyLicense(f, content, approvedLicensesJavaC, approvedLicensesPython):
        or f.endswith("CMakeLists.txt"):
         if not content.startswith("#"):
             if content.lstrip().startswith("#"):
-                print "ERROR: \"%s\" contains whitespace before initial comment." % f
+                print("ERROR: \"%s\" contains whitespace before initial comment." % f)
                 return 1
             else:
-                print "ERROR: \"%s\" does not begin with a comment." % f
+                print("ERROR: \"%s\" does not begin with a comment." % f)
                 return 1
 
         # skip hashbang
@@ -60,7 +60,7 @@ def verifyLicense(f, content, approvedLicensesJavaC, approvedLicensesPython):
         # verify license
         if licenseStartsHere(content, approvedLicensesPython):
             return 0
-        print "ERROR: \"%s\" does not start with an approved license." % f
+        print("ERROR: \"%s\" does not start with an approved license." % f)
     else:
         # skip hashbang, Groovy case
         if content.startswith("#!") and f.endswith('.groovy'):
@@ -69,25 +69,25 @@ def verifyLicense(f, content, approvedLicensesJavaC, approvedLicensesPython):
 
         if not content.startswith("/*"):
             if content.lstrip().startswith("/*"):
-                print "ERROR: \"%s\" contains whitespace before initial comment." % f
+                print("ERROR: \"%s\" contains whitespace before initial comment." % f)
             else:
-                print "ERROR: \"%s\" does not begin with a comment." % f
+                print("ERROR: \"%s\" does not begin with a comment." % f)
             return 1
         if licenseStartsHere(content, approvedLicensesJavaC):
             return 0
-        print "ERROR: \"%s\" does not start with an approved license." % f
+        print("ERROR: \"%s\" does not start with an approved license." % f)
     return 1
 
 TRAILING_WHITE_SPACE_RE = re.compile(r'[\t\f\v ]+\n')
 def verifyTrailingWhitespace(f, content):
     if TRAILING_WHITE_SPACE_RE.search(content):
-        print("ERROR: \"%s\" contains trailing whitespace." % (f))
+        print("ERROR: \"%s\" contains trailing whitespace." % f)
         return 1
     return 0
 
 def verifyTrailingNewline(f, content):
     if content[-1] != '\n':
-        print("ERROR: \"%s\" has no trailing newline." % (f))
+        print("ERROR: \"%s\" has no trailing newline." % f)
         return 1
     return 0
 
@@ -258,18 +258,18 @@ def fixLicensePython(f, content, approvedLicensesPython):
 
     if not revisedcontent.startswith("#"):
         if licenseStartsHere(revisedcontent.lstrip(), approvedLicensesPython):
-            print "Fix: removing whitespace before the approved license."
+            print("Fix: removing whitespace before the approved license.")
             return writeRepairedContent(f, preserved + revisedcontent.lstrip(), content)
 
-    print "Fix: Inserting a default license before the original content."
+    print("Fix: Inserting a default license before the original content.")
     return writeRepairedContent(f, preserved + approvedLicensesPython[-1] + revisedcontent, content)
 
 def fixLicenseJavaC(f, content, approvedLicensesJavaC):
     if licenseStartsHere(content.lstrip(), approvedLicensesJavaC):
-        print "Fix: removing whitespace before the approved license."
+        print("Fix: removing whitespace before the approved license.")
         revisedcontent = content.lstrip()
     else:
-        print "Fix: Inserting a default license before the original content."
+        print("Fix: Inserting a default license before the original content.")
         revisedcontent = approvedLicensesJavaC[-1] + content
     return writeRepairedContent(f, revisedcontent,  content)
 
@@ -282,7 +282,7 @@ def fixTabs(f, content):
             # go ahead and allow trailing whitespace -- clean it up later
             line = pre + ("    "[(len(pre) % 4 ): 4]) + post
         cleanlines.append(line)
-    print "Fix: Replacing tabs with 4th-column indentation."
+    print("Fix: Replacing tabs with 4th-column indentation.")
     return writeRepairedContent(f, "\n".join(cleanlines),  content)
 
 def fixTrailingWhitespace(f, content):
@@ -292,11 +292,11 @@ def fixTrailingWhitespace(f, content):
         if TRAILING_WHITE_SPACE_RE.search(line):
             (line, ignored) = TRAILING_WHITE_SPACE_RE.split(line)
         cleanlines.append(line)
-    print "Fix: Removing trailing whitespace."
+    print("Fix: Removing trailing whitespace.")
     return writeRepairedContent(f, "\n".join(cleanlines),  content)
 
 def fixTrailingNewline(f, content):
-    print "Fix: Add trailing newline."
+    print("Fix: Add trailing newline.")
     return writeRepairedContent(f, content+'\n',  content)
 
 FIX_LICENSES_LEVEL = 2
@@ -396,7 +396,7 @@ for arg in sys.argv[1:]:
         elif arg == "--fixall":
             fix = FIX_LICENSES_LEVEL + 1
         else:
-            print 'IGNORING INVALID OPTION: "%s". It must be "--fixws" or "--fixall" or if "%s" is an additional code repo directory, it must follow a standalone "--" option.' % (arg, arg)
+            print('IGNORING INVALID OPTION: "%s". It must be "--fixws" or "--fixall" or if "%s" is an additional code repo directory, it must follow a standalone "--" option.' % (arg, arg))
 
 testLicenses =   [basepath + 'tools/approved_licenses/mit_x11_hstore_and_voltdb.txt',
                   basepath + 'tools/approved_licenses/mit_x11_evanjones_and_voltdb.txt',
@@ -437,11 +437,11 @@ fixcount += fixinc
 errcount += errinc
 
 if errcount == 0:
-    print "SUCCESS. Found 0 license text errors, 0 files containing tabs or trailing whitespace."
+    print("SUCCESS. Found 0 license text errors, 0 files containing tabs or trailing whitespace.")
 elif fix:
-    print "PROGRESS? Tried to fix %d of the %d found license text or whitespace errors. Re-run licensescheck to validate. Consult .lcbak files to recover if something went wrong." % (fixcount, errcount)
+    print("PROGRESS? Tried to fix %d of the %d found license text or whitespace errors. Re-run licensescheck to validate. Consult .lcbak files to recover if something went wrong." % (fixcount, errcount))
 else:
-    print "FAILURE. Found %d license text or whitespace errors." % errcount
+    print("FAILURE. Found %d license text or whitespace errors." % errcount)
 
 # run through any other source the caller wants checked
 # assumes a single valid license in $repo/tools/approved_licenses/license.txt
@@ -455,7 +455,7 @@ if not ascommithook:
                 parsing_options = False
 
         elif arg != "${voltpro}":
-            print "Checking additional repository: " + arg;
+            print("Checking additional repository: " + arg)
             if arg.startswith(".") or arg.startswith("/"):
                 pathprefix = arg
             else:
@@ -475,9 +475,9 @@ if not ascommithook:
             proerrcount += errinc
 
             if proerrcount == 0:
-                print "SUCCESS. Found 0 license text errors, 0 files containing tabs or trailing whitespace."
+                print("SUCCESS. Found 0 license text errors, 0 files containing tabs or trailing whitespace.")
             else:
-                print "FAILURE (%s). Found %d license text or whitespace errors." % (arg, proerrcount)
+                print("FAILURE (%s). Found %d license text or whitespace errors." % (arg, proerrcount))
 
 
 if (errcount + proerrcount) == 0:

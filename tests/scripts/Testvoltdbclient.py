@@ -2,7 +2,7 @@
 # -*- coding: utf-8
 
 # This file is part of VoltDB.
-# Copyright (C) 2008-2020 VoltDB Inc.
+# Copyright (C) 2008-2021 VoltDB Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -27,15 +27,7 @@ import sys
 import os
 
 # ensure version 3.6+ of python
-# (ant build scripts like to run us in python2, sigh)
 if sys.hexversion < 0x03060000:
-    for dir in os.environ['PATH'].split(':'):
-        for n in range(6, 12): # future-proofing but not too far
-            name = 'python3.%d' % n
-            path = os.path.join(dir, name)
-            if os.path.isfile(path):
-                print('Restarting with %s ...' % path)
-                os.execv(path, [path] + sys.argv)
     sys.stderr.write("Python version 3.6 or greater is required.\n" +
                      "Please install a more recent Python release and retry.\n")
     sys.exit(-1)
