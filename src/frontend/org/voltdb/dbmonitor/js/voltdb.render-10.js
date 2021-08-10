@@ -138,7 +138,7 @@ function alertNodeClicked(obj) {
         '<div class="overlay-title">Login</div>' +
         '<div id="UnableToLoginMsg" style="padding: 5px 0 0 20px; color: #ff0000; display: none;">Unable to connect. Please try to login using another username/password.</div>' +
         '<div class="clear"></div>' +
-        '<div  class="overlay-content" style="height:215px; min-width: 441px; padding: 0" >' +
+        '<div  class="overlay-content" style="height:auto; min-width: auto; padding: 0" >' +
         '<div id="loginBox">' +
         '<label for="username">Username:</label>' +
         '<input type="text" id="username" name="username"><br/>' +
