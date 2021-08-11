@@ -81,6 +81,7 @@ import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.NullCallback;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
+import org.voltdb.client.UpdateApplicationCatalog;
 
 import sun.misc.Signal;
 import sun.misc.SignalHandler;
@@ -570,7 +571,7 @@ public class AsyncBenchmark {
                     File file2 = new File(catPath + "/deployment.xml");
                     // Flip the catalog
                     lastCatalog = (lastCatalog+1) % 2;
-                    response = client.updateApplicationCatalog(catalog_files[ lastCatalog ], file2);
+                    response = UpdateApplicationCatalog.update(client, catalog_files[ lastCatalog ], file2);
                     if (response.getStatus() != ClientResponse.SUCCESS) {
                         log.error(_F("UAC operation failed with %s\n", response.getStatusString()));
                         throw new RuntimeException();
