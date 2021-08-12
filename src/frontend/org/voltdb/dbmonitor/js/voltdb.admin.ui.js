@@ -8,7 +8,6 @@ var editStates = {
     ShowLoading: 2
 };
 var INT_MAX_VALUE = 2147483647;
-var kubernetes_con;
 
 function getListOfRoles() {
     // Got to figure out what roles are available.
@@ -60,26 +59,8 @@ function rolehtml(){
     return role_options
 }
 
-function check_kubernetes(server,port){
-    uri = "http://"+server+":"+port+"/api/1.0/?Procedure=@SystemInformation";
-    con = false;
-    $.get(uri,
-        function (data, textStatus, jqXHR) {  // success callback
-            if (textStatus == "success"){
-                data = data["results"][0]["data"];
-                $.each(data,function(id,val){
-                    if (val[1] == "KUBERNETES") {
-                        con = val[2];
-                    }
-                });
-            }
-        });
-    return con;
-}
-
 function loadAdminPage() {
-    kubernetes_con = check_kubernetes($(location).attr("hostname"),$(location).attr("port"));
-    if (kubernetes_con){
+    if (voltDbRenderer.kubernetes_con){
         var htmlcontent = "";
         htmlcontent = htmlcontent.concat(
             '<div class="kubernetes-content">'+
@@ -5535,7 +5516,7 @@ function loadAdminPage() {
 
                 var content = '';
 
-                if (!kubernetes_con){
+                if (!voltDbRenderer.kubernetes_con){
                     content = '<a id="btnEditDiskLimit" href="javascript:void(0)" onclick="editDiskLimit(1)" class="edit" title="Edit">&nbsp;</a>' +
                     '<div id="loadingDiskLimit" class="loading-small loadExport" style="display: none;"></div>';
                 }
@@ -5581,7 +5562,7 @@ function loadAdminPage() {
                         '   <td align="right">' +
                         '   </td>' +
                         '<td>&nbsp</td>';
-                if(!kubernetes_con){
+                if(!voltDbRenderer.kubernetes_con){
                     result += '   <td><a id="btnEditDiskLimit" href="javascript:void(0)" onclick="editDiskLimit(1)" class="edit" title="Edit">&nbsp;</a>' +
                     '<div id="loadingDiskLimit" class="loading-small loadExport" style="display: none;"></div></td>';
                 }
@@ -5606,7 +5587,7 @@ function loadAdminPage() {
                 '<tr>' +
                 '<th>Username</th>' +
                 '<th>Role</th>';
-            if (!kubernetes_con){
+            if (!voltDbRenderer.kubernetes_con){
                 tableHeader = tableHeader.concat(
                 '<th>&nbsp</th>' +
                 '<th><a href="#addUserPopup" id="addNewUserLink1" onclick="addUser(-1)" class="plusAdd" title="Add User">&nbsp;</a></th>'
@@ -5625,7 +5606,7 @@ function loadAdminPage() {
                         '<td>' + userName + '</td>' +
                         '<td>' + formatDisplayName(role) + '</td>' +
                         '<td>&nbsp</td>';
-                    if (!kubernetes_con){
+                    if (!voltDbRenderer.kubernetes_con){
                         result += '<td><a  href="javascript:void(0)" class="edit" title="Edit" onclick="addUser(1,\'' + userName + '\',\'' + role + '\');">&nbsp;</a></td>';
                     }
                     result += '</tr>';

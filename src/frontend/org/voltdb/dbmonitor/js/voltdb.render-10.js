@@ -42,8 +42,30 @@ function alertNodeClicked(obj) {
   $(".popup_close").trigger("click");
 }
 
+function check_kubernetes(server,port){
+  uri = "http://"+server+":"+port+"/api/1.0/?Procedure=@SystemInformation";
+  con = "false";
+  $.get(uri,
+      function (data, textStatus, jqXHR) {  // success callback
+          if (textStatus == "success"){
+              data = data["results"][0]["data"];
+              $.each(data,function(id,val){
+                  if (val[1] == "KUBERNETES") {
+                      con = val[2];
+                  }
+              });
+          }
+      });
+  if (con == "true"){
+    return true;
+  }else{
+    return false;
+  }
+}
+
 (function (window) {
   var iVoltDbRenderer = function () {
+    this.kubernetes_con = check_kubernetes($(location).attr("hostname"),$(location).attr("port"));
     this.hostNames = [];
     this.currentHost = "";
 
