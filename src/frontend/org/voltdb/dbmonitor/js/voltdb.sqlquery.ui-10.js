@@ -1052,16 +1052,17 @@ $(document).ready(function () {
         var queryTab = $(
           $("#worktabs div.ui-tabs-panel")[$tabs.tabs("option", "active")]
         );
-        if(queryTab.text().split(' ')[0] === 'exec'){
-          VoltDbUI.refreshSqlAndSchemaTab();
-        }
+        var query = queryTab.text().split(' ')[0].toLowerCase();
         if (queryTab.length == 1) {
           var queryUI = new QueryUI(
             $($("#worktabs div.ui-tabs-panel")[$tabs.tabs("option", "active")])
           );
+          queryUI.execute();
+        }
+        if(query === 'create' || query === 'update'){
           setTimeout(()=>{
-            queryUI.execute();
-          },100)
+            VoltDbUI.refreshSqlAndSchemaTab();
+          },1500)
         }
       });
 
