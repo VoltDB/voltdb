@@ -982,8 +982,8 @@ public class VoltDB {
             }
 
             if (!inzFH.exists() || !inzFH.isFile() || !inzFH.canRead()) {
-                hostLog.fatal(String.format("Specified directory '%s' is not a VoltDB initialized root",
-                                            m_voltdbRoot.getAbsolutePath()));
+                hostLog.fatalFmt("Specified directory '%s' is not a VoltDB initialized root",
+                                 m_voltdbRoot.getAbsolutePath());
                 referToDocAndExit();
             }
 

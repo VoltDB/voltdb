@@ -662,7 +662,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
         String absPath = managedPath.getAbsolutePath();
         if (!managedPath.canRead()) { // can't read? assume empty but note in log
-            hostLog.warn(String.format("Cannot read directory '%s'", absPath));
+            hostLog.warnFmt("Cannot read directory '%s'", absPath);
             return null;
         }
         Collection<String> ignorable = Arrays.asList(ignoredFilenames); // HashSet<> is overkill
@@ -926,7 +926,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             // Print the ascii art, but only on actual start
             if (config.m_startAction != StartAction.INITIALIZE) {
                 consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
-                hostLog.info("PID of this Volt process is " + myPid);
+                hostLog.infoFmt("PID of this Volt process is %d", myPid);
             }
 
             // Read and print build info on the console
@@ -944,10 +944,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             else {
                 // Log some facts about the user account: account name,
                 // home dir, working dir where Java was started
-                hostLog.info(String.format("User properties: user.name '%s' user.home '%s' user.dir '%s'",
-                                           System.getProperty("user.name"),
-                                           System.getProperty("user.home"),
-                                           System.getProperty("user.dir")));
+                hostLog.infoFmt("User properties: user.name '%s' user.home '%s' user.dir '%s'",
+                                System.getProperty("user.name"),
+                                System.getProperty("user.home"),
+                                System.getProperty("user.dir"));
 
                 // Warn if user is named "root"
                 if (System.getProperty("user.name").equals("root")) {
@@ -1756,7 +1756,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             System.getProperty("LARGE_MODE_RATIO", "0") :
                             System.getenv("LARGE_MODE_RATIO"));
             if (largeModeRatio > 0) {
-                hostLog.info(String.format("The large_mode_ratio property is set as %.2f", largeModeRatio));
+                hostLog.infoFmt("The large_mode_ratio property is set as %.2f", largeModeRatio);
             }
             if (AdHocNTBase.USING_CALCITE) {
                 hostLog.warn("Using Calcite as parser/planner. This is an experimental feature.");
@@ -1978,9 +1978,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         public void run() {
             m_licensing.logLicensingInfo();
             m_myHostId = m_messenger.getHostId();
-            hostLog.info(String.format("Host id of this node is: %d", m_myHostId));
-            hostLog.info("URL of deployment info: " + m_config.m_pathToDeployment);
-            hostLog.info("Cluster uptime: " + MiscUtils.formatUptime(getClusterUptime()));
+            hostLog.infoFmt("Host id of this node is: %d", m_myHostId);
+            hostLog.infoFmt("URL of deployment info: %s", m_config.m_pathToDeployment);
+            hostLog.infoFmt("Cluster uptime: %s", MiscUtils.formatUptime(getClusterUptime()));
             logDebuggingInfo(m_config, m_httpPortExtraLogMessage, m_jsonEnabled);
             // log system setting information
             logSystemSettingFromCatalogContext();
@@ -3153,7 +3153,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_messenger = new org.voltcore.messaging.HostMessenger(hmconfig, this);
         }
 
-        hostLog.info(String.format("Beginning inter-node communication on port %d.", m_config.m_internalPort));
+        hostLog.infoFmt("Beginning inter-node communication on port %d.", m_config.m_internalPort);
 
         try {
             m_messenger.start();
@@ -3173,8 +3173,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
         // Use the host messenger's hostId.
         m_myHostId = m_messenger.getHostId();
-        hostLog.info(String.format("Host id of this node is: %d", m_myHostId));
-        consoleLog.info(String.format("Host id of this node is: %d", m_myHostId));
+        hostLog.infoFmt("Host id of this node is: %d", m_myHostId);
+        consoleLog.infoFmt("Host id of this node is: %d", m_myHostId);
 
         // This is where we wait
         MeshProber.Determination determination = criteria.waitForDetermination();
@@ -3222,29 +3222,29 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
 
         // print out awesome network stuff
-        hostLog.info(String.format("Listening for native wire protocol clients on port %d.", m_config.m_port));
-        hostLog.info(String.format("Listening for admin wire protocol clients on port %d.", config.m_adminPort));
+        hostLog.infoFmt("Listening for native wire protocol clients on port %d.", m_config.m_port);
+        hostLog.infoFmt("Listening for admin wire protocol clients on port %d.", config.m_adminPort);
 
         if (m_startMode == OperationMode.PAUSED) {
-            hostLog.info(String.format("Started in admin mode. Clients on port %d will be rejected in admin mode.", m_config.m_port));
+            hostLog.infoFmt("Started in admin mode. Clients on port %d will be rejected in admin mode.", m_config.m_port);
         }
 
         if (getReplicationRole() == ReplicationRole.REPLICA) {
-            consoleLog.info("Started as " + getReplicationRole().toString().toLowerCase() + " cluster. " +
-                             "Clients can only call read-only procedures.");
+            consoleLog.infoFmt("Started as %s cluster. Clients can only call read-only procedures.",
+                               getReplicationRole().toString().toLowerCase());
         }
         if (httpPortExtraLogMessage != null) {
             hostLog.info(httpPortExtraLogMessage);
         }
         if (config.m_httpPort != -1) {
-            hostLog.info(String.format("Local machine HTTP monitoring is listening on port %d.", config.m_httpPort));
+            hostLog.infoFmt("Local machine HTTP monitoring is listening on port %d.", config.m_httpPort);
         }
         else {
-            hostLog.info(String.format("Local machine HTTP monitoring is disabled."));
+            hostLog.infoFmt("Local machine HTTP monitoring is disabled.");
         }
         if (jsonEnabled) {
-            hostLog.info(String.format("Json API over HTTP enabled at path /api/1.0/, listening on port %d.",
-                    config.m_httpPort));
+            hostLog.infoFmt("Json API over HTTP enabled at path /api/1.0/, listening on port %d.",
+                            config.m_httpPort);
         }
         else {
             hostLog.info("Json API disabled.");
@@ -3256,7 +3256,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         // java heap size
         long javamaxheapmem = ManagementFactory.getMemoryMXBean().getHeapMemoryUsage().getMax();
         javamaxheapmem /= (1024 * 1024);
-        hostLog.info(String.format("Maximum usable Java heap set to %d mb.", javamaxheapmem));
+        hostLog.infoFmt("Maximum usable Java heap set to %d MB.", javamaxheapmem);
 
         // Computed minimum heap requirement
         long minRqt = computeMinimumHeapRqt(m_catalogContext.tables.size(),
@@ -3417,7 +3417,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
         // the software 'edition' is not the same as the license type
         String edition = MiscUtils.isPro() ? "Enterprise Edition" : "Community Edition";
-        consoleLog.info(String.format("Build: %s %s %s", m_versionString, buildString, edition));
+        consoleLog.infoFmt("Build: %s %s %s", m_versionString, buildString, edition);
     }
 
     void logSystemSettingFromCatalogContext() {
@@ -3519,8 +3519,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 m_statusTracker.set(NodeState.SHUTTINGDOWN);
 
                 if (m_catalogContext != null && m_catalogContext.m_ptool.getAdHocLargeFallbackCount() > 0) {
-                    hostLog.info(String.format("%d queries planned through @AdHocLarge were converted to normal @AdHoc plans.",
-                            m_catalogContext.m_ptool.getAdHocLargeFallbackCount()));
+                    hostLog.infoFmt("%d queries planned through @AdHocLarge were converted to normal @AdHoc plans.",
+                                    m_catalogContext.m_ptool.getAdHocLargeFallbackCount());
                 }
                 /*
                  * Various scheduled tasks get crashy in unit tests if they happen to run
@@ -4394,7 +4394,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
                 String actionName = m_joining ? "join" : "rejoin";
                 m_joining = false;
-                consoleLog.info(String.format("Node %s completed", actionName)); // onRejoinCompletion
+                consoleLog.infoFmt("Node %s completed", actionName); // onRejoinCompletion
                 allDone = true;
             }
 
@@ -4712,7 +4712,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 String actionName = m_joining ? "join" : "rejoin";
                 // remove the rejoin blocker
                 CoreZK.removeRejoinNodeIndicatorForHost(m_messenger.getZK(), m_myHostId);
-                consoleLog.info(String.format("Node %s completed", actionName)); // onRecoveryComplete
+                consoleLog.infoFmt("Node %s completed", actionName); // onRecoveryComplete
                 m_statusTracker.setStartupComplete();
                 m_rejoinTruncationReqId = null;
                 m_rejoining = false;
