@@ -1057,12 +1057,7 @@ $(document).ready(function () {
           var queryUI = new QueryUI(
             $($("#worktabs div.ui-tabs-panel")[$tabs.tabs("option", "active")])
           );
-          queryUI.execute();
-        }
-        if(query === 'create' || query === 'update'){
-          setTimeout(()=>{
-            VoltDbUI.refreshSqlAndSchemaTab();
-          },1500)
+          queryUI.execute(query);
         }
       });
 
