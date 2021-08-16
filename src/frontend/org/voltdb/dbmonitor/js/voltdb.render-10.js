@@ -3377,6 +3377,7 @@ function check_kubernetes(server,port){
           con = false;
         }
         $.each(VoltDbAdminConfig.servers, function (id, val) {
+          var conn = true;
           if ((val.serverName != null || val.serverName != "" || val.serverName != undefined) && val.serverState == "RUNNING") {
             if (voltDbRenderer.currentHost != val.serverName && con) {
               className = "shutdown";
@@ -3384,8 +3385,10 @@ function check_kubernetes(server,port){
             }else{
               className = "disableServer";
               currentServerColumnClass = "shutdownServer stopDisable";
+              conn = false;
             }
             if (location.port == val.httpPort){
+              conn = false;
               className = "disableServer";
               currentServerColumnClass = "shutdownServer stopDisable";
             }
@@ -3409,17 +3412,26 @@ function check_kubernetes(server,port){
                 val.serverName +
                 '" class="' +
                 className +
-                '" id="stopServer_' +
+                '"' 
+            );
+            if (conn){
+              htmlServerListHtml = htmlServerListHtml.concat(
+                'id="stopServer_' +
                 val.serverName +
-                '">' +
-                '<span class="' +
-                currentServerColumnClass +
-                '">Stop</span></a></td></tr>'
+                '"'
+              );
+            }
+            htmlServerListHtml = htmlServerListHtml.concat(
+              '>' +
+              '<span class="' +
+              currentServerColumnClass +
+              '">Stop</span></a></td></tr>'
             );
           } else if ((val.serverName != null || val.serverName != "" || val.serverName != undefined) && val.serverState == "PAUSED") {
             if (voltDbRenderer.currentHost != val.serverName && con) {
               className = "shutdown";
             }else{
+              conn = false;
               className = "disableServer";
             }
             currentServerRowClass =
@@ -3441,10 +3453,17 @@ function check_kubernetes(server,port){
                 val.hostId +
                 '" data-HostName="' +
                 val.serverName +
-                '"class="resume" id="stopServer_' +
+                '"class="resume" '
+                );
+            if (conn){
+              htmlServerListHtml = htmlServerListHtml.concat(
+                'id="stopServer_' +
                 val.serverName +
-                '">' +
-                '<span class="' +
+                '"'
+              );
+            }
+            htmlServerListHtml = htmlServerListHtml.concat( 
+                '><span class="' +
                 currentServerColumnClass +
                 '">Paused</span></a></td></tr>'
             );
@@ -3460,22 +3479,20 @@ function check_kubernetes(server,port){
                 "<span>Stop</span></a></td></tr>"
             );
           } else if (val.serverName != null || val.serverName != "" || val.serverName != undefined || val.serverState == "MISSING") {
-            htmlServerListHtml = htmlServerListHtml.concat(
-              '<tr><td class="configLabel" width="40%"><a class="serNameTruncate" href="#">' +
-                val.serverName + "-" + val.hostId + 
-                "</a></td>" +
-                "<td  align='center' >" +
-                val.ipAddress +
-                "</td>" +
-                '<td align="right"><a href="javascript:void(0);" data-HostId="' +
-                val.hostId +
-                '" data-HostName="' +
-                val.serverName +
-                '" class="disableServer"  id="stopServer_' +
-                val.serverName +
-                '" onclick="VoltDbUI.openPopup(this);">' +
-                '<span class="shutdownServer stopDisable">Stop</span></a></td></tr>'
-            );
+            // htmlServerListHtml = htmlServerListHtml.concat(
+            //   '<tr><td class="configLabel" width="40%"><a class="serNameTruncate" href="#">' +
+            //     val.serverName + "-" + val.hostId + 
+            //     "</a></td>" +
+            //     "<td  align='center' >" +
+            //     val.ipAddress +
+            //     "</td>" +
+            //     '<td align="right"><a href="javascript:void(0);" data-HostId="' +
+            //     val.hostId +
+            //     '" data-HostName="' +
+            //     val.serverName +
+            //     '" class="disableServer">' +
+            //     '<span class="shutdownServer stopDisable">Stop</span></a></td></tr>'
+            // );
           }
         });
         updateAdminServerList();
