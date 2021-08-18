@@ -784,6 +784,7 @@ function convertOverlayData(data) {
 
 function logout() {
   saveSessionCookie("username", null);
+  saveSessionCookie("password", null)
   saveSessionCookie("current-tab", NavigationTabs.DBMonitor);
   $("#logOut").prop("title", "");
   location.href = "/logout";
@@ -3454,8 +3455,9 @@ var loadPage = function (serverName, portid) {
   $("#conPopup").popup({
     closeDialog: function () {
       VoltDbUI.isConnectionChecked = false;
-      VoltDbUI.refreshConnectionTime("20000");
+      VoltDbUI.refreshConnectionTime("5000");
       $("#connectionPopup").hide();
+      window.location.reload();
     },
   });
 
@@ -4005,7 +4007,7 @@ var loadPage = function (serverName, portid) {
     },
   });
 
-  VoltDbUI.refreshConnectionTime("20000");
+  VoltDbUI.refreshConnectionTime("5000");
 };
 
 /*********************************************************************************************

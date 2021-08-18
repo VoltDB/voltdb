@@ -1062,7 +1062,7 @@ function loadAdminPage() {
     $("#serverShutdownPopup").popup({
         closeDialog: function () {
             VoltDbUI.isConnectionChecked = false;
-            VoltDbUI.refreshConnectionTime('20000');
+            VoltDbUI.refreshConnectionTime('5000');
             $('#shutdownInfoPopup').hide();
         }
     });
@@ -4698,8 +4698,8 @@ function loadAdminPage() {
                 } else if ($("#userSaveDelete").data('status') == 'delete') {
                     toggleSecurityEdit(editStates.ShowLoading);
                     voltDbRenderer.UpdateUserConfiguration(null, function (result) {
-
                         if (!result.status) { //Handle the condition when the user deletes himself.
+                            toggleSecurityEdit(editStates.ShowEdit);
                             return;
                         }
 

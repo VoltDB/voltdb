@@ -213,6 +213,7 @@ function check_kubernetes(server,port){
               if (result) {
                 //Save user details to cookie.
                 saveSessionCookie("username", usernameVal);
+                saveSessionCookie("password",passwordVal)
                 voltDbRenderer.ShowUsername(usernameVal);
                 pageLoadCallback();
                 popupCallback();

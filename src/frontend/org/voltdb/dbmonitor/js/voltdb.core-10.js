@@ -501,7 +501,7 @@
                 },
                 statusCode:{
                     401: function(response){
-                        alert('Failed to authenticate to the server. Please check the configuration of your client/browser')
+                        alert('Failed to authenticate to the server. Please authenticate again in next window.')
                     }
                 },
                 timeout: 60000
@@ -542,7 +542,6 @@
             var i = 0;
             var connectionQueue = connection.getQueue();
             connectionQueue.Start();
-
             if (shortApiCallDetails != null && shortApiCallDetails.isShortApiCall) {
                 connectionQueue.BeginExecute([], [], function (data) {
                     connection.Metadata[processName] = data;
