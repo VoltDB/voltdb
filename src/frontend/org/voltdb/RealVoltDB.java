@@ -4828,7 +4828,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     ProClass.HANDLER_CRASH,
                     m_clientInterface, m_cartographer, m_messenger, drConsumerClusterId,
                     (byte) m_catalogContext.cluster.getPreferredsource(), drIfAndPort.getFirst(),
-                    drIfAndPort.getSecond(), drType);
+                    drIfAndPort.getSecond(), drType, m_producerDRGateway);
             m_globalServiceElector.registerService(m_consumerDRGateway);
             return true;
         }

@@ -223,4 +223,10 @@ public interface ProducerDRGateway {
     public enum Mode {
         NEW, REJOIN, RECOVER, JOIN;
     }
+
+    /**
+     * Returns current state which is held in private format, hence Object return.
+     * @return producer's dr state
+     */
+    public Object getProducerDRState();
 }
