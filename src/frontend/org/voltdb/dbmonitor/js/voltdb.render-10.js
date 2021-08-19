@@ -65,7 +65,7 @@ function check_kubernetes(server,port){
 
 (function (window) {
   var iVoltDbRenderer = function () {
-    this.kubernetes_con = false;
+    this.kubernetes_con = true;
     this.hostNames = [];
     this.currentHost = "";
 
@@ -212,8 +212,10 @@ function check_kubernetes(server,port){
               $("#overlay").hide();
               if (result) {
                 //Save user details to cookie.
-                voltDbRenderer.kubernetes_con = check_kubernetes($(location).attr("hostname"),$(location).attr("port"));
-                loadAdminPage();
+                setTimeout(function(){
+                  voltDbRenderer.kubernetes_con = check_kubernetes($(location).attr("hostname"),$(location).attr("port"));
+                  loadAdminPage();
+                },1000);
                 saveSessionCookie("username", usernameVal);
                 saveSessionCookie("password",passwordVal)
                 voltDbRenderer.ShowUsername(usernameVal);
