@@ -132,7 +132,7 @@ public class VoltDB {
     static {
         REAL_DEFAULT_TIMEZONE = TimeZone.getDefault();
         setDefaultTimezone();
-        ClientFactory.increaseClientCountToOne();
+        ClientFactory.preserveResources();
     }
 
     /** Encapsulates VoltDB configuration parameters */

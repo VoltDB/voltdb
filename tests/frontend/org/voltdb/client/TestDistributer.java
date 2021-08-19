@@ -59,7 +59,7 @@ public class TestDistributer extends TestCase {
         AtomicBoolean sendProcTimeout = new AtomicBoolean(false);
         volatile Semaphore invokedSubscribe = new Semaphore(0);
         volatile Semaphore invokedTopology = new Semaphore(0);
-        volatile Semaphore invokedSystemInformation = new Semaphore(0);
+        volatile Semaphore invokedSystemCatalog = new Semaphore(0);
 
         @Override
         public int getMaxRead() {
@@ -85,7 +85,7 @@ public class TestDistributer extends TestCase {
                     } else if (proc.equals("@Statistics")) {
                         invokedTopology.release();
                     } else if (proc.equals("@SystemCatalog")) {
-                        invokedSystemInformation.release();
+                        invokedSystemCatalog.release();
                     } else {
                         vt = new VoltTable[1];
                         vt[0] = new VoltTable(new VoltTable.ColumnInfo("Foo", VoltType.BIGINT));
@@ -105,10 +105,10 @@ public class TestDistributer extends TestCase {
                     buf.clear();
                     c.writeStream().enqueue(buf);
                     roundTrips.incrementAndGet();
-                    System.err.println("Sending response.");
+                    System.err.printf("Sending response for %s.%n", proc);
                 }
                 else {
-                    System.err.println("Witholding response.");
+                    System.err.printf("Witholding response for %s.%n", proc);
                 }
             }
             catch (Exception ex) {
@@ -310,6 +310,9 @@ public class TestDistributer extends TestCase {
     @Override
     public void setUp()
     {
+        System.out.printf("=-=-=-=-=-=-= Starting test %s =-=-=-=-=-=-=\n", getName());
+        // Reset client factory state to original
+        ClientFactory.m_preserveResources = false;
         while (ClientFactory.m_activeClientCount > 0) {
             try {
                 ClientFactory.decreaseClientNum();
@@ -318,6 +321,11 @@ public class TestDistributer extends TestCase {
         }
         // The DNS cache is always initialized in the started state
         ReverseDNSCache.start();
+    }
+
+    @Override
+    public void tearDown() throws Exception {
+        System.out.printf("=-=-=-=-=-=-= End of test %s =-=-=-=-=-=-=\n", getName());
     }
 
     @Test
@@ -978,7 +986,7 @@ public class TestDistributer extends TestCase {
 
         //Test that metadata was retrieved
         assertTrue(volt0.handler.invokedSubscribe.tryAcquire(10, TimeUnit.SECONDS));
-        assertTrue(volt0.handler.invokedSystemInformation.tryAcquire(10, TimeUnit.SECONDS));
+        assertTrue(volt0.handler.invokedSystemCatalog.tryAcquire(10, TimeUnit.SECONDS));
         assertTrue(volt0.handler.invokedTopology.tryAcquire( 10, TimeUnit.SECONDS));
 
         c.createConnection("localhost", 20001);
@@ -986,7 +994,7 @@ public class TestDistributer extends TestCase {
         Thread.sleep(50);
         //Should not have invoked anything
         assertFalse(volt1.handler.invokedSubscribe.tryAcquire());
-        assertFalse(volt1.handler.invokedSystemInformation.tryAcquire());
+        assertFalse(volt1.handler.invokedSystemCatalog.tryAcquire());
         assertFalse(volt1.handler.invokedTopology.tryAcquire());
 
         volt0.shutdown();
@@ -996,7 +1004,7 @@ public class TestDistributer extends TestCase {
         assertTrue(volt1.handler.invokedSubscribe.tryAcquire(10, TimeUnit.SECONDS));
         assertTrue(volt1.handler.invokedTopology.tryAcquire( 10, TimeUnit.SECONDS));
         //Don't need to get the catalog again due to node failure
-        assertFalse(volt1.handler.invokedSystemInformation.tryAcquire());
+        assertFalse(volt1.handler.invokedSystemCatalog.tryAcquire());
         } finally {
             volt0.shutdown();
             volt1.shutdown();
@@ -1023,17 +1031,16 @@ public class TestDistributer extends TestCase {
             Thread.sleep(50);
             //Should not have invoked anything
             assertFalse(volt1.handler.invokedSubscribe.tryAcquire());
-            assertFalse(volt1.handler.invokedSystemInformation.tryAcquire());
+            assertFalse(volt1.handler.invokedSystemCatalog.tryAcquire());
             assertFalse(volt1.handler.invokedTopology.tryAcquire());
 
             volt0.shutdown();
 
             Thread.sleep(50);
             //Test that topology is retrieved and re-subscribed
-            assertTrue(volt1.handler.invokedSubscribe.tryAcquire(10, TimeUnit.SECONDS));
-            assertTrue(volt1.handler.invokedTopology.tryAcquire( 10, TimeUnit.SECONDS));
-            //Don't need to get the catalog again due to node failure
-            assertTrue(volt1.handler.invokedSystemInformation.tryAcquire());
+            assertTrue("not invokedSubscribe", volt1.handler.invokedSubscribe.tryAcquire(10, TimeUnit.SECONDS));
+            assertTrue("not invokedTopology", volt1.handler.invokedTopology.tryAcquire(10, TimeUnit.SECONDS));
+            assertTrue("not invokedSystemCatalog", volt1.handler.invokedSystemCatalog.tryAcquire(10, TimeUnit.SECONDS));
         } finally {
             volt0.shutdown();
             volt1.shutdown();
@@ -1066,7 +1073,8 @@ public class TestDistributer extends TestCase {
                 teardownConnection.await();
                 gracefulExits.incrementAndGet();
             }
-            catch (InterruptedException | IOException e) {
+            catch (Exception ex) {
+                System.out.printf("Thread %s ungraceful exit: %s%n", Thread.currentThread().getName(), ex);
             }
             finally {
                 if (c != null) {
@@ -1094,8 +1102,39 @@ public class TestDistributer extends TestCase {
         MockVolt volt0 = new MockVolt(20000);
         volt0.handleConnection = false;
 
+        boolean connected = false;
         try {
             volt0.start();
+            stopRevDNS(); // I don't know why we do this but...
+            System.out.println("Signalling connection establishment");
+            connected = true;
+            threadedClient.establishConnection.countDown();
+        }
+        catch (Exception ex) {
+            System.out.printf("Unexpected exception starting MockVolt: %s", ex);
+            fail("Unexpected exception");
+        }
+        finally {
+            if (connected) {
+                System.out.println("Signalling connection teardown");
+                threadedClient.teardownConnection.countDown();
+            }
+            else {
+                t1.interrupt();
+                t2.interrupt();
+                t3.interrupt();
+            }
+            t1.join();
+            t2.join();
+            t3.join();
+            assertEquals(3, threadedClient.gracefulExits.get());
+            System.out.println("Shutdown");
+            volt0.shutdown();
+        }
+    }
+
+    private void stopRevDNS() {
+        try {
             Client forceRemoveDNSThread = threadedClient.createClient();
             forceRemoveDNSThread.close();
             boolean dnsThreadUp = true;
@@ -1103,23 +1142,18 @@ public class TestDistributer extends TestCase {
                 try {
                     ReverseDNSCache.submit(new Runnable() {
                         @Override
-                        public void run() {}
+                        public void run() { }
                     });
                 }
                 catch (IllegalStateException e) {
                     dnsThreadUp = false;
                 }
+                Thread.sleep(100);
             }
-            threadedClient.establishConnection.countDown();
         }
-        finally {
-            threadedClient.teardownConnection.countDown();
-            t1.join();
-            t2.join();
-            t3.join();
-            assertEquals(threadedClient.gracefulExits.get(), 3);
-            volt0.shutdown();
+        catch (Exception ex) {
+            System.out.printf("Unexpected exception stopping ReverseDNSCache: %s%n", ex);
+            // but keep going
         }
     }
 }
-

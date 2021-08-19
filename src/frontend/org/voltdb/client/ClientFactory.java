@@ -25,15 +25,13 @@ import org.voltcore.utils.EstTimeUpdater;
  *
  */
 public abstract class ClientFactory {
-    // If m_preserveResources is set m_activeClientCount will always be 1 irrespective of the number of clients
-    // initialized through the factory.
+
     static int m_activeClientCount = 0;
     static boolean m_preserveResources = false;
 
     /**
-     * <p>Create a {@link Client} with no connections. The Client will be optimized to send stored procedure invocations
-     * that are 128 bytes in size. Authentication will use a blank username and password unless
-     * you use the @deprecated createConnection methods.</p>
+     * Create a {@link Client} with no connections and all default options.
+     * Authentication will use a blank username and password.
      *
      * @return Newly constructed {@link Client}
      */
@@ -42,46 +40,51 @@ public abstract class ClientFactory {
     }
 
     /**
-     * <p>Recommended method for creating a client. Using a ClientConfig object ensures
-     * that a client application is isolated from changes to the configuration options.
-     * Authentication credentials are provided at construction time with this method
-     * instead of when invoking createConnection.</p>
+     * Recommended method for creating a {@link Client}.
+     * <p>
+     * Using a {@link ClientConfig} object ensures that a client application
+     * is isolated from changes to the configuration options. Authentication
+     * credentials are provided via the configuration object.</p>
      *
-     * @param config A ClientConfig object specifying what type of client to create
-     * @return A configured client
+     * @param config A {@link ClientConfig} object
+     * @return A configured {@link Client}
      */
     public static Client createClient(ClientConfig config) {
-        Client client = null;
-        synchronized (ClientFactory.class) {
-            if (!m_preserveResources && ++m_activeClientCount == 1) {
-                EstTimeUpdater.start();
-                ReverseDNSCache.start();
-            }
-        }
-        client = new ClientImpl(config);
-        return client;
+        start();
+        return new ClientImpl(config);
     }
 
-    public static synchronized void decreaseClientNum() throws InterruptedException {
-        // the client is the last alive client. Before exit, close all the static resources and threads.
-        if (!m_preserveResources && m_activeClientCount <= 1) {
-            m_activeClientCount = 0;
-            //Estimate Time Updater stop updates.
-            EstTimeUpdater.stop();
-            //stop ReverseDNSCache.
-            ReverseDNSCache.stop();
-        }
-        else {
-            m_activeClientCount--;
+    private static synchronized void start() {
+        if (m_activeClientCount++ == 0 && !m_preserveResources) {
+            EstTimeUpdater.start();
+            ReverseDNSCache.start();
         }
     }
 
-    public static synchronized void increaseClientCountToOne() {
-        // This method is intended to ensure that the resources needed to create clients
-        // are always initialized and won't be released with the active client count goes to zero.
+    /**
+     * Internally used by the VoltDB server during initialization.
+     * <p>
+     * This method is intended to ensure that the resources needed to create clients
+     * are always initialized and won't be released when the active client count goes to zero.
+     */
+    public static synchronized void preserveResources() {
         m_preserveResources = true;
         EstTimeUpdater.start();
         ReverseDNSCache.start();
-        m_activeClientCount = 1;
+    }
+
+    /**
+     * Internal client implementation support.
+     * <p>
+     * If the client is the last alive client, then close all the static
+     * resources, and stop threads created by 'start'.
+     */
+    static synchronized void decreaseClientNum() throws InterruptedException {
+        if (m_activeClientCount > 0) {
+            if (--m_activeClientCount == 0 && !m_preserveResources) {
+                EstTimeUpdater.stop();
+                ReverseDNSCache.stop();
+            }
+        }
     }
 }
