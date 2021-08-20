@@ -89,7 +89,7 @@ public class DRRoleStats extends StatsSource {
         final String role = getRole();
 
         rowValues[DRRole.ROLE.ordinal()] = role;
-        rowValues[DRRole.STATE.ordinal()] = state.getValue().name();
+        rowValues[DRRole.STATE.ordinal()] = "NONE".equalsIgnoreCase(role) ? State.DISABLED.name() : state.getValue().name();
         rowValues[DRRole.REMOTE_CLUSTER_ID.ordinal()] = state.getKey();
         return DRRole.values().length;
     }
@@ -99,7 +99,8 @@ public class DRRoleStats extends StatsSource {
     {
         final ProducerDRGateway producer = m_vdb.getNodeDRGateway();
         final Map<Byte, DRProducerNodeStats> producerStats;
-        if (producer != null) {
+        final String role = getRole();
+        if (producer != null && !"NONE".equalsIgnoreCase(role)) {
             producerStats = producer.getNodeDRStats();
         } else {
             producerStats = ImmutableMap.of((byte) -1, DRProducerNodeStats.DISABLED_NODE_STATS);
@@ -113,7 +114,7 @@ public class DRRoleStats extends StatsSource {
             consumerStates = ImmutableMap.of((byte) -1, State.DISABLED);
         }
 
-        final Map<Byte, State> states = mergeProducerConsumerStates(producerStats, consumerStates);
+        final Map<Byte, State> states = mergeProducerConsumerStates(producerStats, consumerStates, role);
 
         final Iterator<Map.Entry<Byte, State>> iter = states.entrySet().iterator();
         return new Iterator<Object>() {
@@ -137,7 +138,7 @@ public class DRRoleStats extends StatsSource {
     }
 
     private static Map<Byte, State> mergeProducerConsumerStates(Map<Byte, DRProducerNodeStats> producerStats,
-                                                                Map<Byte, State> consumerStates)
+                                                                Map<Byte, State> consumerStates, final String role)
     {
         Map<Byte, State> states = new HashMap<>();
         for (byte clusterId : Sets.union(producerStats.keySet(), consumerStates.keySet())) {
@@ -148,7 +149,7 @@ public class DRRoleStats extends StatsSource {
                 finalState = finalState.and(producerNodeStats.state);
             }
             if (consumerState != null) {
-                finalState = finalState.and(consumerState);
+                finalState = finalState.and("NONE".equalsIgnoreCase(role) ? State.DISABLED : consumerState);
             }
             states.put(clusterId, finalState);
         }
