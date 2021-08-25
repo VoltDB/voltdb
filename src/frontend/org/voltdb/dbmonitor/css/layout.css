@@ -4845,3 +4845,6 @@ table.dataTable {top:0;}
     padding-top: 0.3rem;
     font-size: 1rem;
 }
+#admin.kubernetes .k8s_hidden {
+    display: none !important;
+}

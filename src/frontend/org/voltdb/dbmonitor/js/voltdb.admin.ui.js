@@ -59,44 +59,22 @@ function rolehtml(){
     }
     return role_options
 }
-
-function check_kubernetes(server,port){
-    uri = "http://"+server+":"+port+"/api/1.0/?Procedure=@SystemInformation";
-    con = false;
-    $.get(uri,
-        function (data, textStatus, jqXHR) {  // success callback
-            if (textStatus == "success"){
-                data = data["results"][0]["data"];
-                $.each(data,function(id,val){
-                    if (val[1] == "KUBERNETES") {
-                        con = val[2];
-                    }
-                });
-            }
-        });
-    return con;
+/*
+* Set the admin tab to read-only if we are running under Kubernetes 
+*/
+function set_kubernetes_admin(){
+    if ($("#admin").hasClass("kubernetes")) return;
+    console.log("Setting Kubernetes read-only");
+    $("#admin").addClass("kubernetes");
+    var k8s_banner =
+        '<div class="kubernetes-content">'+
+        '<div class="kubernetes-logo"><p class="kubernetes-title">Managed by Kubernetes</p><p class="kubernetes-subtitle">Use Helm to manage and administer your cluster</p></div>' + 
+        '</div>';
+    $(".adminLeft").html(k8s_banner);    
 }
 
 function loadAdminPage() {
-    kubernetes_con = check_kubernetes($(location).attr("hostname"),$(location).attr("port"));
-    if (kubernetes_con){
-        var htmlcontent = "";
-        htmlcontent = htmlcontent.concat(
-            '<div class="kubernetes-content">'+
-            '<div class="kubernetes-logo"><p class="kubernetes-title">Managed by Kubernetes</p><p class="kubernetes-subtitle">Use Helm to manage and administer your cluster</p></div>' + 
-            '</div>'
-        )
-        $(".adminLeft").html(htmlcontent);
-        $("#securityEdit").remove();
-        $("#autoSnapshotEdit").remove();
-        $("#addNewConfigLink").remove();
-        $("#addNewImportConfigLink").remove();
-        $("#snmpEdit").remove();
-        $("#btnEditHrtTimeOut").remove();
-        $("#btnEditQueryTimeout").remove();
-        $("#btnDeleteMemory").remove();
-        $("#btnEditMemorySize").remove();
-    }
+
     adminClusterObjects = {
         btnClusterPause: $('#pauseConfirmation'),
         btnClusterResume: $('#resumeConfirmation'),
@@ -5535,10 +5513,8 @@ function loadAdminPage() {
 
                 var content = '';
 
-                if (!kubernetes_con){
-                    content = '<a id="btnEditDiskLimit" href="javascript:void(0)" onclick="editDiskLimit(1)" class="edit" title="Edit">&nbsp;</a>' +
+                content = '<a id="btnEditDiskLimit" href="javascript:void(0)" onclick="editDiskLimit(1)" class="edit k8s_hidden" title="Edit">&nbsp;</a>' +
                     '<div id="loadingDiskLimit" class="loading-small loadExport" style="display: none;"></div>';
-                }
 
                 result += '<tr class="child-row-6 subLabelRow parentprop" id="row-60">' +
                        '   <td class="configLabel" id="diskLimit" onclick="toggleProperties(this);" title="Click to expand/collapse" style="cursor: pointer;">' +
@@ -5581,10 +5557,8 @@ function loadAdminPage() {
                         '   <td align="right">' +
                         '   </td>' +
                         '<td>&nbsp</td>';
-                if(!kubernetes_con){
-                    result += '   <td><a id="btnEditDiskLimit" href="javascript:void(0)" onclick="editDiskLimit(1)" class="edit" title="Edit">&nbsp;</a>' +
+                result += '   <td><a id="btnEditDiskLimit" href="javascript:void(0)" onclick="editDiskLimit(1)" class="edit k8s_hidden" title="Edit">&nbsp;</a>' +
                     '<div id="loadingDiskLimit" class="loading-small loadExport" style="display: none;"></div></td>';
-                }
                 result += '</tr>' +
                         '<tr class="childprop-row-60 subLabelRow" ' + style + '>' +
                         '<td width="67%" class="configLabel" colspan="3">&nbsp &nbsp &nbsp No features available.</td>' +
@@ -5606,12 +5580,10 @@ function loadAdminPage() {
                 '<tr>' +
                 '<th>Username</th>' +
                 '<th>Role</th>';
-            if (!kubernetes_con){
                 tableHeader = tableHeader.concat(
                 '<th>&nbsp</th>' +
-                '<th><a href="#addUserPopup" id="addNewUserLink1" onclick="addUser(-1)" class="plusAdd" title="Add User">&nbsp;</a></th>'
+                '<th><a href="#addUserPopup" id="addNewUserLink1" onclick="addUser(-1)" class="plusAdd k8s_hidden" title="Add User">&nbsp;</a></th>'
                 )
-            }
             tableHeader = tableHeader.concat(
                 '</tr>'
             )
@@ -5625,9 +5597,8 @@ function loadAdminPage() {
                         '<td>' + userName + '</td>' +
                         '<td>' + formatDisplayName(role) + '</td>' +
                         '<td>&nbsp</td>';
-                    if (!kubernetes_con){
-                        result += '<td><a  href="javascript:void(0)" class="edit" title="Edit" onclick="addUser(1,\'' + userName + '\',\'' + role + '\');">&nbsp;</a></td>';
-                    }
+                    result += '<td><a  href="javascript:void(0)" class="edit k8s_hidden" title="Edit" onclick="addUser(1,\'' + userName + '\',\'' + role + '\');">&nbsp;</a></td>';
+
                     result += '</tr>';
                 }
             }

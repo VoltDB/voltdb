@@ -1049,6 +1049,13 @@ function alertNodeClicked(obj) {
             voltDbRenderer.hostNames.push(singleData[2]);
         }
 
+        if (singleData[1] == "KUBERNETES") {
+          if (true) { // }(singleData[2] == "true") {
+            console.log("Detected Kubernetes.");
+            set_kubernetes_admin();
+          }
+        }
+
         //assign entry in data object to 'currentServerOverview' if object being iterated is not a current host object
         //otherwise to a updatedSystemOverview
         if (voltDbRenderer.isHost) {
@@ -3384,9 +3391,9 @@ function alertNodeClicked(obj) {
                 '" data-HostName="' +
                 val.serverName +
                 '" class="' +
-                className +
-                '" id="stopServer_' +
-                val.serverName +
+                className +' k8s_hidden' +
+                '" id="stopServer_' + 
+                val.serverName + 
                 '">' +
                 '<span class="' +
                 currentServerColumnClass +
