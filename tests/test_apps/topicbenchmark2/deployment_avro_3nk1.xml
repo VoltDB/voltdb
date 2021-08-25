@@ -1,0 +1,41 @@
+<?xml version="1.0"?>
+<deployment>
+  <!-- deployment file to match ENG-21510 -->
+   <cluster hostcount="3" sitesperhost="8" kfactor="1" />
+   <!--
+       NOTE: avo registry URL must match the value of the 'schemaregistry' parameter
+   -->
+   <avro registry="http://localhost:8081" namespace="" />
+   <systemsettings>
+      <flushinterval minimum="10">
+          <export interval="100" />
+      </flushinterval>
+   </systemsettings>
+    <threadpools>
+      <pool name="topicbenchmark" size="10" />
+    </threadpools>
+    <topics enabled="true" threadpool="topicbenchmark">
+     <broker>
+       <property name="port">9095</property>
+       <property name="network.thread.count">15</property>
+     </broker>
+     <!-- Note: do not specify a format for the topic in order to let the key format be determined as LONG -->
+     <topic name="TEST_TOPIC" procedure="test_topic" retention="1 dy">
+       <property name="producer.parameters.includeKey">true</property>
+       <property name="producer.format.value">avro</property>
+       <property name="consumer.format.value">avro</property>
+       <!-- option to test inline encoding
+       <property name="topic.store.encoded">true</property>
+       -->
+     </topic>
+     <!-- Note: do not specify a format for the topic in order to let the key format be determined as LONG -->
+     <topic name="TEST_TOPIC01" procedure="test_topic01" retention="1 dy">
+       <property name="producer.parameters.includeKey">true</property>
+       <property name="producer.format.value">avro</property>
+       <property name="consumer.format.value">avro</property>
+       <!-- option to test inline encoding
+       <property name="topic.store.encoded">true</property>
+       -->
+     </topic>
+   </topics>
+</deployment>
