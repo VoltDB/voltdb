@@ -59,6 +59,7 @@ function clean() {
     rm -rf obj debugoutput voltdbroot statement-plans catalog-report.html log *.jar *.csv
     find . -name '*.class' | xargs rm -f
     rm -rf voltdbroot
+    rm -rf node0/* node1/* node2/*
 }
 
 # Grab the necessary command line arguments
@@ -103,6 +104,33 @@ function server_avro() {
     srccompile-ifneeded
     voltdb init --force --config=deployment_avro.xml
     server_common
+}
+
+# run the voltdb server locally for AVRO testing in 3nk1 config
+# Confluent platform must be running with schema registry on default port
+# Schema registry must be configured to disable schema compatibility:
+#   curl -X PUT -H "Content-Type: application/vnd.schemaregistry.v1+json" \\n  --data '{"compatibility": "NONE"}' \\n  http://localhost:8081/config\n
+# Use this sequence of commands:
+#   ./run.sh clean
+#   ./run.sh server_avro_3nk1
+#     (no need for CTRL-C + bg)
+#   ./run.sh init_avro
+#   ./run.sh run_avro_3nk1_benchmark
+#   voltadmin shutdown
+#   (stop & cleanup the confluent environment)
+function server_avro_3nk1() {
+    srccompile-ifneeded
+    rm -rf node0/* node1/* node2/*
+    voltdb init --force -D node0 -C deployment_avro_3nk1.xml
+    voltdb init --force -D node1 -C deployment_avro_3nk1.xml
+    voltdb init --force -D node2 -C deployment_avro_3nk1.xml
+    sleep 3
+    voltdb start --host=localhost:3021,localhost:3022,localhost:3023  -D node0 \
+               --admin=21211 --client=21212 --http=8085 --internal=3021 --zookeeper=7181 --topicsport=9093 &
+    voltdb start --host=localhost:3021,localhost:3022,localhost:3023 -D node1 \
+               --admin=21210 --client=21213 --http=8086 --internal=3022 --zookeeper=7182  --topicsport=9094 &
+    voltdb start --host=localhost:3021,localhost:3022,localhost:3023 -D node2 \
+              --admin=21209 --client=21214 --http=8087 --internal=3023 --zookeeper=7183  --topicsport=9095 &
 }
 
 function server_common() {
@@ -204,6 +232,25 @@ function run_avro_benchmark() {
         --groupmembers=10 \
         --pollprogress=10000 \
         --transientmembers=3
+}
+
+# Benchmark case to match ENG-21510
+# Note servers localhost only, not identified by ports so targeting the default 21212
+function run_avro_3nk1_benchmark() {
+    srccompile-ifneeded
+    java -classpath topicbenchmark2-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file:${LOG4J} \
+        topicbenchmark2.TopicBenchmark2 \
+        --servers=localhost \
+        --count=1000000 \
+        --insertrate=10000 \
+        --useavro=true \
+        --producers=6 \
+        --groups=6 \
+        --groupmembers=8 \
+        --pollprogress=1000000 \
+        --transientmembers=3 \
+        --maxpollsilence=240 \
+        --staticmembers=true
 }
 
 # Use this to benchmark Volt inline avro performance against kafka
