@@ -3388,6 +3388,10 @@ function set_kubernetes(server,port){
         $.each(VoltDbAdminConfig.servers, function (id, val) {
           var conn = true;
           if ((val.serverName != null || val.serverName != "" || val.serverName != undefined) && val.serverState == "RUNNING") {
+            currentServerRowClass =
+              voltDbRenderer.currentHost == val.serverName
+                ? "activeHostMonitoring"
+                : "activeHost";
             if (voltDbRenderer.currentHost != val.serverName && con) {
               className = "shutdown";
               currentServerColumnClass = "shutdownServer";
