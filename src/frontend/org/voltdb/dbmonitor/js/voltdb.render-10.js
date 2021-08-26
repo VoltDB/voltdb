@@ -3247,6 +3247,12 @@ function set_kubernetes(server,port){
       var currentServerColumnClass;
       var count = 0;
 
+      function sortByHostId(v1,v2) {
+        var hostIdV1 = parseInt(v1.hostId);
+        var hostIdV2 = parseInt(v2.hostId)
+        return ((hostIdV1 < hostIdV2) ? -1 : ((hostIdV1 > hostIdV2) ? 1 : 0));
+      }
+
       this.setServerDetails = function (hostId, serverInfo, iteratorCount) {
         var count = 0;
         var stopperServerCount = 0;
@@ -3257,7 +3263,8 @@ function set_kubernetes(server,port){
           VoltDbAdminConfig.servers.length > 0 &&
           check_hostid(hostId)
         ) {
-          $.each(VoltDbAdminConfig.servers, function (id, value) {
+          VoltDbAdminConfig.servers.sort(sortByHostId)
+          $.each(VoltDbAdminConfigservers, function (id, value) {
             {
               if (
                 value.serverName != serverInfo["HOSTNAME"] &&
@@ -3300,6 +3307,7 @@ function set_kubernetes(server,port){
             serverInfo["HTTPPORT"]
           );
           VoltDbAdminConfig.servers.push(serverDetails);
+          VoltDbAdminConfig.servers.sort(sortByHostId)
           count++;
         }
       };
