@@ -3263,7 +3263,7 @@ function set_kubernetes(server,port){
           VoltDbAdminConfig.servers.length > 0 &&
           check_hostid(hostId)
         ) {
-          VoltDbAdminConfig.servers.sort(sortByHostId)
+          VoltDbAdminConfig.servers.sort(sortByHostId);
           $.each(VoltDbAdminConfigservers, function (id, value) {
             {
               if (
@@ -3275,7 +3275,8 @@ function set_kubernetes(server,port){
                   serverInfo["HOSTNAME"],
                   serverInfo["CLUSTERSTATE"],
                   serverInfo["IPADDRESS"],
-                  serverInfo["HTTPPORT"]
+                  serverInfo["HTTPPORT"],
+                  serverInfo["CLIENTPORT"]
                 );
                 VoltDbAdminConfig.servers[iteratorCount] = serverDetails;
 
@@ -3304,10 +3305,11 @@ function set_kubernetes(server,port){
             hostname,
             serverInfo["CLUSTERSTATE"],
             serverInfo["IPADDRESS"],
-            serverInfo["HTTPPORT"]
+            serverInfo["HTTPPORT"],
+            serverInfo["CLIENTPORT"]
           );
           VoltDbAdminConfig.servers.push(serverDetails);
-          VoltDbAdminConfig.servers.sort(sortByHostId)
+          VoltDbAdminConfig.servers.sort(sortByHostId);
           count++;
         }
       };
@@ -3401,9 +3403,11 @@ function set_kubernetes(server,port){
               conn = false;
             }
             if (location.port == val.httpPort){
-              conn = false;
-              className = "disableServer";
-              currentServerColumnClass = "shutdownServer stopDisable";
+              if (client_port == val.clientPort){
+                conn = false;
+                className = "disableServer";
+                currentServerColumnClass = "shutdownServer stopDisable";
+              }
             }
             currentServerColumnClass =
               voltDbRenderer.currentHost == val.serverName

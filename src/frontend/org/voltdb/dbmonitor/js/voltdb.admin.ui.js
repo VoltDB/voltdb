@@ -8,6 +8,7 @@ var editStates = {
     ShowLoading: 2
 };
 var INT_MAX_VALUE = 2147483647;
+var client_port = 0;
 
 function getListOfRoles() {
     // Got to figure out what roles are available.
@@ -5108,12 +5109,13 @@ function loadAdminPage() {
         this.exportTypes = [];
         this.isSaveSnapshot = false;
 
-        this.server = function (hostIdvalue, serverNameValue, serverStateValue, ipAddress, HTTPPORT) {
+        this.server = function (hostIdvalue, serverNameValue, serverStateValue, ipAddress, HTTPPORT, ClientPort) {
             this.hostId = hostIdvalue;
             this.serverName = serverNameValue;
             this.serverState = serverStateValue;
             this.ipAddress = ipAddress;
             this.httpPort = HTTPPORT;
+            this.clientPort = ClientPort;
         };
 
         this.stoppedServer = function (hostIdvalue, serverNameValue) {
@@ -5139,6 +5141,7 @@ function loadAdminPage() {
 
         this.displayPortAndRefreshClusterState = function (portAndClusterValues, serverSettings) {
             if (portAndClusterValues != undefined && VoltDbAdminConfig.isAdmin) {
+                client_port = portAndClusterValues.clientPort;
                 configurePortAndOverviewValues(portAndClusterValues, serverSettings);
                 refreshClusterValues(portAndClusterValues);
                 configurePromoteAction(portAndClusterValues);
