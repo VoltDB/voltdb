@@ -1050,7 +1050,7 @@ function alertNodeClicked(obj) {
         }
 
         if (singleData[1] == "KUBERNETES") {
-          if (true) { // }(singleData[2] == "true") {
+          if (singleData[2] == "true") {
             console.log("Detected Kubernetes.");
             set_kubernetes_admin();
           }

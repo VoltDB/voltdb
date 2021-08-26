@@ -5369,7 +5369,7 @@ function loadAdminPage() {
                             '   <td>' + getOnOffText(enabled) + '</td>' +
                             '   <td>' +
                             '       <div class="exportDelete" style="display:none;"></div>' +
-                            '       <a href="javascript:void(0)" id="exportEdit' + i + '" class="edit" onclick="editStream(' + i + ')" title="Edit">&nbsp;</a>' +
+                            '       <a href="javascript:void(0)" id="exportEdit' + i + '" class="edit k8s_hidden" onclick="editStream(' + i + ')" title="Edit">&nbsp;</a>' +
                             '   </td>' +
                             '</tr>';
 
@@ -5480,7 +5480,7 @@ function loadAdminPage() {
                             '   <td>' + getOnOffText(enabled) + '</td>' +
                             '   <td>' +
                             '       <div class="exportDelete" style="display:none;"></div>' +
-                            '       <a href="javascript:void(0)" id="importEdit' + i + '" class="edit" onclick="editImportStream(' + i + ')" title="Edit">&nbsp;</a>' +
+                            '       <a href="javascript:void(0)" id="importEdit' + i + '" class="edit k8s_hidden" onclick="editImportStream(' + i + ')" title="Edit">&nbsp;</a>' +
                             '   </td>' +
                             '</tr>';
                 result += resultProperty + resultSubProperty;
