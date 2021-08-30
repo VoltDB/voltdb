@@ -54,6 +54,23 @@ public abstract class ClientFactory {
         return new ClientImpl(config);
     }
 
+    /**
+     * Create a "version 2" client, {@link Client2}.
+     * <p>
+     * This call takes a {@link Client2Config} argument, which
+     * distinguishes it from {@link #createClient(ClientConfig)}.
+     * <p>
+     * All client options, including authentication information, are
+     * provided via the {@link Client2Config} object.
+     *
+     * @param config A {@link Client2Config} object
+     * @return A configured {@link Client2}
+     */
+    public static Client2 createClient(Client2Config config) {
+        start();
+        return new Client2Impl(config);
+    }
+
     private static synchronized void start() {
         if (m_activeClientCount++ == 0 && !m_preserveResources) {
             EstTimeUpdater.start();
@@ -87,4 +104,5 @@ public abstract class ClientFactory {
             }
         }
     }
+
 }

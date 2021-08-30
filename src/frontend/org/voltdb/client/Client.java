@@ -197,15 +197,12 @@ public interface Client {
     throws IOException;
 
     /**
-     * Synchronously invokes the UpdateClasses procedure. Blocks until a
-     * result is available. A {@link ProcCallException} is thrown if the
-     * response is anything other than success.
+     * Synchronously updates class definitions in the VoltDB database.
+     * Blocks until a result is available. A {@link ProcCallException}
+     * is thrown if the response is anything other than success.
      * <p>
-     * This method is a convenience method that is equivalent to reading
-     * a jarfile containing classes to be added/updated, into a byte array,
-     * then calling {@link #callProcedure(String, Object...)} with "@UpdateClasses"
-     * as the procedure name, followed by the bytes of the jarfile, and a string
-     *  containing a comma-separates list of classes to delete from the catalog.
+     * This method is a convenience method that calls through to
+     * {@link UpdateClasses#update(Client,File,String)}
      *
      * @param jarPath Path to the jar file containing new/updated classes.
      * @param classesToDelete comma-separated list of classes to delete.
@@ -218,16 +215,12 @@ public interface Client {
     throws IOException, NoConnectionsException, ProcCallException;
 
     /**
-     * Asynchronously invokes the UpdateClasses procedure. Does not guarantee
-     * that the invocation is actually queued. Check the return value to determine
-     * if queuing actually took place.
+     * Asynchronously updates class definitions in the VoltDB database.
+     * Does not guarantee that the invocation was actually queued: check
+     * the return value to determine if queuing actually took place.
      * <p>
-     * This method is a convenience method that is equivalent to reading
-     * a jarfile containing classes to be added/updated, into a byte array,
-     * then calling {@link #callProcedure(ProcedureCallback, String, Object...)}
-     * with "@UpdateClasses as the procedure name, followed by the bytes of the
-     * jarfile, and a string containing a comma-separates list of classes to
-     * delete from the catalog.
+     * This method is a convenience method that calls through to
+     * {@link UpdateClasses#update(Client,ProcedureCallback,File,String)}
      *
      * @param callback ProcedureCallback that will be invoked with procedure results.
      * @param jarPath Path to the jar file containing new/updated classes.  May be null.

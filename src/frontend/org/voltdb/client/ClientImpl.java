@@ -527,27 +527,19 @@ public final class ClientImpl implements Client {
     }
 
     /**
-     * Update classes
+     * Update classes: just a wrapper around the utility class.
      */
     @Override
     public ClientResponse updateClasses(File jarPath, String classesToDelete)
     throws IOException, ProcCallException {
-        byte[] jarbytes = null;
-        if (jarPath != null) {
-            jarbytes = ClientUtils.fileToBytes(jarPath);
-        }
-        return callProcedure("@UpdateClasses", jarbytes, classesToDelete);
+        return UpdateClasses.update(this, jarPath, classesToDelete);
     }
 
     @Override
     public boolean updateClasses(ProcedureCallback callback,
                                  File jarPath,
                                  String classesToDelete) throws IOException {
-        byte[] jarbytes = null;
-        if (jarPath != null) {
-            jarbytes = ClientUtils.fileToBytes(jarPath);
-        }
-        return callProcedure(callback, "@UpdateClasses", jarbytes, classesToDelete);
+        return UpdateClasses.update(this, callback, jarPath, classesToDelete);
     }
 
     /**

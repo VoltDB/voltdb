@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -38,7 +38,8 @@ import java.util.TreeMap;
  */
 public class ClientStatsContext {
 
-    final Distributer m_distributor;
+    final Distributer m_distributor; // original client API
+    final Client2Impl m_client2; // client API version 2
     Map<Long, Map<String, ClientStats>> m_baseline;
     Map<Long, Map<String, ClientStats>> m_current;
     Map<Long, ClientIOStats> m_baselineIO;
@@ -53,7 +54,24 @@ public class ClientStatsContext {
                        Map<Long, ClientIOStats> currentIO,
                        Map<Integer, ClientAffinityStats> currentAffinity)
     {
+        this(distributor, null, current, currentIO, currentAffinity);
+    }
+
+    ClientStatsContext(Client2Impl client2,
+                       Map<Long, Map<String, ClientStats>> current,
+                       Map<Long, ClientIOStats> currentIO,
+                       Map<Integer, ClientAffinityStats> currentAffinity)
+    {
+        this(null, client2, current, currentIO, currentAffinity);
+    }
+
+    private ClientStatsContext(Distributer distributor, Client2Impl client2,
+                       Map<Long, Map<String, ClientStats>> current,
+                       Map<Long, ClientIOStats> currentIO,
+                       Map<Integer, ClientAffinityStats> currentAffinity)
+    {
         m_distributor = distributor;
+        m_client2 = client2;
         m_baseline = new TreeMap<Long, Map<String, ClientStats>>();
         m_baselineIO = new TreeMap<Long, ClientIOStats>();
         m_baselineAffinity = new HashMap<Integer, ClientAffinityStats>();
@@ -72,10 +90,16 @@ public class ClientStatsContext {
      * @return A <code>this</code> pointer for chaining calls.
      */
     public ClientStatsContext fetch() {
-        m_current = m_distributor.getStatsSnapshot();
-        m_currentIO = m_distributor.getIOStatsSnapshot();
+        if (m_client2 != null) {
+            m_current = m_client2.getStatsSnapshot();
+            m_currentIO = m_client2.getIOStatsSnapshot();
+            m_currentAffinity = m_client2.getAffinityStatsSnapshot();
+        } else {
+            m_current = m_distributor.getStatsSnapshot();
+            m_currentIO = m_distributor.getIOStatsSnapshot();
+            m_currentAffinity = m_distributor.getAffinityStatsSnapshot();
+        }
         m_currentTS = System.currentTimeMillis();
-        m_currentAffinity = m_distributor.getAffinityStatsSnapshot();
         return this;
     }
 
@@ -88,8 +112,8 @@ public class ClientStatsContext {
      */
     public ClientStatsContext fetchAndResetBaseline() {
         fetch();
-        ClientStatsContext retval = new ClientStatsContext(m_distributor, m_current, m_currentIO,
-                m_currentAffinity);
+        ClientStatsContext retval = new ClientStatsContext(m_distributor, m_client2, m_current,
+                                                           m_currentIO, m_currentAffinity);
         retval.m_baseline = m_baseline;
         retval.m_baselineIO = m_baselineIO;
         retval.m_baselineTS = m_baselineTS;

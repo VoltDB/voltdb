@@ -49,7 +49,7 @@ public interface ClientResponse {
     /**
      * Status code indicating the connection to the database that the invocation was queued at
      * was lost before a response was received. It is possible that the invocation was sent, executed, and successfully
-     * committed before a response could be returned or the invocation may never have been sent.
+     * committed before a response could be returned, or the invocation may never have been sent.
      */
     public static final byte CONNECTION_LOST = -4;
 
@@ -109,10 +109,23 @@ public interface ClientResponse {
 
     /**
      * Status code indicating that the transaction failed in the client before it
-     * was sent to the VoltDB server. This can happen when requests time out before
-     * transmission, perhaps due to being queued awaiting send permits.
+     * was sent to the VoltDB server. This status code is used for client errors
+     * other than timeouts.
      */
-    public static final byte TXN_NOT_SENT = -14;
+    public static final byte CLIENT_ERROR_TXN_NOT_SENT = -14;
+
+    /**
+     * Status code indicating that the request was timed out in the client
+     * before it could be sent to the VoltDB server.
+     */
+    public static final byte CLIENT_REQUEST_TIMEOUT = -15;
+
+    /**
+     * Status code indicating that the request was timed out in the client
+     * while waiting for a response from the VoltDB server. No conclusion can
+     * be drawn about whether the transaction has been executed.
+     */
+    public static final byte CLIENT_RESPONSE_TIMEOUT = -16;
 
     /**
      * Default value for the user specified app status code field

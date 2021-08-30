@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -49,6 +49,7 @@ public abstract class ProcedureInvocationExtensions {
     public static final byte ALL_PARTITION = 2; // whether proc is part of run-everywhere
     public static final byte PARTITION_DESTINATION = 3; // Which partition this procedure is targeting
     public static final byte BATCH_CALL = 4; // If this is a batch call to a procedure
+    public static final byte REQUEST_PRIORITY = 5; // client-assigned priority for this request
 
     private static final int INTEGER_SIZE = Integer.BYTES;
 
@@ -111,6 +112,20 @@ public abstract class ProcedureInvocationExtensions {
         return true;
     }
 
+    public static void writeRequestPriorityWithTypeByte(ByteBuffer buf, int prio) {
+        buf.put(REQUEST_PRIORITY);
+        writeLength(buf, 1);
+        buf.put((byte)prio);
+    }
+
+    public static int readRequestPriority(ByteBuffer buf) {
+        int len = readLength(buf);
+        if (len != 1) {
+            throw new IllegalStateException("Priority extension serialization length expected to be 1: " + len);
+        }
+        return buf.get();
+    }
+
     public static void skipUnknownExtension(ByteBuffer buf) {
         int len = readLength(buf);
         buf.position(buf.position() + len); // skip ahead
@@ -140,10 +155,10 @@ public abstract class ProcedureInvocationExtensions {
         }
     }
 
-    private static int readInt(ByteBuffer buf, String extenstion) {
+    private static int readInt(ByteBuffer buf, String extension) {
         int len = readLength(buf);
         if (len != INTEGER_SIZE) {
-            throw new IllegalStateException(extenstion + " extension serialization length expected to be 4");
+            throw new IllegalStateException(extension + " extension serialization length expected to be 4");
         }
         return buf.getInt();
     }

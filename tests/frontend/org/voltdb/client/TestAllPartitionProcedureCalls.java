@@ -122,26 +122,26 @@ public class TestAllPartitionProcedureCalls extends JUnit4LocalClusterTest {
         // check sysproc
         responses = client.callAllPartitionProcedure("@Statistics", "MEMORY");
         for (ClientResponseWithPartitionKey response : responses) {
-            assertEquals(ClientResponse.GRACEFUL_FAILURE, response.response.getStatus());
-            String msg = response.response.getStatusString();
-            assertTrue(msg.contains("Invalid procedure for all-partition execution"));
+            checkFail(response);
         }
 
         // check multipart
         responses = client.callAllPartitionProcedure("MultiPartitionProcedureSample", 0);
         for (ClientResponseWithPartitionKey response : responses) {
-            assertEquals(ClientResponse.GRACEFUL_FAILURE, response.response.getStatus());
-            String msg = response.response.getStatusString();
-            assertTrue(msg.contains("Invalid procedure for all-partition execution"));
+            checkFail(response);
         }
 
         // check wrong-partitioning
         responses = client.callAllPartitionProcedure("PartitionedTestProcNonZeroPartitioningParam", 0, 1);
         for (ClientResponseWithPartitionKey response : responses) {
-            assertEquals(ClientResponse.GRACEFUL_FAILURE, response.response.getStatus());
-            String msg = response.response.getStatusString();
-            assertTrue(msg.contains("Invalid procedure for all-partition execution"));
+            checkFail(response);
         }
+    }
+
+    private void checkFail(ClientResponseWithPartitionKey response) {
+        assertEquals(ClientResponse.GRACEFUL_FAILURE, response.response.getStatus());
+        String msg = response.response.getStatusString();
+        assertTrue("wrong failure msg \""+msg+"\"", msg.contains("Invalid procedure for all-partition execution"));
     }
 
     @Test
@@ -204,10 +204,15 @@ public class TestAllPartitionProcedureCalls extends JUnit4LocalClusterTest {
 
     private void validateResults(ClientResponseWithPartitionKey[]  responses, int partitionCount) {
         assertNotNull("responses are null", responses);
-        assertEquals ("response array size is not equal to the number of partitions", partitionCount, responses.length);
+        assertEquals("response array size is not equal to the number of partitions", partitionCount, responses.length);
         long total = 0;
         for (ClientResponseWithPartitionKey resp: responses) {
-            VoltTable results = resp.response.getResults()[0];
+            byte status = resp.response.getStatus();
+            String msg = resp.response.getStatusString();
+            assertEquals("response failed, message \""+msg+"\"", ClientResponse.SUCCESS, status);
+            VoltTable[] vta = resp.response.getResults();
+            assertTrue("response has no table", vta.length > 0);
+            VoltTable results = vta[0];
             long count = results.fetchRow(0).getLong(0);
             assertTrue(count > 0);
             total += count;

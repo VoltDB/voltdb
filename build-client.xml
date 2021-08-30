@@ -226,6 +226,13 @@ DISTRIBUTION
             <include name="src/frontend/org/voltdb/client/ClientStatsUtil.java" />
             <include name="src/frontend/org/voltdb/client/ClientAffinityStats.java" />
             <include name="src/frontend/org/voltdb/client/ClientStatsContext.java" />
+            <include name="src/frontend/org/voltdb/client/Client2.java" />
+            <include name="src/frontend/org/voltdb/client/Client2Config.java" />
+            <include name="src/frontend/org/voltdb/client/Client2CallOptions.java" />
+            <include name="src/frontend/org/voltdb/client/Client2Notification.java" />
+            <include name="src/frontend/org/voltdb/client/GeneralException.java" />
+            <include name="src/frontend/org/voltdb/client/RequestLimitException.java" />
+            <include name="src/frontend/org/voltdb/client/UpdateClasses.java" />
             <include name="src/frontend/org/voltdb/types/TimestampType.java" />
             <include name="src/frontend/org/voltdb/types/GeographyPointValue.java" />
             <include name="src/frontend/org/voltdb/types/GeographyValue.java" />
@@ -338,6 +345,7 @@ JAVA COMPILATION
 
     <invoke-javac-client srcdir="${build.clientsrc.dir}"/>
 </target>
+
 
 <!-- END PROJECT -->
 </project>
