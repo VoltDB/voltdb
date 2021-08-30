@@ -3299,18 +3299,34 @@ function set_kubernetes(server,port){
             }
           });
         } else {
-          var hostname = serverInfo["HOSTNAME"];
-          serverDetails = new VoltDbAdminConfig.server(
-            hostId,
-            hostname,
-            serverInfo["CLUSTERSTATE"],
-            serverInfo["IPADDRESS"],
-            serverInfo["HTTPPORT"],
-            serverInfo["CLIENTPORT"]
-          );
-          VoltDbAdminConfig.servers.push(serverDetails);
-          VoltDbAdminConfig.servers.sort(sortByHostId);
-          count++;
+          if (location.hostname == "localhost"){
+            var hostname = serverInfo["HOSTNAME"];
+            serverDetails = new VoltDbAdminConfig.server(
+              hostId,
+              hostname,
+              serverInfo["CLUSTERSTATE"],
+              serverInfo["IPADDRESS"],
+              serverInfo["HTTPPORT"],
+              serverInfo["CLIENTPORT"]
+            );
+            VoltDbAdminConfig.servers.push(serverDetails);
+            VoltDbAdminConfig.servers.sort(sortByHostId);
+            count++;
+          }else{
+            if (location.port == serverInfo["HTTPPORT"]){
+              VoltDbAdminConfig.servers = [];
+              var hostname = serverInfo["HOSTNAME"];
+              serverDetails = new VoltDbAdminConfig.server(
+              hostId,
+              hostname,
+              serverInfo["CLUSTERSTATE"],
+              serverInfo["IPADDRESS"],
+              serverInfo["HTTPPORT"],
+              serverInfo["CLIENTPORT"]
+            );
+            VoltDbAdminConfig.servers.push(serverDetails);
+            }
+          }
         }
       };
 
@@ -3336,7 +3352,7 @@ function set_kubernetes(server,port){
         var runningServerCounter = 0;
 
         $.each(VoltDbAdminConfig.servers, function (id, value) {
-          if (voltDbRenderer.currentHost != value.serverName) {
+          // if (voltDbRenderer.currentHost != value.serverName) {
             if (value.serverState == "RUNNING") {
               if (runningServerCounter == 0)
                 VoltDbAdminConfig.runningServerIds =
@@ -3354,14 +3370,16 @@ function set_kubernetes(server,port){
               }
               runningServerCounter++;
             }
-          }
+          // }
         });
       };
       if (adminClusterObjects.ignoreServerListUpdateCount > 0) {
         adminClusterObjects.ignoreServerListUpdateCount--;
       } else {
         if (systemOverview != null || systemOverview != undefined) {
-          VoltDbAdminConfig.servers = [];
+          if (location.hostname == "localhost"){
+            VoltDbAdminConfig.servers = [];
+          }
           $.each(systemOverview, function (id, val) {
             setServerDetails(val.NODEID, val, count);
             count++;
@@ -3383,9 +3401,9 @@ function set_kubernetes(server,port){
             count++ ;
           }
         });
-        var con = true;
-        if (count >= parseInt($("#kSafety").text())){
-          con = false;
+        var con = false;
+        if (count < parseInt($("#kSafety").text())){
+          con = true;
         }
         $.each(VoltDbAdminConfig.servers, function (id, val) {
           var conn = true;
@@ -3394,7 +3412,8 @@ function set_kubernetes(server,port){
               voltDbRenderer.currentHost == val.serverName
                 ? "activeHostMonitoring"
                 : "activeHost";
-            if (voltDbRenderer.currentHost != val.serverName && con) {
+            // if (voltDbRenderer.currentHost != val.serverName && con) {
+            if (con){
               className = "shutdown";
               currentServerColumnClass = "shutdownServer";
             }else{
@@ -3402,17 +3421,17 @@ function set_kubernetes(server,port){
               currentServerColumnClass = "shutdownServer stopDisable";
               conn = false;
             }
-            if (location.port == val.httpPort){
-              if (client_port == val.clientPort){
-                conn = false;
-                className = "disableServer";
-                currentServerColumnClass = "shutdownServer stopDisable";
-              }
-            }
-            currentServerColumnClass =
-              voltDbRenderer.currentHost == val.serverName
-                ? "shutdownServer stopDisable"
-                : "shutdownServer";
+            // if (location.port == val.httpPort){
+            //   if (client_port == val.clientPort){
+            //     conn = false;
+            //     className = "disableServer";
+            //     currentServerColumnClass = "shutdownServer stopDisable";
+            //   }
+            // }
+            // currentServerColumnClass =
+            //   voltDbRenderer.currentHost == val.serverName
+            //     ? "shutdownServer stopDisable"
+            //     : "shutdownServer";
 
             htmlServerListHtml = htmlServerListHtml.concat(
               '<tr class="' +
