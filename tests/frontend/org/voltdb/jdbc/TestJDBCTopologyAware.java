@@ -119,20 +119,17 @@ public class TestJDBCTopologyAware extends RegressionSuite
             rs.next();
             int cnt = rs.getInt(1);
             assertEquals(cnt, 1);
-            cnt = 0;
 
             m_config.killSingleHost(0);
             Thread.sleep(500); // give repair a chance to settle
 
-            ps = conn.prepareStatement(sql);
             ps.setInt(1, 13);
             rs = ps.executeQuery();
             rs.next();
             cnt = rs.getInt(1);
             assertEquals(cnt, 1);
-            cnt = 0;
 
-         } catch (Exception ex) {
+        } catch (Exception ex) {
             //We could get here if the transaction was submitted while the
             //cluster is failing.  Handle the mastership change case, but hope
             //it doesn't happen...
@@ -149,8 +146,7 @@ public class TestJDBCTopologyAware extends RegressionSuite
         Thread.sleep(500); // give repair a chance to settle
     }
 
-
-    public void testMultiNodeJDBCConnectionReconnect() throws Exception {
+    public void testMultiNodeJDBCConnectionReconnectFail() throws Exception {
         // Need to build the URL before pre-killing the node or we don't
         // add it to the URL list.
         StringBuilder sb = new StringBuilder();
@@ -190,17 +186,15 @@ public class TestJDBCTopologyAware extends RegressionSuite
             rs.next();
             int cnt = rs.getInt(1);
             assertEquals(cnt, 1);
-            cnt = 0;
 
             m_config.killSingleHost(0);
             Thread.sleep(500); // give repair a chance to settle
-            ps = conn.prepareStatement(sql);
+
             ps.setInt(1, 13);
             rs = ps.executeQuery();
             rs.next();
             cnt = rs.getInt(1);
             assertEquals(cnt, 1);
-            cnt = 0;
 
         } catch (Exception ex) {
             // This test is expected to fail because a single flag is not sufficient to keep client operational
@@ -228,7 +222,7 @@ public class TestJDBCTopologyAware extends RegressionSuite
         VoltProjectBuilder project = getBuilderForTest();
         boolean success;
         m_config = new LocalCluster("decimal-default.jar", 4, 5, kfactor, BackendTarget.NATIVE_EE_JNI);
-        m_config.setHasLocalServer(true);
+        m_config.setHasLocalServer(false);
         success = m_config.compile(project);
         assertTrue(success);
 
