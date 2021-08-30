@@ -68,11 +68,13 @@ public class DeploymentRequestServlet extends VoltBaseServlet {
     String m_schema = "";
 
     final ObjectMapper m_mapper = MapperHolder.mapper;
+    final ObjectMapper m_updatemapper = MapperHolder.m_updatemapper;
     // ObjectMapper is thread safe, and uses a lot of memory to cache
     // class specific serializers and deserializers. Use JSR-133
     // initialization on demand holder to hold a sole instance
     public final static class MapperHolder {
         final static public ObjectMapper mapper;
+        final static public ObjectMapper m_updatemapper;
         final static public JsonFactory factory = new JsonFactory();
         static {
             ObjectMapper configurable = new ObjectMapper();
@@ -95,6 +97,25 @@ public class DeploymentRequestServlet extends VoltBaseServlet {
             configurable.addMixIn(PathsType.Voltdbroot.class, IgnoreNodePathKeyMixIn.class);
 
             mapper = configurable;
+
+            ObjectMapper uconfigurable = new ObjectMapper();
+            // configurable.setSerializationInclusion(Inclusion.NON_NULL);
+            uconfigurable.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+            uconfigurable.configure(JsonGenerator.Feature.AUTO_CLOSE_TARGET, false);
+            uconfigurable.addMixIn(ExportType.class, IgnoreLegacyExportAttributesMixIn.class);
+            //These mixins are to ignore the "key" and redirect "path" to getNodePath()
+            uconfigurable.addMixIn(PathsType.Commandlog.class,
+                    IgnoreNodePathKeyMixIn.class);
+            uconfigurable.addMixIn(PathsType.Commandlogsnapshot.class,
+                    IgnoreNodePathKeyMixIn.class);
+            uconfigurable.addMixIn(PathsType.Droverflow.class,
+                    IgnoreNodePathKeyMixIn.class);
+            uconfigurable.addMixIn(PathsType.Exportoverflow.class,
+                    IgnoreNodePathKeyMixIn.class);
+            uconfigurable.addMixIn(PathsType.Snapshots.class,
+                    IgnoreNodePathKeyMixIn.class);
+            uconfigurable.addMixIn(PathsType.Voltdbroot.class, IgnoreNodePathKeyMixIn.class);
+            m_updatemapper = uconfigurable;
         }
     }
 
@@ -352,7 +373,7 @@ public class DeploymentRequestServlet extends VoltBaseServlet {
             return;
         }
         try {
-            User newUser = m_mapper.readValue(update, User.class);
+            User newUser = m_updatemapper.readValue(update, User.class);
             if (newUser == null) {
                 response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
                 response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Failed to parse user information."));
@@ -412,7 +433,7 @@ public class DeploymentRequestServlet extends VoltBaseServlet {
             return;
         }
         try {
-            User newUser = m_mapper.readValue(update, User.class);
+            User newUser = m_updatemapper.readValue(update, User.class);
             if (newUser == null) {
                 response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
                 response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Failed to parse user information."));

@@ -2053,8 +2053,8 @@ public class TestJSONInterface extends TestCase {
         }
     }
 
-    // NOTE: removed from test since ENG-17219 that upgrades lib/jackson-core from 1.9.13 to 2.9.4
-    public void tesstUsers() throws Exception {
+    // NOTE: if you update jackson and things dont work, dont comment the test but fix it.
+    public void testUsers() throws Exception {
         try {
             String simpleSchema
             = "CREATE TABLE foo (\n"
