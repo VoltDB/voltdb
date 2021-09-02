@@ -3299,7 +3299,6 @@ function set_kubernetes(server,port){
             }
           });
         } else {
-          if (location.hostname == "localhost"){
             var hostname = serverInfo["HOSTNAME"];
             serverDetails = new VoltDbAdminConfig.server(
               hostId,
@@ -3312,21 +3311,6 @@ function set_kubernetes(server,port){
             VoltDbAdminConfig.servers.push(serverDetails);
             VoltDbAdminConfig.servers.sort(sortByHostId);
             count++;
-          }else{
-            if (location.port == serverInfo["HTTPPORT"]){
-              VoltDbAdminConfig.servers = [];
-              var hostname = serverInfo["HOSTNAME"];
-              serverDetails = new VoltDbAdminConfig.server(
-              hostId,
-              hostname,
-              serverInfo["CLUSTERSTATE"],
-              serverInfo["IPADDRESS"],
-              serverInfo["HTTPPORT"],
-              serverInfo["CLIENTPORT"]
-            );
-            VoltDbAdminConfig.servers.push(serverDetails);
-            }
-          }
         }
       };
 
@@ -3377,9 +3361,7 @@ function set_kubernetes(server,port){
         adminClusterObjects.ignoreServerListUpdateCount--;
       } else {
         if (systemOverview != null || systemOverview != undefined) {
-          if (location.hostname == "localhost"){
-            VoltDbAdminConfig.servers = [];
-          }
+          VoltDbAdminConfig.servers = [];
           $.each(systemOverview, function (id, val) {
             setServerDetails(val.NODEID, val, count);
             count++;
