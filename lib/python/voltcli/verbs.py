@@ -357,7 +357,6 @@ class JavaBundle(object):
 
     def initialize(self, verb):
         verb.add_options(
-           cli.StringOption('-l', '--license', 'license', 'specify a license file to replace the existing staged copy of the license'),
            cli.StringOption(None, '--client', 'clientport', 'specify the client port as [ipaddress:]port-number'),
            cli.StringOption(None, '--internal', 'internalport', 'specify the internal port as [ipaddress:]port-number used to communicate between cluster nodes'),
            cli.StringOption(None, '--zookeeper', 'zkport', 'specify the zookeeper port as [ipaddress:]port-number'),
@@ -472,8 +471,6 @@ class ServerBundle(JavaBundle):
             final_args.extend(['httpport', runner.opts.httpport])
         if runner.opts.statusport:
             final_args.extend(['statusport', runner.opts.statusport])
-        if runner.opts.license:
-            final_args.extend(['license', runner.opts.license])
         if runner.opts.internalinterface:
             final_args.extend(['internalinterface', runner.opts.internalinterface])
         if runner.opts.internalport:

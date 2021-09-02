@@ -122,6 +122,19 @@ class StringOption(BaseOption):
         BaseOption.__init__(self, short_opt, long_opt, dest, help_msg, **kwargs)
 
 #===============================================================================
+class PathOption(StringOption):
+#===============================================================================
+    """
+    CLI pathname option.
+    """
+    def __init__(self, short_opt, long_opt, dest, help_msg, **kwargs):
+        StringOption.__init__(self, short_opt, long_opt, dest, help_msg, **kwargs)
+    def postprocess_value(self, value):
+        # The only action we take is to expand a '~' or '~user' prefix
+        # In future we might care to add extra optional checks (exists, is file, etc)
+        return os.path.expanduser(value)
+
+#===============================================================================
 class IntegerOption(BaseOption):
 #===============================================================================
     """

@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2020 VoltDB Inc.
+# Copyright (C) 2008-2021 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -34,8 +34,8 @@ output_help = ('Specifies the path and file name for the output file. \'-\' oper
 @VOLT.Command(
     description = 'Write the selected database resource (deployment or schema) to a file.',
     options = (
-        VOLT.StringOption('-o', '--output', 'output', output_help, default=None),
-        VOLT.StringOption('-D', '--dir', 'directory_spec', dir_spec_help, default=None),
+        VOLT.PathOption('-o', '--output', 'output', output_help, default=None),
+        VOLT.PathOption('-D', '--dir', 'directory_spec', dir_spec_help, default=None),
         VOLT.BooleanOption('-f', '--force', 'force', 'Overwrites an existing file.'),
     ),
     arguments = (

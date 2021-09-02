@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2020 VoltDB Inc.
+# Copyright (C) 2008-2021 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -31,7 +31,7 @@ output_help = ('file name to store collect data in compressed format. \'-\' mean
         VOLT.StringOption (None, '--prefix', 'prefix',
                            'file name prefix for uniquely identifying collection. (Deprecated. Please use --output).',
                            default = ''),
-        VOLT.StringOption('-o', '--output', 'output', output_help, default=''),
+        VOLT.PathOption('-o', '--output', 'output', output_help, default=''),
         VOLT.BooleanOption(None, '--dry-run', 'dryrun',
                            'list the log files without collecting them.',
                            default = False),
@@ -41,7 +41,7 @@ output_help = ('file name to store collect data in compressed format. \'-\' mean
         VOLT.IntegerOption(None, '--days', 'days',
                            'number of days of files to collect (files included are log, crash files), Current day value is 1.',
                            default = 7),
-        VOLT.StringOption('-D', '--dir', 'directory_spec', dir_spec_help, default=''),
+        VOLT.PathOption('-D', '--dir', 'directory_spec', dir_spec_help, default=''),
         VOLT.BooleanOption('-f', '--force', 'force', 'Overwrite the existing file.', default = False),
     ),
     arguments = (

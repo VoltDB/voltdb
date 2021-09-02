@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2020 VoltDB Inc.
+# Copyright (C) 2008-2021 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -14,6 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
 
+import os
 from glob import glob
 
 # Main Java Class
@@ -21,8 +22,9 @@ VoltDB = 'org.voltdb.VoltDB'
 
 def _listOfGlobsToFiles(pathGlobs):
     result = set()
-    for pathGlob in pathGlobs:
-        globRes = glob(pathGlob.strip())
+    for pg in pathGlobs:
+        pathGlob = os.path.expanduser(pg.strip())
+        globRes = glob(pathGlob)
         if globRes:
             result.update(globRes)
         else:
@@ -31,19 +33,17 @@ def _listOfGlobsToFiles(pathGlobs):
 
 @VOLT.Command(
     options = (
-        VOLT.StringOption('-C', '--config', 'configfile',
-                         'specify the location of the deployment file',
-                          default = None),
-        VOLT.StringOption('-D', '--dir', 'directory_spec',
-                          'Specifies the root directory for the database. The default is voltdbroot under the current working directory.',
-                          default = None),
+        VOLT.PathOption('-C', '--config', 'configfile',
+                        'specify the location of the deployment file'),
+        VOLT.PathOption('-D', '--dir', 'directory_spec',
+                        'Specifies the root directory for the database. The default is voltdbroot under the current working directory.'),
         VOLT.BooleanOption('-f', '--force', 'force',
                            'Initialize a new, empty database. Any previous session will be overwritten.'),
         VOLT.StringListOption('-s', '--schema', 'schemas',
                            'Specifies a list of schema files or paths with wildcards, comma separated, containing the data definition (as SQL statements) to be loaded when starting the database.'),
         VOLT.StringListOption('-j', '--classes', 'classes_jarfiles',
                           'Specifies a list of .jar files or paths with wildcards, comma separated, containing classes used to declare stored procedures. The classes are loaded automatically from a saved copy when the database starts.'),
-        VOLT.StringOption('-l', '--license', 'license', 'Specifies the path for the VoltDB license file')
+        VOLT.PathOption('-l', '--license', 'license', 'Specifies the path for the VoltDB license file')
     ),
     description = 'Initializes a new, empty database.'
 )
