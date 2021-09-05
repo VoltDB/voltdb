@@ -1035,6 +1035,9 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.putInt(hostId);
         m_data.putInt(drClusterId);
         m_data.putInt(defaultDrBufferSize);
+        m_data.putInt(drIgnoreConflicts ? 1 : 0);
+        m_data.putInt(drCrcErrorIgnoreMax);
+        m_data.putInt(drCrcErrorIgnoreFatal ? 1 : 0);
         m_data.putLong(EELoggers.getLogLevels());
         m_data.putLong(tempTableMemory);
         m_data.putInt(createDrReplicatedStream ? 1 : 0);
