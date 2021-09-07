@@ -5105,12 +5105,11 @@ function loadAdminPage() {
         this.exportTypes = [];
         this.isSaveSnapshot = false;
 
-        this.server = function (hostIdvalue, serverNameValue, serverStateValue, ipAddress, HTTPPORT) {
+        this.server = function (hostIdvalue, serverNameValue, serverStateValue, ipAddress) {
             this.hostId = hostIdvalue;
             this.serverName = serverNameValue;
             this.serverState = serverStateValue;
             this.ipAddress = ipAddress;
-            this.httpPort = HTTPPORT;
         };
 
         this.stoppedServer = function (hostIdvalue, serverNameValue) {
