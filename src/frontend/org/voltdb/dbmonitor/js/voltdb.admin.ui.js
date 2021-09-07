@@ -8,7 +8,6 @@ var editStates = {
     ShowLoading: 2
 };
 var INT_MAX_VALUE = 2147483647;
-var kubernetes_con;
 
 function getListOfRoles() {
     // Got to figure out what roles are available.
