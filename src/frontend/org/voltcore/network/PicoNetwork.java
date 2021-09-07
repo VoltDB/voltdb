@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -247,8 +247,14 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
                     m_messagesRead++;
                 }
             }
+            /*
+             * An established PicoNetwork connection should only receive valid messages sent by another
+             * VoltDB host. Dump the start of the message to determine if this a corrupted message or
+             * to identify the message type that the sender might have constructed incorrectly.
+             */
             catch (VoltProtocolHandler.BadMessageLength e) {
-                networkLog.error("Bad message length exception", e);
+                networkLog.error(String.format("Bad message length from %s", m_remoteHostAndAddressAndPort), e);
+                networkLog.error(VoltProtocolHandler.formatBadLengthDump("Bad message bytes", e));
                 throw e;
             }
         }

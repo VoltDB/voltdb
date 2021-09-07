@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,6 +20,7 @@ package org.voltcore.network;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Supplier;
 
 import io.netty.buffer.CompositeByteBuf;
 
@@ -30,10 +31,28 @@ public abstract class VoltProtocolHandler implements InputHandler {
     /** The distinct exception class allows better logging of these unexpected errors. */
     class BadMessageLength extends IOException {
         private static final long serialVersionUID = 8547352379044459911L;
-        public BadMessageLength(String string) {
+
+        private int badLength;
+        private byte[] availBytes;
+        private Supplier<byte[]> getBytes;
+        public BadMessageLength(String string, int badLength, Supplier<byte[]> getBytes) {
             super(string);
+            this.badLength = badLength;
+            this.getBytes = getBytes;
+        }
+        int badLength() {
+            return badLength;
+        }
+        byte[] badMessage() {
+            if (availBytes == null) {
+                availBytes = getBytes.get();
+            }
+            return availBytes;
         }
     }
+
+    private static final int badMessageDumpLimit =
+        Integer.parseInt(System.getProperty("VOLTDB_BAD_MESSAGE_DUMP_LIMIT", "512"));
 
     /** serial number of this VoltPort */
     private final long m_connectionId;
@@ -60,7 +79,7 @@ public abstract class VoltProtocolHandler implements InputHandler {
 
         if (m_nextLength == 0 && inputStream.dataAvailable() > (Integer.SIZE/8)) {
             m_nextLength = inputStream.getInt();
-            checkMessageLength();
+            checkMessageLength(inputStream);
         }
         if (m_nextLength > 0 && inputStream.dataAvailable() >= m_nextLength) {
             result = ByteBuffer.allocate(m_nextLength);
@@ -76,7 +95,7 @@ public abstract class VoltProtocolHandler implements InputHandler {
         ByteBuffer result = null;
         if (m_nextLength == 0 && inputBB.readableBytes() > (Integer.SIZE/8)) {
             m_nextLength = inputBB.readInt();
-            checkMessageLength();
+            checkMessageLength(inputBB);
         }
 
         if (m_nextLength > 0 && inputBB.readableBytes() >= m_nextLength) {
@@ -88,18 +107,67 @@ public abstract class VoltProtocolHandler implements InputHandler {
         return result;
     }
 
-    private void checkMessageLength() throws BadMessageLength {
-        if (m_nextLength < 1) {
-            throw new BadMessageLength(
-                    "Next message length is " + m_nextLength + " which is less than 1 and is nonsense");
+    /*
+     * Utilities for detecting and reporting bad message lengths.
+     * The error might indicate an oversized message, or it might
+     * indicate non-volt garbage sent to the socket.
+     */
+
+    private void checkMessageLength(NIOReadStream inputStream) throws BadMessageLength {
+        if (m_nextLength <= 0 || m_nextLength > VoltPort.MAX_MESSAGE_LENGTH) {
+            Supplier<byte[]> getBytes = () -> {
+                int len = Math.min(inputStream.dataAvailable(), badMessageDumpLimit);
+                byte[] buff = new byte[len];
+                if (len > 0) {
+                    inputStream.getBytes(buff);
+                }
+                return buff;
+            };
+            throw new BadMessageLength(badMessageReason(), m_nextLength, getBytes);
         }
-        if (m_nextLength > VoltPort.MAX_MESSAGE_LENGTH) {
-            throw new BadMessageLength(
-                    "Next message length is " + m_nextLength + " which is greater then the hard coded " +
-                    "max of " + VoltPort.MAX_MESSAGE_LENGTH + ". Break up the work into smaller chunks (2 megabytes is reasonable) " +
-                    "and send as multiple messages or stored procedure invocations");
+    }
+
+    private void checkMessageLength(CompositeByteBuf inputBB) throws BadMessageLength {
+        if (m_nextLength <= 0 || m_nextLength > VoltPort.MAX_MESSAGE_LENGTH) {
+            Supplier<byte[]> getBytes = () -> {
+                int len = Math.min(inputBB.readableBytes(), badMessageDumpLimit);
+                byte[] buff = new byte[len];
+                if (len > 0) {
+                    inputBB.readBytes(buff);
+                }
+                return buff;
+            };
+            throw new BadMessageLength(badMessageReason(), m_nextLength, getBytes);
         }
-        assert m_nextLength > 0;
+    }
+
+    private String badMessageReason() {
+        if (m_nextLength <= 0) {
+            return "Next message length is " + m_nextLength + " which is less than the minimum length 1";
+        }
+        else {
+            return "Next message length is " + m_nextLength +
+                   " which is greater than the hardcoded max of " + VoltPort.MAX_MESSAGE_LENGTH +
+                   ". Break up the work into smaller chunks (2 megabytes is reasonable) " +
+                   "and send as multiple messages or stored procedure invocations";
+        }
+    }
+
+    public static String formatBadLengthDump(String caption, BadMessageLength ex) {
+        byte[] buf = ex.badMessage();
+        String firstLine = String.format("%s, length %d %s\n", caption, buf.length,
+                                         buf.length < badMessageDumpLimit ? "" : "(truncated)");
+        int bytesPerLine = 32;
+        int sbCapacity = firstLine.length() + (buf.length * 3) + (buf.length / bytesPerLine) + 1;
+        StringBuffer sb = new StringBuffer(sbCapacity);
+        sb.append(firstLine);
+        for (int i = 0; i < buf.length; i += bytesPerLine) {
+            for (int j = 0; j < bytesPerLine && i+j < buf.length; j++) {
+                sb.append(String.format(" %02x", buf[i+j]));
+            }
+            sb.append('\n');
+        }
+        return sb.toString();
     }
 
     @Override
