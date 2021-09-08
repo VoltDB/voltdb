@@ -555,12 +555,19 @@ public class TestClientFeatures extends TestCase {
         client.backpressureBarrier(System.nanoTime(), TimeUnit.DAYS.toNanos(1));
         client.m_listener.backpressure(true);
 
+        // Backpressure is on. Wait with a timeout of 200 mS.
+        // Expect completion somewhere in the interval (200 mS, 1 min)
+        // and backpressure to remain on: we timed out.
         long start = System.nanoTime();
         assertTrue(client.backpressureBarrier(System.nanoTime(), TimeUnit.MILLISECONDS.toNanos(200)));
         long delta = System.nanoTime() - start;
         assertTrue(delta > TimeUnit.MILLISECONDS.toNanos(200));
         assertTrue(delta < TimeUnit.MINUTES.toNanos(1));
 
+        // Backpressure is on. Arrange to turn it off in 20 mS.
+        // Wait with a timeout of 1 min. Expect completion somewhere
+        // in the interval (20 mS, 1 min) and backpressure to now
+        // be off: we did not time out.
         start = System.nanoTime();
         new Thread() {
             @Override
@@ -574,6 +581,7 @@ public class TestClientFeatures extends TestCase {
             }
         }.start();
         assertFalse(client.backpressureBarrier(System.nanoTime(), TimeUnit.MINUTES.toNanos(1)));
+        delta = System.nanoTime() - start;
         assertTrue(delta < TimeUnit.MINUTES.toNanos(1));
         assertTrue(delta > TimeUnit.MILLISECONDS.toNanos(20));
     }
