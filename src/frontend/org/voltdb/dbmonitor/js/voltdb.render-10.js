@@ -3229,6 +3229,12 @@ function alertNodeClicked(obj) {
       var currentServerColumnClass;
       var count = 0;
 
+      function sortByHostId(v1,v2) {
+        var hostIdV1 = parseInt(v1.hostId);
+        var hostIdV2 = parseInt(v2.hostId)
+        return ((hostIdV1 < hostIdV2) ? -1 : ((hostIdV1 > hostIdV2) ? 1 : 0));
+      }
+
       this.setServerDetails = function (hostId, serverInfo, iteratorCount) {
         var count = 0;
         var stopperServerCount = 0;
@@ -3239,7 +3245,8 @@ function alertNodeClicked(obj) {
           VoltDbAdminConfig.servers.length > 0 &&
           check_hostid(hostId)
         ) {
-          $.each(VoltDbAdminConfig.servers, function (id, value) {
+          VoltDbAdminConfig.servers.sort(sortByHostId);
+          $.each(VoltDbAdminConfigservers, function (id, value) {
             {
               if (
                 value.serverName != serverInfo["HOSTNAME"] &&
@@ -3249,8 +3256,7 @@ function alertNodeClicked(obj) {
                   hostId,
                   serverInfo["HOSTNAME"],
                   serverInfo["CLUSTERSTATE"],
-                  serverInfo["IPADDRESS"],
-                  serverInfo["HTTPPORT"]
+                  serverInfo["IPADDRESS"]
                 );
                 VoltDbAdminConfig.servers[iteratorCount] = serverDetails;
 
@@ -3278,10 +3284,10 @@ function alertNodeClicked(obj) {
             hostId,
             hostname,
             serverInfo["CLUSTERSTATE"],
-            serverInfo["IPADDRESS"],
-            serverInfo["HTTPPORT"]
+            serverInfo["IPADDRESS"]
           );
           VoltDbAdminConfig.servers.push(serverDetails);
+          VoltDbAdminConfig.servers.sort(sortByHostId);
           count++;
         }
       };
@@ -3308,7 +3314,7 @@ function alertNodeClicked(obj) {
         var runningServerCounter = 0;
 
         $.each(VoltDbAdminConfig.servers, function (id, value) {
-          if (voltDbRenderer.currentHost != value.serverName) {
+          // if (voltDbRenderer.currentHost != value.serverName) {
             if (value.serverState == "RUNNING") {
               if (runningServerCounter == 0)
                 VoltDbAdminConfig.runningServerIds =
@@ -3326,7 +3332,7 @@ function alertNodeClicked(obj) {
               }
               runningServerCounter++;
             }
-          }
+          // }
         });
       };
       if (adminClusterObjects.ignoreServerListUpdateCount > 0) {
@@ -3355,27 +3361,37 @@ function alertNodeClicked(obj) {
             count++ ;
           }
         });
-        var con = true;
-        if (count >= parseInt($("#kSafety").text())){
-          con = false;
+        var con = false;
+        if (count < parseInt($("#kSafety").text())){
+          con = true;
         }
         $.each(VoltDbAdminConfig.servers, function (id, val) {
+          var conn = true;
           if ((val.serverName != null || val.serverName != "" || val.serverName != undefined) && val.serverState == "RUNNING") {
-            if (voltDbRenderer.currentHost != val.serverName && con) {
+            currentServerRowClass =
+              voltDbRenderer.currentHost == val.serverName
+                ? "activeHostMonitoring"
+                : "activeHost";
+            // if (voltDbRenderer.currentHost != val.serverName && con) {
+            if (con){
               className = "shutdown";
               currentServerColumnClass = "shutdownServer";
             }else{
               className = "disableServer";
               currentServerColumnClass = "shutdownServer stopDisable";
+              conn = false;
             }
-            if (location.port == val.httpPort){
-              className = "disableServer";
-              currentServerColumnClass = "shutdownServer stopDisable";
-            }
-            currentServerColumnClass =
-              voltDbRenderer.currentHost == val.serverName
-                ? "shutdownServer stopDisable"
-                : "shutdownServer";
+            // if (location.port == val.httpPort){
+            //   if (client_port == val.clientPort){
+            //     conn = false;
+            //     className = "disableServer";
+            //     currentServerColumnClass = "shutdownServer stopDisable";
+            //   }
+            // }
+            // currentServerColumnClass =
+            //   voltDbRenderer.currentHost == val.serverName
+            //     ? "shutdownServer stopDisable"
+            //     : "shutdownServer";
 
             htmlServerListHtml = htmlServerListHtml.concat(
               '<tr class="' +
@@ -3391,18 +3407,27 @@ function alertNodeClicked(obj) {
                 '" data-HostName="' +
                 val.serverName +
                 '" class="' +
-                className +' k8s_hidden' +
-                '" id="stopServer_' + 
-                val.serverName + 
-                '">' +
-                '<span class="' +
-                currentServerColumnClass +
-                '">Stop</span></a></td></tr>'
+                className + ' k8s_hidden' +
+                '"' 
+            );
+            if (conn){
+              htmlServerListHtml = htmlServerListHtml.concat(
+                'id="stopServer_' +
+                val.serverName +
+                '"'
+              );
+            }
+            htmlServerListHtml = htmlServerListHtml.concat(
+              '>' +
+              '<span class="' +
+              currentServerColumnClass +
+              '">Stop</span></a></td></tr>'
             );
           } else if ((val.serverName != null || val.serverName != "" || val.serverName != undefined) && val.serverState == "PAUSED") {
             if (voltDbRenderer.currentHost != val.serverName && con) {
               className = "shutdown";
             }else{
+              conn = false;
               className = "disableServer";
             }
             currentServerRowClass =
@@ -3424,10 +3449,17 @@ function alertNodeClicked(obj) {
                 val.hostId +
                 '" data-HostName="' +
                 val.serverName +
-                '"class="resume" id="stopServer_' +
+                '"class="resume" '
+                );
+            if (conn){
+              htmlServerListHtml = htmlServerListHtml.concat(
+                'id="stopServer_' +
                 val.serverName +
-                '">' +
-                '<span class="' +
+                '"'
+              );
+            }
+            htmlServerListHtml = htmlServerListHtml.concat( 
+                '><span class="' +
                 currentServerColumnClass +
                 '">Paused</span></a></td></tr>'
             );
@@ -3443,22 +3475,20 @@ function alertNodeClicked(obj) {
                 "<span>Stop</span></a></td></tr>"
             );
           } else if (val.serverName != null || val.serverName != "" || val.serverName != undefined || val.serverState == "MISSING") {
-            htmlServerListHtml = htmlServerListHtml.concat(
-              '<tr><td class="configLabel" width="40%"><a class="serNameTruncate" href="#">' +
-                val.serverName + "-" + val.hostId + 
-                "</a></td>" +
-                "<td  align='center' >" +
-                val.ipAddress +
-                "</td>" +
-                '<td align="right"><a href="javascript:void(0);" data-HostId="' +
-                val.hostId +
-                '" data-HostName="' +
-                val.serverName +
-                '" class="disableServer"  id="stopServer_' +
-                val.serverName +
-                '" onclick="VoltDbUI.openPopup(this);">' +
-                '<span class="shutdownServer stopDisable">Stop</span></a></td></tr>'
-            );
+            // htmlServerListHtml = htmlServerListHtml.concat(
+            //   '<tr><td class="configLabel" width="40%"><a class="serNameTruncate" href="#">' +
+            //     val.serverName + "-" + val.hostId + 
+            //     "</a></td>" +
+            //     "<td  align='center' >" +
+            //     val.ipAddress +
+            //     "</td>" +
+            //     '<td align="right"><a href="javascript:void(0);" data-HostId="' +
+            //     val.hostId +
+            //     '" data-HostName="' +
+            //     val.serverName +
+            //     '" class="disableServer">' +
+            //     '<span class="shutdownServer stopDisable">Stop</span></a></td></tr>'
+            // );
           }
         });
         updateAdminServerList();

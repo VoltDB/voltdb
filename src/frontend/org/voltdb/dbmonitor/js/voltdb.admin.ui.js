@@ -8,7 +8,6 @@ var editStates = {
     ShowLoading: 2
 };
 var INT_MAX_VALUE = 2147483647;
-var kubernetes_con;
 
 function getListOfRoles() {
     // Got to figure out what roles are available.
@@ -5105,12 +5104,11 @@ function loadAdminPage() {
         this.exportTypes = [];
         this.isSaveSnapshot = false;
 
-        this.server = function (hostIdvalue, serverNameValue, serverStateValue, ipAddress, HTTPPORT) {
+        this.server = function (hostIdvalue, serverNameValue, serverStateValue, ipAddress) {
             this.hostId = hostIdvalue;
             this.serverName = serverNameValue;
             this.serverState = serverStateValue;
             this.ipAddress = ipAddress;
-            this.httpPort = HTTPPORT;
         };
 
         this.stoppedServer = function (hostIdvalue, serverNameValue) {
