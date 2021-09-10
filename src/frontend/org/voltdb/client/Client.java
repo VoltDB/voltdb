@@ -169,6 +169,9 @@ public interface Client {
      * @param unit TimeUnit of procedure timeout
      * @param parameters vararg list of procedure's parameter values.
      * @return ClientResponse for execution.
+     * @throws ProcCallException on any VoltDB-specific failure.
+     * @throws NoConnectionsException if this {@link Client} instance is not connected to any servers.
+     * @throws IOException if there is a Java network or connection problem.
      */
     public ClientResponse callProcedureWithClientTimeout(int batchTimeout,
                                                          String procName,
@@ -187,6 +190,8 @@ public interface Client {
      * @param clientTimeoutUnit units for query timeout
      * @param parameters vararg list of procedure's parameter values.
      * @return True if the procedure was queued and false otherwise
+     * @throws NoConnectionsException if this {@link Client} instance is not connected to any servers.
+     * @throws IOException if there is a Java network or connection problem.
      */
     public boolean callProcedureWithClientTimeout(ProcedureCallback callback,
                                                   int batchTimeout,
@@ -194,7 +199,7 @@ public interface Client {
                                                   long clientTimeout,
                                                   TimeUnit clientTimeoutUnit,
                                                   Object... parameters)
-    throws IOException;
+    throws IOException, NoConnectionsException;
 
     /**
      * Synchronously updates class definitions in the VoltDB database.
