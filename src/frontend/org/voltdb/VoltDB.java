@@ -332,6 +332,9 @@ public class VoltDB {
         /** Allow starting voltdb with non-empty managed directories. */
         public boolean m_forceVoltdbCreate = false;
 
+        /** Number of archived snapshot directories to retain if m_forceVoltdbCreate is true */
+        public int m_snapArchiveRetainCount = Integer.getInteger("SNAPSHOT_DIRECTORY_ARCHIVE_LIMIT", 2);
+
         /** cluster name designation */
         public String m_clusterName = DEFAULT_CLUSTER_NAME;
 
@@ -670,6 +673,9 @@ public class VoltDB {
                     hap = MiscUtils.getHostAndPortFromInterfaceSpec(val, m_drInterface, DEFAULT_DR_PORT);
                     m_drInterface = hap.getHost();
                     m_drAgentPortStart = hap.getPort();
+                    break;
+                case "retain":
+                    m_snapArchiveRetainCount = Integer.parseInt(val);
                     break;
                 case "schema":
                     m_userSchemas = parseFiles(val, m_userSchemas, "schema");

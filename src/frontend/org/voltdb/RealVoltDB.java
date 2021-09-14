@@ -1007,10 +1007,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             // stage deployment, license, schema, and hidden initialization marker file
             // under voltdbroot
             if (config.m_startAction == StartAction.INITIALIZE) {
-                if (config.m_forceVoltdbCreate && m_nodeSettings.clean()) {
-                    String msg = "Archived previous snapshot directory to " + m_nodeSettings.getSnapshoth() + ".1";
-                    consoleLog.info(msg);
-                    hostLog.info(msg);
+                if (config.m_forceVoltdbCreate) {
+                    SnapshotArchiver.archiveSnapshotDirectory(getSnapshotPath(), config.m_snapArchiveRetainCount);
+                    m_nodeSettings.clean();
                 }
                 if (readDepl.deployment.getDr() != null && DrRoleType.XDCR.equals(readDepl.deployment.getDr().getRole())) {
                     // add default export configuration to DR conflict table

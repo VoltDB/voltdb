@@ -38,7 +38,9 @@ def _listOfGlobsToFiles(pathGlobs):
         VOLT.PathOption('-D', '--dir', 'directory_spec',
                         'Specifies the root directory for the database. The default is voltdbroot under the current working directory.'),
         VOLT.BooleanOption('-f', '--force', 'force',
-                           'Initialize a new, empty database. Any previous session will be overwritten.'),
+                           'Initialize a new, empty database. Any previous session will be overwritten. Existing snapshot directories are archived.'),
+        VOLT.IntegerOption('-r', '--retain', 'retain',
+                           'Specifies how many generations of archived snapshots directories will be retained when --force is used. Defaults to 2. The value 0 is allowed.'),
         VOLT.StringListOption('-s', '--schema', 'schemas',
                            'Specifies a list of schema files or paths with wildcards, comma separated, containing the data definition (as SQL statements) to be loaded when starting the database.'),
         VOLT.StringListOption('-j', '--classes', 'classes_jarfiles',
@@ -55,7 +57,9 @@ def init(runner):
     if runner.opts.directory_spec:
         runner.args.extend(['voltdbroot', runner.opts.directory_spec])
     if runner.opts.force:
-        runner.args.extend(['force'])
+        runner.args.append('force')
+        if runner.opts.retain is not None:
+            runner.args.extend(['retain', runner.opts.retain])
     if runner.opts.schemas:
         runner.args.append('schema')
         runner.args.append(_listOfGlobsToFiles(runner.opts.schemas))

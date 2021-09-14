@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -26,8 +26,6 @@ import java.util.Map;
 import java.util.NavigableMap;
 import java.util.Properties;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import org.aeonbits.owner.Config.Sources;
 import org.aeonbits.owner.ConfigFactory;
@@ -126,49 +124,6 @@ public interface NodeSettings extends Settings {
                 .build();
     }
 
-    default boolean archiveSnapshotDirectory() {
-        File snapshotDH = resolveToAbsolutePath(getSnapshoth());
-        String [] snapshots = snapshotDH.list();
-        if (snapshots == null || snapshots.length == 0) {
-            return false;
-        }
-
-        Pattern archvRE = Pattern.compile(getSnapshoth().getName() + "\\.(\\d+)");
-        final ImmutableSortedMap.Builder<Integer, File> mb = ImmutableSortedMap.naturalOrder();
-
-        File parent = snapshotDH.getParentFile();
-        parent.listFiles(new FileFilter() {
-            @Override
-            public boolean accept(File path) {
-                Matcher mtc = archvRE.matcher(path.getName());
-                if (path.isDirectory() && mtc.matches()) {
-                    mb.put(Integer.parseInt(mtc.group(1)), path);
-                    return true;
-                }
-                return false;
-            }
-        });
-        NavigableMap<Integer, File> snapdirs = mb.build();
-        for (Map.Entry<Integer, File> e: snapdirs.descendingMap().entrySet()) {
-            File renameTo = new File(snapshotDH.getPath() + "." + (e.getKey() + 1));
-            try {
-                Files.move(e.getValue().toPath(), renameTo.toPath());
-            } catch (IOException exc) {
-                throw new SettingsException("failed to rename " + e.getValue()  + " to " + renameTo, exc);
-            }
-        }
-        File renameTo = new File(snapshotDH.getPath() + ".1");
-        try {
-            Files.move(snapshotDH.toPath(), renameTo.toPath());
-        } catch (IOException e) {
-            throw new SettingsException("failed to rename " + snapshotDH  + " to " + renameTo, e);
-        }
-        if (!snapshotDH.mkdir()) {
-            throw new SettingsException("failed to create snapshot directory " + snapshotDH);
-        }
-        return true;
-    }
-
     default List<String> ensureDirectoriesExist() {
         ImmutableList.Builder<String> failed = ImmutableList.builder();
         Map<String, File> managedArtifactsPaths = getManagedArtifactPaths();
@@ -201,8 +156,7 @@ public interface NodeSettings extends Settings {
         return failed.build();
     }
 
-    default boolean clean() {
-        boolean archivedSnapshots = archiveSnapshotDirectory();
+    default void clean() {
         for (File path: getManagedArtifactPaths().values()) {
             File [] children = path.listFiles();
             if (children == null) {
@@ -212,7 +166,6 @@ public interface NodeSettings extends Settings {
                 MiscUtils.deleteRecursively(child);
             }
         }
-        return archivedSnapshots;
     }
 
     @Override
