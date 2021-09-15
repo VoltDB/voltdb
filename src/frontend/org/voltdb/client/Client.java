@@ -112,7 +112,7 @@ public interface Client {
      * If a particular host produces such an error, it will be
      * ignored on subsequent retries.
      * <p>
-     * Connection progress may be monitored via a {@link ClientStatusListenerEx}.
+     * Connection progress may be monitored via a {@link ClientStatusListenerExt}.
      * The <code>connectionCreated</code> method will be invoked
      * with a status of either <code>UNABLE_TO_CONNECT</code> or
      * <code>SUCCESS</code>.
