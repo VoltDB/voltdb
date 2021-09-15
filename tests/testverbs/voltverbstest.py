@@ -90,6 +90,7 @@ placementgroup = Opt('placement-group', 'placementgroup', str, 2)
 prefix = Opt('prefix', 'prefix', str, 2)
 publicinterface = Opt('publicinterface', 'publicinterface', str, 2)
 replication = Opt('replication', 'replicationport', str, 2)
+retain = Opt('retain', 'retain', int, 2)
 schema = Opt('schema', 'schema', str, 2)
 skipheapdump = Opt('skip-heap-dump', 'skip-heap-dump', None, 2)
 topicsport = Opt('topicsport', 'topicsHostPort', str, 2)
@@ -115,6 +116,7 @@ volt_opts = {'check': [],
              'init': [config,
                       voltdbroot,
                       force,
+                      retain,
                       classes,
                       licensefile,
                       schema],

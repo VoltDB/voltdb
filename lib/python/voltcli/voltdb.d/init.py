@@ -58,8 +58,8 @@ def init(runner):
         runner.args.extend(['voltdbroot', runner.opts.directory_spec])
     if runner.opts.force:
         runner.args.append('force')
-        if runner.opts.retain is not None:
-            runner.args.extend(['retain', runner.opts.retain])
+    if runner.opts.retain is not None:
+        runner.args.extend(['retain', runner.opts.retain])
     if runner.opts.schemas:
         runner.args.append('schema')
         runner.args.append(_listOfGlobsToFiles(runner.opts.schemas))
