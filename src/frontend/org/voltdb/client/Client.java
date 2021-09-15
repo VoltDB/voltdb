@@ -81,6 +81,51 @@ public interface Client {
     throws UnknownHostException, IOException;
 
     /**
+     * Create a connection to the first available VoltDB node
+     * from a specified list. Each entry in the list is
+     * an address or hostname, optionally followed by a
+     * port number, as for {@link #createConnection(String)}.
+     * Entries are separated by commas.
+     *
+     * @param hostList comma-list of host specifications
+     * @throws IOException if there is a Java network or connection problem.
+     */
+    public void createAnyConnection(String hostList)
+    throws IOException;
+
+    /**
+     * Create a connection to the first available VoltDB node
+     * from a specified list. Each entry in the list is
+     * an address or hostname, optionally followed by a
+     * port number, as for {@link #createConnection(String)}.
+     * Entries are separated by commas.
+     * <p>
+     * If no connection can be made to any of the specified
+     * hosts, then this method can retry connecting
+     * after a specified delay and until a timeout has
+     * expired. The timeout is only checked at the end
+     * of each complete pass through the host list.
+     * <p>
+     * Not all errors are likely to be recoverable on retry.
+     * Therefore, only <code>IOException</code>, not including
+     * <code>UnknownHostException</code> will be retried.
+     * If a particular host produces such an error, it will be
+     * ignored on subsequent retries.
+     * <p>
+     * Connection progress may be monitored via a {@link ClientStatusListenerEx}.
+     * The <code>connectionCreated</code> method will be invoked
+     * with a status of either <code>UNABLE_TO_CONNECT</code> or
+     * <code>SUCCESS</code>.
+     *
+     * @param hostList comma-list of host specifications
+     * @param timeout approximate limit on retrying (millisecs)
+     * @param delay wait time between retries (millisecs)
+     * @throws IOException if there is a Java network or connection problem.
+     */
+    public void createAnyConnection(String hostList, long timeout, long delay)
+    throws IOException;
+
+    /**
      * Invoke a procedure. This is a synchronous call: it blocks until
      * a result is available.
      * <p>

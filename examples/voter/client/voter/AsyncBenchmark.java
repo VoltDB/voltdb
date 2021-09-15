@@ -42,6 +42,7 @@
 
 package voter;
 
+import java.io.IOException;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.CountDownLatch;
@@ -166,6 +167,15 @@ public class AsyncBenchmark {
                 System.err.printf("Connection to %s:%d was lost.\n", hostname, port);
             }
         }
+
+        @Override
+        public void connectionCreated(String hostname, int port, AutoConnectionStatus status) {
+            if (status == AutoConnectionStatus.SUCCESS) {
+                System.out.printf("Connection to %s:%s established\n", hostname, port);
+            } else {
+                System.out.printf("Connect to %s:%s failed, %s\n", hostname, port, status);
+            }
+        }
     }
 
     /**
@@ -235,13 +245,14 @@ public class AsyncBenchmark {
      * syntax (where :port is optional).
      * @throws InterruptedException if anything bad happens with the threads.
      */
-    void connect(String servers) throws InterruptedException {
+    void connect(String servers) throws InterruptedException, IOException {
         System.out.println("Connecting to VoltDB...");
 
-        String[] serverArray = servers.split(",");
         if (config.topologyaware) {
-            connectToOneServerWithRetry(serverArray[0]);
+            // Find a live host; give up after 10 mins; 5 secs between retries
+            client.createAnyConnection(servers, 600_000, 5_000);
         } else {
+            final String[] serverArray = servers.split(",");
             final CountDownLatch connections = new CountDownLatch(serverArray.length);
 
             // use a new thread to connect to each server

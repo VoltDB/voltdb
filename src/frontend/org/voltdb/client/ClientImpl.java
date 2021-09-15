@@ -20,8 +20,12 @@ package org.voltdb.client;
 import java.io.File;
 import java.io.InterruptedIOException;
 import java.io.IOException;
+import java.net.ConnectException;
 import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.LinkedHashSet;
 import java.util.Map;
@@ -35,7 +39,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
-
 import com.google_voltpatches.common.net.HostAndPort;
 import io.netty.handler.ssl.SslContext;
 
@@ -1000,6 +1003,62 @@ public final class ClientImpl implements Client {
             throw new NoConnectionsException("Client is shut down");
         }
         m_distributer.createConnectionWithHashedCredentials(host, m_username, m_passwordHash, port, m_hashScheme);
+    }
+
+    @Override
+    public void createAnyConnection(String hostList) throws IOException {
+        createAnyConnection(hostList, 0, 0);
+    }
+
+    @Override
+    public void createAnyConnection(String hostList, long timeout, long delay) throws IOException {
+        List<HostAndPort> servers = hostAndPortList(hostList);
+        long startTime = System.currentTimeMillis();
+        while (true) {
+            Iterator<HostAndPort> it = servers.iterator();
+            while (it.hasNext()) {
+                HostAndPort srv = it.next();
+                String host = srv.getHost();
+                int port = srv.getPort();
+                try {
+                    createConnectionImpl(host, port);
+                    return; // we only need one
+                } catch (UnknownHostException e) { // this is an IOException
+                    it.remove(); // not likely to be recoverable
+                } catch (IOException e) {
+                    // may retry
+                } catch (Exception e) {
+                    it.remove(); // no retry for this bad boy
+                }
+                if (m_clientStatusListener != null) {
+                    m_clientStatusListener.connectionCreated(host, port, AutoConnectionStatus.UNABLE_TO_CONNECT);
+                }
+            }
+            if (servers.isEmpty() || System.currentTimeMillis() - startTime >= timeout) {
+                throw new ConnectException("Failed to connect to cluster");
+            }
+            try {
+                Thread.sleep(delay);
+            } catch (InterruptedException ex) {
+                throw new InterruptedIOException("Interrupted while waiting to retry connect");
+            }
+        }
+    }
+
+    private List<HostAndPort> hostAndPortList(String servers) {
+        List<HostAndPort> list = new ArrayList<>();
+        for (String srv : servers.split(",")) {
+            srv = srv.trim();
+            if (!srv.isEmpty()) {
+                list.add(HostAndPort.fromString(srv)
+                                    .withDefaultPort(VOLTDB_SERVER_PORT)
+                                    .requireBracketsForIPv6());
+            }
+        }
+        if (list.isEmpty()) {
+            throw new IllegalArgumentException("Empty server list");
+        }
+        return list;
     }
 
     @Override
