@@ -25,6 +25,7 @@ package client.benchmark;
 
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
+import org.voltdb.CLIConfig.Option;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
@@ -72,12 +73,10 @@ public class DUSBenchmark {
     private List<String> tableNamesForDeleteAndUpdate = null;
 
     /** Constructor **/
-    public DUSBenchmark(String[] args) throws Exception {
-        config = new DUSBConfig();
-        config.parse(DUSBenchmark.class.getName(), args);
+    public DUSBenchmark(DUSBConfig config) throws Exception {
+        this.config = config;
 
         // Echo input option values (useful for debugging):
-        System.out.println("\nIn DUSBenchmark constructor args:\n    "+Arrays.toString(args));
         System.out.println("  displayinterval: "+config.displayinterval);
         System.out.println("  duration       : "+config.duration);
         System.out.println("  tabletypes     : "+config.tabletypes);
@@ -90,9 +89,11 @@ public class DUSBenchmark {
         System.out.println("  updateorder    : "+config.updateorder);
         System.out.println("  statsfile      : "+config.statsfile);
         System.out.println("  servers        : "+config.servers);
+        System.out.println("  rate limit     : "+config.ratelimit);
 
         DUSBClientListener dusbcl = new DUSBClientListener();
         ClientConfig cc = new ClientConfig(null, null, dusbcl);
+        cc.setMaxTransactionsPerSecond(config.ratelimit);
         cc.setProcedureCallTimeout(10 * 60 * 1000);       // 10 minutes
         cc.setConnectionResponseTimeout(20 * 60 * 1000);  // 20 minutes
         client = ClientFactory.createClient(cc);
@@ -117,6 +118,7 @@ public class DUSBenchmark {
         }
 
         stats = new DUSBenchmarkStats(client);
+        init();
     }
 
 
@@ -177,6 +179,9 @@ public class DUSBenchmark {
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "deleteupdatesnapshot.csv";
 
+        @Option(desc = "Maximum TPS rate for benchmark.")
+        int ratelimit = Integer.MAX_VALUE;
+
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
@@ -197,7 +202,7 @@ public class DUSBenchmark {
                      exitWithMessageAndUsage("Unrecognized type '"+type+"' in columntypes: "+columntypes);
                  }
             }
-
+            if (ratelimit <= 0) exitWithMessageAndUsage("ratelimit must be > 0");
         }
     } // end of DUSBConfig
 
@@ -803,8 +808,10 @@ public class DUSBenchmark {
 
 
     public static void main(String[] args) throws Exception {
-        DUSBenchmark benchmark = new DUSBenchmark(args);
-        benchmark.init();
+        DUSBConfig config = new DUSBConfig();
+        config.parse(DUSBenchmark.class.getName(), args);
+
+        DUSBenchmark benchmark = new DUSBenchmark(config);
         benchmark.runBenchmark();
     }
 }
