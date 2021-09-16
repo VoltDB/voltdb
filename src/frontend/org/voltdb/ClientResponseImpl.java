@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -204,17 +204,35 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
         if (tableCount < 0) {
             throw new IOException("Table count is negative: " + tableCount);
         }
-        results = new VoltTable[tableCount];
-        for (int i = 0; i < tableCount; i++) {
-            int tableSize = buf.getInt();
-            final int originalLimit = buf.limit();
-            buf.limit(buf.position() + tableSize);
-            final ByteBuffer slice = buf.slice();
-            buf.position(buf.position() + tableSize);
-            buf.limit(originalLimit);
-            results[i] = new VoltTable(slice, false);
-        }
         setProperly = true;
+        int count = 0;
+        try {
+            results = new VoltTable[tableCount];
+            for (int i = 0; i < tableCount; i++) {
+                int tableSize = buf.getInt();
+                final int originalLimit = buf.limit();
+                buf.limit(buf.position() + tableSize);
+                final ByteBuffer slice = buf.slice();
+                buf.position(buf.position() + tableSize);
+                buf.limit(originalLimit);
+                results[i] = new VoltTable(slice, false);
+                count = i;
+            }
+        } catch (Throwable t) {
+            StringBuilder builder = new StringBuilder("Unexpected errors in response. status: ");
+            builder.append(getStatus());
+            builder.append(statusString == null ? "" : statusString);
+            builder.append(" appStatus:");
+            builder.append(getAppStatus());
+            builder.append(getAppStatusString() == null ? "" : " " + getAppStatusString());
+            builder.append(" table count:");
+            builder.append(tableCount + "\n");
+            while (count > 0) {
+                builder.append(results[count--].toFormattedString());
+            }
+            dropResultTable();
+            throw new IOException(builder.toString());
+        }
     }
 
     public int getSerializedSize() {

@@ -1665,4 +1665,8 @@ public class ProcedureRunner {
         }
         return results;
     }
+
+    public int getPartitionId() {
+        return m_site.getSystemProcedureExecutionContext().getPartitionId();
+    }
 }

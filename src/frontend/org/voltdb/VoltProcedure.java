@@ -302,4 +302,8 @@ public abstract class VoltProcedure {
     public void setAppStatusString(String statusString) {
         m_runner.setAppStatusString(statusString);
     }
+
+    public int getPartitionId() {
+        return m_runner.getPartitionId();
+    }
 }

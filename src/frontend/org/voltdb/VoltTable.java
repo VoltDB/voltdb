@@ -424,6 +424,28 @@ public final class VoltTable extends VoltTableRow implements JSONString {
     }
 
     /**
+     * get a not fully constructed and validated VoltTable.
+     * DO NOT use it for production
+     * @param buf The buffer containing VoltTable buffer.
+     */
+    public static VoltTable getInstanceForTest(ByteBuffer buf) {
+        return new VoltTable(buf);
+    }
+
+    /**
+     * This VoltTable is not fully instantiated/validated and is for test only.
+     */
+    private VoltTable(ByteBuffer backing) {
+        // no test metadata when creating tables from buffers
+        m_extraMetadata = null;
+        m_buffer = backing;
+        m_rowStart = m_buffer.getInt(0) + 4;
+        m_colCount = m_buffer.getShort(POS_COL_COUNT);
+        m_buffer.position(m_buffer.limit());
+        m_readOnly = true;
+    }
+
+    /**
      * Given a column and an array of columns, return a new array of columns with the
      * single guy prepended onto the others. This function is used in the constructor
      * below so that one constructor can call another without breaking Java rules about
