@@ -18,9 +18,8 @@
 package org.voltdb.client;
 
 import java.io.IOException;
+import java.net.ConnectException;
 import java.net.InetSocketAddress;
-import java.net.SocketException;
-import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
@@ -532,7 +531,7 @@ public class Client2Impl implements Client2 {
         networkPool = new VoltNetworkPool(1, 1, null, "Client2");
         networkPool.start();
 
-        defaultRequestPriority = clipRequestPriority(config.requestPriority);
+        defaultRequestPriority = config.requestPriority;
         connectTimeout = config.connectionSetupTimeout;
         procedureCallTimeout = config.procedureCallTimeout;
         connectionResponseTimeout = config.connectionResponseTimeout;
@@ -610,41 +609,52 @@ public class Client2Impl implements Client2 {
     }
 
     /**
-     * Connect to specified server string, in host:port form.
-     * Host can be IPv6, IPv4, or hostname. If IPv6, it must be
-     * enclosed in brackets. Port specification is optional.
-     * A single attempt will be made; no retries.
+     * Connect to the first available server in a list of
+     * servers, each specified in host:port form, and
+     * separated by commas. Retries are supported, with
+     * user-supplied overall timeout.
      */
     @Override
-    public void connectSync(String server)
+    public void connectSync(String servers, long timeout, long delay, TimeUnit unit)
     throws IOException {
-        HostAndPort hp = HostAndPort.fromString(server.trim())
-                                    .withDefaultPort(21212)
-                                    .requireBracketsForIPv6();
-        connectSync(hp.getHost(), hp.getPort());
+        List<HostAndPort> hpList = hostAndPortList(servers);
+        toSyncReturn(doConnect(hpList, timeout, delay, unit));
+    }
+
+    @Override
+    public void connectSync(String servers)
+    throws IOException {
+        connectSync(servers, 0, 0, TimeUnit.NANOSECONDS);
     }
 
     /**
      * Connect to specified host on specified port.
-     * A single attempt will be made; no retries.
+     * Retries are supported, with user-supplied overall timeout.
      */
+    @Override
+    public void connectSync(String host, int port, long timeout, long delay, TimeUnit unit)
+    throws IOException {
+        List<HostAndPort> hpList = hostAndPortList(host, port);
+        toSyncReturn(doConnect(hpList, timeout, delay, unit));
+    }
+
     @Override
     public void connectSync(String host, int port)
     throws IOException {
-        toSyncReturn(doConnect(host, port, 0, 0));
+        connectSync(host, port, 0, 0, TimeUnit.NANOSECONDS);
     }
 
     /**
-     * Connect to specified server string, in host:port form.
-     * Retries are supported. with user-supplied overall
-     * timeout. The operation will complete asynchronously,
+     * Connect to the first available server in a list of
+     * servers, each specified in host:port form, and
+     * separated by commas. Retries are supported, with
+     * user-supplied overall timeout. The operation will
+     * complete asynchronously.
      */
     @Override
-    public CompletableFuture<Void> connectAsync(String server, long timeout, long delay, TimeUnit unit) {
-        HostAndPort hp = HostAndPort.fromString(server.trim())
-                                    .withDefaultPort(21212)
-                                    .requireBracketsForIPv6();
-        return connectAsync(hp.getHost(), hp.getPort(), timeout, delay, unit);
+    public CompletableFuture<Void> connectAsync(String servers, long timeout, long delay, TimeUnit unit) {
+        List<HostAndPort> hpList = hostAndPortList(servers);
+        return doConnect(hpList, timeout, delay, unit);
     }
 
     /**
@@ -654,9 +664,8 @@ public class Client2Impl implements Client2 {
      */
     @Override
     public CompletableFuture<Void> connectAsync(String host, int port, long timeout, long delay, TimeUnit unit) {
-        long tmoNs = unit.toNanos(Math.max(0, timeout));
-        long delayNs = unit.toNanos(Math.max(0, delay));
-        return doConnect(host, port, tmoNs, delayNs);
+        List<HostAndPort> hpList = hostAndPortList(host, port);
+        return doConnect(hpList, timeout, delay, unit);
     }
 
     /**
@@ -712,7 +721,7 @@ public class Client2Impl implements Client2 {
         if (options != null) {
             if (options.clientTimeout != null) clientTmo = options.clientTimeout;
             if (options.batchTimeout != null) batchTmo = options.batchTimeout;
-            if (options.requestPriority != null) reqPrio = clipRequestPriority(options.requestPriority);
+            if (options.requestPriority != null) reqPrio = options.requestPriority;
         }
         return doProcCall(clientTmo, batchTmo, ProcedureInvocation.NO_PARTITION, reqPrio, procName, parameters);
     }
@@ -734,7 +743,7 @@ public class Client2Impl implements Client2 {
         if (options != null) {
             if (options.clientTimeout != null) clientTmo = options.clientTimeout;
             if (options.batchTimeout != null) batchTmo = options.batchTimeout;
-            if (options.requestPriority != null) reqPrio = clipRequestPriority(options.requestPriority);
+            if (options.requestPriority != null) reqPrio = options.requestPriority;
         }
         return doAllPartitionCall(clientTmo, batchTmo, reqPrio, procName, parameters);
     }
@@ -785,24 +794,27 @@ public class Client2Impl implements Client2 {
      * Executes the actual connection setup in a separate thread,
      * since the underlying routines are synchronous. Retry
      * is supported, with provision for approximate timeout.
+     * Completes when a single connection has been made.
+     * Individual connect failures and eventual success are
+     * reported through the  notification mechanism.
      */
-    private CompletableFuture<Void> doConnect(String host, int port, long timeout, long delay) {
+    private CompletableFuture<Void> doConnect(List<HostAndPort> servers, long timeout, long delay, TimeUnit unit) {
+        long tmoNs = timeout > 0 ? unit.toNanos(timeout) : 0;
+        long delayNs = delay > 0 ? unit.toNanos(delay) : 0;
         CompletableFuture<Void> future = new CompletableFuture<>();
-        execService.schedule(new UserConnectionTask(host, port, timeout, delay, future), 0, TimeUnit.NANOSECONDS);
+        execService.schedule(new UserConnectionTask(servers, tmoNs, delayNs, future), 0, TimeUnit.NANOSECONDS);
         return future;
     }
 
     private class UserConnectionTask implements Runnable {
-        private final String host;
-        private final int port;
+        private final List<HostAndPort> servers;
         private final long startTime;
         private final long timeout;
         private final long retryDelay;
         private final CompletableFuture<Void> future;
 
-        UserConnectionTask(String h, int p, long t, long d, CompletableFuture<Void> f) {
-            host = h;
-            port = p;
+        UserConnectionTask(List<HostAndPort> s, long t, long d, CompletableFuture<Void> f) {
+            servers = new ArrayList<>(s);
             startTime = System.nanoTime();
             timeout = t;
             retryDelay = d;
@@ -811,30 +823,53 @@ public class Client2Impl implements Client2 {
 
         @Override
         public void run() {
-            boolean retry = false;
-            Exception fail = null;
-            try {
-                createConnection(host, port);
-                future.complete(null);
-                return;
+            boolean retry = true;
+            Iterator<HostAndPort> it = servers.iterator();
+            while (it.hasNext()) {
+                HostAndPort server = it.next();
+                try {
+                    createConnection(server.getHost(), server.getPort());
+                    future.complete(null);
+                    return; // we only connect one
+                }
+                catch (IOException ex) {
+                    // handled via notifyConnectFailure
+                    retry &= (System.nanoTime() - startTime < timeout);
+                }
+                catch (Exception ex) {
+                    logError("Unexpected exception, connect to %s failed: %s", server, ex.getMessage());
+                    it.remove(); // not retrying this one
+                }
             }
-            catch (SocketException | UnknownHostException ex) {
-                fail = ex;
-                retry = (System.nanoTime() - startTime < timeout);
-            }
-            catch (Exception ex) {
-                fail = ex;
-            }
-            HostAndPort hap = HostAndPort.fromParts(host, port);
-            if (retry) {
-                logError("Failed to connect to host at %s: %s", hap, fail.getMessage());
+            if (retry && !servers.isEmpty()) {
                 execService.schedule(this, retryDelay, TimeUnit.NANOSECONDS);
             }
             else {
-                logError("Failed to connect to host at %s: %s (no retry)", hap, fail.getMessage());
-                future.completeExceptionally(fail);
+                future.completeExceptionally(new ConnectException("Failed to connect to cluster"));
             }
         }
+    }
+
+    private List<HostAndPort> hostAndPortList(String servers) {
+        List<HostAndPort> list = new ArrayList<>();
+        for (String srv : servers.split(",")) {
+            srv = srv.trim();
+            if (!srv.isEmpty()) {
+                list.add(HostAndPort.fromString(srv)
+                                    .withDefaultPort(21212)
+                                    .requireBracketsForIPv6());
+            }
+        }
+        if (list.isEmpty()) {
+            throw new IllegalArgumentException("Empty server list");
+        }
+        return list;
+    }
+
+    private List<HostAndPort> hostAndPortList(String host, int port) {
+        List<HostAndPort> list = new ArrayList<>(1);
+        list.add(HostAndPort.fromParts(host, port));
+        return list;
     }
 
     /*
@@ -1043,6 +1078,14 @@ public class Client2Impl implements Client2 {
         // Check procedure name is set, since we rely on this elsewhere
         if (procName == null || procName.isEmpty()) {
             future.completeExceptionally(new IllegalArgumentException("Procedure name required"));
+            return future;
+        }
+
+        // Validate request priority
+        if (requestPrio < ProcedureInvocation.HIGHEST_PRIORITY || requestPrio > ProcedureInvocation.LOWEST_PRIORITY) {
+            String err = String.format("Invalid request priority %d; range is %d to %d",
+                                       requestPrio, ProcedureInvocation.HIGHEST_PRIORITY, ProcedureInvocation.LOWEST_PRIORITY);
+            future.completeExceptionally(new IllegalArgumentException(err));
             return future;
         }
 
@@ -1746,20 +1789,6 @@ public class Client2Impl implements Client2 {
     }
 
     /*
-     * Utility: clip priority range, just for safety's sake.
-     * Out-of-range priorities are forced to the lowest possible
-     * priority. The result is always non-negative, due to
-     * the values assigned for HIGHEST and LOWEST. Remember
-     * that lower numbers mean higher priority.
-     */
-    private int clipRequestPriority(int prio) {
-        if (prio < ProcedureInvocation.HIGHEST_PRIORITY || prio > ProcedureInvocation.LOWEST_PRIORITY) {
-            prio = ProcedureInvocation.LOWEST_PRIORITY;
-        }
-        return prio;
-    }
-
-    /*
      * Fail a request when we didn't even get as far as setting
      * up a request context for it.
      */
@@ -2198,8 +2227,11 @@ public class Client2Impl implements Client2 {
                         retry = false;
                         break; // one is all we need
                     }
+                    catch (IOException ex) {
+                        // Handled via notifyConnectFailure
+                    }
                     catch (Exception ex) {
-                        logError("Failed to connect to host at %s: %s", hap, ex.getMessage());
+                        logError("Unexpected exception, connect to %s failed: %s", hap, ex.getMessage());
                     }
                 }
             }
@@ -2292,8 +2324,12 @@ public class Client2Impl implements Client2 {
                         createConnection(hap.getHost(), hap.getPort());
                         it.remove();
                     }
+                    catch (IOException ex) {
+                        // Handled via notifyConnectFailure
+                        retry = true;
+                    }
                     catch (Exception ex) {
-                        logError("Failed to connect to host %d at %s: %s", hostId, hap, ex.getMessage());
+                        logError("Unexpected exception, connect to %s failed: %s", hap, ex.getMessage());
                         retry = true;
                     }
                 }

@@ -37,10 +37,12 @@
 
 package voter;
 
+import java.io.IOException;
 import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltdb.CLIConfig;
@@ -255,28 +257,10 @@ public class Client2AsyncBenchmark {
      *
      * @param servers A comma separated list of servers using the hostname:port
      * syntax (where :port is optional).
-     * @throws InterruptedException if a wait is interrupted
      */
-    void connect(String servers) throws InterruptedException {
+    void connect(String servers) throws IOException {
         System.out.println("Connecting to VoltDB ...");
-
-        int sleep = 1000;
-        while (true) {
-            String[] serverArray = servers.split(",");
-            for (String server : serverArray) {
-                try {
-                    client.connectSync(server);
-                    //'connection up' notification has printed success message
-                    return;
-                }
-                catch (Exception ex) {
-                    // ignore; let the 'connect fail' notification handle it
-                }
-            }
-            System.err.printf("Retrying in %s second%s ...\n", sleep/1000, sleep/1000 == 1 ? "" : "s");
-            Thread.sleep(sleep);
-            if (sleep < 8000) sleep *= 2;
-        }
+        client.connectSync(servers, 300, 5, TimeUnit.SECONDS);
     }
 
     /**

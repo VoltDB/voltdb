@@ -63,6 +63,11 @@ public class Client2Config {
     public static final int DEFAULT_REQUEST_PRIORITY = Client2Impl.DEFAULT_REQUEST_PRIORITY;
     public static final int DEFAULT_RESPONSE_THREADS = Client2Impl.DEFAULT_RESPONSE_THREADS;
 
+    // Similarly for the valid priority range (from ProcedureInvocation)
+
+    public static final int HIGHEST_PRIORITY = ProcedureInvocation.HIGHEST_PRIORITY;
+    public static final int LOWEST_PRIORITY = ProcedureInvocation.LOWEST_PRIORITY;
+
     // All these have package access for use by Client2Impl
     // All times are in nanoseconds
 
@@ -135,7 +140,7 @@ public class Client2Config {
     /**
      * Set hashed password for connections to VoltDB.
      *
-     * @param password password
+     * @param password hashed password
      * @return this
      */
     public Client2Config hashedPassword(String password) {
@@ -149,7 +154,8 @@ public class Client2Config {
      * Set hashed password for connections to VoltDB. The password was
      * hashed using a specified hash scheme.
      *
-     * @param password password
+     * @param password  hashed password
+     * @param hashScheme hash scheme used to hash the password
      * @return this
      */
     public Client2Config hashedPassword(String password, ClientAuthScheme hashScheme) {
@@ -408,12 +414,16 @@ public class Client2Config {
      * <p>
      * The value given here can be overridden by individual
      * procedure calls.
+     * <p>
+     * The valid priority range is from {@link #HIGHEST_PRIORITY}
+     * to {@link #LOWEST_PRIORITY}, inclusive. Higher priorities
+     * have lower numerical values.
      *
-     * @param prio priority, in range 0 (highest) to 31 (lowest)
+     * @param prio priority
      * @return this
      */
     public Client2Config requestPriority(int prio) {
-        requestPriority = prio;
+        requestPriority = checkRequestPriority(prio);
         return this;
     }
 
@@ -658,5 +668,14 @@ public class Client2Config {
             }
         }
         return username;
+    }
+
+    static int checkRequestPriority(int prio) {
+        if (prio < HIGHEST_PRIORITY || prio > LOWEST_PRIORITY) {
+            String err = String.format("Invalid request priority %d; range is %d to %d",
+                                       prio, HIGHEST_PRIORITY, LOWEST_PRIORITY);
+            throw new IllegalArgumentException(err);
+        }
+        return prio;
     }
 }

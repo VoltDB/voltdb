@@ -108,22 +108,67 @@ public interface Client2 extends Closeable {
      * Returns an estimate of the number of outstanding
      * transactions. This is only useful for debugging,
      * and of course is liable to immediate change.
+     *
+     * @return the outstanding transaction count
      */
     int outstandingTxnCount();
 
     /**
-     * Connect to specified server string, in host:port form.
+     * Connect to first available server in a specified
+     * list of servers, each in host:port form, and separated
+     * by commas.
+     * <p>
      * Host can be IPv6, IPv4, or hostname. If IPv6, it must be
      * enclosed in brackets. Port specification is optional.
+     * <p>
+     * This method connects to only one server. Other connections
+     * may be made as a result of querying the VoltDB cluster
+     * topology.
+     * <p>
+     * Completion is synchronous. If no connection could be set
+     * up to any of the specified servers, a reattempt will be
+     * scheduled after a specified delay, until a total timeout
+     * has been exceeded. Use zero timeout for no retry.
      *
-     * @param server as host and optional port
+     * @param servers list of servers, each as host and optional port
+     * @param timeout overall timeout
+     * @param delay time between retries
+     * @param unit units in which <code>timeout</code> and <code>delay</code> are expressed
      * @throws IOException server communication error
      */
-    void connectSync(String server)
+    void connectSync(String servers, long timeout, long delay, TimeUnit unit)
+        throws IOException;
+
+    /**
+     * Convenient form of {@link #connectSync(String,long,long,TimeUnit)}
+     * that specifies no retry.
+     *
+     * @param servers list of servers, each as host and optional port
+     * @throws IOException server communication error
+     */
+    void connectSync(String servers)
         throws IOException;
 
     /**
      * Connect to specified host on specified port.
+     * <p>
+     * Completion is synchronous. On a failure to connect, a reattempt
+     * will be scheduled after a specified delay, until a total timeout
+     * has been exceeded. Use zero timeout for no retry.
+     *
+     * @param host as address or hostname
+     * @param port port number
+     * @param timeout overall timeout
+     * @param delay time between retries
+     * @param unit units in which <code>timeout</code> and <code>delay</code> are expressed
+     * @throws IOException server communication error
+     */
+    void connectSync(String host, int port, long timeout, long delay, TimeUnit unit)
+        throws IOException;
+
+    /**
+     * Convenient form of {@link #connectSync(String,int,long,long,TimeUnit)}
+     * that specifies no retry.
      *
      * @param host as address or hostname
      * @param port port number
@@ -133,33 +178,44 @@ public interface Client2 extends Closeable {
         throws IOException;
 
     /**
-     * Connect to specified server string, in host:port form.
+     * Connect to first available server in a specified
+     * list of servers, each in host:port form, and separated
+     * by commas.
+     * <p>
      * Host can be IPv6, IPv4, or hostname. If IPv6, it must be
      * enclosed in brackets. Port specification is optional.
      * <p>
-     * Completion is asynchronous. On a failure to connect, a
-     * reattempt will be scheduled after a specified delay, until
-     * a total timeout has been exceeded.
+     * This method connects to only one server. Other connections
+     * may be made as a result of querying the VoltDB cluster
+     * topology.
+     * <p>
+     * Completion is asynchronous. If no connection could be set
+     * up to any of the specified servers, a reattempt will be
+     * scheduled after a specified delay, until a total timeout
+     * has been exceeded. Use zero timeout for no retry.
      *
-     * @param server as host and optional port
+     * @param servers list of servers, each as host and optional port
      * @param timeout overall timeout
      * @param delay time between retries
      * @param unit units in which <code>timeout</code> and <code>delay</code> are expressed
+     * @return a {@code CompletableFuture}
      */
-    CompletableFuture<Void> connectAsync(String server, long timeout, long delay, TimeUnit unit);
+    CompletableFuture<Void> connectAsync(String servers, long timeout, long delay, TimeUnit unit);
 
    /**
      * Connect to specified host on specified port.
      * <p>
      * Completion is asynchronous. On a failure to connect, a
      * reattempt will be scheduled after a specified delay, until
-     * a total timeout has been exceeded.
+     * a total timeout has been exceeded. Use zero timeout for
+     * no retry.
      *
      * @param host as address or hostname
      * @param port port number
      * @param timeout overall timeout
      * @param delay time between retries
      * @param unit units in which <code>timeout</code> and <code>delay</code> are expressed
+     * @return a {@code CompletableFuture}
      */
     CompletableFuture<Void> connectAsync(String host, int port, long timeout, long delay, TimeUnit unit);
 

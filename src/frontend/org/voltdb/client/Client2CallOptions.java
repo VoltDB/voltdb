@@ -86,12 +86,16 @@ public class Client2CallOptions {
 
     /**
      * Sets the request priority for a procedure call.
+     * <p>
+     * The valid priority range is from {@link Client2Config#HIGHEST_PRIORITY}
+     * to {@link Client2Config#LOWEST_PRIORITY}, inclusive. Higher priorities
+     * have lower numerical values.
      *
-     * @param prio priority, in range 1 (highest) to 8 (lowest)
+     * @param prio priority
      * @return this
      */
     public Client2CallOptions requestPriority(int prio) {
-        requestPriority = prio;
+        requestPriority = Client2Config.checkRequestPriority(prio);
         return this;
     }
- }
+}
