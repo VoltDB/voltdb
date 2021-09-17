@@ -789,7 +789,7 @@ jQuery.extend({
                     401: function(jqXHR, textStatus, errorThrown){
                         var data = jqXHR.responseJSON;
                         callback(data, (jqXHR.getResponseHeader("Host") != null ? jqXHR.getResponseHeader("Host").split(":")[0] : "-1"))
-                        if (data.statusstring.includes("kerberos")){
+                        if (data !== undefined && data.statusstring.includes("kerberos")){
                             console.log('Failed to authenticate to the server via Kerberos. Please check the configuration of your client/browser')
                         }
 

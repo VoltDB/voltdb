@@ -856,19 +856,45 @@ function set_kubernetes(server,port){
         connection.Metadata["SHORTAPI_PROFILE"] != null
       ) {
         var data = connection.Metadata["SHORTAPI_PROFILE"];
-
+        console.log(data);
         if (data.permissions != null) {
           $.each(data.permissions, function (index, value) {
             if (value.toUpperCase().trim() == "ADMIN") {
               isAdmin = true;
-              return false;
+              return true;
             }
-            return true;
+            return false;
           });
         }
       }
       return isAdmin;
     };
+
+    // var checkRolesUpdate = function (conn) {
+    //   var currentUser = VoltDbUI.getCookie("username");
+    //   var currentUserRole = '';
+    //   var usersList = conn.users.user;
+    //   var isCurrentUserAdmin;
+    //   var isRoleChanged = false;
+
+    //   VoltDBService.GetShortApiProfile(function (connection) {
+    //     data = connection.Metadata["SHORTAPI_PROFILE"];
+    //     $.each(data.permissions, function (index, value) {
+    //         if (value.toUpperCase() == "ADMIN") {
+    //           isCurrentUserAdmin = true;
+    //         }
+    //     });
+
+    //     $.each(usersList, function(index, value){
+    //       if(currentUser === value.name){
+    //         currentUserRole = value.roles;
+    //       }
+    //     })
+
+    //   console.log(currentUserRole, isCurrentUserAdmin);
+
+    //   });
+    // }
 
     var loadAdminDeploymentInformation = function (connection) {
       var adminConfigValues = {};
@@ -877,12 +903,26 @@ function set_kubernetes(server,port){
         connection.Metadata["SHORTAPI_DEPLOYMENT"] != null
       ) {
         var data = connection.Metadata["SHORTAPI_DEPLOYMENT"];
+        var usersList = data.users.user;
+
+        // checkRolesUpdate(data)
 
         //The user does not have permission to view admin details.
-        if (data.status == -3) {
+        if (!hasAdminPrivileges) {
           adminConfigValues.VMCNoPermission = true;
           return adminConfigValues;
+        }else{
+          adminConfigValues.VMCNoPermission = false;
+          VoltDbAdminConfig.isAdmin = true;
         }
+
+        // $.each(usersList,function (index, value) {
+        //   if(currentUser === value.name){
+        //     if(value.roles.toLowerCase() === "administrator"){
+        //       VoltDbAdminConfig.isAdmin = true;
+        //     }else VoltDbAdminConfig.isAdmin = false;
+        //   }
+        // })
 
         adminConfigValues["sitesperhost"] = data.cluster.sitesperhost;
         adminConfigValues["kSafety"] = data.cluster.kfactor;
@@ -1014,6 +1054,7 @@ function set_kubernetes(server,port){
           adminConfigValues["privacykey"] = data["snmp"].privacykey;
         }
       }
+
       return adminConfigValues;
     };
 

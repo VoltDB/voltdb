@@ -864,7 +864,7 @@ var loadPage = function (serverName, portid) {
   }
 
   var showAdminPage = function () {
-    if (!VoltDbAdminConfig.isAdmin) {
+    if (VoltDbAdminConfig.isAdmin) {
       VoltDbAdminConfig.isAdmin = true;
       if (
         VoltDbUI.getCookie("sql_port_for_paused_db") ==
@@ -929,7 +929,6 @@ var loadPage = function (serverName, portid) {
     true,
     function (adminConfigValues, rawConfigValues) {
       securityChecks.securityChecked = true;
-
       //Show admin page if security is turned off.
       if (
         adminConfigValues != null &&
@@ -947,7 +946,6 @@ var loadPage = function (serverName, portid) {
 
   voltDbRenderer.CheckAdminPriviledges(function (hasAdminPrivileges) {
     securityChecks.previlegesChecked = true;
-
     if (hasAdminPrivileges) {
       showAdminPage();
     } else if (!VoltDbAdminConfig.isAdmin) {
@@ -1214,8 +1212,7 @@ var loadPage = function (serverName, portid) {
       false,
       function (adminConfigValues, rawConfigValues) {
         if (!VoltDbUI.hasPermissionToView) return;
-
-        if (rawConfigValues.status == -3 && VoltDbAdminConfig.isAdmin) {
+        if (rawConfigValues !== undefined && rawConfigValues.status == -3 && VoltDbAdminConfig.isAdmin) {
           VoltDbAdminConfig.isAdmin = false;
           setTimeout(function () {
             var checkPermission = function () {
