@@ -70,6 +70,7 @@ public class DUSBenchmarkCallback implements ProcedureCallback {
         this.procedureName = procedure;
         this.maxErrors = maxErrors;
         procedures.putIfAbsent(procedure, 1);
+        DUSBenchmark.countProcResults(procedure);
     }
 
     public DUSBenchmarkCallback(String procedure) {

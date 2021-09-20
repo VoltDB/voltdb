@@ -81,7 +81,7 @@ public class DeleteRows extends VoltProcedure {
         // Delete from partitioned table
         } else if ( "DUSB_P1".equals(tableName.toUpperCase()) ) {
             if ( "ID".equals(columnName.toUpperCase()) ) {
-                sqlStatement = DELETE_FROM_DUSB_R1_BY_ID;
+                sqlStatement = DELETE_FROM_DUSB_P1_BY_ID;
             } else if ( "MOD_ID".equals(columnName.toUpperCase()) ) {
                 sqlStatement = DELETE_FROM_DUSB_P1_BY_MOD_ID;
             } else {

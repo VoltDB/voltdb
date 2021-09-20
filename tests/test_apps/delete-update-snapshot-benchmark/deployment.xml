@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<deployment>
+    <systemsettings>
+        <query timeout="60000"/>
+    </systemsettings>
+</deployment>

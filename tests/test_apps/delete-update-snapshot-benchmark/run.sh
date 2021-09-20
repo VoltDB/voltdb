@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 APPNAME="delete-update-snapshot"
+CONFIGFILE="deployment.xml"
 
 # leader host for startup purposes only
 # (once running, all nodes are the same -- no leaders)
@@ -40,8 +41,8 @@ function cleanall() {
 # compile the source code for procedures and the client into a jar file
 function jars() {
     # compile java source
-    javac -classpath $APPCLASSPATH  src/procedures/*.java
     javac -classpath $CLIENTCLASSPATH src/client/benchmark/*.java
+    javac -classpath src:$APPCLASSPATH src/procedures/*.java
     # build procedure and client jars
     jar cf dusbench.jar -C src procedures/  -C src client/benchmark/
     # remove compiled .class files
@@ -59,8 +60,14 @@ function jars-if-needed() {
 function server() {
     # note: "init --force" will delete any existing data
     # omit the "init" command to recover existing data
-    voltdb init --force
+    voltdb init --force -C $CONFIGFILE $ARGS
     voltdb start -H $STARTUPLEADERHOST
+}
+
+# run the voltdb server locally
+function server-auto-snapshot() {
+    CONFIGFILE="deployment-auto-snapshot.xml"
+    server
 }
 
 # load schema and procedures
@@ -95,7 +102,7 @@ if [ $# -eq 0 ]; then help; exit; fi
 while [ -n "$1" ] ; do
     CMD="$1"
     ARGS=
-    if [[ "$1" == "client" ]]; then
+    if [[ "$1" == "client" || "$1" == "server" ]]; then
         while [[ "$2" == "--"* ]]; do
             ARGS="$ARGS $2 $3"
             shift

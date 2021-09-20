@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<deployment>
+    <systemsettings>
+        <query timeout="60000"/>
+    </systemsettings>
+    <snapshot prefix="dusb-autosave" frequency="10s" retain="5" />
+</deployment>

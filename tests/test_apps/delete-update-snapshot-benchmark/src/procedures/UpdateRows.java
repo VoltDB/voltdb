@@ -83,7 +83,8 @@ public class UpdateRows extends VoltProcedure {
     }
 
 
-    // Determine which SQLStmt to use, based on tableName and columnName
+    // Determine which SQLStmt to use, based on tableName, columnName,
+    // and inlineOrOutline
     private SQLStmt getSqlStatement(String tableName, String columnName,
             String inlineOrOutline) {
         SQLStmt sqlStatement = null;
@@ -124,16 +125,16 @@ public class UpdateRows extends VoltProcedure {
             if ( "ID".equals(columnNameUpperCase) ) {
                 if (inlineOrOutlineUpperCase.startsWith("OUT") ||
                         inlineOrOutlineUpperCase.startsWith("NON")) {
-                        sqlStatement = UPDATE_DUSB_R1_OUT_BY_ID;
+                        sqlStatement = UPDATE_DUSB_P1_OUT_BY_ID;
                     } else {
-                        sqlStatement = UPDATE_DUSB_R1_IN_BY_ID;
+                        sqlStatement = UPDATE_DUSB_P1_IN_BY_ID;
                     }
             } else if ( "MOD_ID".equals(columnNameUpperCase) ) {
                 if (inlineOrOutlineUpperCase.startsWith("OUT") ||
                         inlineOrOutlineUpperCase.startsWith("NON")) {
-                        sqlStatement = UPDATE_DUSB_R1_OUT_BY_MOD_ID;
+                        sqlStatement = UPDATE_DUSB_P1_OUT_BY_MOD_ID;
                     } else {
-                        sqlStatement = UPDATE_DUSB_R1_IN_BY_MOD_ID;
+                        sqlStatement = UPDATE_DUSB_P1_IN_BY_MOD_ID;
                     }
             } else {
                 throw new VoltAbortException("Unknown column name: '"+columnName
