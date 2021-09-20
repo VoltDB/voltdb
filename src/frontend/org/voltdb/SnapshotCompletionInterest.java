@@ -28,6 +28,7 @@ public interface SnapshotCompletionInterest {
 
     public static class SnapshotCompletionEvent {
         public final String path;
+        public final SnapshotPathType pathType;
         public final String nonce;
         // multipartTxnId is the txnId of the snapshot itself.
         // as well as the last snapshotted MP transaction.
@@ -63,6 +64,7 @@ public interface SnapshotCompletionInterest {
                 final int drVersion,
                 final long clusterCreateTime) {
             this.path = path;
+            this.pathType = stype;
             this.nonce = nonce;
             this.multipartTxnId = multipartTxnId;
             this.partitionTxnIds = partitionTxnIds;

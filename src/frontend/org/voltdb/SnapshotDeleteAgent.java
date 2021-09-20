@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -134,11 +134,16 @@ public class SnapshotDeleteAgent extends OpsAgent
         }
 
         if (paths.length != nonces.length) {
-            return "A path must be provided for every nonce";
+            if (paths.length > nonces.length) {
+                return "A path must be provided for every nonce";
+            } else {
+                return "A nonce must be provided for every path";
+            }
         }
+
         String stype = SnapshotPathType.SNAP_PATH.toString();
         if (params.size() > 2) {
-            stype = (String )(ParameterConverter.tryToMakeCompatible(
+            stype = (String)(ParameterConverter.tryToMakeCompatible(
                         String.class,
                         paramList[2]));
         }
@@ -187,19 +192,22 @@ public class SnapshotDeleteAgent extends OpsAgent
             public void run() {
                 StringBuilder sb = new StringBuilder();
                 sb.append("Deleting files: ");
+                int delCount = 0;
                 for (int ii = 0; ii < paths.length; ii++) {
-                    //When user calls @SnapshotDelete this will be set to SNAP_PATH so we will delete what user requested.
-                    //If its SNAP_AUTO then its coming from periodic delete task.
+                    //When user calls @SnapshotDelete, 'stype' will be set to SNAP_PATH so we will delete what user requested.
+                    //If its SNAP_AUTO then its coming from periodic delete task so we use the configured snapshot path.
                     String path = SnapshotUtil.getRealPath(stype, paths[ii]);
                     List<File> relevantFiles = retrieveRelevantFiles(path, nonces[ii]);
                     if (relevantFiles != null) {
                         for (final File f : relevantFiles) {
-                            sb.append(f.getPath());
-                            sb.append(',');
-                            //long size = f.length();
+                            sb.append(f.getPath()).append(' ');
                             f.delete();
+                            delCount++;
                         }
                     }
+                }
+                if (delCount == 0) {
+                    sb.append("none");
                 }
                 SNAP_LOG.info(sb.toString());
             }
@@ -208,6 +216,7 @@ public class SnapshotDeleteAgent extends OpsAgent
         return new VoltTable[] {result};
     }
 
+    // Foe auto snaps, the nonce has the prefix and a timestamp
     private final List<File> retrieveRelevantFiles(String filePath, String nonce) {
         final File path = new VoltFile(filePath);
 
@@ -250,15 +259,16 @@ public class SnapshotDeleteAgent extends OpsAgent
                     return false;
                 }
 
-                if (!pathname.getName().endsWith(".vpt") &&
-                    !pathname.getName().endsWith(".digest") &&
-                    !pathname.getName().endsWith(".jar") &&
-                    !pathname.getName().endsWith(SnapshotUtil.HASH_EXTENSION) &&
-                    !pathname.getName().endsWith(SnapshotUtil.COMPLETION_EXTENSION)) {
+                String filename = pathname.getName();
+                if (!filename.endsWith(".vpt") &&
+                    !filename.endsWith(".digest") &&
+                    !filename.endsWith(".jar") &&
+                    !filename.endsWith(SnapshotUtil.HASH_EXTENSION) &&
+                    !filename.endsWith(SnapshotUtil.COMPLETION_EXTENSION)) {
                     return false;
                 }
 
-                if (pathname.getName().startsWith(nonce)) {
+                if (filename.startsWith(nonce)) {
                     return true;
                 }
                 return false;
