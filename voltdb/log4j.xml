@@ -74,6 +74,14 @@
         <level value="DEBUG"/>
     </logger -->
 
+    <!-- logger name="TOPICS">
+        <level value="TRACE"/>
+    </logger -->
+
+    <!-- logger name="TOPIC_GROUPS">
+        <level value="TRACE"/>
+    </logger -->
+
     <!-- logger name="IMPORT">
         <level value="INFO"/>
     </logger -->
