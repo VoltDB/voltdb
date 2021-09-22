@@ -903,12 +903,15 @@ function set_kubernetes(server,port){
         connection.Metadata["SHORTAPI_DEPLOYMENT"] != null
       ) {
         var data = connection.Metadata["SHORTAPI_DEPLOYMENT"];
-        var usersList = data.users.user;
+        var usersList = data.users;
 
         // checkRolesUpdate(data)
 
         //The user does not have permission to view admin details.
-        if (!hasAdminPrivileges) {
+        if(usersList === null){
+          adminConfigValues.VMCNoPermission = false;
+          VoltDbAdminConfig.isAdmin = true;
+        }else if (!hasAdminPrivileges) {
           adminConfigValues.VMCNoPermission = true;
           return adminConfigValues;
         }else{
