@@ -50,6 +50,7 @@ import org.apache.zookeeper_voltpatches.data.Stat;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
@@ -143,13 +144,11 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     private Future<?> m_truncationSnapshotScanTask;
 
     // Configuration data for automatic snapshot operation
-    private TimeUnit m_frequencyUnit;
+    private boolean m_autoEnabled;
     private long m_frequencyInMillis;
-    private int m_frequency;
     private int m_retain;
     private String m_path;
-    private String m_prefix;
-    private String m_prefixAndSeparator;
+    private String m_autoPrefix;
 
     // Used with prefix to generate unique nonce for an auto snapshot
     private final SimpleDateFormat m_dateFormat = new SimpleDateFormat("'_'yyyy.MM.dd.HH.mm.ss");
@@ -161,13 +160,19 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     private Future<?> m_autoSnapshotTask;
     private long m_nextSnapshotTime;
 
+    // Data for grooming terminus snapshots
+    private String m_terminusPrefix = "SHUTDOWN";
+    private boolean m_groomTermini;
+    private int m_terminusRetention;
+    private final LinkedList<Snapshot> m_terminusSnapshots = new LinkedList<>();
+
     // Don't invoke sysprocs too close together; require a minimum
     // time between invocations. Used by unit tests.
     static long m_minTimeBetweenSysprocs = 3000;
     private long m_lastSysprocInvocation = System.currentTimeMillis();
 
     // List of snapshots on disk sorted by creation time
-    private final LinkedList<Snapshot> m_snapshots = new LinkedList<>();
+    private final LinkedList<Snapshot> m_autoSnapshots = new LinkedList<>();
 
     // States the daemon can be in (also used by unit tests)
     enum State {
@@ -176,8 +181,9 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         WAITING, // paused in between snapshots
         DELETING, // deleting snapshots that are no longer going to be retained.
         SNAPSHOTTING, // @SnapshotSave executing
+        STOPPED // task is not running
     }
-    private State m_state = State.STARTUP;
+    private State m_state = State.STOPPED;
 
     // Identification of the single thread on which most work is executed
     private long m_snapshotThreadId;
@@ -194,14 +200,6 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 m_snapshotThreadId = Thread.currentThread().getId();
             }
         });
-
-        m_frequencyUnit = null;
-        m_retain = 0;
-        m_frequency = 0;
-        m_frequencyInMillis = 0;
-        m_prefix = null;
-        m_path = null;
-        m_prefixAndSeparator = null;
 
         // Register the snapshot status to the StatsAgent
         SnapshotStatus snapshotStatus = new SnapshotStatus(VoltDB.instance().getCommandLogSnapshotPath(),
@@ -1189,7 +1187,12 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     }
 
     /**
-     * Make this SnapshotDaemon responsible for generating snapshots
+     * This method has two purposes: (1) to provide available scheduling information,
+     * and (2) to enable or disable snapshot daemon activity. The latter is only
+     * meaningful if we are the elected auto snapshot leader.
+     *
+     * Called from ClientInterface or RealVoltDB on events that affect eligibility
+     * to run.
      */
     public ListenableFuture<Void> mayGoActiveOrInactive(final SnapshotSchedule schedule)
     {
@@ -1204,65 +1207,79 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
     private void makeActivePrivate(final SnapshotSchedule schedule) {
         m_lastKnownSchedule = schedule;
-        if (schedule.getEnabled()) {
-            m_frequency = schedule.getFrequencyvalue();
-            m_retain = schedule.getRetain();
-            m_path = VoltDB.instance().getSnapshotPath();
-            m_prefix = schedule.getPrefix();
-            m_prefixAndSeparator = m_prefix + "_";
-            final String frequencyUnitString = schedule.getFrequencyunit().toLowerCase();
-            assert(frequencyUnitString.length() == 1);
-            final char frequencyUnit = frequencyUnitString.charAt(0);
+        m_autoEnabled = schedule.getEnabled();
+        m_path = VoltDB.instance().getSnapshotPath();
 
+        // Automatic snapshot scheduling parameters
+        if (m_autoEnabled) {
+            m_retain = schedule.getRetain();
+            m_autoPrefix = schedule.getPrefix();
+
+            int frequency = schedule.getFrequencyvalue();
+            char frequencyUnit = schedule.getFrequencyunit().toLowerCase().charAt(0);
+            TimeUnit timeUnit;
             switch (frequencyUnit) {
             case 's':
-                m_frequencyUnit = TimeUnit.SECONDS;
+                timeUnit = TimeUnit.SECONDS;
                 break;
             case 'm':
-                m_frequencyUnit = TimeUnit.MINUTES;
+                timeUnit = TimeUnit.MINUTES;
                 break;
             case 'h':
-                m_frequencyUnit = TimeUnit.HOURS;
+                timeUnit = TimeUnit.HOURS;
                 break;
-                default:
-                    throw new RuntimeException("Frequency unit " + frequencyUnitString + "" +
-                            " in snapshot schedule is not one of d,m,h");
+            default:
+                throw new RuntimeException("Frequency unit '" + frequencyUnit +
+                                           "' in snapshot schedule is not one of s,m,h");
             }
-            m_frequencyInMillis = TimeUnit.MILLISECONDS.convert( m_frequency, m_frequencyUnit);
+            m_frequencyInMillis = timeUnit.toMillis(frequency);
             m_nextSnapshotTime = System.currentTimeMillis() + m_frequencyInMillis;
         }
 
-        if (m_isAutoSnapshotLeader) {
-            if (schedule.getEnabled()) {
-                if (m_autoSnapshotTask == null) {
-                    m_autoSnapshotTask = m_es.scheduleAtFixedRate(new Runnable() {
-                        @Override
-                        public void run() {
-                            try {
-                                doPeriodicWork(System.currentTimeMillis());
-                            } catch (Exception e) {
-                                SNAP_LOG.warn("Error doing periodic snapshot management work", e);
-                            }
-                        }
-                    }, 0, m_periodicWorkInterval, TimeUnit.MILLISECONDS);
-                }
-            } else {
-                if (m_autoSnapshotTask != null) {
-                    m_autoSnapshotTask.cancel(false);
-                    m_autoSnapshotTask = null;
-                }
-            }
+        // One-time grooming of terminus snapshots
+        m_terminusRetention = Integer.getInteger("SHUTDOWN_SNAPSHOT_RETENTION_COUNT", 2);
+        m_groomTermini = true; // always
+
+        // Schedule the automatic snapshot task periodically. We need this
+        // even if not intending to do automatic snapshots but we do want
+        // to groom terminus snapshots. In this case, the task will eventually
+        // self-cancel.
+        if (m_isAutoSnapshotLeader && (m_autoEnabled || m_groomTermini)) {
+            scheduleAutoSnapshotTask();
+        }
+
+        // No reason to be running the auto snapshot task, so cancel it
+        else {
+            cancelAutoSnapshotTask();
         }
     }
 
-    public void makeInactive() {
-        m_es.execute(new Runnable() {
-            @Override
-            public void run() {
+    private void scheduleAutoSnapshotTask() {
+        if (m_autoSnapshotTask == null) {
+            SNAP_LOG.info("Starting periodic snapshot management task");
+            m_state = State.STARTUP;
+            m_autoSnapshotTask = m_es.scheduleAtFixedRate(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        doPeriodicWork(System.currentTimeMillis());
+                    } catch (Exception e) {
+                        SNAP_LOG.warn("Error doing periodic snapshot management work", e);
+                    }
+                }
+            }, 0, m_periodicWorkInterval, TimeUnit.MILLISECONDS);
+        }
+    }
 
-                m_snapshots.clear();
-            }
-        });
+    private void cancelAutoSnapshotTask() {
+        if (m_autoSnapshotTask != null) {
+            SNAP_LOG.info("Terminating periodic snapshot management task");
+            m_autoSnapshotTask.cancel(false);
+            m_autoSnapshotTask = null;
+            m_autoSnapshots.clear();
+            m_terminusSnapshots.clear();
+            m_state = State.STOPPED;
+        }
     }
 
     private class Snapshot implements Comparable<Snapshot> {
@@ -1292,18 +1309,11 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     ////////////////////////////////////////////////
 
     /**
-     * Periodically invoked by a task that executes at a rate determined by m_frequency.
-     * Dispatches based on the current daemon state.
+     * Periodically invoked by a task that executes at a rate determined by
+     * m_frequencyInMillis. Dispatches based on the current daemon state.
      */
-    private void doPeriodicWork(final long now) {
-        if (m_lastKnownSchedule == null) {
-            setState(State.STARTUP);
-            return;
-        }
-
-        if (m_frequencyUnit == null) {
-            return; // not configured
-        }
+    private void doPeriodicWork(long now) {
+        assert m_lastKnownSchedule != null;
 
         switch (m_state) {
         case STARTUP:
@@ -1333,11 +1343,21 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
      * initiate a new snapshot.
      */
     private void processWaitingPeriodicWork(long now) {
+
+        // If auto snapshots are not enabled, then we should
+        // cancel further execution. This is the case when we're
+        // only wanting to groom terminus snapshots at startup.
+        if (!m_autoEnabled) {
+            cancelAutoSnapshotTask();
+            return;
+        }
+
+        // Fast return if it's too soon to do anything
         if (now - m_lastSysprocInvocation < m_minTimeBetweenSysprocs) {
             return;
         }
 
-        if (m_snapshots.size() > m_retain) {
+        if (m_autoSnapshots.size() > m_retain) {
             // Quick hack to make sure we don't delete while a snapshot is running.
             // Deletes work really badly during a snapshot because the FS is occupied
             if (!SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.isEmpty()) {
@@ -1362,7 +1382,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         m_lastSysprocInvocation = now;
         final Date nowDate = new Date(now);
         final String dateString = m_dateFormat.format(nowDate);
-        final String nonce = m_prefix + dateString;
+        final String nonce = m_autoPrefix + dateString;
 
         JSONObject jsObj = new JSONObject();
         try {
@@ -1371,7 +1391,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             jsObj.put(SnapshotUtil.JSON_NONCE, nonce);
             jsObj.put("perPartitionTxnIds", retrievePerPartitionTransactionIds());
 
-            m_snapshots.offer(new Snapshot(m_path, nonce, now));
+            m_autoSnapshots.add(new Snapshot(m_path, nonce, now));
             long handle = m_nextCallbackHandle++;
 
             m_procedureCallbacks.put(handle, new ProcedureCallback() {
@@ -1379,7 +1399,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 public void clientCallback(final ClientResponse clientResponse)
                         throws Exception {
                     m_lastInitiationTs = null;
-                    processClientResponsePrivate(clientResponse);
+                    processSnapshotResponse(clientResponse);
                 }
             });
 
@@ -1410,7 +1430,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             @Override
             public void clientCallback(final ClientResponse clientResponse)
                     throws Exception {
-                processClientResponsePrivate(clientResponse);
+                processScanResponse(clientResponse);
             }
         });
 
@@ -1446,38 +1466,11 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     }
 
     /**
-     * Handles completion of some snapshot-related request, which
-     * could be @SnapshotSave, @SnapshotScan, @SnapshotDelete.
-     * Dispatches accordingly.
-     *
-     * TODO: there seems to be no reason to have this as a single routine
-     */
-    private void processClientResponsePrivate(ClientResponse response) {
-        if (m_frequencyUnit == null) {
-            throw new RuntimeException("SnapshotDaemon received a response when it has not been configured to run");
-        }
-
-        switch (m_state) {
-        case SCANNING:
-            processScanResponse(response);
-            break;
-        case SNAPSHOTTING:
-            processSnapshotResponse(response);
-            break;
-        case DELETING:
-            processDeleteResponse(response);
-            break;
-        default:
-            throw new RuntimeException("SnapshotDaemon received a response in state " + m_state);
-         }
-    }
-
-    /**
      * Process a response to a request to create an auto snapshot.
      * Confirm and log that the snapshot was a success
      */
     private void processSnapshotResponse(ClientResponse response) {
-        setState(State.WAITING);
+        changeState(State.SNAPSHOTTING, State.WAITING, "snapshot");
 
         final long now = System.currentTimeMillis();
         m_nextSnapshotTime += m_frequencyInMillis;
@@ -1496,7 +1489,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         final String err = SnapshotUtil.didSnapshotRequestFailWithErr(results);
         if (err != null) {
             SNAP_LOG.warn("Snapshot failed with failure response: " +  err);
-            m_snapshots.removeLast();
+            m_autoSnapshots.removeLast();
             return;
         }
 
@@ -1510,7 +1503,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             }
         }
         if (!success) {
-            m_snapshots.removeLast();
+            m_autoSnapshots.removeLast();
         }
     }
 
@@ -1522,7 +1515,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
      * error or a bug.
      */
     private void processDeleteResponse(ClientResponse response) {
-        setState(State.WAITING);
+        changeState(State.DELETING, State.WAITING, "delete");
 
         if (response.getStatus() != ClientResponse.SUCCESS){
             logFailureResponse("Deletion of snapshots failed", response);
@@ -1543,28 +1536,51 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
      * not be retained.
      */
     private void processScanResponse(ClientResponse response) {
-        setState(State.WAITING);
+        changeState(State.SCANNING, State.WAITING, "scan");
 
         final VoltTable snapshots = checkSnapshotScanResponse(response);
         if (snapshots == null) {
             return;
         }
 
+        // Build snapshot lists as needed
         final File myPath = new File(m_path);
+        final String autoNonce = m_autoPrefix + '_';
+        final String termNonce = m_terminusPrefix + "_";
         while (snapshots.advanceRow()) {
             final String path = snapshots.getString("PATH");
             final File pathFile = new File(path);
             if (pathFile.equals(myPath)) {
                 final String nonce = snapshots.getString("NONCE");
-                if (nonce.startsWith(m_prefixAndSeparator)) {
-                    final Long txnId = snapshots.getLong("TXNID");
-                    m_snapshots.add(new Snapshot(path, nonce, txnId));
+                final Long txnId = snapshots.getLong("TXNID");
+                if (m_autoEnabled && nonce.startsWith(autoNonce)) {
+                    m_autoSnapshots.add(new Snapshot(path, nonce, txnId));
+                }
+                else if (m_groomTermini && nonce.startsWith(termNonce)) {
+                    m_terminusSnapshots.add(new Snapshot(path, nonce, txnId));
                 }
             }
         }
+        Collections.sort(m_autoSnapshots);
+        Collections.sort(m_terminusSnapshots);
 
-        java.util.Collections.sort(m_snapshots);
-        deleteExtraSnapshots();
+        // Immediately groom if needed. Do terminus snapshots first;
+        // the WAITING state will pick up the auto snapshots. Otherwise
+        // do auto snapshots immediately.
+        boolean groomAutoNow = false;
+        if (m_autoEnabled) {
+            SNAP_LOG.infoFmt("Scan found %d automatic snapshots, retaining %d",
+                             m_autoSnapshots.size(), m_retain);
+            groomAutoNow = true;
+        }
+        if (m_groomTermini) {
+            SNAP_LOG.infoFmt("Scan found %d shutdown snapshots, retaining %d",
+                             m_terminusSnapshots.size(), m_terminusRetention);
+            groomAutoNow &= !deleteExtraSnapshots(m_terminusSnapshots, m_terminusRetention);
+        }
+        if (groomAutoNow) {
+            deleteExtraSnapshots(m_autoSnapshots, m_retain);
+        }
     }
 
     /**
@@ -1600,37 +1616,57 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
      * id, and therefore in order of age.
      */
     private void deleteExtraSnapshots() {
+        deleteExtraSnapshots(m_autoSnapshots, m_retain);
+    }
+
+    /*
+     * Given a sorted list of candidate snapshots, conditionally
+     * initiates a request to @SnapshotDelete to delete sufficient
+     * number of snapshots to get the list down to the desired
+     * length.
+     *
+     * Generally this is processing automatic snapshots, but
+     * during startup it may prune terminus snapshots.
+     *
+     * Returns false if there's no need to delete anything (and
+     * state will be WAITING).  Returns true if we have initiated
+     * deletion (and state will now be DELETING).
+     */
+    private boolean deleteExtraSnapshots(LinkedList<Snapshot> candidates, int retainCount) {
         assert Thread.currentThread().getId() == m_snapshotThreadId;
 
-        if (m_snapshots.size() <= m_retain) {
+        int deleteCount = candidates.size() - retainCount;
+        if (deleteCount <= 0) {
             setState(State.WAITING);
-        } else {
-            m_lastSysprocInvocation = System.currentTimeMillis();
-            setState(State.DELETING);
-
-            final int numberToDelete = m_snapshots.size() - m_retain;
-            String[] pathsToDelete = new String[numberToDelete];
-            String[] noncesToDelete = new String[numberToDelete];
-            for (int ii = 0; ii < numberToDelete; ii++) {
-                final Snapshot s = m_snapshots.poll();
-                pathsToDelete[ii] = s.path;
-                noncesToDelete[ii] = s.nonce;
-                SNAP_LOG.info("Snapshot daemon deleting " + s.nonce);
-            }
-
-            Object[] params = new Object[] { pathsToDelete,
-                                             noncesToDelete,
-                                             SnapshotPathType.SNAP_AUTO.toString() };
-            long handle = m_nextCallbackHandle++;
-            m_procedureCallbacks.put(handle, new ProcedureCallback() {
-                @Override
-                public void clientCallback(final ClientResponse clientResponse)
-                        throws Exception {
-                    processClientResponsePrivate(clientResponse);
-                }
-            });
-            m_initiator.initiateSnapshotDaemonWork("@SnapshotDelete", handle, params);
+            return false;
         }
+
+        m_lastSysprocInvocation = System.currentTimeMillis();
+        setState(State.DELETING);
+
+        String[] pathsToDelete = new String[deleteCount];
+        String[] noncesToDelete = new String[deleteCount];
+        for (int ii=0; ii<deleteCount; ii++) {
+            Snapshot snap = candidates.poll();
+            pathsToDelete[ii] = snap.path;
+            noncesToDelete[ii] = snap.nonce;
+            SNAP_LOG.info("Snapshot daemon deleting " + snap.nonce);
+        }
+
+        Object[] params = new Object[] { pathsToDelete,
+                                         noncesToDelete,
+                                         SnapshotPathType.SNAP_AUTO.toString() };
+        long handle = m_nextCallbackHandle++;
+        m_procedureCallbacks.put(handle, new ProcedureCallback() {
+            @Override
+            public void clientCallback(final ClientResponse clientResponse)
+                throws Exception {
+                processDeleteResponse(clientResponse);
+            }
+        });
+
+        m_initiator.initiateSnapshotDaemonWork("@SnapshotDelete", handle, params);
+        return true;
     }
 
     /*
@@ -1652,8 +1688,18 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         return m_state;
     }
 
-    void setState(State state) {
+    private void setState(State state) {
         m_state = state;
+    }
+
+    private void changeState(State from, State to, String what) {
+        if (m_state != from) {
+            String err = String.format("Response to %s request being processed in state %s, expected state %s",
+                                       what, m_state, from);
+            SNAP_LOG.warn(err);
+            throw new RuntimeException(err);
+        }
+        m_state = to;
     }
 
     public void shutdown() throws InterruptedException {

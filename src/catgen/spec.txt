@@ -345,8 +345,8 @@ begin SnapshotSchedule javaonly "A schedule for the database to follow when crea
   bool enabled                  "Is this auto snapshot schedule enabled?"
   string frequencyUnit          "Unit of time frequency is specified in"
   int frequencyValue            "Frequency in some unit"
-  int retain                    "How many snapshots to retain"
-  string prefix                 "Prefix for snapshot filenames"
+  int retain                    "How many auto snapshots to retain"
+  string prefix                 "Prefix for auto snapshot filenames"
 end
 
 begin TaskParameter javaonly

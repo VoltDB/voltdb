@@ -45,8 +45,11 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestName;
 import org.mockito.ArgumentCaptor;
+
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.network.Connection;
 import org.voltcore.network.WriteStream;
@@ -128,8 +131,12 @@ public class TestSnapshotDaemon {
     protected SnapshotIOAgent m_ioAgent;
     protected MockVoltDB m_mockVoltDB;
 
+    @Rule
+    public final TestName m_name = new TestName();
+
     @Before
     public void setUp() throws Exception {
+        System.out.printf("-=-=-=--=--=-=- Start of test %s -=-=-=--=--=-=-\n", m_name.getMethodName());
         SnapshotDaemon.m_periodicWorkInterval = 100;
         SnapshotDaemon.m_minTimeBetweenSysprocs = 1000;
     }
@@ -141,6 +148,7 @@ public class TestSnapshotDaemon {
         m_mockVoltDB = null;
         m_daemon = null;
         m_initiator = null;
+        System.out.printf("-=-=-=--=--=-=- End of test %s -=-=-=--=--=-=-\n", m_name.getMethodName());
     }
 
     public SnapshotDaemon getSnapshotDaemon(boolean wantFakeResponses) throws Exception {
@@ -686,6 +694,15 @@ public class TestSnapshotDaemon {
     }
 
     public Callable<ClientResponseImpl> getSuccessfulScanThreeResults(final long handle) {
+        return threeResults("woobie", handle, SnapshotPathType.SNAP_PATH);
+    }
+
+    public Callable<ClientResponseImpl> getShutdownScanThreeResults(final long handle) {
+        return threeResults("SHUTDOWN", handle, SnapshotPathType.SNAP_AUTO);
+    }
+
+    private Callable<ClientResponseImpl> threeResults(String prefix, long handle, SnapshotPathType type) {
+
         ClientResponseImpl response = new ClientResponseImpl() {
 
             @Override
@@ -698,19 +715,19 @@ public class TestSnapshotDaemon {
                 VoltTable resultTable = new VoltTable(SnapshotScanAgent.clientColumnInfo);
                 resultTable.addRow(
                         "/tmp",
-                        "woobie_2",
-                        2,
-                        2,
+                        prefix + "_2",
+                        2, // txnid
+                        2, // created
                         0,
                         "",
                         "",
                         "",
                         "",
-                        SnapshotPathType.SNAP_PATH.toString()
+                        type.toString()
                         );
                 resultTable.addRow(
                         "/tmp",
-                        "woobie_5",
+                        prefix + "_5",
                         5,
                         5,
                         0,
@@ -718,11 +735,11 @@ public class TestSnapshotDaemon {
                         "",
                         "",
                         "",
-                        SnapshotPathType.SNAP_PATH.toString()
+                        type.toString()
                         );
                 resultTable.addRow(
                         "/tmp",
-                        "woobie_3",
+                        prefix + "_3",
                         3,
                         3,
                         0,
@@ -730,7 +747,7 @@ public class TestSnapshotDaemon {
                         "",
                         "",
                         "",
-                        SnapshotPathType.SNAP_PATH.toString()
+                        type.toString()
                         );
                 return new VoltTable[] { resultTable, null, null };
             }
@@ -795,7 +812,7 @@ public class TestSnapshotDaemon {
 
         daemon.processClientResponse(getFailureResponse(handle)).get();
         assertNull(m_initiator.procedureName);
-        assertEquals(daemon.getState(), SnapshotDaemon.State.WAITING);
+        assertEquals(SnapshotDaemon.State.WAITING, daemon.getState());
 
         daemon = getBasicDaemon(false);
 
@@ -803,7 +820,7 @@ public class TestSnapshotDaemon {
         daemon.processClientResponse(getSuccessfulScanThreeResults(handle)).get();
         daemon.processClientResponse(getErrMsgResponse(1));
         Thread.sleep(60);
-        assertEquals(daemon.getState(), SnapshotDaemon.State.WAITING);
+        assertEquals(SnapshotDaemon.State.WAITING, daemon.getState());
     }
 
     @Test
@@ -842,7 +859,7 @@ public class TestSnapshotDaemon {
         handle = m_initiator.clientData;
         m_initiator.clear();
         daemon.processClientResponse(getErrMsgResponse(handle)).get();
-        assertEquals(daemon.getState(), SnapshotDaemon.State.WAITING);
+        assertEquals(SnapshotDaemon.State.WAITING, daemon.getState());
 
         daemon = getBasicDaemon(false);
 
@@ -965,5 +982,36 @@ public class TestSnapshotDaemon {
         Thread.sleep(1200);
         assertNotNull(m_initiator.procedureName);
         assertTrue("@SnapshotDelete".equals(m_initiator.procedureName));
+    }
+
+    @Test
+    public void testShutdownGrooming() throws Exception {
+        SnapshotDaemon daemon = getBasicDaemon(false);
+        long handle = m_initiator.clientData;
+        m_initiator.clear();
+
+        // Process @SnapshotScan results: 3 shutdown snapshots found.
+        // Expect daemon should delete oldest one.
+        daemon.processClientResponse(getShutdownScanThreeResults(handle)).get();
+        assertNotNull(m_initiator.procedureName);
+        assertTrue("@SnapshotDelete".equals(m_initiator.procedureName));
+
+        String[] paths = (String[])(m_initiator.params[0]);
+        String[] nonces = (String[])(m_initiator.params[1]);
+        assertEquals("bad paths count", 1, paths.length);
+        assertEquals("bad nonces count", 1, nonces.length);
+        assertTrue("bad path", "/tmp".equals(paths[0]));
+        assertTrue("bad nonce", "SHUTDOWN_2".equals(nonces[0]));
+
+        handle = m_initiator.clientData;
+        m_initiator.clear();
+        Thread.sleep(60);
+        assertNull(m_initiator.procedureName);
+
+        // Process @SnapshotDelete results.
+        // Expect daemon to enter WAITING state
+        daemon.processClientResponse(getSuccessResponse(999, handle)).get();
+        assertNull(m_initiator.procedureName);
+        assertEquals(SnapshotDaemon.State.WAITING, daemon.getState());
     }
 }
