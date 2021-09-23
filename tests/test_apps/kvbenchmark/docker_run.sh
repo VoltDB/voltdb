@@ -56,7 +56,7 @@ if [ $? != 0 ]; then
     echo "loading ddl"
     voltdb/bin/sqlcmd --servers=$SERVERS $SPORT $SSLOPT < ddl.sql
     if [ "$DR" != "" ]; then
-        voltdb/bin/sqlcmd --servers=$SERVERS $SPORT $SSLOPT --query="DR TABLE STORE"
+        voltdb/bin/sqlcmd --servers=$SERVERS $SPORT $SSLOPT --query="DR TABLE STORE; DR TABLE EXTRAS"
     fi
 
 
@@ -92,5 +92,3 @@ $JAVA -classpath kvbenchmark.jar:${VJAR}:${APPCLASSPATH} -Dlog4j.configuration=$
         --password=$PASSWORD \
         --statsfile=$STATSFILE \
         --topologyaware=$TOPOLOGYAWARE
-
-
