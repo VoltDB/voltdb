@@ -784,8 +784,10 @@ function convertOverlayData(data) {
 }
 
 function logout() {
+  console.log('Logged out');
   saveSessionCookie("username", null);
-  saveSessionCookie("password", null)
+  saveSessionCookie("password", null);
+  saveSessionCookie("role", null)
   saveSessionCookie("current-tab", NavigationTabs.DBMonitor);
   $("#logOut").prop("title", "");
   location.href = "/logout";
@@ -4488,6 +4490,7 @@ var adjustExporterGraphSpacing = function () {
     var checkServerConnection = function () {
       if (!VoltDbUI.isConnectionChecked) {
         VoltDbUI.isConnectionChecked = true;
+        voltDbRenderer.checkRolesUpdate();
         voltDbRenderer.CheckServerConnection(function (result) {
           if (result == false) {
             VoltDBCore.isServerConnected = false;

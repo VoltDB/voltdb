@@ -5066,6 +5066,7 @@ function loadAdminPage() {
         this.isExportLoading = false;
         this.isCommandLogEnabled = false;
         this.isAdmin = false;
+        this.isRoleChanged = false;
         this.registeredElements = [];
         this.servers = [];
         this.stoppedServer = "";
