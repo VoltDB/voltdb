@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,9 +23,9 @@
 
 package org.voltdb.exportclient;
 
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -498,7 +498,7 @@ public class TestExportToFileClient extends ExportClientTestBase {
         decoder.onBlockCompletion(row);
 
 
-        boolean validName = true;
+        String invalidName = null;
         final File dir = new File(m_dir);
         final File[] subdirs = dir.listFiles();
 
@@ -513,13 +513,17 @@ public class TestExportToFileClient extends ExportClientTestBase {
                 }
             }
             for (File file : allFiles) {
-                if (!(file.getName().matches("\\d\\-mytable\\-\\(\\d\\)\\.[a-z]{3}")||file.getName().matches("\\d\\-mytable\\-\\(\\d\\)-schema\\.json"))) {
-                    validName = false;
+                String name = file.getName();
+                if (!(name.matches("\\d{19}\\-mytable\\-\\(\\d\\)\\.[a-z]{3}") ||
+                      name.matches("\\d{19}\\-mytable\\-\\(\\d\\)-schema\\.json"))) {
+                    invalidName = name;
                     break;
                 }
             }
         }
-        assertTrue(validName);
+
+        String failMsg = String.format("invalid name: %s", invalidName);
+        assertNull(failMsg, invalidName);
     }
 
     @Test
@@ -555,7 +559,7 @@ public class TestExportToFileClient extends ExportClientTestBase {
         decoder.processRow(row);
         decoder.onBlockCompletion(row);
 
-        boolean validName = true;
+        String invalidName = null;
         final File dir = new File(m_dir);
         final File[] subdirs = dir.listFiles();
 
@@ -570,13 +574,17 @@ public class TestExportToFileClient extends ExportClientTestBase {
                 }
             }
             for (File file : allFiles) {
-                if (!(file.getName().matches("\\d\\-mytable\\.[a-z]{3}") || file.getName().matches("\\d\\-mytable-schema\\.json"))) {
-                    validName = false;
+                String name = file.getName();
+                if (!(name.matches("\\d{19}\\-mytable\\.[a-z]{3}") ||
+                      name.matches("\\d{19}\\-mytable-schema\\.json"))) {
+                    invalidName = name;
                     break;
                 }
             }
         }
-        assertTrue(validName);
+
+        String failMsg = String.format("invalid name: %s", invalidName);
+        assertNull(failMsg, invalidName);
     }
 
     @Test
