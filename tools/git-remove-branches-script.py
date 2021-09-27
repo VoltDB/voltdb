@@ -17,10 +17,11 @@ import subprocess
 import sys
 import time
 import traceback
+import os
 
-
+dryrun=sys.argv[1]
 # set exclusions if there are any branches that should not be listed
-exclusions = ['^master','^release-[1-9]?[0-9.]+\.x$']
+exclusions = ['^master','^release-[1-9]?[0-9.]+\.x$','^release-[1-9]?[0-9.]?[0-9]?']
 combined_regex= '(' + ')|('.join(exclusions) + ')'
 jira_url = 'https://issues.voltdb.com/'
 gitshowmap = \
@@ -41,7 +42,7 @@ def get_release_branches():
     git_cmd = 'git branch -r'
     print ('#\n# git command: %s\n#' % git_cmd)
     (returncode, stdout, stderr) = run_cmd (git_cmd)
-    return [b.strip() for b in stdout.splitlines() if b.strip().find('origin/release-') == 0 and b.strip()[-2:] == '.x']
+    return [b.strip() for b in stdout.splitlines() if b.strip().find('origin/release-') == 0 ]
 
 def get_branch_list(merged, base=None):
     branches=[]
@@ -278,6 +279,7 @@ if __name__ == "__main__":
     # Initialize the list of branch names (or substrings) to be skipped, i.e.,
     # branches whose names contain any of these strings will not be deleted
     # (or listed for possible deletion)
+    print "##dryrun is %s" % dryrun
     skip_branch_names = ['keep', 'feature', 'integ']
     if options.keep_branches:
         skip_branch_names.extend(options.keep_branches.split(','))
@@ -286,10 +288,19 @@ if __name__ == "__main__":
     branch_names = get_branch_list(options.merged, options.release)
     format_string = DELIMITER.join([gitshowmap[key] for key in sorted(gitshowmap)])
     #Iterate over it and get a bunch of commit information using git log
+
+    print "branch_names is %s" % branch_names
     branch_infos = []
     for b in branch_names:
-        branch_info = {}
-        branch_info['name'] = b.split('/')[1]
+        if b.find("/refs/tags/") != -1:
+            print "##Skip tag!"
+            break
+        elif b.find("origin/feature") != -1:
+           branch_info = {}
+           branch_info['name'] = b.split('/')[2] 
+        else:
+            branch_info = {}
+            branch_info['name'] = b.split('/')[1]
 
         #Get the git log info and pack it into a branch_info dictionary
         cmd = 'git log -1 --format=%s %s' % (format_string, b)
