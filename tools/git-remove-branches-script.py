@@ -289,7 +289,8 @@ if __name__ == "__main__":
     format_string = DELIMITER.join([gitshowmap[key] for key in sorted(gitshowmap)])
     #Iterate over it and get a bunch of commit information using git log
 
-    print "branch_names is %s" % branch_names
+    print "##branch_names is %s" % branch_names
+
     branch_infos = []
     for b in branch_names:
         if b.find("/refs/tags/") != -1:
