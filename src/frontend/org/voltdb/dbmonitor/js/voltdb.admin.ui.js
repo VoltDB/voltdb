@@ -1253,7 +1253,6 @@ function loadAdminPage() {
                         //reload the page if security is enabled, user is asked to login upon reload action if user session no longer exist
                         if (adminConfigurations.security.enabled){
                             logout();
-                            window.location.reload();
                         }
 
                         //Reload Admin configurations for displaying the updated value
