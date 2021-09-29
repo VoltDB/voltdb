@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<deployment>
+    <!--  simplest single-cluster config / -->
+    <cluster hostcount="1" sitesperhost="2"/>
+    <commandlog enabled="true" />
+</deployment>
