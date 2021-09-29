@@ -784,10 +784,13 @@ function convertOverlayData(data) {
 }
 
 function logout() {
-  console.log('Logged out');
   saveSessionCookie("username", null);
   saveSessionCookie("password", null);
-  saveSessionCookie("role", null)
+  if(VoltDbAdminConfig.isRoleChanged){
+    saveSessionCookie("role", -1);
+  }else{
+    saveSessionCookie("role", null);
+  }
   saveSessionCookie("current-tab", NavigationTabs.DBMonitor);
   $("#logOut").prop("title", "");
   location.href = "/logout";

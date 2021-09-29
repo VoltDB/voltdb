@@ -501,7 +501,8 @@
                 },
                 statusCode:{
                     401: function(response){
-                        alert('Failed to authenticate to the server. Please authenticate again in next window.')
+                        saveSessionCookie("password",-1);
+                        // alert('Failed to authenticate to the server. Please authenticate again in next window.')
                     }
                 },
                 timeout: 60000

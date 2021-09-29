@@ -159,6 +159,8 @@ function set_kubernetes(server,port){
         '<div id="loginBoxDialogue" style="overflow: hidden" >' +
         '<div class="overlay-title">Login</div>' +
         '<div id="UnableToLoginMsg" style="padding: 5px 0 0 20px; color: #ff0000; display: none;">Unable to connect. Please try to login using another username/password.</div>' +
+        '<div id="PasswordChangeMsg" style="padding: 5px 0 0 20px; color: #ff0000; display: none;">Your password has been changed. Please login with new credentials.</div>' +
+        '<div id="RoleChangeMsg" style="padding: 5px 0 0 20px; color: #ff0000; display: none;">Your role has been changed. Please login again.</div>' +
         '<div class="clear"></div>' +
         '<div  class="overlay-content" style="height:auto; min-width: auto; padding: 0" >' +
         '<div id="loginBox">' +
@@ -182,7 +184,17 @@ function set_kubernetes(server,port){
       $("#username").data("portid", portId);
       $("#loginBoxDialogue").hide();
       $("#loginLink").popup({
-        open: function (event, ui, ele) {},
+        open: function (event, ui, ele) {
+          var roleUpdated = parseInt(VoltDbUI.getCookie("role"));
+          var passwordUpdated = parseInt(VoltDbUI.getCookie("password"))
+          if(roleUpdated === -1){
+            $("#RoleChangeMsg").show();
+          }
+
+          if(passwordUpdated === -1){
+            $("#PasswordChangeMsg").show();
+          }
+        },
         login: function (popupCallback) {
           $("#overlay").show();
           $("#UnableToLoginMsg").hide();
@@ -211,6 +223,8 @@ function set_kubernetes(server,port){
 
               $("#overlay").hide();
               if (result) {
+                $("#RoleChangeMsg").hide();
+                $("#PasswordChangeMsg").hide();
                 //Save user details to cookie.
                 set_kubernetes($(location).attr("hostname"),$(location).attr("port"));
                 loadAdminPage();
@@ -893,7 +907,7 @@ function set_kubernetes(server,port){
         VoltDbAdminConfig.isRoleChanged = isRoleChanged;
 
         if(isRoleChanged){
-          alert("Security settings has been changed. Please, re-authenticate in next window.");
+          $("#roleChange").popup();
           logout();
         }
       });
