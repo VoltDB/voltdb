@@ -189,10 +189,12 @@ function set_kubernetes(server,port){
           var passwordUpdated = parseInt(VoltDbUI.getCookie("password"))
           if(roleUpdated === -1){
             $("#RoleChangeMsg").show();
+            saveSessionCookie("role",null);
           }
 
           if(passwordUpdated === -1){
             $("#PasswordChangeMsg").show();
+            saveSessionCookie("password",null);
           }
         },
         login: function (popupCallback) {
@@ -212,6 +214,7 @@ function set_kubernetes(server,port){
             passwordVal,
             true,
             function (result, response) {
+              console.log(result, response);
               if (
                 responseObtained ||
                 (response != undefined &&
@@ -230,6 +233,7 @@ function set_kubernetes(server,port){
                 loadAdminPage();
                 saveSessionCookie("username", usernameVal);
                 saveSessionCookie("password",passwordVal);
+                // saveSessionCookie("role",'user');
                 VoltDBService.GetShortApiDeployment(function (connection) {
                   var currentUserRole = "user";
                   var rawData = connection.Metadata["SHORTAPI_DEPLOYMENT"];
@@ -239,6 +243,7 @@ function set_kubernetes(server,port){
                   if(usersList !== null){
                     currentUserRole = usersList.filter(user => user.name === usernameVal)[0].roles;
                   }
+                  console.log(currentUserRole);
                   saveSessionCookie("role",currentUserRole)
                 })
                 voltDbRenderer.ShowUsername(usernameVal);
@@ -252,6 +257,9 @@ function set_kubernetes(server,port){
                 $("#logOut").css("display", "block");
                 $("#logOut").prop("title", VoltDbUI.getCookie("username"));
               } else {
+                $("#RoleChangeMsg").hide();
+                $("#PasswordChangeMsg").hide();
+
                 //Error: Server is not available(-100) or Connection refused(-5) but is not "Authentication rejected(-3)"
                 if (response != undefined && response.status != -3) {
                   popupCallback();
@@ -897,18 +905,19 @@ function set_kubernetes(server,port){
 
     this.checkRolesUpdate = function(){
       VoltDBService.GetShortApiDeployment(function (connection) {
-        var rawData = connection.Metadata["SHORTAPI_DEPLOYMENT"];
-        var currentUser = VoltDbUI.getCookie("username");
         var currentUserRole = VoltDbUI.getCookie("role");
-        var usersList = rawData !== undefined ? rawData.users.user : null;
-        var updatedUserRole = usersList !== null ? usersList.filter(user => user.name === currentUser)[0].roles : 'user';
-        var isRoleChanged = currentUserRole === updatedUserRole ? false : true;
+        var currentUser = VoltDbUI.getCookie("username");
 
-        VoltDbAdminConfig.isRoleChanged = isRoleChanged;
+        if(currentUserRole !== 'null'){
+          var rawData = connection.Metadata["SHORTAPI_DEPLOYMENT"];
+          var usersList = rawData !== undefined ? rawData.users.user : null;
+          var updatedUserRole = usersList !== null ? usersList.filter(user => user.name === currentUser)[0].roles : 'user';
+          var isRoleChanged = currentUserRole === updatedUserRole ? false : true;
 
-        if(isRoleChanged){
-          $("#roleChange").popup();
-          logout();
+          VoltDbAdminConfig.isRoleChanged = isRoleChanged;
+          if(isRoleChanged){
+            logout();
+          }
         }
       });
     }
@@ -921,8 +930,6 @@ function set_kubernetes(server,port){
       ) {
         var data = connection.Metadata["SHORTAPI_DEPLOYMENT"];
         var usersList = data.users;
-
-        // checkRolesUpdate(data)
 
         //The user does not have permission to view admin details.
         if(usersList === null){

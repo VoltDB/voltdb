@@ -4490,10 +4490,13 @@ var adjustExporterGraphSpacing = function () {
         );
       });
 
+    setInterval(()=>{
+      voltDbRenderer.checkRolesUpdate();
+    },3000)
+    
     var checkServerConnection = function () {
       if (!VoltDbUI.isConnectionChecked) {
         VoltDbUI.isConnectionChecked = true;
-        voltDbRenderer.checkRolesUpdate();
         voltDbRenderer.CheckServerConnection(function (result) {
           if (result == false) {
             VoltDBCore.isServerConnected = false;
