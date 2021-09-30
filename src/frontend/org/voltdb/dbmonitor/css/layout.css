@@ -4845,3 +4845,21 @@ table.dataTable {top:0;}
     padding-top: 0.3rem;
     font-size: 1rem;
 }
+
+.errMsgBox {
+    width: auto;
+    height: 40px;
+    background: #EAEAEA;
+    border-left:5px;
+    border-style: solid;
+    border-color: #F43C3C;
+    display: flex;
+    align-items: center;
+}
+
+.errMsg {
+    font-size: 12px;
+    line-height: 19px;
+    padding: 0px 10px;
+    text-align: center;
+}

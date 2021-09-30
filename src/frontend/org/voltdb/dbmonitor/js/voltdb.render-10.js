@@ -158,9 +158,9 @@ function set_kubernetes(server,port){
         "<!-- POPUP Login -->" +
         '<div id="loginBoxDialogue" style="overflow: hidden" >' +
         '<div class="overlay-title">Login</div>' +
-        '<div id="UnableToLoginMsg" style="padding: 5px 0 0 20px; color: #ff0000; display: none;">Unable to connect. Please try to login using another username/password.</div>' +
-        '<div id="PasswordChangeMsg" style="padding: 5px 0 0 20px; color: #ff0000; display: none;">Your password has been changed. Please login with new credentials.</div>' +
-        '<div id="RoleChangeMsg" style="padding: 5px 0 0 20px; color: #ff0000; display: none;">Your role has been changed. Please login again.</div>' +
+        '<div id="UnableToLoginMsg" class="errMsgBox" style=" display: none;"><div class="errMsg">Unable to connect. Please try to login using another username/password.</div></div>' +
+        '<div id="PasswordChangeMsg" class="errMsgBox" style="display: none;"><div class="errMsg">Your credentials has been changed. Please login with new credentials.</div></div>' +
+        '<div id="RoleChangeMsg" class="errMsgBox" style="display: none;"><div class="errMsg">Your role has been changed. Please login again.</div></div>' +
         '<div class="clear"></div>' +
         '<div  class="overlay-content" style="height:auto; min-width: auto; padding: 0" >' +
         '<div id="loginBox">' +
