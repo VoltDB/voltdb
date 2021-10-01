@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,6 +17,7 @@
 
 package org.voltdb;
 
+import java.net.InetSocketAddress;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
@@ -57,6 +58,10 @@ public class VoltNTSystemProcedure extends VoltNonTransactionalProcedure {
 
     protected void noteRestoreCompleted() {
         m_runner.noteRestoreCompleted();
+    }
+
+    public InetSocketAddress getRemoteAddress() {
+        return m_runner.getRemoteAddress();
     }
 
     protected ProcedureRunnerNT getProcedureRunner() {

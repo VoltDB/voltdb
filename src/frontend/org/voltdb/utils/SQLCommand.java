@@ -55,8 +55,8 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
 import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.VoltType;
 import org.voltdb.client.BatchTimeoutOverrideType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
@@ -1312,6 +1312,8 @@ public class SQLCommand {
                 ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<>())
                         .put(1, Arrays.asList("varchar"))
                         .put(2, Arrays.asList("varchar", "varchar")).build());
+        Procedures.put("@Note",
+                ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
     }
 
     private static Client getClient(ClientConfig config, String[] servers, int port) throws Exception {

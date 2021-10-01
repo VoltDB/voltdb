@@ -99,7 +99,14 @@ public class SystemProcedureCatalog {
         }
 
         static Builder createNp(String className) {
-            return new Builder(className, Initiator.MULTI_PARTITION, 0, VoltType.INVALID, false, Restartability.NOT_APPLICABLE).notDurable();
+            return createNp(className, 0, VoltType.INVALID);
+        }
+
+        static Builder createNp(String className, VoltType partitionParamType) {
+            return createNp(className, 0, partitionParamType);
+        }
+        static Builder createNp(String className, int partitionParam, VoltType partitionParamType) {
+            return new Builder(className, Initiator.MULTI_PARTITION, partitionParam, partitionParamType, false, Restartability.NOT_APPLICABLE).notDurable();
         }
 
         static Builder createEverySite(String className, int partitionParam, VoltType partitionParamType) {
@@ -711,6 +718,11 @@ public class SystemProcedureCatalog {
         builder.put("@TopicDirectInsertSP",
                 Builder.createSp("org.voltdb.sysprocs.TopicDirectInsertSP", -1, VoltType.INVALID)
                         .commercial().build());
+
+        builder.put("@Note",
+                Builder.createNp("org.voltdb.sysprocs.LogNote", VoltType.STRING).allowedInReplica().build());
+        builder.put("@LogNoteOnHost",
+                Builder.createNp("org.voltdb.sysprocs.LogNote$LogNoteOnHost", VoltType.STRING).allowedInReplica().build());
 
         builder.put("@ValidateDeployment",
                 new Config("org.voltdb.sysprocs.ValidateDeployment",
