@@ -213,7 +213,6 @@ function set_kubernetes(server,port){
             passwordVal,
             true,
             function (result, response) {
-              console.log(result, response);
               if (
                 responseObtained ||
                 (response != undefined &&
@@ -242,7 +241,6 @@ function set_kubernetes(server,port){
                   if(usersList !== null){
                     currentUserRole = usersList.filter(user => user.name === usernameVal)[0].roles;
                   }
-                  console.log(currentUserRole);
                   saveSessionCookie("role",currentUserRole)
                 })
                 voltDbRenderer.ShowUsername(usernameVal);
