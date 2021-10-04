@@ -70,6 +70,7 @@ import org.voltdb.messaging.SnapshotCheckRequestMessage;
 import org.voltdb.messaging.SnapshotCheckResponseMessage;
 import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
+import org.voltdb.utils.TimeUtils;
 import org.voltdb.utils.VoltTableUtil;
 
 import com.google_voltpatches.common.base.Throwables;
@@ -1216,23 +1217,9 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             m_autoPrefix = schedule.getPrefix();
 
             int frequency = schedule.getFrequencyvalue();
-            char frequencyUnit = schedule.getFrequencyunit().toLowerCase().charAt(0);
-            TimeUnit timeUnit;
-            switch (frequencyUnit) {
-            case 's':
-                timeUnit = TimeUnit.SECONDS;
-                break;
-            case 'm':
-                timeUnit = TimeUnit.MINUTES;
-                break;
-            case 'h':
-                timeUnit = TimeUnit.HOURS;
-                break;
-            default:
-                throw new RuntimeException("Frequency unit '" + frequencyUnit +
-                                           "' in snapshot schedule is not one of s,m,h");
-            }
+            TimeUnit timeUnit = TimeUtils.convertTimeUnit(schedule.getFrequencyunit());
             m_frequencyInMillis = timeUnit.toMillis(frequency);
+
             m_nextSnapshotTime = System.currentTimeMillis() + m_frequencyInMillis;
         }
 

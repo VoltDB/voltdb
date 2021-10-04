@@ -79,7 +79,6 @@ public class TestExportToFileClient extends ExportClientTestBase {
         } catch (IOException e) {
             fail(e.getMessage());
         }
-        System.setProperty("__EXPORT_FILE_ROTATE_PERIOD_UNIT__", TimeUnit.SECONDS.name());
         ExportToFileClient.TEST_VOLTDB_ROOT = m_dir;
         VoltDB.replaceVoltDBInstanceForTest(s_mockVoltDB);
     }
@@ -180,6 +179,43 @@ public class TestExportToFileClient extends ExportClientTestBase {
     }
 
     @Test
+    public void testPeriodUnits() throws Exception
+    {
+        unitTest("123s", 123);
+        unitTest("123m", 123 * 60);
+        unitTest("123h", 123 * 60 * 60);
+        unitTest("123d", 123 * 60 * 60 * 24);
+        unitTest("123",  123 * 60); // default to minutes
+        unitTest("123x", -1); // fail
+    }
+
+    private void unitTest(String value, int expected) {
+        ExportToFileClient client = new ExportToFileClient();
+        String nonce = "TEST_" + value;
+        try {
+            Properties props = new Properties();
+            props.put("nonce", nonce);
+            props.put("period", value);
+            client.configure(props);
+        }
+        catch (Exception ex) {
+            if (expected < 0) {
+                System.out.printf("%s failed as expected: %s\n", nonce, ex.getMessage());
+            } else {
+                fail(String.format("%s threw unexpected exception: %s", nonce, ex));
+            }
+            return;
+        }
+        if (expected < 0) {
+            fail(String.format("%s was expected to fail but resulted in %s", nonce, client.m_periodSecs));
+        }
+        else {
+            assertEquals(String.format("%s gave unexpected result %s", nonce, client.m_periodSecs),
+                         expected, client.m_periodSecs);
+        }
+    }
+
+    @Test
     public void testFileRollingUnbatched() throws Exception
     {
         final long startTs = System.currentTimeMillis();
@@ -188,7 +224,7 @@ public class TestExportToFileClient extends ExportClientTestBase {
         props.put("nonce", Long.toString(System.currentTimeMillis()));
         props.put("type", "csv");
         props.put("outdir", m_dir);
-        props.put("period", "1"); // 1 second rolling period
+        props.put("period", "1s"); // 1 second rolling period
         client.configure(props);
 
         final AdvertisedDataSource source = constructTestSource(false, 0);
@@ -249,7 +285,7 @@ public class TestExportToFileClient extends ExportClientTestBase {
         props.put("nonce", Long.toString(System.currentTimeMillis()));
         props.put("type", "csv");
         props.put("outdir", m_dir);
-        props.put("period", "1"); // 1 second rolling period
+        props.put("period", "1s"); // 1 second rolling period
         props.put("batched", "true");
         client.configure(props);
 
@@ -311,7 +347,7 @@ public class TestExportToFileClient extends ExportClientTestBase {
         props.put("nonce", Long.toString(System.currentTimeMillis()));
         props.put("type", "csv");
         props.put("outdir", m_dir);
-        props.put("period", "100"); // 100 second rolling period
+        props.put("period", "100s"); // 100 second rolling period
         props.put("with-schema", "false"); // disable write JSON representation
         client.configure(props);
 
@@ -365,7 +401,7 @@ public class TestExportToFileClient extends ExportClientTestBase {
         props.put("nonce", Long.toString(System.currentTimeMillis()));
         props.put("type", "csv");
         props.put("outdir", m_dir);
-        props.put("period", "1"); // 1 second rolling period
+        props.put("period", "1s"); // 1 second rolling period
         props.put("with-schema", "true"); // enable write JSON representation
         client.configure(props);
 
@@ -417,7 +453,7 @@ public class TestExportToFileClient extends ExportClientTestBase {
         props.put("nonce", Long.toString(System.currentTimeMillis()));
         props.put("type", "csv");
         props.put("outdir", m_dir);
-        props.put("period", "1"); // 1 second rolling period
+        props.put("period", "1s"); // 1 second rolling period
         props.put("with-schema", "true"); // enable write JSON representation
         client.configure(props);
 
@@ -472,7 +508,7 @@ public class TestExportToFileClient extends ExportClientTestBase {
         props.put("nonce", Long.toString(System.currentTimeMillis()));
         props.put("type", "csv");
         props.put("outdir", m_dir);
-        props.put("period", "1"); // 1 second rolling period
+        props.put("period", "1s"); // 1 second rolling period
         props.put("with-schema", "true");
         props.put("batched", "true");
         props.put("uniquenames", "true");
@@ -534,7 +570,7 @@ public class TestExportToFileClient extends ExportClientTestBase {
         props.put("nonce", Long.toString(System.currentTimeMillis()));
         props.put("type", "csv");
         props.put("outdir", m_dir);
-        props.put("period", "1"); // 1 second rolling period
+        props.put("period", "1s"); // 1 second rolling period
         props.put("with-schema", "true");
         props.put("batched", "true");
         props.put("uniquenames", "false");
@@ -595,7 +631,7 @@ public class TestExportToFileClient extends ExportClientTestBase {
         props.put("nonce", Long.toString(System.currentTimeMillis()));
         props.put("type", "csv");
         props.put("outdir", m_dir);
-        props.put("period", "1"); // 1 second rolling period
+        props.put("period", "1s"); // 1 second rolling period
         props.put("with-schema", "true");
         props.put("batched", "false");
         props.put("uniquenames", "true");
@@ -644,7 +680,7 @@ public class TestExportToFileClient extends ExportClientTestBase {
         props.put("nonce", Long.toString(System.currentTimeMillis()));
         props.put("type", "csv");
         props.put("outdir", m_dir);
-        props.put("period", "1"); // 1 second rolling period
+        props.put("period", "1s"); // 1 second rolling period
         props.put("with-schema", "true");
         props.put("batched", "false");
         props.put("uniquenames", "false");

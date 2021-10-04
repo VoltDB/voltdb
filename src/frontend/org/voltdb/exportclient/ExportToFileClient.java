@@ -59,6 +59,7 @@ import org.voltdb.export.ExportManagerInterface;
 import org.voltdb.export.ExportManagerInterface.ExportMode;
 import org.voltdb.exportclient.ExportDecoderBase.BinaryEncoding;
 import org.voltdb.exportclient.decode.CSVWriterDecoder;
+import org.voltdb.utils.TimeUtils;
 import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.base.Throwables;
@@ -73,8 +74,6 @@ import au.com.bytecode.opencsv_voltpatches.CSVWriter;
 public class ExportToFileClient extends ExportClientBase {
 
     private static final VoltLogger m_logger = new VoltLogger("ExportClient");
-    private static final TimeUnit TIME_PERIOD_UNIT =
-            TimeUnit.valueOf(System.getProperty("__EXPORT_FILE_ROTATE_PERIOD_UNIT__", TimeUnit.MINUTES.name()));
     private static final int EXPORT_DELIM_NUM_CHARACTERS = 4;
     private static final String DEFAULT_DATE_FORMAT = "yyyyMMddHHmmss";
 
@@ -92,10 +91,15 @@ public class ExportToFileClient extends ExportClientBase {
     protected HashMap<DecoderMetaData, ExportToFileDecoder> m_tableDecoders;
     // map of executor service to tables
     protected HashMap<String, ListeningExecutorService> m_decoderExecutor;
-    // how often to roll batches / files (in minutes)
-    protected int m_period;
-    // how long to retain rolled batches / files (in minutes)
-    protected int m_retain;
+
+    // Times are tracked in seconds for the benefit of unit test code,
+    // though the default unit for user configuration is minutes.
+
+    // how often to roll batches / files
+    protected int m_periodSecs;
+    // how long to retain rolled batches / files
+    protected int m_retainSecs;
+
     // use thread-local to avoid SimpleDateFormat thread-safety issues
     protected ThreadLocal<SimpleDateFormat> m_dateformat;
     protected String m_dateFormatOriginalString;
@@ -464,10 +468,10 @@ public class ExportToFileClient extends ExportClientBase {
             }
 
             // Prune by age of batch directory.
-            if (m_retain >= 0) {
+            if (m_retainSecs >= 0) {
                 Pattern pattern = getPatternForBatchDir();
                 ExportFilePruner pruner = new ExportFilePruner(pattern, m_dateFormatOriginalString);
-                pruner.pruneByAge(m_outDir, TIME_PERIOD_UNIT.toMillis(m_retain));
+                pruner.pruneByAge(m_outDir, TimeUnit.SECONDS.toMillis(m_retainSecs));
             }
         }
 
@@ -503,10 +507,10 @@ public class ExportToFileClient extends ExportClientBase {
             // regardless of whether we just renamed a file for any given table.
             // If we ever do pruning by retention count, we would need to do
             // them one table at a time; move this code into the rename loop.
-            if (m_retain >= 0) {
+            if (m_retainSecs >= 0) {
                 Pattern pattern = getFilenamePattern(null);
                 ExportFilePruner pruner = new ExportFilePruner(pattern, m_dateFormatOriginalString);
-                pruner.pruneByAge(m_dirContainingFiles, TIME_PERIOD_UNIT.toMillis(m_retain));
+                pruner.pruneByAge(m_dirContainingFiles, TimeUnit.SECONDS.toMillis(m_retainSecs));
             }
         }
 
@@ -943,21 +947,24 @@ public class ExportToFileClient extends ExportClientBase {
 
         boolean skipinternal = Boolean.parseBoolean(conf.getProperty("skipinternals", "false"));
 
-        int period = Integer.parseInt(conf.getProperty("period", "60"));
-        if (period <= 0) {
+        // "period" and "retain" can optionally have a unit indication m, h, or d
+        // if absent, assumed to be 'm' for back-compatibility
+
+        int periodSecs = TimeUtils.convertIntTimeAndUnit(conf.getProperty("period", "60"), TimeUnit.SECONDS, TimeUnit.MINUTES);
+        if (periodSecs <= 0) {
             throw new IllegalArgumentException("Error: Specified value for 'period' must be greater than 0.");
         }
 
-        int retain = -1; // negative: no pruning
+        int retainSecs = -1; // negative: no pruning
         String retainProp = conf.getProperty("retain");
         if (retainProp != null) {
-            retain = Integer.parseInt(retainProp);
-            if (retain <= 0) {
+            retainSecs = TimeUtils.convertIntTimeAndUnit(retainProp, TimeUnit.SECONDS, TimeUnit.MINUTES);
+            if (retainSecs <= 0) {
                 throw new IllegalArgumentException("Error: Specified value for 'retain' must be greater than 0.");
             }
-            if (retain < period) {
-                String msg = String.format("Error: 'retain' value (%d) cannot be less than 'period' value (%d).",
-                                           retain, period);
+            if (retainSecs < periodSecs) {
+                String msg = String.format("Error: 'retain' value (%d secs) cannot be less than 'period' value (%d secs).",
+                                           retainSecs, periodSecs);
                 throw new IllegalArgumentException(msg);
             }
         }
@@ -991,8 +998,8 @@ public class ExportToFileClient extends ExportClientBase {
                 delimiter,
                 nonce,
                 outdir,
-                period,
-                retain,
+                periodSecs,
+                retainSecs,
                 dateformatString,
                 fullDelimiters,
                 skipinternal,
@@ -1007,8 +1014,8 @@ public class ExportToFileClient extends ExportClientBase {
                               final char delimiter,
                               final String nonce,
                               final File outdir,
-                              final int period,
-                              final int retain,
+                              final int periodSecs,
+                              final int retainSecs,
                               final String dateformatString,
                               String fullDelimiters,
                               final boolean skipinternal,
@@ -1023,8 +1030,8 @@ public class ExportToFileClient extends ExportClientBase {
         m_outDir = outdir;
         m_tableDecoders = new HashMap<>();
         m_decoderExecutor = new HashMap<>();
-        m_period = period;
-        m_retain = retain;
+        m_periodSecs = periodSecs;
+        m_retainSecs = retainSecs;
         m_dateFormatOriginalString = dateformatString;
         // SimpleDateFormat isn't threadsafe
         // ThreadLocal variables should protect them, lamely.
@@ -1057,7 +1064,7 @@ public class ExportToFileClient extends ExportClientBase {
         m_current = new PeriodicExportContext();
 
 
-        // schedule rotations every m_period minutes
+        // schedule rotations every m_periodSecs seconds
         Runnable rotator = new Runnable() {
             @Override
             public void run() {
@@ -1071,6 +1078,7 @@ public class ExportToFileClient extends ExportClientBase {
         m_scheduledFileRotatorService =
                 CoreUtils.getScheduledThreadPoolExecutor(
                         "Export file rotate timer for nonce " + nonce, 1, CoreUtils.SMALL_STACK_SIZE);
-        m_scheduledFileRotatorService.scheduleWithFixedDelay(rotator, m_period, m_period, TIME_PERIOD_UNIT);
+        m_scheduledFileRotatorService.scheduleWithFixedDelay(rotator, m_periodSecs, m_periodSecs, TimeUnit.SECONDS);
+        m_logger.infoFmt("File rotator for nonce %s will run every %s seconds", nonce, m_periodSecs);
     }
 }

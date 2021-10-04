@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -26,6 +26,7 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -48,6 +49,7 @@ import org.voltdb.settings.NodeSettings;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.InMemoryJarfile;
+import org.voltdb.utils.TimeUtils;
 import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -469,19 +471,10 @@ public class CatalogContext {
             logLines.put("snapshot-schedule1", "No schedule set for automated snapshots.");
         }
         else {
-            final String frequencyUnitString = ssched.getFrequencyunit().toLowerCase();
-            final char frequencyUnit = frequencyUnitString.charAt(0);
+            TimeUnit unit = TimeUtils.convertTimeUnit(ssched.getFrequencyunit());
             String msg = "[unknown frequency]";
-            switch (frequencyUnit) {
-            case 's':
-                msg = String.valueOf(ssched.getFrequencyvalue()) + " seconds";
-                break;
-            case 'm':
-                msg = String.valueOf(ssched.getFrequencyvalue()) + " minutes";
-                break;
-            case 'h':
-                msg = String.valueOf(ssched.getFrequencyvalue()) + " hours";
-                break;
+            if (unit != null) {
+                msg = String.format("%s %s", ssched.getFrequencyvalue(), unit.name().toLowerCase());
             }
             logLines.put("snapshot-schedule1", "Automatic snapshots enabled, saved to " + VoltDB.instance().getSnapshotPath() +
                          " and named with prefix '" + ssched.getPrefix() + "'.");

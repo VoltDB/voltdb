@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -92,6 +92,7 @@ import org.voltdb.exportclient.decode.EntityDecoder;
 import org.voltdb.exportclient.decode.NVPairsDecoder;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.HDFSUtils;
+import org.voltdb.utils.TimeUtils;
 import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.base.Charsets;
@@ -116,8 +117,6 @@ public class HttpExportClient extends ExportClientBase {
 
     // Max number of pooled HTTP connections to the endpoint
     private static final int HTTP_EXPORT_MAX_CONNS = Integer.getInteger("HTTP_EXPORT_MAX_CONNS", 20);
-    private static final TimeUnit TIME_PERIOD_UNIT =
-            TimeUnit.valueOf(System.getProperty("__EXPORT_FILE_ROTATE_PERIOD_UNIT__", TimeUnit.MINUTES.name()));
 
     static final String HmacSHA1 = "HmacSHA1";
     static final String HmacSHA256 = "HmacSHA256";
@@ -224,7 +223,9 @@ public class HttpExportClient extends ExportClientBase {
     private CloseableHttpAsyncClient m_client = HttpAsyncClients.createDefault();
     // m_batchMode is set to false in the configure() method by default
     boolean m_batchMode;
-    int m_period;
+    // we track time in seconds for the benefit of unit tests
+    // though normally the rollover period is given in hours
+    int m_periodSecs;
     boolean m_isHdfs;
     boolean m_isHttpfs;
     boolean m_isKrb;
@@ -335,7 +336,9 @@ public class HttpExportClient extends ExportClientBase {
             m_timeZone = TimeZone.getTimeZone(timeZoneID);
         }
 
-        m_period = Integer.parseInt(config.getProperty("period", "1")) * 60;
+        // We track period in seconds for the benefit of unit test code; the default config unit is hours
+        m_periodSecs = TimeUtils.convertIntTimeAndUnit(config.getProperty("period", "1"), TimeUnit.SECONDS, TimeUnit.HOURS);
+
         m_tableDecoders = Collections.synchronizedMap(new LinkedHashMap<RollingDecoder, HttpExportDecoder>());
         m_batchMode = Boolean.parseBoolean(config.getProperty("batch.mode", Boolean.toString(m_isHdfs)));
 
@@ -417,7 +420,7 @@ public class HttpExportClient extends ExportClientBase {
         connect();
 
         if (m_isHdfs && EndpointExpander.hasDateConversion(m_endpoint)) {
-            // schedule rotations every m_period minutes
+            // schedule rotations every m_periodSecs seconds
             Runnable rotator = new Runnable() {
                 @Override
                 public void run() {
@@ -429,8 +432,16 @@ public class HttpExportClient extends ExportClientBase {
                 }
             };
 
+            int initialDelay = m_periodSecs;
+            if ((m_periodSecs % 3600) == 0) { // for periods that are multiples of one hour
+                initialDelay = (60 - Calendar.getInstance().get(Calendar.MINUTE)) * 60; // synchronize on the hour
+                m_logger.infoFmt("File rotator will run in %s seconds then every %s hours", initialDelay, m_periodSecs/3600);
+            } else {
+                m_logger.infoFmt("File rotator will run every %s seconds", m_periodSecs);
+            }
+
             m_ses = CoreUtils.getScheduledThreadPoolExecutor("Export file rotate timer", 1, CoreUtils.SMALL_STACK_SIZE);
-            m_ses.scheduleWithFixedDelay(rotator, (60 - Calendar.getInstance().get(Calendar.MINUTE)), m_period, TIME_PERIOD_UNIT);
+            m_ses.scheduleWithFixedDelay(rotator, initialDelay, m_periodSecs, TimeUnit.SECONDS);
         }
     }
 

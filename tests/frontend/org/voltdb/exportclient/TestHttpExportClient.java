@@ -114,7 +114,6 @@ public class TestHttpExportClient extends ExportClientTestBase {
     {
         super.setup();
         m_table = new VoltTable(vtable.getTableSchema());
-        System.setProperty("__EXPORT_FILE_ROTATE_PERIOD_UNIT__", TimeUnit.MILLISECONDS.name());
     }
 
     @After
@@ -1192,12 +1191,12 @@ public class TestHttpExportClient extends ExportClientTestBase {
     @Test
     public void testRoll() throws Exception
     {
-        final int rolls= 5;
-        final int rollTimePeriod = 17;
-        Semaphore received= new Semaphore(0);
+        final int rolls = 5;
+        final int rollTimePeriodSecs = 1;
+        Semaphore received = new Semaphore(0);
 
         final Properties config = new Properties();
-        config.setProperty("period", Integer.toString(rollTimePeriod));
+        config.setProperty("period", rollTimePeriodSecs + "s");
         String endpoint = "/webhdfs/v1/root/%d/%t/%g/%p.csv";
 
         HttpRequestHandler requestHandler = new HttpRequestHandler() {
@@ -1221,11 +1220,11 @@ public class TestHttpExportClient extends ExportClientTestBase {
                 }
             }
         };
-        boolean sucess = false;
+        boolean success = false;
         for (int i = 0; i < rolls; ++i) {
             roundtripTest(endpoint, config, requestHandler, m_testStartTime+i, (i % 2) == 0);
-            sucess = received.tryAcquire(rollTimePeriod*2, TimeUnit.MILLISECONDS);
-            assert(sucess);
+            success = received.tryAcquire(rollTimePeriodSecs * 2, TimeUnit.SECONDS);
+            assertTrue("nothing received", success);
         }
     }
 
@@ -1256,6 +1255,9 @@ public class TestHttpExportClient extends ExportClientTestBase {
 
         final HttpExportClient dut = new HttpExportClient();
         config.setProperty("endpoint", "http:/" + m_server.getServiceAddress().toString() + endpointPath);
+        if (config.getProperty("period") == null) {
+            config.setProperty("period", "1s"); // must set else it defaults to 1 hour
+        }
         dut.configure(config);
 
         final ExportDecoderBase decoder = dut.constructExportDecoder(constructTestSource(false, 0));

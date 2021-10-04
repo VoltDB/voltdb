@@ -52,6 +52,7 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -2300,27 +2301,18 @@ public abstract class CatalogUtil {
             schedule = db.getSnapshotschedule().add("default");
         }
         schedule.setEnabled(snapshotSettings.isEnabled());
-        String frequency = snapshotSettings.getFrequency();
-        if (!frequency.endsWith("s") &&
-                !frequency.endsWith("m") &&
-                !frequency.endsWith("h")) {
-            hostLog.error(
-                    "Snapshot frequency " + frequency +
-                    " needs to end with time unit specified" +
-                    " that is one of [s, m, h] (seconds, minutes, hours)" +
-                    " Defaulting snapshot frequency to 10m.");
-            frequency = "10m";
-        }
 
-        int frequencyInt = 0;
-        String frequencySubstring = frequency.substring(0, frequency.length() - 1);
+        int frequencyInt = 10;
+        char frequencyUnit = 'm';
+        String frequency = snapshotSettings.getFrequency();
         try {
-            frequencyInt = Integer.parseInt(frequencySubstring);
-        } catch (Exception e) {
-            hostLog.error("Frequency " + frequencySubstring +
-                    " is not an integer. Defaulting frequency to 10m.");
-            frequency = "10m";
-            frequencyInt = 10;
+            TimeUtils.TimeAndUnit tu = TimeUtils.parseTimeAndUnit(frequency, TimeUnit.SECONDS, null);
+            frequencyInt = Math.toIntExact(tu.number);
+            frequencyUnit = tu.flag;
+        } catch (TimeUtils.InvalidTimeException | ArithmeticException ex) {
+            hostLog.error("Snapshot frequency " + frequency + " is not valid. It should be " +
+                          " an integer followed by one of [s, m, h] for seconds, minutes, hours." +
+                          " Defaulting snapshot frequency to 10m.");
         }
 
         String prefix = snapshotSettings.getPrefix();
@@ -2346,8 +2338,7 @@ public abstract class CatalogUtil {
             retain = 1;
         }
 
-        schedule.setFrequencyunit(
-                frequency.substring(frequency.length() - 1, frequency.length()));
+        schedule.setFrequencyunit(String.valueOf(frequencyUnit));
         schedule.setFrequencyvalue(frequencyInt);
         schedule.setPrefix(prefix);
         schedule.setRetain(retain);

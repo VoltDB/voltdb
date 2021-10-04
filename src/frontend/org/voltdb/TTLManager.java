@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -44,6 +44,7 @@ import org.voltdb.client.ProcedureCallback;
 import org.voltdb.iv2.MpTransactionState;
 import org.voltdb.sysprocs.LowImpactDeleteNT.ResultTable;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.TimeUtils;
 
 //schedule and process time-to-live feature via @LowImpactDeleteNT. The host with smallest host id
 //will get the task done.
@@ -149,19 +150,9 @@ public class TTLManager extends StatsSource{
                 return ttl.getTtlvalue();
             }
             TimeUnit timeUnit = TimeUnit.SECONDS;
-            if(!ttl.getTtlunit().isEmpty()) {
-                final char frequencyUnit = ttl.getTtlunit().toLowerCase().charAt(0);
-                switch (frequencyUnit) {
-                case 'm':
-                    timeUnit = TimeUnit.MINUTES;
-                    break;
-                case 'h':
-                    timeUnit = TimeUnit.HOURS;
-                    break;
-                case 'd':
-                    timeUnit = TimeUnit.DAYS;
-                    break;
-                default:
+            if (!ttl.getTtlunit().isEmpty()) {
+                timeUnit = TimeUtils.convertTimeUnit(ttl.getTtlunit().substring(0,1));
+                if (timeUnit == null) { // error, not one of smhd, so just ignore?
                     timeUnit = TimeUnit.SECONDS;
                 }
             }
