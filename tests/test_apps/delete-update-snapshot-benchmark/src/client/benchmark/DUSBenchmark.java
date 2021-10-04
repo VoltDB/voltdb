@@ -241,7 +241,7 @@ public class DUSBenchmark {
         String[] colValuesArray = null;
 
         // Compute the number of "blocks" of rows to insert, from the total
-        // number of rows, and the delete/update block size (num. rows): 
+        // number of rows, and the delete/update block size (num. rows):
         long minId = 0;
         long numRows = config.insertnumrows;
         long numInsertBlocks = config.deleteupdatenumrows;
@@ -606,7 +606,7 @@ public class DUSBenchmark {
             String additionalMessage) {
         throw new IllegalArgumentException("Illegal or Unknown "+argName+", '"
             +argValue+"' is not allowed"+additionalMessage);
-    } 
+    }
 
     /** Throw an IllegalArgumentException, for the specified argument name and value. **/
     private void throwIllegalArgException(String argName, String argValue) {
