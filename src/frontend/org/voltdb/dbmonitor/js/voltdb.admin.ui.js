@@ -5068,6 +5068,7 @@ function loadAdminPage() {
         this.isCommandLogEnabled = false;
         this.isAdmin = false;
         this.isRoleChanged = false;
+        this.isReloadRequired = false;
         this.registeredElements = [];
         this.servers = [];
         this.stoppedServer = "";

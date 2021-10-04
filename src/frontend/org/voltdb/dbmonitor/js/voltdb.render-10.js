@@ -919,12 +919,14 @@ function set_kubernetes(server,port){
               VoltDbAdminConfig.isAdmin = false;
             }
             saveSessionCookie('role', updatedUserRole);
+            VoltDbAdminConfig.isReloadRequired = true;
           }else{
             if(currentUserRole.toLowerCase() === 'administrator'){
               VoltDbAdminConfig.isAdmin = true;
             }else{
               VoltDbAdminConfig.isAdmin = false;
             }
+            VoltDbAdminConfig.isReloadRequired = false;
           }
         }else {
           VoltDbAdminConfig.isAdmin = true;

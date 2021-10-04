@@ -15,7 +15,7 @@ if (
 var is_iPad = navigator.userAgent.match(/iPad/i) != null;
 
 $(document).ready(function () {
-  $("#helppopup").load("help.htm", function () {});
+  $("#helppopup").load("help.htm", function () { });
   //clear the localStorage for DataTables in DR Section
   var tmp = [];
   for (var i = 0, len = localStorage.length; i < len; i++) {
@@ -29,11 +29,11 @@ $(document).ready(function () {
     var value = localStorage[key];
     if (key != "queries" && key != "queryNameList" && key != "key") {
       if (value != undefined) {
-        try{
+        try {
           var data = $.parseJSON(value);
         }
-        catch(err){
-          console.log('JSON ERROR : ',key,value,err);
+        catch (err) {
+          console.log('JSON ERROR : ', key, value, err);
           localStorage.removeItem(key);
           errCount++;
           continue;
@@ -67,13 +67,13 @@ $(document).ready(function () {
         key.indexOf("DataTables_tblDrMAster") > -1 ||
         key.indexOf("DataTables_tblDrReplica") > -1 ||
         key.indexOf("DataTables_tblCmdLog_") > -1
-      ){
+      ) {
         localStorage.removeItem(key);
       }
     }
   }
 
-  if(errCount>0){
+  if (errCount > 0) {
     window.location.reload();
   }
 
@@ -461,7 +461,7 @@ $(document).ready(function () {
   //If security is enabled, then it displays login popup. After user is verified, it calls loadPage().
   //If security is not enabled, then it simply calls loadPage().
   voltDbRenderer.HandleLogin(serverName, portid, function () {
-    set_kubernetes($(location).attr("hostname"),$(location).attr("port"));
+    set_kubernetes($(location).attr("hostname"), $(location).attr("port"));
     loadPage(serverName, portid);
   });
 
@@ -786,9 +786,9 @@ function convertOverlayData(data) {
 function logout() {
   saveSessionCookie("username", null);
   saveSessionCookie("password", null);
-  if(VoltDbAdminConfig.isRoleChanged){
+  if (VoltDbAdminConfig.isRoleChanged) {
     saveSessionCookie("role", -1);
-  }else{
+  } else {
     saveSessionCookie("role", null);
   }
   saveSessionCookie("current-tab", NavigationTabs.DBMonitor);
@@ -806,22 +806,21 @@ function changePassword(obj) {
     });
 }
 
-function showAdminPage () {
-  voltDbRenderer.checkRolesUpdate();
-    if (VoltDbAdminConfig.isAdmin) {
-      if (
-        VoltDbUI.getCookie("sql_port_for_paused_db") ==
-        sqlPortForPausedDB.UseAdminPort
-      ) {
-        VoltDBService.SetConnectionForSQLExecution(true);
-        SQLQueryRender.saveConnectionKey(true);
-      }
-      $("#navAdmin").show();
-      loadAdminPage();
-    }else{
-      $("#navAdmin").hide();
+function showAdminPage() {
+  if (VoltDbAdminConfig.isAdmin) {
+    if (
+      VoltDbUI.getCookie("sql_port_for_paused_db") ==
+      sqlPortForPausedDB.UseAdminPort
+    ) {
+      VoltDBService.SetConnectionForSQLExecution(true);
+      SQLQueryRender.saveConnectionKey(true);
     }
-  };
+    $("#navAdmin").show();
+    loadAdminPage();
+  } else {
+    $("#navAdmin").hide();
+  }
+};
 
 var loadPage = function (serverName, portid) {
   $(".drShowHide").show();
@@ -1183,9 +1182,9 @@ var loadPage = function (serverName, portid) {
                     $("#errorLabel").text(statusString);
                     var popup = new $.Popup({
                       content: "divStopServerError",
-                      afterOpen: function() {
-                        $(document).off("click","#A2");
-                        $(document).on("click","#A2",function(){
+                      afterOpen: function () {
+                        $(document).off("click", "#A2");
+                        $(document).on("click", "#A2", function () {
                           popup.close();
                         });
                       }
@@ -1236,8 +1235,8 @@ var loadPage = function (serverName, portid) {
             };
             voltDbRenderer.GetSystemInformation(
               checkPermission,
-              function (portAndOverviewValues, serverSettings) {},
-              function (data) {}
+              function (portAndOverviewValues, serverSettings) { },
+              function (data) { }
             );
           }, 2000);
         } else {
@@ -1272,11 +1271,11 @@ var loadPage = function (serverName, portid) {
             $("#buildString").html(clusterDetails.BUILDSTRING);
             $("#clusterComposition").html(
               hostCount +
-                " hosts with " +
-                hostCount * siteCount +
-                " sites (" +
-                siteCount +
-                " per host)"
+              " hosts with " +
+              hostCount * siteCount +
+              " sites (" +
+              siteCount +
+              " per host)"
             );
             $("#runningSince").html(
               getRunningTimeInfo(
@@ -1823,7 +1822,7 @@ var loadPage = function (serverName, portid) {
                   if (drDetails[currentServer]["STATE"] != "DISABLED") {
                     VoltDbUI.drMasterEnabled =
                       drDetails[currentServer]["MASTERENABLED"] != null &&
-                      drDetails[currentServer]["MASTERENABLED"] != false
+                        drDetails[currentServer]["MASTERENABLED"] != false
                         ? true
                         : false;
                     VoltDbUI.drMasterState = drDetails[currentServer]["STATE"];
@@ -1847,7 +1846,7 @@ var loadPage = function (serverName, portid) {
                         if (
                           !(
                             VoltDbUI.drReplicationRole.toLowerCase() ==
-                              "none" && !VoltDbUI.drMasterEnabled
+                            "none" && !VoltDbUI.drMasterEnabled
                           )
                         ) {
                           var userPreference = getUserPreferences();
@@ -1898,7 +1897,7 @@ var loadPage = function (serverName, portid) {
                             }
                             if (
                               VoltDbUI.drConsumerState.toLowerCase() !=
-                                "disable" ||
+                              "disable" ||
                               VoltDbUI.drMasterState.toUpperCase() == "ACTIVE"
                             ) {
                               $("#divDrReplication").show();
@@ -1918,7 +1917,7 @@ var loadPage = function (serverName, portid) {
                             if (
                               VoltDbUI.drMasterEnabled &&
                               VoltDbUI.drConsumerState.toLowerCase() !=
-                                "disable"
+                              "disable"
                             ) {
                               showHideDrGraph(true);
                               isDrGraphVisible = true;
@@ -1942,7 +1941,7 @@ var loadPage = function (serverName, portid) {
                             if (
                               VoltDbUI.drMasterEnabled ||
                               VoltDbUI.drConsumerState.toLowerCase() !=
-                                "disable"
+                              "disable"
                             ) {
                               $("#divDrReplication").show();
                             } else {
@@ -1957,8 +1956,8 @@ var loadPage = function (serverName, portid) {
                             $("#clusterId").show();
                             $("#clusterId").html(
                               " (ID: " +
-                                clusterInfo[getCurrentServer()]["CLUSTER_ID"] +
-                                ")"
+                              clusterInfo[getCurrentServer()]["CLUSTER_ID"] +
+                              ")"
                             );
                           });
                           VoltDbUI.isDRInfoRequired = true;
@@ -2048,7 +2047,7 @@ var loadPage = function (serverName, portid) {
             replicaLatency.push(
               (response[combinedId][key][0].LASTQUEUEDTIMESTAMP -
                 response[combinedId][key][0].LASTACKTIMESTAMP) /
-                1000000
+              1000000
             );
           }
         }
@@ -2325,10 +2324,10 @@ var loadPage = function (serverName, portid) {
       if (replicaLatency.length != 0) {
         $(".latencyDR_" + combinedId).html(
           "<p>Latency <span id='latencyDR_" +
-            combinedId +
-            "'>" +
-            max(replicaLatency) +
-            " </span> sec</p>"
+          combinedId +
+          "'>" +
+          max(replicaLatency) +
+          " </span> sec</p>"
         );
       } else {
         $(".latencyDR_" + combinedId).html("");
@@ -3981,10 +3980,10 @@ var loadPage = function (serverName, portid) {
       $("#trShowHideSysProcedures").remove();
       $("#tblAnalysisSettings").append(
         '<tr id="trShowHideSysProcedures">' +
-          "<td>Show System Procedures</td>" +
-          '<td style="text-align:right"><input type="checkbox" value="" id="chkSystemProcedure"></td>' +
-          "<td></td>" +
-          "</tr>"
+        "<td>Show System Procedures</td>" +
+        '<td style="text-align:right"><input type="checkbox" value="" id="chkSystemProcedure"></td>' +
+        "<td></td>" +
+        "</tr>"
       );
       $("#chkSystemProcedure").iCheck({
         checkboxClass: "icheckbox_square-aero customCheckbox",
@@ -4084,11 +4083,11 @@ var isNodeButtonRegistered = function (elementName) {
 //Dummy wrapper for console.log for IE9
 if (!(window.console && console.log)) {
   console = {
-    log: function () {},
-    debug: function () {},
-    info: function () {},
-    warn: function () {},
-    error: function () {},
+    log: function () { },
+    debug: function () { },
+    info: function () { },
+    warn: function () { },
+    error: function () { },
   };
 }
 
@@ -4500,10 +4499,13 @@ var adjustExporterGraphSpacing = function () {
         );
       });
 
-    setInterval(()=>{
-      showAdminPage();
-    },2000)
-    
+    setInterval(() => {
+      voltDbRenderer.checkRolesUpdate();
+      if (VoltDbAdminConfig.isReloadRequired) {
+        showAdminPage();
+      }
+    }, 2000)
+
     var checkServerConnection = function () {
       if (!VoltDbUI.isConnectionChecked) {
         VoltDbUI.isConnectionChecked = true;
