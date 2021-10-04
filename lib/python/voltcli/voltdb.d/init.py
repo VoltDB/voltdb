@@ -21,15 +21,22 @@ from glob import glob
 VoltDB = 'org.voltdb.VoltDB'
 
 def _listOfGlobsToFiles(pathGlobs):
-    result = set()
+    result = list() # must preserve order
+    uniq = set()
     for pg in pathGlobs:
         pathGlob = os.path.expanduser(pg.strip())
         globRes = glob(pathGlob)
         if globRes:
-            result.update(globRes)
+            for path in globRes:
+                _addUnique(result, uniq, path)
         else:
-            result.add(pathGlob)
+            _addUnique(result, uniq, pathGlob)
     return ",".join(result)
+
+def _addUnique(result, uniq, path):
+    if path not in uniq:
+        result.append(path)
+        uniq.add(path)
 
 @VOLT.Command(
     options = (
