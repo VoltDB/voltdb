@@ -807,7 +807,8 @@ function changePassword(obj) {
 }
 
 function showAdminPage() {
-  if (VoltDbAdminConfig.isAdmin) {
+  var userRole = VoltDbUI.getCookie("role");
+  if (VoltDbAdminConfig.isAdmin && userRole !== null && userRole.toLowerCase() === 'administrator') {
     if (
       VoltDbUI.getCookie("sql_port_for_paused_db") ==
       sqlPortForPausedDB.UseAdminPort
@@ -970,7 +971,7 @@ var loadPage = function (serverName, portid) {
       $("#btnLoginWarningOk").unbind("click");
       $("#btnLoginWarningOk").on("click", function () {
         if (!VoltDbUI.hasPermissionToView) {
-          location.reload(true);
+          window.location.reload();
         } else {
           if (VoltDbUI.CurrentTab == NavigationTabs.Admin) {
             setTimeout(function () {
