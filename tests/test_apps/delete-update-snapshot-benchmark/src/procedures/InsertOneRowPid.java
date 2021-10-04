@@ -25,29 +25,38 @@ package procedures;
 
 import client.benchmark.DUSBenchmark;
 import org.voltdb.SQLStmt;
-import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-/** Partitioned version of DeleteOneRow */
-public class DeleteOneRowP extends DeleteOneRow {
+import java.util.Arrays;
+import java.util.List;
+
+
+/** Partitioned version of InsertOneRow */
+public class InsertOneRowPid extends InsertOneRow {
 
     // The run() method, as required for each VoltProcedure
-    public VoltTable[] run(long idValue, String tableName)
+    public VoltTable[] run(long id, String tableName,
+            String[] columnNames, String[] columnValues)
             throws VoltAbortException
     {
         // Check for a non-partitioned table, which is not allowed here
         if (tableName == null || !DUSBenchmark.PARTITIONED_TABLES.contains(tableName.toUpperCase())) {
-            throw new VoltAbortException("Illegal table name ("+tableName+") for DeleteOneRowP.");
+            throw new VoltAbortException("Illegal table name ("+tableName+") for InsertOneRowPid.");
         }
 
         // Determine which SQLStmt to use
-        SQLStmt sqlStatement = getDeleteStatement(tableName);
+        SQLStmt sqlStatement = getInsertStatement(tableName);
+
+        // Get the query args, as an Object array
+        Object[] args = getInsertArgs(id, columnNames, columnValues);
 
         // Queue the query
-        voltQueueSQL(sqlStatement, idValue);
+        voltQueueSQL(sqlStatement, args);
 
         // Execute the query
-        return voltExecuteSQL(true);
+        VoltTable[] vt = voltExecuteSQL(true);
+
+        return vt;
     }
 
 }

@@ -1,6 +1,38 @@
-<?xml version="1.0"?>
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <deployment>
+    <cluster hostcount="1" sitesperhost="8" kfactor="0" schema="ddl"/>
+    <paths>
+        <voltdbroot path="/Users/jcrawford/git/new/internal/tests/test_apps/delete-update-snapshot-benchmark/voltdbroot"/>
+        <snapshots path="snapshots"/>
+        <exportoverflow path="export_overflow"/>
+        <droverflow path="dr_overflow"/>
+        <commandlog path="command_log"/>
+        <commandlogsnapshot path="command_log_snapshot"/>
+        <largequeryswap path="large_query_swap"/>
+    </paths>
+    <partition-detection/>
+    <heartbeat/>
+    <ssl/>
+    <httpd enabled="true">
+        <jsonapi enabled="true"/>
+    </httpd>
+    <snapshot enabled="false"/>
+    <commandlog enabled="true">
+        <frequency/>
+    </commandlog>
     <systemsettings>
+        <temptables/>
+        <snapshot/>
+        <elastic/>
         <query timeout="60000"/>
+        <procedure/>
+        <resourcemonitor>
+            <memorylimit/>
+        </resourcemonitor>
+        <flushinterval>
+            <dr/>
+            <export/>
+        </flushinterval>
     </systemsettings>
+    <security/>
 </deployment>

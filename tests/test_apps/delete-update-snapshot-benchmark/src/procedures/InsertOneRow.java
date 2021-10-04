@@ -67,9 +67,7 @@ public class InsertOneRow extends VoltProcedure {
         voltQueueSQL(sqlStatement, args);
 
         // Execute the query
-        VoltTable[] vt = voltExecuteSQL(true);
-
-        return vt;
+        return voltExecuteSQL(true);
     }
 
 
@@ -89,7 +87,7 @@ public class InsertOneRow extends VoltProcedure {
     }
 
 
-    // Determine which SQLStmt to use, based on tableName
+    // Get the query args, as an Object array
     Object[] getInsertArgs(long id, String[] columnNames, String[] columnValues) {
 
         int numColumns = columnNames.length;

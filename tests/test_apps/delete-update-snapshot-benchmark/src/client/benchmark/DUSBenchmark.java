@@ -24,7 +24,6 @@
 package client.benchmark;
 
 import org.voltdb.CLIConfig;
-import org.voltdb.VoltTable;
 import org.voltdb.CLIConfig.Option;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
@@ -32,6 +31,7 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ClientStatusListenerExt;
 import org.voltdb.client.ProcedureCallback;
+import org.voltdb.VoltTable;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -53,26 +53,30 @@ import java.util.Random;
  *  Note: DUS(B) stands for Delete-Update-Snapshot (Benchmark). */
 public class DUSBenchmark {
 
-    // Define this in just one place, besides the DDL file
-    public static final List<String> PARTITIONED_TABLES = Arrays.asList("DUSB_P1");
+    // Define these in just one place, besides the DDL file
+    public static final List<String> PARTITIONED_TABLES    = Arrays.asList("DUSB_P1", "DUSB_P2");
+    public static final List<String> PARTITIONED_BY_ID     = Arrays.asList("DUSB_P1");
+    public static final List<String> PARTITIONED_BY_MOD_ID = Arrays.asList("DUSB_P2");
+    public static final List<String> REPLICATED_TABLES     = Arrays.asList("DUSB_R1");
 
     protected final DUSBConfig config;
     private Client client;
     private Random rand = new Random();
     private DUSBenchmarkStats stats;
 
-    private static final long backpressureSleepMillis = 1000;
+    private static final int backpressureSleepMillis = 1000;
     private static boolean backpressure = false;
-    private static long countBackpressureCalls = 0;
-    private static long countBackpressureDelays = 0;
+    private static int countBackpressureCalls = 0;
+    private static int countBackpressureDelays = 0;
 
-    private static long countSynchronousCalls = 0;
-    private static long countAsynchronousCalls = 0;
-    private static long countNoResponseInTime = 0;
-    private static long countOtherErrors = 0;
+    private static int countSynchronousCalls = 0;
+    private static int countAsynchronousCalls = 0;
+    private static int countNoResponseInTime = 0;
+    private static int countOtherErrors = 0;
     private static Map<String,Long> countStoredProcCalls = new ConcurrentHashMap<String,Long>();
     private static Map<String,Long> countStoredProcResults = new ConcurrentHashMap<String,Long>();
 
+    private long insertBlockSize = -1;
     private long minimumId = -1;
     private long maximumId = -1;
     private long minimumModId = -1;
@@ -84,18 +88,18 @@ public class DUSBenchmark {
         this.config = config;
 
         // Echo input option values (useful for debugging):
+        System.out.println("\nIn DUSBenchmark constructor:");
         System.out.println("  displayinterval: "+config.displayinterval);
         System.out.println("  tabletypes     : "+config.tabletypes);
         System.out.println("  columntypes    : "+config.columntypes);
         System.out.println("  insertnumrows  : "+config.insertnumrows);
-        System.out.println("  insertblocksize: "+config.insertblocksize);
-        System.out.println("  deleteblocksize: "+config.deleteblocksize);
-        System.out.println("  updateblocksize: "+config.updateblocksize);
-        System.out.println("  deleteorder    : "+config.deleteorder);
-        System.out.println("  updateorder    : "+config.updateorder);
+        System.out.println("  deleteupdatenumrows: "+config.deleteupdatenumrows);
+        System.out.println("  deleteupdatevalues: "+config.deleteupdatevalues);
+        System.out.println("  deleteupdatecolumn: "+config.deleteupdatecolumn);
+        System.out.println("  deleteupdateorder : "+config.deleteupdateorder);
+        System.out.println("  rate limit     : "+config.ratelimit);
         System.out.println("  statsfile      : "+config.statsfile);
         System.out.println("  servers        : "+config.servers);
-        System.out.println("  rate limit     : "+config.ratelimit);
 
         DUSBClientListener dusbcl = new DUSBClientListener(config.insertnumrows);
         ClientConfig cc = new ClientConfig(null, null, dusbcl);
@@ -135,12 +139,12 @@ public class DUSBenchmark {
                 + "connect to database for queries; default: 'localhost'.")
         String servers = "localhost";
 
-        @Option(desc = "Comma-separated list of one or more of the following: replicated, "
-                + "partitioned, [view??]; default: 'partitioned'.")
-        String tabletypes = "replicated";
+        @Option(desc = "Comma-separated list of one or more of the following: 'partitioned' "
+                + "(the default), 'replicated', or 'view' [not yet implemented].")
+        String tabletypes = "partitioned";
 
-        @Option(desc = "Comma-separated list of one or more of the following: inline "
-                + "(i.e., numeric, timestamp, short varchar), outline (i.e., non-inline: "
+        @Option(desc = "Comma-separated list of one or more of the following: 'inline' "
+                + "(i.e., numeric, timestamp, short varchar), 'outline' (i.e., non-inline: "
                 + "long varchar columns), varbinary, geo (which varbinary or geo columns "
                 + "are used depends on use of inline and/or outline); default: 'inline'.")
         String columntypes = "inline";
@@ -149,61 +153,60 @@ public class DUSBenchmark {
                 + "default: 10,000,000 (ten million).")
         long insertnumrows = 10000000;
 
-        @Option(desc = "Size of the blocks by which row inserts will occur; e.g. if "
-                + "insertnumrows is a thousand (1000), and blocksize is a hundred "
-                + "(100), rows will be inserted as 10 blocks of a hundred (100) rows;"
-                + "default: 1000 (a thousand).")
-        long insertblocksize = 1000;
+        @Option(desc = "The number of rows to be deleted or updated by each (stored proc) "
+                + "transaction; note that initial inserts will typically happen in a "
+                + "blocksize of roughly insertnumrows / deleteupdatenumrows rows at a "
+                + "time, and the MOD_ID columns will have values running from zero to "
+                + "blocksize - 1, i.e., MOD_ID = ID % blocksize; default: 1000.")
+        long deleteupdatenumrows = 1000;
 
-        @Option(desc = "Number of rows to be deleted, by each delete; default: insertblocksize.")
-        long deleteblocksize = insertblocksize;
+        @Option(desc = "The manner in which to delete and update: 'single' to indicate "
+                + "just one value at a time (e.g. using 'WHERE MOD_ID = ?'); or 'range' "
+                + "to indicate a range of values (e.g. using 'WHERE MOD_ID <= ? AND "
+                + "MOD_ID > ?'; case insensitive, default: 'single'.")
+        String deleteupdatevalues = "single";
 
-        @Option(desc = "Number of rows to be updated, by each update; default: deleteblocksize.")
-        long updateblocksize = deleteblocksize;
+        @Option(desc = "The column to be used for delete and update: 'id' (e.g. using "
+                + "'WHERE ID = ?'); or 'modid' (e.g. using 'WHERE MOD_ID = ?'); case "
+                + "insensitive, default: 'modid'.")
+        String deleteupdatecolumn = "modid";
 
-        @Option(desc = "The order in which to delete rows, either: 'byid' (ascending), "
-                + "'byiddesc'; or, for a more arbitrary order, i.e. not in the same "
-                + "order they were inserted: 'bymodid' (the default), or 'bymodiddesc' ;"
-                + "or, to delete rows one at a time 'onebyone' (ascending), or 'onebyonedesc';"
-                + " case insensitive.")
-        String deleteorder = "bymodid";
+        @Option(desc = "The order in which to delete and update values, either: 'ascending' "
+                + "(the default), 'descending' or 'random' [not yet implemented]; case insensitive.")
+        String deleteupdateorder = "ascending";
 
-        @Option(desc = "The order in which to update rows, either: 'byid' (ascending), "
-                + "'byiddesc'; or, for a more arbitrary order, i.e. not in the same "
-                + "order they were inserted: 'bymodid', or 'bymodiddesc'; or, to update "
-                + "rows one at a time 'onebyone' (ascending), or 'onebyonedesc';"
-                + " case insensitive; default: deleteorder.")
-        String updateorder = deleteorder;
+        @Option(desc = "Number of updates/deletes to do before starting the snapshot; "
+                + "default: -1, which means never start the snapshot.")
+        long startSnapshotAtIteration = -1;
 
-        @Option(desc = "Number of updates/deletes to do before starting the snapshot; default: 3.")
-        long startSnapshotAtIteration = 3;
+        @Option(desc = "Maximum TPS (transactions per second) limit for benchmark; "
+                + "default: Integer.MAX_VALUE.")
+        int ratelimit = Integer.MAX_VALUE;
 
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "deleteupdatesnapshot.csv";
-
-        @Option(desc = "Maximum TPS rate for benchmark.")
-        int ratelimit = Integer.MAX_VALUE;
 
         @Override
         public void validate() {
             if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
             if (servers.length() == 0) servers = "localhost";
             if (statsfile.length() == 0) statsfile = "deleteupdatesnapshot.csv";
-            if (tabletypes == null || tabletypes.isEmpty()) exitWithMessageAndUsage("tabletypes cannot be null or empty");
-            List knownTableTypes = Arrays.asList("replicated", "partitioned");
-            for (String type : tabletypes.split(",")) {
-                 if (!knownTableTypes.contains(type.trim().toLowerCase())) {
-                     exitWithMessageAndUsage("Unrecognized type '"+type+"' in tabletypes: "+tabletypes);
-                 }
-            }
-            if (columntypes == null || columntypes.isEmpty()) exitWithMessageAndUsage("columntypes cannot be null or empty");
-            List knownColumnTypes = Arrays.asList("inline", "outline", "varbinary", "geo");
-            for (String type : columntypes.split(",")) {
-                 if (!knownColumnTypes.contains(type.trim().toLowerCase())) {
-                     exitWithMessageAndUsage("Unrecognized type '"+type+"' in columntypes: "+columntypes);
-                 }
-            }
+            checkKnownValues("tabletypes",  tabletypes,  "replicated", "partitioned" /*, "view"*/ );
+            checkKnownValues("columntypes", columntypes, "inline", "outline", "varbinary", "geo");
+            checkKnownValues("deleteupdatevalues", deleteupdatevalues, "single", "range");
+            checkKnownValues("deleteupdatecolumn", deleteupdatecolumn, "id", "modid");
+            checkKnownValues("deleteupdateorder",  deleteupdateorder,  "ascending", "descending" /*, "random"*/ );
             if (ratelimit <= 0) exitWithMessageAndUsage("ratelimit must be > 0");
+        }
+
+        private void checkKnownValues(String name, String values, String ... knownValues) {
+            if (values == null || values.isEmpty()) exitWithMessageAndUsage(name+" cannot be null or empty");
+            List<String> knownValuesList = Arrays.asList(knownValues);
+            for (String val : values.split(",")) {
+                if (!knownValuesList.contains(val.trim().toLowerCase())) {
+                    exitWithMessageAndUsage("Unrecognized value '"+val+"' in "+name+": "+values);
+                }
+           }
         }
     } // end of DUSBConfig
 
@@ -211,70 +214,89 @@ public class DUSBenchmark {
     /** Initialize the DUSBenchmark, by adding lots of rows to the table(s). **/
     private void init() throws Exception {
 
-        // TODO: debug print:
-        System.out.println("\nStart of DUSBenchmark.init()");
+        // Debug print:
+        System.out.println("\n\nStart of DUSBenchmark.init()");
 
-        // Get the list of table names to which to add rows
+        // Get the lists of table names to which to add, delete, and update rows
         List<String> tableNamesForInsertValues = new ArrayList<String>();
-        List<String> tableNamesForBulkInsert = new ArrayList<String>();
+        List<String> tableNamesForInsertFromSelect = new ArrayList<String>();
         String tableTypesLower = config.tabletypes.toLowerCase();
+        tableNamesForInsertValues.add("DUSB_R1");
         if (tableTypesLower.contains("replicated")) {
-            tableNamesForInsertValues.add("DUSB_R1");
-            tableNamesForBulkInsert.add("DUSB_R1");
+            tableNamesForInsertFromSelect.add("DUSB_R1");
         }
         if (tableTypesLower.contains("partitioned")) {
-            if (!tableNamesForInsertValues.contains("DUSB_R1")) {
-                tableNamesForInsertValues.add("DUSB_R1");
+            if ("modid".equals(config.deleteupdatecolumn.toLowerCase())) {
+                tableNamesForInsertFromSelect.add("DUSB_P2");
+            } else {
+                tableNamesForInsertFromSelect.add("DUSB_P1");
             }
-            tableNamesForBulkInsert.add("DUSB_P1");
         }
-        tableNamesForDeleteAndUpdate = tableNamesForBulkInsert;
+        tableNamesForDeleteAndUpdate = tableNamesForInsertFromSelect;
 
         // Get the list of column names to be set, for those columns that
         // will be non-null
         List<String> columnNames = getColumnNames();
-
         String[] colNamesArray  = columnNames.toArray(new String[0]);
         String[] colValuesArray = null;
 
+        // Compute the number of "blocks" of rows to insert, from the total
+        // number of rows, and the delete/update block size (num. rows): 
         long minId = 0;
+        long numRows = config.insertnumrows;
+        long numInsertBlocks = config.deleteupdatenumrows;
+        // If it divides evenly, it's simple
+        insertBlockSize = numRows / numInsertBlocks;
+        // Otherwise, round to one decimal place, i.e., to the nearest 0.1;
+        // then take the "ceiling" (nearest integer above or equal to)
+        if (numRows % numInsertBlocks != 0) {
+            insertBlockSize = (long) Math.ceil( Math.round(10.0D * numRows / numInsertBlocks)
+                                                         / 10.0D );
+        }
+
+        // Insert the initial rows (1 "block"), one at a time
         for (String tableName : tableNamesForInsertValues) {
             String procName = "InsertOneRow";
-            if (tableName != null && tableName.toUpperCase().equals("DUSB_P1")) {
-                procName = "InsertOneRowP";
+            if (tableName != null && PARTITIONED_BY_ID.contains(tableName.toUpperCase())) {
+                procName = "InsertOneRowPid";
             }
 
-            // TODO: debug print:
+            // Debug print:
             System.out.println( "\nIn DUSBenchmark.init()"
-                    +": tableNames "+tableNamesForInsertValues
-                    +", tableName "+tableName
+                    +": tableNames(insert) "+tableNamesForInsertValues
+                    +", tableNames(select) "+tableNamesForInsertFromSelect
+                    +", tableNames(del&upd) "+tableNamesForDeleteAndUpdate
                     +", tableName "+tableName
                     +"\ncolumnNames: "+Arrays.toString(colNamesArray)
                     +"\nminId "+minId
-                    +", insertblocksize "+config.insertblocksize
-                    +", insertnumrows "+config.insertnumrows );
+                    +", insertnumrows "+numRows
+                    +", deleteupdatenumrows "+config.deleteupdatenumrows
+                    +", numInsertBlocks "+numInsertBlocks
+                    +", insertBlockSize "+insertBlockSize );
 
-            for (long row=0; row < config.insertblocksize; row++) {
+            for (long rowId=0; rowId < insertBlockSize; rowId++) {
                 // Get the array of random column values to be set, for those
                 // columns that will be non-null
                 colValuesArray = getColumnValues(colNamesArray);
 
-                // TODO: debug print:
-                if (row == 0 || row == config.insertblocksize / 2
-                             || row == config.insertblocksize - 1) {
-                    System.out.println( "\ncolValuesArray, row "+row+": "
+                // Occasional debug print:
+                boolean debugPrint = false;
+                if (rowId == 0 || rowId == insertBlockSize / 2
+                               || rowId == insertBlockSize - 1) {
+                    debugPrint = true;
+                    System.out.println( "\ncolValuesArray, row "+rowId+": "
                                         + Arrays.toString(colValuesArray) );
                 }
 
-                ClientResponse cr = client.callProcedure(procName, row,
+                // Insert one row
+                ClientResponse cr = client.callProcedure(procName, rowId,
                                     tableName, colNamesArray, colValuesArray);
                 VoltTable vt = cr.getResults()[0];
-                // TODO: check 'cr/vt' result ??
 
-                // TODO: debug print:
-                if (row == 0 || row == config.insertblocksize / 2
-                             || row == config.insertblocksize - 1) {
-                    System.out.println( "\nRow "+row
+                // Debug print: occasionally, or when something goes wrong
+                if  (debugPrint || cr.getStatus() != ClientResponse.SUCCESS ||
+                        vt.getStatusCode() != -128 ) {
+                    System.out.println( "\nRow "+rowId
                              +": vt.getStatusCode "+vt.getStatusCode()
                              +", cr.getStatus "+cr.getStatus()
                              +" (SUCCESS="+ClientResponse.SUCCESS+")"
@@ -282,19 +304,58 @@ public class DUSBenchmark {
                 }
             }
         }
-        for (String tableName : tableNamesForBulkInsert) {
-            VoltTable vt = client.callProcedure("BulkInsert", tableName, colNamesArray,
-                    colValuesArray, minId, config.insertblocksize, config.insertnumrows)
-                    .getResults()[0];
-            // TODO: check 'cr/vt' result ??
+
+        for (String tableName : tableNamesForInsertFromSelect) {
+
+            // Due to limits  on Partioned tables, they need to be populated by
+            // INSERT FROM SELECT queries that select from a Replicated table; so
+            // a Partioned table needs to copy one extra "block" at the beginning,
+            // whereas a Replicated table is copying from itself, so the first
+            // "block" has already been populated
+            long minBlock = 0;
+            if (REPLICATED_TABLES.contains(tableName.toUpperCase())) {
+                minBlock = 1;
+            }
+
+            // Insert lots more rows, using InsertFromSelect, i.e., queries of the form:
+            // INSERT INTO <table1> SELECT ...  FROM <table2> WHERE ...
+            long maxId = insertBlockSize;
+            for (long block = minBlock; block < numInsertBlocks; block++) {
+                long addToId = block * insertBlockSize;
+
+                // For the last block, only in the case where the insertBlockSize
+                // did not divide evenly
+                if (block == numInsertBlocks - 1 && numRows % numInsertBlocks != 0) {
+                    maxId = numInsertBlocks*insertBlockSize - numRows;
+                }
+
+                // Insert many rows
+                ClientResponse cr = client.callProcedureWithTimeout( 60000,
+                        "InsertFromSelect", tableName, addToId, minId, maxId );
+                VoltTable vt = cr.getResults()[0];
+
+                // Debug print: occasionally, or when something goes wrong
+                if ( block <= 1 || block == numInsertBlocks / 2 ||
+                        block == numInsertBlocks - 1  ||
+                        cr.getStatus() != ClientResponse.SUCCESS ||
+                        vt.getStatusCode() != -128 ) {
+                    System.out.println( "\nBlock "+block
+                            +": addToId "+addToId+", numInsertBlocks "+numInsertBlocks
+                            +", vt.getStatusCode "+vt.getStatusCode()
+                            +", cr.getStatus "+cr.getStatus()
+                            +" (SUCCESS="+ClientResponse.SUCCESS+"), "
+                            +"cr.getStatusString: "+cr.getStatusString() );
+                }
+            }
         }
 
         // Set values needed by runBenchmark()
         minimumId = minimumModId = minId;
-        maximumId = config.insertnumrows;
-        maximumModId = config.insertblocksize;
+        // Technically, these are one more than the maximum allowed value
+        maximumId = numRows + minId;
+        maximumModId = insertBlockSize + minId;
 
-        // TODO: debug print:
+        // Debug print:
         System.out.println("\nEnd of DUSBenchmark.init()");
 
     } // end of init()
@@ -429,11 +490,10 @@ public class DUSBenchmark {
                     colValuesArray[i] = getRandomGeographyString(8);
                     break;
                 default:
-                    throw new RuntimeException("Unknown column name: '"
-                                                +colNamesArray[i]+"'.");
+                    throwIllegalArgException("column name", colNamesArray[i]);
                 }  // end of switch
 
-            } catch (IllegalArgumentException e) {
+            } catch (Exception e) {
                 throw new RuntimeException( "Failed to set random value, for column name '"
                                             +colNamesArray[i]+"'.", e );
             } // end of try/catch
@@ -540,6 +600,20 @@ public class DUSBenchmark {
     } // end of getRandomGeographyString(...)
 
 
+    /** Throw an IllegalArgumentException, for the specified argument name and
+     *  value, with an additional error message. **/
+    private void throwIllegalArgException(String argName, String argValue,
+            String additionalMessage) {
+        throw new IllegalArgumentException("Illegal or Unknown "+argName+", '"
+            +argValue+"' is not allowed"+additionalMessage);
+    } 
+
+    /** Throw an IllegalArgumentException, for the specified argument name and value. **/
+    private void throwIllegalArgException(String argName, String argValue) {
+        throwIllegalArgException(argName, argValue, ".");
+    }
+
+
     /** Check for backpressure (and other conditions) */
     public class DUSBClientListener extends ClientStatusListenerExt {
         private long numRows = -1;
@@ -564,13 +638,13 @@ public class DUSBenchmark {
 
         @Override
         public void connectionLost(String hostname, int port, int connectionsLeft, DisconnectCause cause) {
-            System.out.println("\nDUSBClientListener.connectionLost called, with hostname: "+hostname
+            System.out.println("\nDUSBClientListener.connectionLost called, with: hostname "+hostname
                     +", port "+port+", connectionsLeft "+connectionsLeft+", cause "+cause+"\n");
         }
 
         @Override
         public void connectionCreated(String hostname, int port, AutoConnectionStatus status) {
-            System.out.println("\nDUSBClientListener.connectionCreated called, with hostname: "
+            System.out.println("\nDUSBClientListener.connectionCreated called, with: hostname "
                     +hostname+", port "+port+", status "+status+"\n");
         }
 
@@ -582,7 +656,7 @@ public class DUSBenchmark {
 
         @Override
         public void lateProcedureResponse(ClientResponse cr, String hostname, int port) {
-            System.out.println("\nDUSBClientListener.lateProcedureResponse called, with hostname: "
+            System.out.println("\nDUSBClientListener.lateProcedureResponse called, with: hostname "
                     +hostname+", port "+port+", ClientResponse "+cr+"\n");
         }
     }
@@ -617,7 +691,7 @@ public class DUSBenchmark {
    }
 
 
-    /** Retruns a String, suitable for printing, that contains the number of
+    /** Returns a String, suitable for printing, that contains the number of
      *  times that each stored procedure was called; and produced a result. */
     private String printProcCounts() {
         SortedSet<String> sortedKeys = new TreeSet<String>();
@@ -640,7 +714,14 @@ public class DUSBenchmark {
             String tableName, String columnName, long minValue, long maxValue,
             String inlineOrOutline, boolean debugPrint) throws Exception {
 
-        // Debug print, when called for
+        if (procName == null) {
+            throwIllegalArgException("procName", procName, ", with tableName '"
+                    +tableName+"', columnName '"+columnName+"', minValue "
+                    +minValue+", maxValue "+maxValue+", inlineOrOutline '"
+                    +inlineOrOutline+"', debugPrint "+debugPrint+". " );
+        }
+
+        // Debug print, occasionally or when there is backpressure
         if (debugPrint || backpressure) {
             if ("@SnapshotSave".equals(procName)) {
                 // For @SnapshotSave, the meanings of the parameters are different
@@ -672,138 +753,201 @@ public class DUSBenchmark {
         boolean queued = true;
 
         if (callBack == null) {
-            // This doesn't normally happen
+            // synchronous calls (this doesn't normally happen)
             countSynchronousCalls++;
             ClientResponse cr = null;
-            if (procName != null && procName.startsWith("DeleteOneRow")) {
-                cr = client.callProcedure(procName, minValue, tableName);
-            } else if (procName != null && procName.startsWith("UpdateOneRow")) {
-                cr = client.callProcedure(procName, minValue, tableName, inlineOrOutline);
+
+            if (procName.startsWith("Delete")) {
+                if (procName.equals("DeleteMultiValues")) {
+                    cr = client.callProcedure(procName, tableName, columnName, minValue, maxValue);
+                } else if (procName.equals("DeleteOneValue")) {
+                    cr = client.callProcedure(procName, minValue, tableName, columnName);
+                } else {
+                    cr = client.callProcedure(procName, minValue, tableName);
+                }
+
+            } else if (procName.startsWith("Update")) {
+                if (procName.equals("UpdateMultiValues")) {
+                    cr = client.callProcedure(procName, tableName, columnName, minValue, maxValue, inlineOrOutline);
+                } else if (procName.equals("UpdateOneValue")) {
+                    cr = client.callProcedure(procName, minValue, tableName, columnName, inlineOrOutline);
+                } else {
+                    cr = client.callProcedure(procName, minValue, tableName, inlineOrOutline);
+                }
             } else if (procName != null && procName.equals("@SnapshotSave")) {
                 cr = client.callProcedure(procName, tableName, columnName, minValue);
-            } else if (useInlineOrOutline) {
-                cr = client.callProcedure(procName, tableName, columnName, minValue, maxValue,
-                                            inlineOrOutline);
+
             } else {
-                cr = client.callProcedure(procName, tableName, columnName, minValue, maxValue);
+                throwIllegalArgException("(synch) procName", procName, " (with tableName '"
+                        +tableName+"', columnName '"+columnName+"', minValue "+minValue
+                        +", maxValue "+maxValue+", inlineOrOutline '"+inlineOrOutline
+                        +"', debugPrint "+debugPrint+"). " );
             }
             callBack = new DUSBenchmarkCallback(procName+"-synchronous");
             callBack.clientCallback(cr);
 
         } else {
-            if (procName != null && procName.startsWith("DeleteOneRow")) {
-                queued = client.callProcedure(callBack, procName, minValue, tableName);
-            } else if (procName != null && procName.startsWith("UpdateOneRow")) {
-                queued = client.callProcedure(callBack, procName, minValue, tableName,
-                                inlineOrOutline);
+            // asynchronous calls (as usual)
+            if (procName.startsWith("Delete")) {
+                if (procName.equals("DeleteMultiValues")) {
+                    queued = client.callProcedure(callBack, procName, tableName, columnName, minValue, maxValue);
+                } else if (procName.equals("DeleteOneValue")) {
+                    queued = client.callProcedure(callBack, procName, minValue, tableName, columnName);
+                } else {
+                    queued = client.callProcedure(callBack, procName, minValue, tableName);
+                }
+
+            } else if (procName.startsWith("Update")) {
+                if (procName.equals("UpdateMultiValues")) {
+                    queued = client.callProcedure(callBack, procName, tableName, columnName, minValue, maxValue, inlineOrOutline);
+                } else if (procName.equals("UpdateOneValue")) {
+                    queued = client.callProcedure(callBack, procName, minValue, tableName, columnName, inlineOrOutline);
+                } else {
+                    queued = client.callProcedure(callBack, procName, minValue, tableName, inlineOrOutline);
+                }
             } else if (procName != null && procName.equals("@SnapshotSave")) {
-                queued = client.callProcedure(callBack, procName, tableName, columnName,
-                                minValue);
-            } else if (useInlineOrOutline) {
-                queued = client.callProcedure(callBack, procName, tableName, columnName,
-                                minValue, maxValue, inlineOrOutline);
+                queued = client.callProcedure(callBack, procName, tableName, columnName, minValue);
+
             } else {
-                queued = client.callProcedure(callBack, procName, tableName, columnName,
-                                minValue, maxValue);
+                throwIllegalArgException("(asynch) procName", procName, " (with tableName '"
+                        +tableName+"', columnName '"+columnName+"', minValue "+minValue
+                        +", maxValue "+maxValue+", inlineOrOutline '"+inlineOrOutline
+                        +"', debugPrint "+debugPrint+"). " );
             }
             countAsynchronousCalls++;
         }
         countProcCalls(procName);
 
         if (!queued) {
-            System.out.println(procName+" not queued successfully, for table "
+            System.err.println(procName+" not queued successfully, for table "
                 +tableName+", column "+columnName+", minValue "+minValue
                 +", maxValue "+maxValue+" (inlineOrOutline "+inlineOrOutline+").");
         }
     }
 
 
-    /** If using one of the "...OneRow" stored procs with a partitioned table,
-     *  add a "P" to the end of the proc name, to use the partitioned version. **/
-    private String alterProcName(String procName, String tableName) {
-        if (procName == null || tableName == null) {
-            throw new RuntimeException("Illegal null tableName ("+tableName+") "
-                                        +"or procName ("+procName+").");
+    /** Get the Stored Procedure name you want, based on various factors. **/
+    private String getProcName(String procType, String tableName,
+            String delUpdValues, String delUpdColumn) {
+
+        if (procType == null || tableName == null || delUpdValues == null || delUpdColumn == null) {
+            throw new IllegalArgumentException("Illegal null procType ("+procType+"), "
+                    +"tableName ("+tableName+"), delUpdValues ("+delUpdValues+"), "
+                    +"or delUpdColumn ("+delUpdColumn+")." );
         }
 
-        if (procName.endsWith("OneRow") && PARTITIONED_TABLES.contains(tableName)) {
-            return procName + "P";
+        String oneOrMultiValues = "OneValue";
+        String partitioning = "";
+
+        if ("range".equals(delUpdValues.toLowerCase())) {
+            oneOrMultiValues = "MultiValues";
+
+        } else if ("id".equals(delUpdColumn.toLowerCase()) &&
+                PARTITIONED_BY_ID.contains(tableName.toUpperCase())) {
+            partitioning = "Pid";
+
+        } else if ("modid".equals(delUpdColumn.toLowerCase()) &&
+                PARTITIONED_BY_MOD_ID.contains(tableName.toUpperCase())) {
+            partitioning = "PmodId";
         }
 
-        return procName;
+        return procType + oneOrMultiValues + partitioning;
     }
 
 
     /** Run the DUSBenchmark, by simultaneously running a snapshot, while
      *  updating and deleting lots of table rows. **/
     private void runBenchmark() throws Exception {
-
         System.out.println("\n\nStart of DUSBenchmark.runBenchmark()");
 
-        // Get the blockSize, that is, the number of table rows to be deleted
-        // (or updated) by each stored procedure call
-        if (config.updateblocksize != config.deleteblocksize) {
-            throw new UnsupportedOperationException("Using a different updateblocksize ("
-                    +config.updateblocksize+") and deleteblocksize ("+config.deleteblocksize
-                    +") is not yet supported");
-        }
-        long blockSize = config.deleteblocksize;
-
-        // If we are deleting (& updating) by MOD_ID values rather than ID values,
-        // then we need an equivalent to 'blockSize' for the MOD_ID values
-        long modIdIncrement = 1;
-        if (config.deleteorder != null &&
-                config.deleteorder.toLowerCase().startsWith("bymodid")) {
-
-            // The MOD_ID value increment, in order to delete (or update) roughly
-            // the intended number of rows (blockSize) with each stored proc call,
-            // should be the blockSize times the ratio of the total number of rows
-            // and the total number of distinct MOD_ID values
-            modIdIncrement = Math.round( (maximumModId - minimumModId) * blockSize
-                                          / (maximumId - minimumId) );
-            // Cannot be less than one
-            modIdIncrement = Math.max(1, modIdIncrement);
-        }
-
-        String columnName = "UNSPECIFIED";
-        long initMinValue = -1, minValueIncrement = -1, numIterations = -1;
-
-        if ("byid".equals(config.deleteorder.toLowerCase())) {
+        // Prepare values used in the for loop below
+        String columnName = null;
+        long numIterations = -1, initMinValue = -1, minValueIncrement = 0, modIdIncrement = 0;
+        if ("id".equals(config.deleteupdatecolumn.toLowerCase())) {
             columnName = "ID";
-            initMinValue      = minimumId;
-            minValueIncrement = blockSize;
-            numIterations = (long) Math.ceil( (maximumId - minimumId)*1.0D / blockSize );
-        } else if ("byiddesc".equals(config.deleteorder.toLowerCase())) {
-            columnName = "ID";
-            initMinValue      = maximumId - blockSize;
-            minValueIncrement = -blockSize;
-            numIterations = (long) Math.ceil( (maximumId - minimumId)*1.0D / blockSize );
-        } else if ("bymodid".equals(config.deleteorder.toLowerCase())) {
+
+            if ("single".equals(config.deleteupdatevalues.toLowerCase())) {
+                numIterations = maximumId - minimumId;
+                if ("ascending".equals(config.deleteupdateorder.toLowerCase())) {
+                    initMinValue = minimumId;
+                    minValueIncrement = 1;
+                } else if ("descending".equals(config.deleteupdateorder.toLowerCase())) {
+                    initMinValue = maximumId - 1;
+                    minValueIncrement = -1;
+                } else {
+                    throwIllegalArgException("'deleteupdateorder' config "
+                            +"parameter value", config.deleteupdateorder);
+                }
+
+            } else if ("range".equals(config.deleteupdatevalues.toLowerCase())) {
+                numIterations = (int) Math.ceil( (maximumId - minimumId)*1.0D / insertBlockSize );
+                if ("ascending".equals(config.deleteupdateorder.toLowerCase())) {
+                    initMinValue = minimumId;
+                    minValueIncrement = insertBlockSize;
+                } else if ("descending".equals(config.deleteupdateorder.toLowerCase())) {
+                    initMinValue = maximumId - insertBlockSize;
+                    minValueIncrement = -insertBlockSize;
+                } else {
+                    throwIllegalArgException("'deleteupdateorder' config "
+                            +"parameter value", config.deleteupdateorder);
+                }
+
+            } else {
+                throwIllegalArgException("'deleteupdatecolumn' config "
+                        +"parameter value", config.deleteupdatecolumn);
+            }
+
+        } else if ("modid".equals(config.deleteupdatecolumn.toLowerCase())) {
             columnName = "MOD_ID";
-            initMinValue      = minimumModId;
-            minValueIncrement = modIdIncrement;
-            numIterations = (long) Math.ceil( (maximumModId - minimumModId)*1.0D / modIdIncrement );
-        } else if ("bymodiddesc".equals(config.deleteorder.toLowerCase())) {
-            columnName = "MOD_ID";
-            initMinValue      = maximumModId - modIdIncrement;
-            minValueIncrement = -modIdIncrement;
-            numIterations = (long) Math.ceil( (maximumModId - minimumModId)*1.0D / modIdIncrement );
-        } else if ("onebyone".equals(config.deleteorder.toLowerCase())) {
-            columnName = "ID";
-            initMinValue = minimumId;
-            minValueIncrement = 1;
-            numIterations = maximumId - minimumId;
-        } else if ("onebyonedesc".equals(config.deleteorder.toLowerCase())) {
-            columnName = "ID";
-            initMinValue = maximumId - 1;
-            minValueIncrement = -1;
-            numIterations = maximumId - minimumId;
+
+            if ("single".equals(config.deleteupdatevalues.toLowerCase())) {
+                numIterations = maximumModId - minimumModId;
+                if ("ascending".equals(config.deleteupdateorder.toLowerCase())) {
+                    initMinValue = minimumModId;
+                    minValueIncrement = 1;
+                } else if ("descending".equals(config.deleteupdateorder.toLowerCase())) {
+                    initMinValue = maximumModId - 1;
+                    minValueIncrement = -1;
+                } else {
+                    throwIllegalArgException("'deleteupdateorder' config "
+                            +"parameter value", config.deleteupdateorder);
+                }
+
+            } else if ("range".equals(config.deleteupdatevalues.toLowerCase())) {
+                // When deleting (& updating) by a range of MOD_ID values, we need an
+                // equivalent to the 'insertBlockSize' used for ID values.  This MOD_ID
+                // value increment, which is used to delete (or update) roughly the
+                // intended number of rows with each stored proc call, should be the
+                // insertBlockSize times the ratio of the total number of rows and
+                // the total number of distinct MOD_ID values
+                modIdIncrement = Math.round( (maximumModId - minimumModId) * insertBlockSize * 1.0D
+                                              / (maximumId - minimumId) );
+                // Cannot be less than one
+                modIdIncrement = Math.max(1, modIdIncrement);
+
+                numIterations = (long) Math.ceil( (maximumModId - minimumModId)*1.0D / modIdIncrement );
+                if ("ascending".equals(config.deleteupdateorder.toLowerCase())) {
+                    initMinValue = minimumModId;
+                    minValueIncrement = modIdIncrement;
+                } else if ("descending".equals(config.deleteupdateorder.toLowerCase())) {
+                    initMinValue = maximumModId - modIdIncrement;
+                    minValueIncrement = -modIdIncrement;
+                } else {
+                    throwIllegalArgException("'deleteupdateorder' config "
+                            +"parameter value", config.deleteupdateorder);
+                }
+
+            } else {
+                throwIllegalArgException("'deleteupdatecolumn' config "
+                        +"parameter value", config.deleteupdatecolumn);
+            }
+
         } else {
-            throw new IllegalArgumentException("Unknown 'deleteorder' config "
-                    + "parameter value ("+config.deleteorder+") is not allowed.");
+            throwIllegalArgException("'deleteupdatevalues' config "
+                    + "parameter value", config.deleteupdatevalues);
         }
 
-        // Which group of columns should get updated, in the UpdateRows procedure?
+        // Which group of columns should get updated, in the various Update procs?
         String updateInlineOrOutlineColumns = "INLINE";
         if (config.columntypes.toLowerCase().contains("outline")) {
             updateInlineOrOutlineColumns = "OUTLINE";
@@ -813,7 +957,7 @@ public class DUSBenchmark {
         System.out.println("\nValues used in the main for loop"
                 +": minimumId "+minimumId
                 +", maximumId "+maximumId
-                +", blockSize "+blockSize
+                +", insertBlockSize "+insertBlockSize
                 +", minimumModId "+minimumModId
                 +", maximumModId "+maximumModId
                 +", modIdIncrement "+modIdIncrement
@@ -825,9 +969,10 @@ public class DUSBenchmark {
                 +";\ntableNamesForDeleteAndUpdate: "+tableNamesForDeleteAndUpdate+"\n" );
 
         stats.startBenchmark(config.displayinterval);
+        long maxValueIncrement = Math.abs(minValueIncrement);
         for (long i=0; i < numIterations; i++) {
             long minValue = initMinValue + i*minValueIncrement;
-            long maxValue = minValue + Math.abs(minValueIncrement);
+            long maxValue = minValue + maxValueIncrement;
 
             boolean debugPrint = false;
             if (i == 0 || i == numIterations/2 || i == numIterations - 1) {
@@ -852,22 +997,13 @@ public class DUSBenchmark {
                 }
             }
 
-            List<String> procNames = new ArrayList<String>();
-            if (config.deleteorder.toLowerCase().startsWith("onebyone")) {
-                procNames.add("UpdateOneRow");
-                procNames.add("DeleteOneRow");
-            } else {
-                procNames.add("UpdateRows");
-                procNames.add("DeleteRows");
-            }
-
-            for (String procName : procNames) {
-                String inlineOrOutline = (procName != null && procName.startsWith("Update"))
-                                          ? updateInlineOrOutlineColumns : null;
+            for (String procType : Arrays.asList("Update", "Delete")) {
+                String inlineOrOutline = "Update".equals(procType) ? updateInlineOrOutlineColumns : null;
                 for (String tableName : tableNamesForDeleteAndUpdate) {
-                    String finalProcName = alterProcName(procName, tableName);
-                    callStoredProc( new DUSBenchmarkCallback(finalProcName),
-                            finalProcName, tableName, columnName, minValue,
+                    String procName = getProcName(procType, tableName, config.deleteupdatevalues,
+                            config.deleteupdatecolumn);
+                    callStoredProc( new DUSBenchmarkCallback(procName),
+                            procName, tableName, columnName, minValue,
                             maxValue, inlineOrOutline, debugPrint );
                 }
             }

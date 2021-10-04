@@ -23,58 +23,32 @@
 
 package procedures;
 
+import client.benchmark.DUSBenchmark;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
 
-public class DeleteOneRow extends VoltProcedure {
-
-    // Declare the SQL Statements to be used
-    private final static SQLStmt DELETE_FROM_DUSB_R1 = new SQLStmt(
-            "DELETE FROM DUSB_R1 WHERE ID = ?;");
-    final static SQLStmt DELETE_FROM_DUSB_P1 = new SQLStmt(
-            "DELETE FROM DUSB_P1 WHERE ID = ?;");
-
+/** Version of UpdateOneValue Partitioned on column MOD_ID */
+public class UpdateOneValuePmodId extends UpdateOneValue {
 
     // The run() method, as required for each VoltProcedure
-    public VoltTable[] run(long idValue, String tableName)
+    public VoltTable[] run(long modidValue, String tableName, String inlineOrOutline)
             throws VoltAbortException
     {
+        // Check that the table is partitioned by MOD_ID
+        if (tableName == null || !DUSBenchmark.PARTITIONED_BY_MOD_ID.contains(tableName.toUpperCase())) {
+            throw new VoltAbortException("Illegal table name ("+tableName+") for UpdateOneRowPmodid.");
+        }
+
         // Determine which SQLStmt to use
-        SQLStmt sqlStatement = getDeleteStatement(tableName);
+        SQLStmt sqlStatement = getUpdateStatement(tableName, "MOD_ID", inlineOrOutline);
 
         // Queue the query
-        voltQueueSQL(sqlStatement, idValue);
+        voltQueueSQL(sqlStatement, modidValue);
 
         // Execute the query
         return voltExecuteSQL(true);
-    }
-
-
-    // Determine which SQLStmt to use, based on tableName
-    SQLStmt getDeleteStatement(String tableName) {
-        SQLStmt sqlStatement = null;
-
-        // Check for null values
-        if (tableName == null) {
-            throw new VoltAbortException("Illegal null table name ("
-                    +tableName+") in DeleteOneRow.");
-        }
-
-        // Delete from replicated table
-        if ("DUSB_R1".equals(tableName.toUpperCase())) {
-            sqlStatement = DELETE_FROM_DUSB_R1;
-
-        // Delete from partitioned table
-        } else if ("DUSB_P1".equals(tableName.toUpperCase())) {
-            sqlStatement = DELETE_FROM_DUSB_P1;
-
-        } else {
-            throw new VoltAbortException("Unknown table name: '"+tableName+"'.");
-        }
-
-        return sqlStatement;
     }
 
 }

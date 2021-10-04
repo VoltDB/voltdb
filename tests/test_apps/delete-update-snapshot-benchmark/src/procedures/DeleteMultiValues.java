@@ -28,17 +28,23 @@ import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
 
-public class DeleteRows extends VoltProcedure {
+public class DeleteMultiValues extends VoltProcedure {
 
-    // Declare the SQL Statements to be used
-    public final static SQLStmt DELETE_FROM_DUSB_R1_BY_ID = new SQLStmt(
+    // Declare the (Delete) SQL Statements to be used
+    public static final SQLStmt DELETE_ROWS_DUSB_R1_BY_ID = new SQLStmt(
             "DELETE FROM DUSB_R1 WHERE ID >= ? AND ID < ?;");
-    public final static SQLStmt DELETE_FROM_DUSB_R1_BY_MOD_ID = new SQLStmt(
+    public static final SQLStmt DELETE_ROWS_DUSB_R1_BY_MOD_ID = new SQLStmt(
             "DELETE FROM DUSB_R1 WHERE MOD_ID >= ? AND MOD_ID < ?;");
-    public final static SQLStmt DELETE_FROM_DUSB_P1_BY_ID = new SQLStmt(
+
+    public static final SQLStmt DELETE_ROWS_DUSB_P1_BY_ID = new SQLStmt(
             "DELETE FROM DUSB_P1 WHERE ID >= ? AND ID < ?;");
-    public final static SQLStmt DELETE_FROM_DUSB_P1_BY_MOD_ID = new SQLStmt(
+    public static final SQLStmt DELETE_ROWS_DUSB_P1_BY_MOD_ID = new SQLStmt(
             "DELETE FROM DUSB_P1 WHERE MOD_ID >= ? AND MOD_ID < ?;");
+
+    public static final SQLStmt DELETE_ROWS_DUSB_P2_BY_ID = new SQLStmt(
+            "DELETE FROM DUSB_P2 WHERE ID >= ? AND ID < ?;");
+    public static final SQLStmt DELETE_ROWS_DUSB_P2_BY_MOD_ID = new SQLStmt(
+            "DELETE FROM DUSB_P2 WHERE MOD_ID >= ? AND MOD_ID < ?;");
 
 
     // The run() method, as required for each VoltProcedure
@@ -56,7 +62,6 @@ public class DeleteRows extends VoltProcedure {
         return voltExecuteSQL(true);
     }
 
-
     // Determine which SQLStmt to use, based on tableName and columnName
     private SQLStmt getSqlStatement(String tableName, String columnName) {
         SQLStmt sqlStatement = null;
@@ -67,23 +72,37 @@ public class DeleteRows extends VoltProcedure {
                     +tableName+") or column name ("+columnName+").");
         }
 
+        String tableNameUpperCase  = tableName.toUpperCase();
+        String columnNameUpperCase = columnName.toUpperCase();
+
         // Delete from replicated table
-        if ( "DUSB_R1".equals(tableName.toUpperCase()) ) {
-            if ( "ID".equals(columnName.toUpperCase()) ) {
-                sqlStatement = DELETE_FROM_DUSB_R1_BY_ID;
-            } else if ( "MOD_ID".equals(columnName.toUpperCase()) ) {
-                sqlStatement = DELETE_FROM_DUSB_R1_BY_MOD_ID;
+        if ( "DUSB_R1".equals(tableNameUpperCase) ) {
+            if ( "ID".equals(columnNameUpperCase) ) {
+                sqlStatement = DELETE_ROWS_DUSB_R1_BY_ID;
+            } else if ( "MOD_ID".equals(columnNameUpperCase) ) {
+                sqlStatement = DELETE_ROWS_DUSB_R1_BY_MOD_ID;
             } else {
                 throw new VoltAbortException("Unknown column name: '"+columnName
                         +"' (with table name '"+tableName+"').");
             }
 
-        // Delete from partitioned table
-        } else if ( "DUSB_P1".equals(tableName.toUpperCase()) ) {
-            if ( "ID".equals(columnName.toUpperCase()) ) {
-                sqlStatement = DELETE_FROM_DUSB_P1_BY_ID;
-            } else if ( "MOD_ID".equals(columnName.toUpperCase()) ) {
-                sqlStatement = DELETE_FROM_DUSB_P1_BY_MOD_ID;
+        // Delete from the first partitioned table (partitioned on ID)
+        } else if ( "DUSB_P1".equals(tableNameUpperCase) ) {
+            if ( "ID".equals(columnNameUpperCase) ) {
+                sqlStatement = DELETE_ROWS_DUSB_P1_BY_ID;
+            } else if ( "MOD_ID".equals(columnNameUpperCase) ) {
+                sqlStatement = DELETE_ROWS_DUSB_P1_BY_MOD_ID;
+            } else {
+                throw new VoltAbortException("Unknown column name: '"+columnName
+                        +"' (with table name '"+tableName+"').");
+            }
+
+        // Delete from the second partitioned table (partitioned on MOD_ID)
+        } else if ( "DUSB_P2".equals(tableNameUpperCase) ) {
+            if ( "ID".equals(columnNameUpperCase) ) {
+                sqlStatement = DELETE_ROWS_DUSB_P2_BY_ID;
+            } else if ( "MOD_ID".equals(columnNameUpperCase) ) {
+                sqlStatement = DELETE_ROWS_DUSB_P2_BY_MOD_ID;
             } else {
                 throw new VoltAbortException("Unknown column name: '"+columnName
                         +"' (with table name '"+tableName+"').");
