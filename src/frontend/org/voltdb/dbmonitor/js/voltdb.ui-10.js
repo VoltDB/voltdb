@@ -806,6 +806,23 @@ function changePassword(obj) {
     });
 }
 
+function showAdminPage () {
+  voltDbRenderer.checkRolesUpdate();
+    if (VoltDbAdminConfig.isAdmin) {
+      if (
+        VoltDbUI.getCookie("sql_port_for_paused_db") ==
+        sqlPortForPausedDB.UseAdminPort
+      ) {
+        VoltDBService.SetConnectionForSQLExecution(true);
+        SQLQueryRender.saveConnectionKey(true);
+      }
+      $("#navAdmin").show();
+      loadAdminPage();
+    }else{
+      $("#navAdmin").hide();
+    }
+  };
+
 var loadPage = function (serverName, portid) {
   $(".drShowHide").show();
   $(".clpShowHide").show();
@@ -868,20 +885,7 @@ var loadPage = function (serverName, portid) {
     }
   }
 
-  var showAdminPage = function () {
-    if (VoltDbAdminConfig.isAdmin) {
-      VoltDbAdminConfig.isAdmin = true;
-      if (
-        VoltDbUI.getCookie("sql_port_for_paused_db") ==
-        sqlPortForPausedDB.UseAdminPort
-      ) {
-        VoltDBService.SetConnectionForSQLExecution(true);
-        SQLQueryRender.saveConnectionKey(true);
-      }
-      $("#navAdmin").show();
-      loadAdminPage();
-    }
-  };
+  showAdminPage();
 
   //Retains the current tab while page refreshing.
   var retainCurrentTab = function () {
@@ -1218,7 +1222,6 @@ var loadPage = function (serverName, portid) {
       function (adminConfigValues, rawConfigValues) {
         if (!VoltDbUI.hasPermissionToView) return;
         if (rawConfigValues !== undefined && rawConfigValues.status == -3 && VoltDbAdminConfig.isAdmin) {
-          VoltDbAdminConfig.isAdmin = false;
           setTimeout(function () {
             var checkPermission = function () {
               if (!VoltDbUI.hasPermissionToView) return;
@@ -3464,6 +3467,13 @@ var loadPage = function (serverName, portid) {
     },
   });
 
+  $("#rolePopup").popup({
+    closeDialog: function () {
+      $("#roleChangePopup").hide();
+      window.location.reload();
+    },
+  });
+
   $("#showAnalysisDetails").popup({
     open: function (event, ui, ele) {
       var procedureName = $("#hidProcedureName").html();
@@ -4491,8 +4501,8 @@ var adjustExporterGraphSpacing = function () {
       });
 
     setInterval(()=>{
-      voltDbRenderer.checkRolesUpdate();
-    },3000)
+      showAdminPage();
+    },2000)
     
     var checkServerConnection = function () {
       if (!VoltDbUI.isConnectionChecked) {

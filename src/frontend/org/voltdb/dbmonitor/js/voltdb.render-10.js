@@ -160,7 +160,6 @@ function set_kubernetes(server,port){
         '<div class="overlay-title">Login</div>' +
         '<div id="UnableToLoginMsg" class="errMsgBox" style=" display: none;"><div class="errMsg">Unable to connect. Please try to login using another username/password.</div></div>' +
         '<div id="PasswordChangeMsg" class="errMsgBox" style="display: none;"><div class="errMsg">Your credentials has been changed. Please login with new credentials.</div></div>' +
-        '<div id="RoleChangeMsg" class="errMsgBox" style="display: none;"><div class="errMsg">Your role has been changed. Please login again.</div></div>' +
         '<div class="clear"></div>' +
         '<div  class="overlay-content" style="height:auto; min-width: auto; padding: 0" >' +
         '<div id="loginBox">' +
@@ -889,7 +888,6 @@ function set_kubernetes(server,port){
         connection.Metadata["SHORTAPI_PROFILE"] != null
       ) {
         var data = connection.Metadata["SHORTAPI_PROFILE"];
-        console.log(data);
         if (data.permissions != null) {
           $.each(data.permissions, function (index, value) {
             if (value.toUpperCase().trim() == "ADMIN") {
@@ -916,8 +914,22 @@ function set_kubernetes(server,port){
 
           VoltDbAdminConfig.isRoleChanged = isRoleChanged;
           if(isRoleChanged){
-            logout();
+            $("#rolePopup").trigger("click");
+            if(updatedUserRole.toLowerCase() === 'administrator'){
+              VoltDbAdminConfig.isAdmin = true;
+            }else{
+              VoltDbAdminConfig.isAdmin = false;
+            }
+            saveSessionCookie('role', updatedUserRole);
+          }else{
+            if(currentUserRole.toLowerCase() === 'administrator'){
+              VoltDbAdminConfig.isAdmin = true;
+            }else{
+              VoltDbAdminConfig.isAdmin = false;
+            }
           }
+        }else {
+          VoltDbAdminConfig.isAdmin = true;
         }
       });
     }

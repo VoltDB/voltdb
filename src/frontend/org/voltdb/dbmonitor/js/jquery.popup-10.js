@@ -275,6 +275,15 @@
         });
       }
 
+      var securityBtn = $("a[id='btnPopOk']");
+      if (securityBtn != undefined) {
+        securityBtn.unbind("click");
+        $(document).on("click","a[id='btnPopOk']", function (e) {
+          e.preventDefault();
+          p.close();
+        });
+      }
+
       var serverShutdownBtn = $("a[id=btnServerShutdownOk]");
       if (serverShutdownBtn != undefined) {
         serverShutdownBtn.unbind("click");
