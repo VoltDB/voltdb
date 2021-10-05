@@ -42,25 +42,25 @@ function alertNodeClicked(obj) {
   $(".popup_close").trigger("click");
 }
 
-function set_kubernetes(server,port){
-  uri = "http://"+server+":"+port+"/api/1.0/?Procedure=@SystemInformation";
+function set_kubernetes(server, port) {
+  uri = "http://" + server + ":" + port + "/api/1.0/?Procedure=@SystemInformation";
   var con = "false";
   $.get(uri,
-      function (data, textStatus, jqXHR) {  // success callback
-        if (textStatus == "success"){
-          data = data["results"][0]["data"];
-          $.each(data,function(id,val){
-            if (val[1] == "KUBERNETES") {
-              con = val[2];
-            }
-          });
-        }
-        if (con == "true"){
-          voltDbRenderer.kubernetes_con = true;
-        }else{
-          voltDbRenderer.kubernetes_con = false;
-        };
-  });
+    function (data, textStatus, jqXHR) {  // success callback
+      if (textStatus == "success") {
+        data = data["results"][0]["data"];
+        $.each(data, function (id, val) {
+          if (val[1] == "KUBERNETES") {
+            con = val[2];
+          }
+        });
+      }
+      if (con == "true") {
+        voltDbRenderer.kubernetes_con = true;
+      } else {
+        voltDbRenderer.kubernetes_con = false;
+      };
+    });
 }
 
 (function (window) {
@@ -186,14 +186,14 @@ function set_kubernetes(server,port){
         open: function (event, ui, ele) {
           var roleUpdated = parseInt(VoltDbUI.getCookie("role"));
           var passwordUpdated = parseInt(VoltDbUI.getCookie("password"))
-          if(roleUpdated === -1){
+          if (roleUpdated === -1) {
             $("#RoleChangeMsg").show();
-            saveSessionCookie("role",null);
+            saveSessionCookie("role", null);
           }
 
-          if(passwordUpdated === -1){
+          if (passwordUpdated === -1) {
             $("#PasswordChangeMsg").show();
-            saveSessionCookie("password",null);
+            saveSessionCookie("password", null);
           }
         },
         login: function (popupCallback) {
@@ -227,10 +227,10 @@ function set_kubernetes(server,port){
                 $("#RoleChangeMsg").hide();
                 $("#PasswordChangeMsg").hide();
                 //Save user details to cookie.
-                set_kubernetes($(location).attr("hostname"),$(location).attr("port"));
+                set_kubernetes($(location).attr("hostname"), $(location).attr("port"));
                 loadAdminPage();
                 saveSessionCookie("username", usernameVal);
-                saveSessionCookie("password",passwordVal);
+                saveSessionCookie("password", passwordVal);
                 // saveSessionCookie("role",'user');
                 VoltDBService.GetShortApiDeployment(function (connection) {
                   var currentUserRole = "user";
@@ -238,10 +238,10 @@ function set_kubernetes(server,port){
                   var users = rawData !== undefined ? rawData.users : null;
                   var usersList = users !== null ? users.user : null;
 
-                  if(usersList !== null){
+                  if (usersList !== null) {
                     currentUserRole = usersList.filter(user => user.name === usernameVal)[0].roles;
                   }
-                  saveSessionCookie("role",currentUserRole)
+                  saveSessionCookie("role", currentUserRole)
                 })
                 voltDbRenderer.ShowUsername(usernameVal);
                 pageLoadCallback();
@@ -303,7 +303,7 @@ function set_kubernetes(server,port){
           : "";
 
       $("#serUnavailablePopup").popup({
-        open: function (event, ui, ele) {},
+        open: function (event, ui, ele) { },
         autoLogin: function (popupCallback) {
           tryAutoLogin();
           popupCallback();
@@ -763,7 +763,7 @@ function set_kubernetes(server,port){
           populateSystemInformation(connection);
           callback();
         });
-      } catch (e) {}
+      } catch (e) { }
     };
 
     this.GetClusterHealth = function (callback) {
@@ -899,36 +899,41 @@ function set_kubernetes(server,port){
       return isAdmin;
     };
 
-    this.checkRolesUpdate = function(){
+    this.checkRolesUpdate = function () {
       VoltDBService.GetShortApiDeployment(function (connection) {
         var currentUserRole = VoltDbUI.getCookie("role");
         var currentUser = VoltDbUI.getCookie("username");
 
-        if(currentUserRole !== 'null'){
+        console.log("currentUser", currentUser, "currentUserRole", currentUserRole);
+
+        if (currentUserRole !== 'null') {
           var rawData = connection.Metadata["SHORTAPI_DEPLOYMENT"];
-          var usersList = rawData !== undefined ? rawData.users.user : null;
-          var updatedUserRole = usersList !== null ? usersList.filter(user => user.name === currentUser)[0].roles : 'user';
+          var usersList = rawData !== undefined ? rawData.users.user : -1;
+          var updatedUserRole = usersList !== -1 ? usersList.filter(user => user.name === currentUser)[0].roles : 'user';
           var isRoleChanged = currentUserRole === updatedUserRole ? false : true;
 
           VoltDbAdminConfig.isRoleChanged = isRoleChanged;
-          if(isRoleChanged){
+          console.log("RawData", rawData);
+          console.log("currentUser", currentUser, "updatedUserRole", updatedUserRole);
+          console.log("Is role changed?", isRoleChanged);
+          if (isRoleChanged) {
             $("#rolePopup").trigger("click");
-            if(updatedUserRole.toLowerCase() === 'administrator'){
+            if (updatedUserRole.toLowerCase() === 'administrator') {
               VoltDbAdminConfig.isAdmin = true;
-            }else{
+            } else {
               VoltDbAdminConfig.isAdmin = false;
             }
             saveSessionCookie('role', updatedUserRole);
             VoltDbAdminConfig.isReloadRequired = true;
-          }else{
-            if(currentUserRole.toLowerCase() === 'administrator'){
+          } else {
+            if (currentUserRole.toLowerCase() === 'administrator') {
               VoltDbAdminConfig.isAdmin = true;
-            }else{
+            } else {
               VoltDbAdminConfig.isAdmin = false;
             }
             VoltDbAdminConfig.isReloadRequired = false;
           }
-        }else {
+        } else {
           VoltDbAdminConfig.isAdmin = true;
         }
       });
@@ -944,13 +949,13 @@ function set_kubernetes(server,port){
         var usersList = data.users;
 
         //The user does not have permission to view admin details.
-        if(usersList === null){
+        if (usersList === null) {
           adminConfigValues.VMCNoPermission = false;
           VoltDbAdminConfig.isAdmin = true;
-        }else if (!hasAdminPrivileges) {
+        } else if (!hasAdminPrivileges) {
           adminConfigValues.VMCNoPermission = true;
           return adminConfigValues;
-        }else{
+        } else {
           adminConfigValues.VMCNoPermission = false;
           VoltDbAdminConfig.isAdmin = true;
         }
@@ -2386,7 +2391,7 @@ function set_kubernetes(server,port){
         }
         replicationRate1M =
           info[colIndex["REPLICATION_RATE_1M"]] == null ||
-          info[colIndex["REPLICATION_RATE_1M"]] < 0
+            info[colIndex["REPLICATION_RATE_1M"]] < 0
             ? 0
             : info[colIndex["REPLICATION_RATE_1M"]] / 1000;
         replicationDetails["DR_GRAPH"][cluster_id + "_" + producer_cluster_id][
@@ -2585,14 +2590,14 @@ function set_kubernetes(server,port){
             if (partition_max[pid] > last_acked) {
               console.log(
                 "DR Producer reports no data for partition " +
-                  pid +
-                  " on host " +
-                  hostname +
-                  " but last acked drId (" +
-                  last_acked +
-                  ") does not match other hosts last acked drId (" +
-                  partition_max[pid] +
-                  ")"
+                pid +
+                " on host " +
+                hostname +
+                " but last acked drId (" +
+                last_acked +
+                ") does not match other hosts last acked drId (" +
+                partition_max[pid] +
+                ")"
               );
             }
             partition_max[pid] = Math.max(last_acked, partition_max[pid]);
@@ -2614,11 +2619,11 @@ function set_kubernetes(server,port){
     var getExportTableInfo = function (connection, exportTableDetails) {
       if (
         connection.Metadata[
-          "@Statistics_TABLE_EXPORT_TABLE_INFORMATION_completeData"
+        "@Statistics_TABLE_EXPORT_TABLE_INFORMATION_completeData"
         ] == null ||
         $.isEmptyObject(
           connection.Metadata[
-            "@Statistics_TABLE_EXPORT_TABLE_INFORMATION_completeData"
+          "@Statistics_TABLE_EXPORT_TABLE_INFORMATION_completeData"
           ]
         )
       ) {
@@ -3042,7 +3047,7 @@ function set_kubernetes(server,port){
             connection.Metadata[
               "@Statistics_PROCEDUREPROFILE_GRAPH_TRANSACTION"
             ].data.length -
-              1
+            1
           ) {
             sysTransaction["TimeStamp"] = srcData[colIndex["TIMESTAMP"]];
           }
@@ -3319,7 +3324,7 @@ function set_kubernetes(server,port){
       var currentServerColumnClass;
       var count = 0;
 
-      function sortByHostId(v1,v2) {
+      function sortByHostId(v1, v2) {
         var hostIdV1 = parseInt(v1.hostId);
         var hostIdV2 = parseInt(v2.hostId)
         return ((hostIdV1 < hostIdV2) ? -1 : ((hostIdV1 > hostIdV2) ? 1 : 0));
@@ -3371,18 +3376,18 @@ function set_kubernetes(server,port){
             }
           });
         } else {
-            var hostname = serverInfo["HOSTNAME"];
-            serverDetails = new VoltDbAdminConfig.server(
-              hostId,
-              hostname,
-              serverInfo["CLUSTERSTATE"],
-              serverInfo["IPADDRESS"],
-              serverInfo["HTTPPORT"],
-              serverInfo["CLIENTPORT"]
-            );
-            VoltDbAdminConfig.servers.push(serverDetails);
-            VoltDbAdminConfig.servers.sort(sortByHostId);
-            count++;
+          var hostname = serverInfo["HOSTNAME"];
+          serverDetails = new VoltDbAdminConfig.server(
+            hostId,
+            hostname,
+            serverInfo["CLUSTERSTATE"],
+            serverInfo["IPADDRESS"],
+            serverInfo["HTTPPORT"],
+            serverInfo["CLIENTPORT"]
+          );
+          VoltDbAdminConfig.servers.push(serverDetails);
+          VoltDbAdminConfig.servers.sort(sortByHostId);
+          count++;
         }
       };
 
@@ -3409,23 +3414,23 @@ function set_kubernetes(server,port){
 
         $.each(VoltDbAdminConfig.servers, function (id, value) {
           // if (voltDbRenderer.currentHost != value.serverName) {
-            if (value.serverState == "RUNNING") {
-              if (runningServerCounter == 0)
-                VoltDbAdminConfig.runningServerIds =
-                  VoltDbAdminConfig.runningServerIds.concat(
-                    "#stopServer_",
-                    value.serverName
-                  );
-              else {
-                VoltDbAdminConfig.runningServerIds =
-                  VoltDbAdminConfig.runningServerIds.concat(
-                    ",",
-                    "#stopServer_",
-                    value.serverName
-                  );
-              }
-              runningServerCounter++;
+          if (value.serverState == "RUNNING") {
+            if (runningServerCounter == 0)
+              VoltDbAdminConfig.runningServerIds =
+                VoltDbAdminConfig.runningServerIds.concat(
+                  "#stopServer_",
+                  value.serverName
+                );
+            else {
+              VoltDbAdminConfig.runningServerIds =
+                VoltDbAdminConfig.runningServerIds.concat(
+                  ",",
+                  "#stopServer_",
+                  value.serverName
+                );
             }
+            runningServerCounter++;
+          }
           // }
         });
       };
@@ -3451,12 +3456,12 @@ function set_kubernetes(server,port){
       ) {
         var count = 0;
         $.each(VoltDbAdminConfig.servers, function (id, val) {
-          if (val.serverState == "PAUSED" || val.serverState == "MISSING"){
-            count++ ;
+          if (val.serverState == "PAUSED" || val.serverState == "MISSING") {
+            count++;
           }
         });
         var con = false;
-        if (count < parseInt($("#kSafety").text())){
+        if (count < parseInt($("#kSafety").text())) {
           con = true;
         }
         $.each(VoltDbAdminConfig.servers, function (id, val) {
@@ -3467,10 +3472,10 @@ function set_kubernetes(server,port){
                 ? "activeHostMonitoring"
                 : "activeHost";
             // if (voltDbRenderer.currentHost != val.serverName && con) {
-            if (con){
+            if (con) {
               className = "shutdown";
               currentServerColumnClass = "shutdownServer";
-            }else{
+            } else {
               className = "disableServer";
               currentServerColumnClass = "shutdownServer stopDisable";
               conn = false;
@@ -3489,22 +3494,22 @@ function set_kubernetes(server,port){
 
             htmlServerListHtml = htmlServerListHtml.concat(
               '<tr class="' +
-                currentServerRowClass +
-                '"><td class="configLabel" width="40%"><a class="serNameTruncate" href="#" >' +
-                val.serverName + "-" + val.hostId +
-                "</a></td>" +
-                "<td  align='center' >" +
-                val.ipAddress +
-                "</td>" +
-                '<td align="right"><a href="javascript:void(0);" data-HostId="' +
-                val.hostId +
-                '" data-HostName="' +
-                val.serverName +
-                '" class="' +
-                className +
-                '"' 
+              currentServerRowClass +
+              '"><td class="configLabel" width="40%"><a class="serNameTruncate" href="#" >' +
+              val.serverName + "-" + val.hostId +
+              "</a></td>" +
+              "<td  align='center' >" +
+              val.ipAddress +
+              "</td>" +
+              '<td align="right"><a href="javascript:void(0);" data-HostId="' +
+              val.hostId +
+              '" data-HostName="' +
+              val.serverName +
+              '" class="' +
+              className +
+              '"'
             );
-            if (conn){
+            if (conn) {
               htmlServerListHtml = htmlServerListHtml.concat(
                 'id="stopServer_' +
                 val.serverName +
@@ -3520,7 +3525,7 @@ function set_kubernetes(server,port){
           } else if ((val.serverName != null || val.serverName != "" || val.serverName != undefined) && val.serverState == "PAUSED") {
             if (voltDbRenderer.currentHost != val.serverName && con) {
               className = "shutdown";
-            }else{
+            } else {
               conn = false;
               className = "disableServer";
             }
@@ -3532,41 +3537,41 @@ function set_kubernetes(server,port){
 
             htmlServerListHtml = htmlServerListHtml.concat(
               '<tr class="' +
-                currentServerRowClass +
-                '"><td class="configLabel" width="40%"><a class="serNameTruncate" href="#" >' +
-                val.serverName + "-" + val.hostId +
-                "</a></td>" +
-                "<td  align='center' >" +
-                val.ipAddress +
-                "</td>" +
-                '<td align="right" class="pauseCursorDefault"><a href="javascript:void(0);" data-HostId="' +
-                val.hostId +
-                '" data-HostName="' +
-                val.serverName +
-                '"class="resume" '
-                );
-            if (conn){
+              currentServerRowClass +
+              '"><td class="configLabel" width="40%"><a class="serNameTruncate" href="#" >' +
+              val.serverName + "-" + val.hostId +
+              "</a></td>" +
+              "<td  align='center' >" +
+              val.ipAddress +
+              "</td>" +
+              '<td align="right" class="pauseCursorDefault"><a href="javascript:void(0);" data-HostId="' +
+              val.hostId +
+              '" data-HostName="' +
+              val.serverName +
+              '"class="resume" '
+            );
+            if (conn) {
               htmlServerListHtml = htmlServerListHtml.concat(
                 'id="stopServer_' +
                 val.serverName +
                 '"'
               );
             }
-            htmlServerListHtml = htmlServerListHtml.concat( 
-                '><span class="' +
-                currentServerColumnClass +
-                '">Paused</span></a></td></tr>'
+            htmlServerListHtml = htmlServerListHtml.concat(
+              '><span class="' +
+              currentServerColumnClass +
+              '">Paused</span></a></td></tr>'
             );
           } else if ((val.serverName != null || val.serverName != "" || val.serverName != undefined) && val.serverState == "JOINING") {
             htmlServerListHtml = htmlServerListHtml.concat(
               '<tr><td class="configLabel" width="40%"><a class="serNameTruncate" href="#">' +
-                val.serverName + "-" + val.hostId +
-                "</a></td>" +
-                "<td  align='center' >" +
-                val.ipAddress +
-                "</td>" +
-                '<td align="right"><a href="javascript:void(0);" class="shutdownDisabled">' +
-                "<span>Stop</span></a></td></tr>"
+              val.serverName + "-" + val.hostId +
+              "</a></td>" +
+              "<td  align='center' >" +
+              val.ipAddress +
+              "</td>" +
+              '<td align="right"><a href="javascript:void(0);" class="shutdownDisabled">' +
+              "<span>Stop</span></a></td></tr>"
             );
           } else if (val.serverName != null || val.serverName != "" || val.serverName != undefined || val.serverState == "MISSING") {
             // htmlServerListHtml = htmlServerListHtml.concat(
@@ -3949,7 +3954,7 @@ function set_kubernetes(server,port){
         connection.Metadata["@SystemCatalog_PROCEDURECOLUMNS" + suffix].data;
       const rawExportStreams =
         typeof connection.Metadata["@Statistics_EXPORT" + suffix] !==
-        "undefined"
+          "undefined"
           ? connection.Metadata["@Statistics_EXPORT" + suffix].data
           : null;
 
@@ -4198,7 +4203,7 @@ function set_kubernetes(server,port){
                     if (
                       tupleData[partitionIndex] ==
                       partitionData[tupleData[tableNameIndex]][i][
-                        partitionIndex
+                      partitionIndex
                       ]
                     ) {
                       duplicatePartition = true;
@@ -4207,7 +4212,7 @@ function set_kubernetes(server,port){
                   }
                   if (
                     partitionEntryCount ==
-                      partitionData[tupleData[tableNameIndex]].length &&
+                    partitionData[tupleData[tableNameIndex]].length &&
                     !duplicatePartition
                   ) {
                     partitionData[tupleData[tableNameIndex]].push(tupleData);
