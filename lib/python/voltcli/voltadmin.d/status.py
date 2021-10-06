@@ -267,16 +267,16 @@ def printPlainSummary(cluster):
     delimiter = '-' * header1.__len__()
 
     # print host info
-    hostHeader = '{:>8}{:>16}'.format("HostId", "Host Name")
+    hostHeader = '{:>8} {:>16}'.format("HostId", "Host Name")
     for clusterId, remoteCluster in list(cluster.remoteclusters_by_id.items()):
-        hostHeader += '{:>20}'.format("Cluster " + str(clusterId) + " (" + remoteCluster.status + ")")
+        hostHeader += ' {:>20}'.format("Cluster " + str(clusterId) + " (" + remoteCluster.status + ")")
 
     rows = list()
     for hostId, hostname in list(cluster.hosts_by_id.items()):
-        row = "{:>8}{:>16}".format(hostId, hostname)
+        row = "{:>8} {:>16}".format(hostId, hostname)
         for clusterId, remoteCluster in list(cluster.remoteclusters_by_id.items()):
             # use get() to avoid keyError when node is shut down
-            row += '{:>17} s'.format(remoteCluster.producer_max_latency.get(hostname + str(clusterId), ''))
+            row += ' {:>17} s'.format(remoteCluster.producer_max_latency.get(hostname + str(clusterId), ''))
         rows.append(row)
 
     sys.stdout.write(header1)
