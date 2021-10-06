@@ -1011,9 +1011,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     SnapshotArchiver.archiveSnapshotDirectory(getSnapshotPath(), config.m_snapArchiveRetainCount);
                     m_nodeSettings.clean();
                 }
-                if (readDepl.deployment.getDr() != null && DrRoleType.XDCR.equals(readDepl.deployment.getDr().getRole())) {
+                DrType dr = readDepl.deployment.getDr();
+                if (dr != null && DrRoleType.XDCR.equals(dr.getRole())) {
                     // add default export configuration to DR conflict table
-                    CatalogUtil.addExportConfigToDRConflictsTable(readDepl.deployment.getExport());
+                    String retention = CatalogUtil.checkDrRetention(dr);
+                    CatalogUtil.addExportConfigToDRConflictsTable(readDepl.deployment.getExport(), retention);
                 }
                 stageDeploymentFileForInitialize(config, readDepl.deployment);
                 m_licensing.stageLicenseFile();

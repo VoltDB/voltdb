@@ -516,6 +516,7 @@
         </xs:simpleType>
     </xs:attribute>
     <xs:attribute name="role" type="drRoleType" default="master"/>
+    <xs:attribute name="conflictretention" type="xs:string" use="optional"/>
   </xs:complexType>
 
   <!-- DR cluster role -->

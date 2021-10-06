@@ -340,6 +340,8 @@ public class VoltProjectBuilder {
     private String m_drConsumerSslPropertyFile = null;
     private Boolean m_drProducerEnabled = null;
     private DrRoleType m_drRole = DrRoleType.MASTER;
+    private String m_drConflictRetention;
+
     private FeaturesType m_featureOptions;
     private TopicsType m_topicsConfiguration;
     private ThreadPoolsType m_threadPoolsConfiguration;
@@ -937,6 +939,10 @@ public class VoltProjectBuilder {
         m_drRole = DrRoleType.XDCR;
     }
 
+    public void setDrConflictRetention(String retention) {
+        m_drConflictRetention = retention;
+    }
+
     public boolean compile(final String jarPath) {
         return compile(jarPath, 1, 1, 0, null, 0) != null;
     }
@@ -1421,6 +1427,9 @@ public class VoltProjectBuilder {
             ConsumerLimitType consumerLimitType = factory.createConsumerLimitType();
             consumerLimitType.setMaxbuffers(Integer.parseInt(m_drBuffers));
             dr.setConsumerlimit(consumerLimitType);
+        }
+        if (m_drConflictRetention != null) {
+            dr.setConflictretention(m_drConflictRetention);
         }
 
         deployment.setFeatures(m_featureOptions);

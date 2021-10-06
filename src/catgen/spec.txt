@@ -20,6 +20,7 @@ begin Cluster                      "A set of connected hosts running one or more
   int drFlushInterval              "Time interval in milliseconds between flushing partially filled DR buffers (depends on globalFlushInterval)"
   int exportFlushInterval          "Time interval in milliseconds between flushing partially filled Export buffers (depends on globalFlushInterval)"
   int preferredSource              "The cluster id from which this joining cluster should request snapshot"
+  string conflictretention         "Optional retention time for XDCR conflict CSV files"
 end
 
 begin Deployment javaonly         "Run-time deployment settings"

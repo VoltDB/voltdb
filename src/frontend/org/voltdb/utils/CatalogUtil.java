@@ -1876,7 +1876,8 @@ public abstract class CatalogUtil {
         Database db = cluster.getDatabases().get("database");
         if (DrRoleType.XDCR.value().equals(cluster.getDrrole())) {
             // add default export configuration to DR conflict table
-            exportType = addExportConfigToDRConflictsTable(exportType);
+            String retention = cluster.getConflictretention();
+            exportType = addExportConfigToDRConflictsTable(exportType, retention);
         }
 
         if (exportType == null) {
@@ -2310,7 +2311,7 @@ public abstract class CatalogUtil {
             frequencyInt = Math.toIntExact(tu.number);
             frequencyUnit = tu.flag;
         } catch (TimeUtils.InvalidTimeException | ArithmeticException ex) {
-            hostLog.error("Snapshot frequency " + frequency + " is not valid. It should be " +
+            hostLog.error("Snapshot frequency '" + frequency + "' is not valid. It should be" +
                           " an integer followed by one of [s, m, h] for seconds, minutes, hours." +
                           " Defaulting snapshot frequency to 10m.");
         }
@@ -2708,7 +2709,11 @@ public abstract class CatalogUtil {
                 cluster.setDrconsumerenabled(true);
                 cluster.setPreferredsource(-1); // reset to -1, if this is an update catalog
             }
-        } else {
+
+            // conflict retention for default xdcr conflicts export
+            cluster.setConflictretention(checkDrRetention(dr));
+
+        } else { // dr == null
             cluster.setDrrole(DrRoleType.NONE.value());
             if (clusterType.getId() != null) {
                 clusterId = clusterType.getId();
@@ -2717,6 +2722,25 @@ public abstract class CatalogUtil {
             }
         }
         cluster.setDrclusterid(clusterId);
+    }
+
+    public static String checkDrRetention(DrType dr) {
+        String result = "";
+        DrRoleType role = dr.getRole();
+        String retention = dr.getConflictretention();
+        if (role == DrRoleType.XDCR && retention != null && !retention.isEmpty()) {
+            try {
+                TimeUtils.TimeAndUnit tu = TimeUtils.parseTimeAndUnit(retention, TimeUnit.SECONDS, null);
+                hostLog.infoFmt("Retention for XDCR conflict files set to %s %s", tu.number, tu.unit.name().toLowerCase());
+                result = retention;
+            } catch (TimeUtils.InvalidTimeException | ArithmeticException ex) {
+                String mess = String.format("XDCR conflict retention '%s' is not valid. It should be an integer" +
+                                           " followed by one of [s, m, h, d] for seconds, minutes, hours, days.",
+                                            retention);
+                throw new IllegalArgumentException(mess);
+            }
+        }
+        return result;
     }
 
     /** Read a hashed password from password.
@@ -3409,8 +3433,9 @@ public abstract class CatalogUtil {
      * Add default configuration to DR conflicts export target if deployment file doesn't have the configuration
      *
      * @param export   list of export configuration
+     * @param retention   conflict retention string
      */
-    public static ExportType addExportConfigToDRConflictsTable(ExportType export) {
+    public static ExportType addExportConfigToDRConflictsTable(ExportType export, String retention) {
         if (export == null) {
             export = new ExportType();
         }
@@ -3427,39 +3452,32 @@ public abstract class CatalogUtil {
             defaultConfiguration.setTarget(DR_CONFLICTS_TABLE_EXPORT_GROUP);
             defaultConfiguration.setType(ServerExportEnum.FILE);
 
-            // type
-            PropertyType type = new PropertyType();
-            type.setName("type");
-            type.setValue(DEFAULT_DR_CONFLICTS_EXPORT_TYPE);
-            defaultConfiguration.getProperty().add(type);
+            setExportProperty(defaultConfiguration, "type", DEFAULT_DR_CONFLICTS_EXPORT_TYPE);
+            setExportProperty(defaultConfiguration, "nonce", DEFAULT_DR_CONFLICTS_NONCE);
+            setExportProperty(defaultConfiguration, "outdir", DEFAULT_DR_CONFLICTS_DIR);
+            setExportProperty(defaultConfiguration, "replicated", "true");
+            setExportProperty(defaultConfiguration, "skipinternals", "true");
 
-            // nonce
-            PropertyType nonce = new PropertyType();
-            nonce.setName("nonce");
-            nonce.setValue(DEFAULT_DR_CONFLICTS_NONCE);
-            defaultConfiguration.getProperty().add(nonce);
-
-            // outdir
-            PropertyType outdir = new PropertyType();
-            outdir.setName("outdir");
-            outdir.setValue(DEFAULT_DR_CONFLICTS_DIR);
-            defaultConfiguration.getProperty().add(outdir);
-
-            // k-safe file export
-            PropertyType ksafe = new PropertyType();
-            ksafe.setName("replicated");
-            ksafe.setValue("true");
-            defaultConfiguration.getProperty().add(ksafe);
-
-            // skip internal export columns
-            PropertyType skipinternal = new PropertyType();
-            skipinternal.setName("skipinternals");
-            skipinternal.setValue("true");
-            defaultConfiguration.getProperty().add(skipinternal);
+            if (retention != null && !retention.isEmpty()) {
+                long retentionSecs = TimeUtils.convertTimeAndUnit(retention, TimeUnit.SECONDS, null);
+                long period = 60; // same as export default
+                if (retentionSecs <= 60) { // short retention needs shorter period
+                    period = (retentionSecs + 1) / 2;
+                }
+                setExportProperty(defaultConfiguration, "retention", retention);
+                setExportProperty(defaultConfiguration, "period", period + "s");
+            }
 
             export.getConfiguration().add(defaultConfiguration);
         }
         return export;
+    }
+
+    private static void setExportProperty(ExportConfigurationType config, String name, String value) {
+        PropertyType prop = new PropertyType();
+        prop.setName(name);
+        prop.setValue(value);
+        config.getProperty().add(prop);
     }
 
     /*
