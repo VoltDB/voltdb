@@ -98,7 +98,7 @@ public class ExportToFileClient extends ExportClientBase {
     // how often to roll batches / files
     protected int m_periodSecs;
     // how long to retain rolled batches / files
-    protected int m_retainSecs;
+    protected int m_retentionSecs;
 
     // use thread-local to avoid SimpleDateFormat thread-safety issues
     protected ThreadLocal<SimpleDateFormat> m_dateformat;
@@ -468,10 +468,10 @@ public class ExportToFileClient extends ExportClientBase {
             }
 
             // Prune by age of batch directory.
-            if (m_retainSecs >= 0) {
+            if (m_retentionSecs >= 0) {
                 Pattern pattern = getPatternForBatchDir();
                 ExportFilePruner pruner = new ExportFilePruner(pattern, m_dateFormatOriginalString);
-                pruner.pruneByAge(m_outDir, TimeUnit.SECONDS.toMillis(m_retainSecs));
+                pruner.pruneByAge(m_outDir, TimeUnit.SECONDS.toMillis(m_retentionSecs));
             }
         }
 
@@ -507,10 +507,10 @@ public class ExportToFileClient extends ExportClientBase {
             // regardless of whether we just renamed a file for any given table.
             // If we ever do pruning by retention count, we would need to do
             // them one table at a time; move this code into the rename loop.
-            if (m_retainSecs >= 0) {
+            if (m_retentionSecs >= 0) {
                 Pattern pattern = getFilenamePattern(null);
                 ExportFilePruner pruner = new ExportFilePruner(pattern, m_dateFormatOriginalString);
-                pruner.pruneByAge(m_dirContainingFiles, TimeUnit.SECONDS.toMillis(m_retainSecs));
+                pruner.pruneByAge(m_dirContainingFiles, TimeUnit.SECONDS.toMillis(m_retentionSecs));
             }
         }
 
@@ -947,7 +947,7 @@ public class ExportToFileClient extends ExportClientBase {
 
         boolean skipinternal = Boolean.parseBoolean(conf.getProperty("skipinternals", "false"));
 
-        // "period" and "retain" can optionally have a unit indication m, h, or d
+        // "period" and "retention" can optionally have a unit indication m, h, or d
         // if absent, assumed to be 'm' for back-compatibility
 
         int periodSecs = TimeUtils.convertIntTimeAndUnit(conf.getProperty("period", "60"), TimeUnit.SECONDS, TimeUnit.MINUTES);
@@ -955,16 +955,16 @@ public class ExportToFileClient extends ExportClientBase {
             throw new IllegalArgumentException("Error: Specified value for 'period' must be greater than 0.");
         }
 
-        int retainSecs = -1; // negative: no pruning
-        String retainProp = conf.getProperty("retain");
-        if (retainProp != null) {
-            retainSecs = TimeUtils.convertIntTimeAndUnit(retainProp, TimeUnit.SECONDS, TimeUnit.MINUTES);
-            if (retainSecs <= 0) {
-                throw new IllegalArgumentException("Error: Specified value for 'retain' must be greater than 0.");
+        int retentionSecs = -1; // negative: no pruning
+        String retentionProp = conf.getProperty("retention");
+        if (retentionProp != null) {
+            retentionSecs = TimeUtils.convertIntTimeAndUnit(retentionProp, TimeUnit.SECONDS, TimeUnit.MINUTES);
+            if (retentionSecs <= 0) {
+                throw new IllegalArgumentException("Error: Specified value for 'retention' must be greater than 0.");
             }
-            if (retainSecs < periodSecs) {
-                String msg = String.format("Error: 'retain' value (%d secs) cannot be less than 'period' value (%d secs).",
-                                           retainSecs, periodSecs);
+            if (retentionSecs < periodSecs) {
+                String msg = String.format("Error: 'retention' value (%d secs) cannot be less than 'period' value (%d secs).",
+                                           retentionSecs, periodSecs);
                 throw new IllegalArgumentException(msg);
             }
         }
@@ -999,7 +999,7 @@ public class ExportToFileClient extends ExportClientBase {
                 nonce,
                 outdir,
                 periodSecs,
-                retainSecs,
+                retentionSecs,
                 dateformatString,
                 fullDelimiters,
                 skipinternal,
@@ -1015,7 +1015,7 @@ public class ExportToFileClient extends ExportClientBase {
                               final String nonce,
                               final File outdir,
                               final int periodSecs,
-                              final int retainSecs,
+                              final int retentionSecs,
                               final String dateformatString,
                               String fullDelimiters,
                               final boolean skipinternal,
@@ -1031,7 +1031,7 @@ public class ExportToFileClient extends ExportClientBase {
         m_tableDecoders = new HashMap<>();
         m_decoderExecutor = new HashMap<>();
         m_periodSecs = periodSecs;
-        m_retainSecs = retainSecs;
+        m_retentionSecs = retentionSecs;
         m_dateFormatOriginalString = dateformatString;
         // SimpleDateFormat isn't threadsafe
         // ThreadLocal variables should protect them, lamely.
@@ -1080,5 +1080,8 @@ public class ExportToFileClient extends ExportClientBase {
                         "Export file rotate timer for nonce " + nonce, 1, CoreUtils.SMALL_STACK_SIZE);
         m_scheduledFileRotatorService.scheduleWithFixedDelay(rotator, m_periodSecs, m_periodSecs, TimeUnit.SECONDS);
         m_logger.infoFmt("File rotator for nonce %s will run every %s seconds", nonce, m_periodSecs);
+        if (m_retentionSecs >= 0) {
+            m_logger.infoFmt("Files older than %s seconds will be purged", m_retentionSecs);
+        }
     }
 }
