@@ -927,7 +927,6 @@ function set_kubernetes(server, port) {
       if (currentUserRole !== 'null' && usersList.length > 0) {
         var updatedUserRole = usersList.filter(user => user.name === currentUser)[0].role;
         var isRoleChanged = currentUserRole === updatedUserRole ? false : true;
-        console.log(updatedRole, isRoleChanged);
 
         VoltDbAdminConfig.isRoleChanged = isRoleChanged;
         if (isRoleChanged) {
