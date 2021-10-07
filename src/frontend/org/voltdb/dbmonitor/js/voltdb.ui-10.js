@@ -4502,9 +4502,11 @@ var adjustExporterGraphSpacing = function () {
       });
 
     setInterval(() => {
-      voltDbRenderer.fetchUsersListDB();
-      if (VoltDbAdminConfig.isReloadRequired) {
-        showAdminPage();
+      if (VoltDbAdminConfig.isSecurityEnabled) {
+        voltDbRenderer.fetchUsersListDB();
+        if (VoltDbAdminConfig.isReloadRequired) {
+          showAdminPage();
+        }
       }
     }, 2000)
 

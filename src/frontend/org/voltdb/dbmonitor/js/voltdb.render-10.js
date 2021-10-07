@@ -921,6 +921,7 @@ function set_kubernetes(server, port) {
     }
 
     function checkRolesUpdate(usersList) {
+
       var currentUserRole = VoltDbUI.getCookie("role");
       var currentUser = VoltDbUI.getCookie("username");
 
@@ -946,6 +947,7 @@ function set_kubernetes(server, port) {
 
     var loadAdminDeploymentInformation = function (connection) {
       var adminConfigValues = {};
+      var currentUser = VoltDbUI.getCookie("username");
       if (
         connection != null &&
         connection.Metadata["SHORTAPI_DEPLOYMENT"] != null
@@ -954,13 +956,13 @@ function set_kubernetes(server, port) {
         var usersList = voltDbRenderer.usersList;
 
         //The user does not have permission to view admin details.
-        if (usersList === null) {
+        if (usersList.length === 0) {
           adminConfigValues.VMCNoPermission = false;
           VoltDbAdminConfig.isAdmin = true;
         } else if (!hasAdminPrivileges) {
           adminConfigValues.VMCNoPermission = true;
           return adminConfigValues;
-        } else {
+        } else if (currentUser === 'null') {
           adminConfigValues.VMCNoPermission = false;
           VoltDbAdminConfig.isAdmin = true;
         }
@@ -973,6 +975,7 @@ function set_kubernetes(server, port) {
             : false;
         adminConfigValues["securityEnabled"] =
           data.security != null ? data.security.enabled : false;
+        VoltDbAdminConfig.isSecurityEnabled = adminConfigValues["securityEnabled"];
 
         if (data.users != null && data.users.user != null)
           adminConfigValues["users"] =

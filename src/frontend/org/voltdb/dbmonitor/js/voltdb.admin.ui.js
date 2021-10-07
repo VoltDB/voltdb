@@ -17,23 +17,23 @@ function getListOfRoles() {
     try {
         var schematext = $("#d").find(".dataBlockContent pre").html();
     } catch (err) {
-      console.log( "Can't get schema: " + err);
+        console.log("Can't get schema: " + err);
     }
-    
+
     // Parse schema
-    var listOfRoles = ['ADMINISTRATOR','USER'];
+    var listOfRoles = ['ADMINISTRATOR', 'USER'];
     var schemaLines = schematext.split("\n");
-    for (var i=0; i< schemaLines.length;i++) {
+    for (var i = 0; i < schemaLines.length; i++) {
         var l = schemaLines[i];
         // Throw away comments
         var pos = l.indexOf("--");
-        if (pos >= 0) schemaLines[i] = l.substring(0,pos);
+        if (pos >= 0) schemaLines[i] = l.substring(0, pos);
     }
     schematext = schemaLines.join(" ");
-        // compress spaces, split statements
+    // compress spaces, split statements
     var statements = schematext.replace(/\s+/g, ' ').split(";");
-        
-    for (var j=0; j < statements.length;j++) {
+
+    for (var j = 0; j < statements.length; j++) {
         var tokens = statements[j].trim().split(" ");
         if (tokens.length > 2) {
             if (tokens[0].toUpperCase() == "CREATE") {
@@ -43,29 +43,29 @@ function getListOfRoles() {
             }
         }
 
-        
+
     }
     var r = "";
-    for (var i=0;i<listOfRoles.length;i++) r += listOfRoles[i] + ", "; 
+    for (var i = 0; i < listOfRoles.length; i++) r += listOfRoles[i] + ", ";
     return listOfRoles;
 
 }
 
-function rolehtml(){
+function rolehtml() {
     var roles = getListOfRoles();
     var role_options = "";
-    for (var i=0;i<roles.length;i++) {
+    for (var i = 0; i < roles.length; i++) {
         role_options += '<option value="' + roles[i] + '">' + roles[i] + '</option>';
     }
     return role_options
 }
 
 function loadAdminPage() {
-    if (voltDbRenderer.kubernetes_con){
+    if (voltDbRenderer.kubernetes_con) {
         var htmlcontent = "";
         htmlcontent = htmlcontent.concat(
-            '<div class="kubernetes-content">'+
-            '<div class="kubernetes-logo"><p class="kubernetes-title">Managed by Kubernetes</p><p class="kubernetes-subtitle">Use Helm to manage and administer your cluster</p></div>' + 
+            '<div class="kubernetes-content">' +
+            '<div class="kubernetes-logo"><p class="kubernetes-title">Managed by Kubernetes</p><p class="kubernetes-subtitle">Use Helm to manage and administer your cluster</p></div>' +
             '</div>'
         )
         $(".adminLeft").html(htmlcontent);
@@ -196,12 +196,12 @@ function loadAdminPage() {
         txtTarget: $("#txtTarget"),
         txtTargetValue: $("#txtTarget").text(),
         txtCommunity: $("#txtCommunity"),
-        txtCommunityValue : $("#txtCommunity").text(),
+        txtCommunityValue: $("#txtCommunity").text(),
         txtUsername: $("#txtUsername"),
-        txtUsernameValue : $("#txtUsername").text(),
+        txtUsernameValue: $("#txtUsername").text(),
         targetSpan: $("#targetSpan"),
         communitySpan: $("#communitySpan"),
-        usernameSpan:$("#usernameSpan"),
+        usernameSpan: $("#usernameSpan"),
         authKeySpan: $("#authKeySpan"),
         privProtocolSpan: $("#privProtocolSpan"),
         privKeySpan: $("#privKeySpan"),
@@ -259,14 +259,14 @@ function loadAdminPage() {
         editStateSnapshot: editStates.ShowEdit,
         loadingSnapshot: $("#loadingSnapshot"),
 
-                //snmp
-        editStateSnmp : editStates.ShowEdit,
+        //snmp
+        editStateSnmp: editStates.ShowEdit,
         loadingSnmp: $("#loadingSnmp"),
         loadingTarget: $("#loadingTarget"),
         loadingCommunity: $("#loadingCommunity"),
         loadingUsername: $("#loadingUsername"),
         loadingAuthProtocol: $("#loadingAuthProtocol"),
-        loadingAuthkey : $("#loadingAuthkey"),
+        loadingAuthkey: $("#loadingAuthkey"),
         loadingPrivProtocol: $("#loadingPrivProtocol"),
         loadingPrivKey: $("#loadingPrivKey"),
 
@@ -340,7 +340,7 @@ function loadAdminPage() {
         editDiskLimitLink: $("#btnEditDiskLimit"),
         loadingDiskLimit: $("#loadingDiskLimit"),
         diskLimitConfiguration: $("#diskLimitConfiguration"),
-        
+
 
         //Dr Mode object
         labelDrmode: $("#drMode"),
@@ -453,29 +453,29 @@ function loadAdminPage() {
             max: "Please enter a positive number between 0 and " + INT_MAX_VALUE + ".",
             digits: "Please enter a positive number without any decimal."
         },
-        authKeyRules:{
+        authKeyRules: {
             required: true,
             minlength: 8
         },
-        authKeyMessages:{
+        authKeyMessages: {
             required: "This field is required",
             minlength: "Please enter at least 8 characters."
         },
-        privKeyRules:{
+        privKeyRules: {
             required: true,
             minlength: 8
         },
-        privKeyMessages:{
+        privKeyMessages: {
             required: "This field is required",
             minlength: "Please enter at least 8 characters.",
         },
-        targetRules:{
+        targetRules: {
             required: true,
-            portRegex : /^[a-zA-Z0-9.-]+$/,
+            portRegex: /^[a-zA-Z0-9.-]+$/,
         },
-        targetMessages:{
-            required:"This field is required",
-            portRegex : "Please enter a valid value.(e.g, hostname:(1-65535))"
+        targetMessages: {
+            required: "This field is required",
+            portRegex: "Please enter a valid value.(e.g, hostname:(1-65535))"
         }
     };
 
@@ -502,58 +502,58 @@ function loadAdminPage() {
         adminEditObjects.txtDrMaster.text(getOnOffText(adminEditObjects.chkDrMaster.is(":checked")));
     });
 
-     adminEditObjects.chkSnmp.on('ifChanged', function () {
+    adminEditObjects.chkSnmp.on('ifChanged', function () {
         adminEditObjects.txtSnmp.text(getOnOffText(adminEditObjects.chkSnmp.is(":checked")));
-        if(adminEditObjects.txtSnmp.text() == "Off"){
+        if (adminEditObjects.txtSnmp.text() == "Off") {
             $("#txtAuthkey").rules("remove");
             $("#txtPrivKey").rules("remove");
             $("#txtTarget").rules("remove");
         }
-        else{
-            if(adminEditObjects.ddlAuthProtocol.val().toLowerCase() != "noauth" && adminEditObjects.txtUsername.val() != ""){
-                    $("#txtAuthkey").rules("add",{
-                        required: true,
-                        minlength: 8,
-                        messages:{
-                            required: "This field is required",
-                            minlength: "Please enter at least 8 characters.",
-                        }
-                    })
-            }
-            else if(adminEditObjects.ddlAuthProtocol.val().toLowerCase() != "noauth" && adminEditObjects.txtUsername.val() == ""){
-                 $("#txtAuthkey").rules("add",{
+        else {
+            if (adminEditObjects.ddlAuthProtocol.val().toLowerCase() != "noauth" && adminEditObjects.txtUsername.val() != "") {
+                $("#txtAuthkey").rules("add", {
                     required: true,
-                    messages:{
+                    minlength: 8,
+                    messages: {
+                        required: "This field is required",
+                        minlength: "Please enter at least 8 characters.",
+                    }
+                })
+            }
+            else if (adminEditObjects.ddlAuthProtocol.val().toLowerCase() != "noauth" && adminEditObjects.txtUsername.val() == "") {
+                $("#txtAuthkey").rules("add", {
+                    required: true,
+                    messages: {
                         required: "This field is required",
                     }
                 })
             }
 
-            if(adminEditObjects.ddlPrivProtocol.val().toLowerCase() != "nopriv" && adminEditObjects.txtUsername.val() != ""){
-                    $("#txtPrivKey").rules("add",{
-                        required: true,
-                        minlength: 8,
-                        messages:{
-                            required: "This field is required",
-                            minlength: "Please enter at least 8 characters.",
-                        }
-                    })
-            }
-            else if(adminEditObjects.ddlPrivProtocol.val().toLowerCase() != "nopriv" && adminEditObjects.txtUsername.val() == ""){
-                 $("#txtPrivKey").rules("add",{
+            if (adminEditObjects.ddlPrivProtocol.val().toLowerCase() != "nopriv" && adminEditObjects.txtUsername.val() != "") {
+                $("#txtPrivKey").rules("add", {
                     required: true,
-                    messages:{
+                    minlength: 8,
+                    messages: {
+                        required: "This field is required",
+                        minlength: "Please enter at least 8 characters.",
+                    }
+                })
+            }
+            else if (adminEditObjects.ddlPrivProtocol.val().toLowerCase() != "nopriv" && adminEditObjects.txtUsername.val() == "") {
+                $("#txtPrivKey").rules("add", {
+                    required: true,
+                    messages: {
                         required: "This field is required",
                     }
                 })
             }
 
-            $("#txtTarget").rules("add",{
+            $("#txtTarget").rules("add", {
                 required: true,
-                portRegex : /^[a-zA-Z0-9.-]+$/,
-                messages:{
-                    required:"This field is required",
-                    portRegex : "Please enter a valid value.(e.g, hostname:(1-65535))"
+                portRegex: /^[a-zA-Z0-9.-]+$/,
+                messages: {
+                    required: "This field is required",
+                    portRegex: "Please enter a valid value.(e.g, hostname:(1-65535))"
                 }
             })
         }
@@ -650,9 +650,9 @@ function loadAdminPage() {
                 }
                 var htmlResult = '';
 
-                if(isProVersion){
+                if (isProVersion) {
                     htmlResult += '<label>Save Snapshot:</label>' +
-                                '&nbsp <input type="checkbox" checked="true" id="chkSaveSnaps" class="chkStream"/>';
+                        '&nbsp <input type="checkbox" checked="true" id="chkSaveSnaps" class="chkStream"/>';
                 }
 
                 htmlResult += '<p class="txt-bold">Are you sure you want to shutdown the cluster?</p>' +
@@ -694,18 +694,18 @@ function loadAdminPage() {
     });
 
 
-    var displayShutdownStatus = function(btnId, status){
-        if(status == "normal"){
+    var displayShutdownStatus = function (btnId, status) {
+        if (status == "normal") {
             $("#" + btnId + "Normal").show()
             $("#" + btnId + "Load").hide()
             $("#" + btnId + "Ok").hide()
             $("#" + btnId + "Failure").hide()
-        } else if(status == "load"){
+        } else if (status == "load") {
             $("#" + btnId + "Normal").hide()
             $("#" + btnId + "Load").show()
             $("#" + btnId + "Ok").hide()
             $("#" + btnId + "Failure").hide()
-        } else if(status == "failure"){
+        } else if (status == "failure") {
             $("#" + btnId + "Normal").hide()
             $("#" + btnId + "Load").hide()
             $("#" + btnId + "Ok").hide()
@@ -718,8 +718,8 @@ function loadAdminPage() {
         }
     }
 
-    var showHideShutdownErrMsg = function(status, msg){
-        if(!status){
+    var showHideShutdownErrMsg = function (status, msg) {
+        if (!status) {
             $("#shutdownErrMsg").html(msg);
             $("#divRetryBtn").show()
             $("#divShutdownErrMsg").show()
@@ -731,7 +731,7 @@ function loadAdminPage() {
         }
     }
 
-    var serverShutdown = function(popup){
+    var serverShutdown = function (popup) {
         showHideShutdownErrMsg(true);
         displayShutdownStatus("liPrepareShutdown", "load")
         voltDbRenderer.prepareShutdownCluster(function (prepare_status) {
@@ -744,7 +744,7 @@ function loadAdminPage() {
             displayShutdownStatus("liShutdownReady", "normal");
             showHideShutdownErrMsg(true);
             var status = prepare_status.status;
-            var zk_pause_txn_id =  prepare_status.zk_pause_txn_id;
+            var zk_pause_txn_id = prepare_status.zk_pause_txn_id;
             if (status != 1) {
                 console.log("The preparation for shutdown failed with status: " + status + ".");
                 displayShutdownStatus("liPrepareShutdown", "failure");
@@ -757,7 +757,7 @@ function loadAdminPage() {
                 displayShutdownStatus("liPrepareShutdown", "ok");
                 displayShutdownStatus("liQueueExpData", "load")
                 voltDbRenderer.QuiesceCluster(function (quiesceStatus) {
-                    if(quiesceStatus != 0){
+                    if (quiesceStatus != 0) {
                         console.log("The cluster has failed to be quiesce with status: " + quiesceStatus + ".")
                         displayShutdownStatus("liQueueExpData", "failure");
                         showHideShutdownErrMsg(false, "The cluster has failed to be quiesce with status: " + quiesceStatus + ".")
@@ -767,25 +767,27 @@ function loadAdminPage() {
                         console.log('Completing outstanding export and DR transactions.')
                         displayShutdownStatus("liQueueExpData", "ok")
                         displayShutdownStatus("liCompleteOutstandingExpDr", "load")
-                        var drDetails = {"DrProducer": {
+                        var drDetails = {
+                            "DrProducer": {
                                 "partition_min": {},
                                 "partition_max": {},
                                 "partition_min_host": {}
                             }
                         }
-                        voltDbRenderer.GetDrProducerInformation(function(drDetails){
+                        voltDbRenderer.GetDrProducerInformation(function (drDetails) {
                             // check the export stats twice because they are periodic
                             var export_tables_with_data = {}
-                            voltDbRenderer.GetDrProducerInformation(function(drDetails){
-                                var exportTableDetails = { "ExportTables": {
+                            voltDbRenderer.GetDrProducerInformation(function (drDetails) {
+                                var exportTableDetails = {
+                                    "ExportTables": {
                                         "export_tables_with_data": {},
                                         "last_table_stat_time": 0
                                     }
                                 }
-                                voltDbRenderer.GetExportTablesInformation(function(exportTableDetails){
+                                voltDbRenderer.GetExportTablesInformation(function (exportTableDetails) {
                                     exportTableDetails["ExportTables"]["last_table_stat_time"] = exportTableDetails["ExportTables"]["collection_time"];
-                                    if((drDetails["DrProducer"].partition_min == undefined || $.isEmptyObject(drDetails["DrProducer"].partition_min)) &&
-                                        exportTableDetails["ExportTables"]["last_table_stat_time"] == 1){
+                                    if ((drDetails["DrProducer"].partition_min == undefined || $.isEmptyObject(drDetails["DrProducer"].partition_min)) &&
+                                        exportTableDetails["ExportTables"]["last_table_stat_time"] == 1) {
                                         // there are no outstanding export or dr transactions
                                         continueShutdown(popup, zk_pause_txn_id)
                                         return
@@ -795,20 +797,20 @@ function loadAdminPage() {
                                     // have to get two samples of table stats because the cached value could be
                                     // from before Quiesce
 
-                                    var setDrExpInterval= setInterval(function(){
+                                    var setDrExpInterval = setInterval(function () {
                                         var result = false;
                                         curr_table_stat_time = 0;
-                                        if(!$.isEmptyObject(drDetails["DrProducer"].partition_min) || drDetails["DrProducer"].partition_min != undefined){
-                                            voltDbRenderer.GetDrProducerInformation(function(drDetails){
-                                                if(exportTableDetails["ExportTables"]["last_table_stat_time"] > 1){
-                                                    voltDbRenderer.GetExportTablesInformation(function(exportTableDetails){
+                                        if (!$.isEmptyObject(drDetails["DrProducer"].partition_min) || drDetails["DrProducer"].partition_min != undefined) {
+                                            voltDbRenderer.GetDrProducerInformation(function (drDetails) {
+                                                if (exportTableDetails["ExportTables"]["last_table_stat_time"] > 1) {
+                                                    voltDbRenderer.GetExportTablesInformation(function (exportTableDetails) {
                                                         curr_table_stat_time = exportTableDetails["ExportTables"]["collection_time"]
                                                         notifyInterval -= 1
                                                         result = checkExportAndDr(exportTableDetails["ExportTables"]["last_table_stat_time"],
-                                                                                  curr_table_stat_time, exportTableDetails["ExportTables"]["export_tables_with_data"],
-                                                                                  drDetails["DrProducer"].partition_min, drDetails["DrProducer"].partition_max,
-                                                                                  drDetails["DrProducer"].partition_min_host, notifyInterval);
-                                                        if(result){
+                                                            curr_table_stat_time, exportTableDetails["ExportTables"]["export_tables_with_data"],
+                                                            drDetails["DrProducer"].partition_min, drDetails["DrProducer"].partition_max,
+                                                            drDetails["DrProducer"].partition_min_host, notifyInterval);
+                                                        if (result) {
                                                             clearInterval(setDrExpInterval)
                                                             continueShutdown(popup, zk_pause_txn_id)
                                                             return;
@@ -817,10 +819,10 @@ function loadAdminPage() {
                                                 } else {
                                                     notifyInterval -= 1
                                                     result = checkExportAndDr(exportTableDetails["ExportTables"]["last_table_stat_time"],
-                                                                              curr_table_stat_time, exportTableDetails["ExportTables"]["export_tables_with_data"],
-                                                                              drDetails["DrProducer"].partition_min, drDetails["DrProducer"].partition_max,
-                                                                              drDetails["DrProducer"].partition_min_host, notifyInterval);
-                                                    if(result){
+                                                        curr_table_stat_time, exportTableDetails["ExportTables"]["export_tables_with_data"],
+                                                        drDetails["DrProducer"].partition_min, drDetails["DrProducer"].partition_max,
+                                                        drDetails["DrProducer"].partition_min_host, notifyInterval);
+                                                    if (result) {
                                                         clearInterval(setDrExpInterval)
                                                         continueShutdown(popup, zk_pause_txn_id)
                                                         return;
@@ -829,27 +831,27 @@ function loadAdminPage() {
 
                                             }, drDetails);
                                         } else {
-                                            if(exportTableDetails["ExportTables"]["last_table_stat_time"] > 1){
-                                                voltDbRenderer.GetExportTablesInformation(function(exportTableDetails){
+                                            if (exportTableDetails["ExportTables"]["last_table_stat_time"] > 1) {
+                                                voltDbRenderer.GetExportTablesInformation(function (exportTableDetails) {
                                                     curr_table_stat_time = exportTableDetails["ExportTables"]["collection_time"]
                                                     notifyInterval -= 1
                                                     result = checkExportAndDr(exportTableDetails["ExportTables"]["last_table_stat_time"],
-                                                                     curr_table_stat_time, exportTableDetails["ExportTables"]["export_tables_with_data"],
-                                                                     drDetails["DrProducer"].partition_min, drDetails["DrProducer"].partition_max,
-                                                                     drDetails["DrProducer"].partition_min_host, notifyInterval);
-                                                    if(result){
+                                                        curr_table_stat_time, exportTableDetails["ExportTables"]["export_tables_with_data"],
+                                                        drDetails["DrProducer"].partition_min, drDetails["DrProducer"].partition_max,
+                                                        drDetails["DrProducer"].partition_min_host, notifyInterval);
+                                                    if (result) {
                                                         clearInterval(setDrExpInterval)
                                                         continueShutdown(popup, zk_pause_txn_id)
                                                         return;
                                                     }
                                                 });
-                                            } else{
+                                            } else {
                                                 notifyInterval -= 1
                                                 result = checkExportAndDr(exportTableDetails["ExportTables"]["last_table_stat_time"],
-                                                                 curr_table_stat_time, exportTableDetails["ExportTables"]["export_tables_with_data"],
-                                                                 drDetails["DrProducer"].partition_min, drDetails["DrProducer"].partition_max,
-                                                                 drDetails["DrProducer"].partition_min_host, notifyInterval);
-                                                if(result){
+                                                    curr_table_stat_time, exportTableDetails["ExportTables"]["export_tables_with_data"],
+                                                    drDetails["DrProducer"].partition_min, drDetails["DrProducer"].partition_max,
+                                                    drDetails["DrProducer"].partition_min_host, notifyInterval);
+                                                if (result) {
                                                     clearInterval(setDrExpInterval)
                                                     continueShutdown(popup, zk_pause_txn_id)
                                                     return;
@@ -873,19 +875,19 @@ function loadAdminPage() {
     var isClientTransFinish = false;
     var isImportRequestFinish = false
 
-    var continueShutdown = function(popup, zk_pause_txn_id){
+    var continueShutdown = function (popup, zk_pause_txn_id) {
         displayShutdownStatus("liCompleteOutstandingExpDr", "ok")
         console.log('All export and DR transactions have been processed.')
         isClientTransFinish = false;
         check_client();
-        var clientTransInterval = setInterval(function(){
-            if(isClientTransFinish){
+        var clientTransInterval = setInterval(function () {
+            if (isClientTransFinish) {
                 clearInterval(clientTransInterval);
                 isImportRequestFinish = false;
                 check_importer()
 
-                var importReqInterval = setInterval(function(){
-                    if(isImportRequestFinish){
+                var importReqInterval = setInterval(function () {
+                    if (isImportRequestFinish) {
                         clearInterval(importReqInterval);
                         console.log('Cluster is ready for shutdown.')
                         displayShutdownStatus("liShutdownReady", "ok")
@@ -895,7 +897,7 @@ function loadAdminPage() {
                             window.clearInterval(VoltDbUI.connectionTimeInterval);
                         }, 10000);
                         $(".popup_close").show();
-                        if(VoltDbAdminConfig.isSaveSnapshot){
+                        if (VoltDbAdminConfig.isSaveSnapshot) {
                             voltDbRenderer.shutdownCluster(function (success) {
                                 if (!success) {
                                     clearTimeout(shutdownTimeout);
@@ -921,21 +923,21 @@ function loadAdminPage() {
                             });
                         }
                     }
-                },2000)
+                }, 2000)
             }
-        },2000)
+        }, 2000)
     }
 
-    var check_client = function(){
+    var check_client = function () {
         console.log('Completing outstanding client transactions.');
         displayShutdownStatus("liCompleteClientTrans", "load")
         voltDbRenderer.GetLiveClientsInfo(function (clientInfo) {
             trans = clientInfo['CLIENTS']['bytes'];
             bytes = clientInfo['CLIENTS']['msgs'];
-            msgs  = clientInfo['CLIENTS']['trans'];
+            msgs = clientInfo['CLIENTS']['trans'];
 
             console.log('Outstanding transactions= ' + trans + ', Outstanding request bytes= ' + bytes + ', Outstanding response messages= ' + msgs)
-            if(trans == 0 && bytes == 0 && msgs == 0){
+            if (trans == 0 && bytes == 0 && msgs == 0) {
                 isClientTransFinish = true
                 displayShutdownStatus("liCompleteClientTrans", "ok")
                 return
@@ -943,17 +945,17 @@ function loadAdminPage() {
                 sleepTime(1000);
                 check_Client();
             }
-            if(isClientTransFinish)
+            if (isClientTransFinish)
                 return
         });
     }
 
-    var check_importer = function(){
+    var check_importer = function () {
         console.log('Completing outstanding importer requests.')
         displayShutdownStatus("liCompleteOutstandingImp", "load")
         voltDbRenderer.GetImportRequestInformation(function (outstanding) {
             console.log('Outstanding importer requests= ' + outstanding)
-            if(outstanding == 0){
+            if (outstanding == 0) {
                 isImportRequestFinish = true
                 displayShutdownStatus("liCompleteOutstandingImp", "ok")
                 return;
@@ -961,25 +963,25 @@ function loadAdminPage() {
                 sleepTime(1000);
                 check_importer();
             }
-            if(isImportRequestFinish)
+            if (isImportRequestFinish)
                 return
         });
     }
 
-    var checkExportAndDr = function(last_table_stat_time, curr_table_stat_time,export_tables_with_data, partition_min, partition_max,
-                                    partition_min_host, notifyInterval){
-        if(last_table_stat_time == 1 || curr_table_stat_time > last_table_stat_time){
+    var checkExportAndDr = function (last_table_stat_time, curr_table_stat_time, export_tables_with_data, partition_min, partition_max,
+        partition_min_host, notifyInterval) {
+        if (last_table_stat_time == 1 || curr_table_stat_time > last_table_stat_time) {
             // have a new sample from table stat cache or there are no tables
-            if($.isEmptyObject(export_tables_with_data) && $.isEmptyObject(partition_min)){
+            if ($.isEmptyObject(export_tables_with_data) && $.isEmptyObject(partition_min)) {
                 console.log('All export and DR transactions have been processed.')
                 return true;
             }
         }
 
         notifyInterval -= 1
-        if(notifyInterval == 0){
+        if (notifyInterval == 0) {
             notifyInterval = 10
-            if(last_table_stat_time > 1 && (!$.isEmptyObject(export_tables_with_data)))
+            if (last_table_stat_time > 1 && (!$.isEmptyObject(export_tables_with_data)))
                 print_export_pending(export_tables_with_data)
             if (!$.isEmptyObject(partition_min))
                 print_dr_pending(partition_min_host, partition_min, partition_max)
@@ -988,20 +990,20 @@ function loadAdminPage() {
     }
 
 
-    var print_export_pending = function(export_tables_with_data){
+    var print_export_pending = function (export_tables_with_data) {
         console.log('The following export tables have unacknowledged transactions:');
         var summaryLine = "    {0} needs acknowledgement on host(s) {1} for partition(s) {2}."
-        $.each(export_tables_with_data, function(key, value){
+        $.each(export_tables_with_data, function (key, value) {
             var pidlist = []
             hostlist = Object.keys(export_tables_with_data[key])
-            for(var i = 0; i < hostlist.length; i++){
-                for(var j = 0; j < export_tables_with_data[key][hostlist[i]].length ;j++)
+            for (var i = 0; i < hostlist.length; i++) {
+                for (var j = 0; j < export_tables_with_data[key][hostlist[i]].length; j++)
                     pidlist.push(export_tables_with_data[key][hostlist[i]][j])
             }
             var partlist = "";
 
-            for(var j = 0; j < pidlist.length; j++){
-                if(j == 0)
+            for (var j = 0; j < pidlist.length; j++) {
+                if (j == 0)
                     partlist = pidlist[j].toString()
                 else
                     partlist = partlist + "," + pidlist[j].toString()
@@ -1011,20 +1013,20 @@ function loadAdminPage() {
         });
     }
 
-    var print_dr_pending = function(partition_min_host, partition_min, partition_max){
+    var print_dr_pending = function (partition_min_host, partition_min, partition_max) {
         console.log('The following partitions have pending DR transactions that the consumer cluster has not processed:')
         var summaryline = "    Partition {0} needs acknowledgement for drIds {1} to {2} on hosts: {3}."
-        $.each(partition_min_host, function(key, value){
+        $.each(partition_min_host, function (key, value) {
             pid = key;
-            console.log(summaryline.format(pid, partition_min[pid]+1, partition_max[pid], partition_min_host[pid].join()))
+            console.log(summaryline.format(pid, partition_min[pid] + 1, partition_max[pid], partition_min_host[pid].join()))
         });
     }
 
-    var sleepTime = function(milliseconds) {
+    var sleepTime = function (milliseconds) {
         var start = new Date().getTime();
         for (var i = 0; i < 1e7; i++) {
-            if ((new Date().getTime() - start) > milliseconds){
-              break;
+            if ((new Date().getTime() - start) > milliseconds) {
+                break;
             }
         }
     }
@@ -1046,15 +1048,15 @@ function loadAdminPage() {
         afterOpen: function () {
             var popup = $(this)[0];
             $("#btnPrepareShutdownOk").unbind("click");
-            $("#btnPrepareShutdownOk").on("click", function(){
+            $("#btnPrepareShutdownOk").on("click", function () {
                 popup.close();
-                setTimeout(function(){
+                setTimeout(function () {
                     $("#btnPrepareShutdown").trigger("click")
-                },500)
+                }, 500)
                 //$("#btnPrepareShutdown").trigger("click")
             })
             $("#btnPrepareShutdownCancel").unbind("click");
-            $("#btnPrepareShutdownCancel").on("click", function(){
+            $("#btnPrepareShutdownCancel").on("click", function () {
                 popup.close();
             })
         }
@@ -1251,7 +1253,7 @@ function loadAdminPage() {
                         adminEditObjects.chkSecurityValue = adminConfigurations.security.enabled;
 
                         //reload the page if security is enabled, user is asked to login upon reload action if user session no longer exist
-                        if (adminConfigurations.security.enabled){
+                        if (adminConfigurations.security.enabled) {
                             logout();
                         }
 
@@ -1787,7 +1789,7 @@ function loadAdminPage() {
         }
     };
 
-    var toggleSnmpEdit = function(state){
+    var toggleSnmpEdit = function (state) {
         adminEditObjects.editStateSnmp = state;
         adminEditObjects.txtTarget.val(adminEditObjects.txtTargetValue);
         adminEditObjects.txtCommunity.val(adminEditObjects.txtCommunityValue);
@@ -1876,24 +1878,22 @@ function loadAdminPage() {
             adminEditObjects.loadingAuthkey.hide();
             adminEditObjects.loadingPrivKey.hide();
 
-            if(adminEditObjects.txtCommunity.val() == "" || adminEditObjects.txtCommunity.val() == null){
+            if (adminEditObjects.txtCommunity.val() == "" || adminEditObjects.txtCommunity.val() == null) {
                 adminEditObjects.txtCommunity.val("public");
             }
 
-            if(adminEditObjects.txtAuthkey.val() == "" || adminEditObjects.txtAuthkey.val() == null)
-            {
+            if (adminEditObjects.txtAuthkey.val() == "" || adminEditObjects.txtAuthkey.val() == null) {
                 adminEditObjects.txtAuthkey.val("voltdbauthkey")
             }
 
-            if(adminEditObjects.txtPrivKey.val() == "" || adminEditObjects.txtPrivKey.val() == null)
-            {
+            if (adminEditObjects.txtPrivKey.val() == "" || adminEditObjects.txtPrivKey.val() == null) {
                 adminEditObjects.txtPrivKey.val("voltdbprivacykey")
             }
 
             VoltDbAdminConfig.isSnmpEditMode = true;
 
         } else {
-           adminEditObjects.iconSnmpOption.show();
+            adminEditObjects.iconSnmpOption.show();
             adminEditObjects.LinkSnmpEdit.show();
             adminEditObjects.btnEditSnmpOk.hide();
             adminEditObjects.btnEditSnmpCancel.hide();
@@ -1983,72 +1983,72 @@ function loadAdminPage() {
     });
 
     adminEditObjects.btnEditSnmpOk.on("click", function (e) {
-        if(adminEditObjects.txtSnmp.text() == "On"){
-            if(adminEditObjects.ddlAuthProtocol.val().toLowerCase() != "noauth" && adminEditObjects.txtUsername.val() != ""){
-                    $("#txtAuthkey").rules("add",{
-                        required: true,
-                        minlength: 8,
-                        messages:{
-                            required: "This field is required",
-                            minlength: "Please enter at least 8 characters.",
-                        }
-                    })
-            }
-            else if(adminEditObjects.ddlAuthProtocol.val().toLowerCase() != "noauth" && adminEditObjects.txtUsername.val() == ""){
-                 $("#txtAuthkey").rules("add",{
+        if (adminEditObjects.txtSnmp.text() == "On") {
+            if (adminEditObjects.ddlAuthProtocol.val().toLowerCase() != "noauth" && adminEditObjects.txtUsername.val() != "") {
+                $("#txtAuthkey").rules("add", {
                     required: true,
-                    messages:{
+                    minlength: 8,
+                    messages: {
+                        required: "This field is required",
+                        minlength: "Please enter at least 8 characters.",
+                    }
+                })
+            }
+            else if (adminEditObjects.ddlAuthProtocol.val().toLowerCase() != "noauth" && adminEditObjects.txtUsername.val() == "") {
+                $("#txtAuthkey").rules("add", {
+                    required: true,
+                    messages: {
                         required: "This field is required",
                     }
                 })
             }
 
-            if(adminEditObjects.ddlPrivProtocol.val().toLowerCase() != "nopriv" && adminEditObjects.txtUsername.val() != ""){
-                    $("#txtPrivKey").rules("add",{
-                        required: true,
-                        minlength: 8,
-                        messages:{
-                            required: "This field is required",
-                            minlength: "Please enter at least 8 characters.",
-                        }
-                    })
-            }
-            else if(adminEditObjects.ddlPrivProtocol.val().toLowerCase() != "nopriv" && adminEditObjects.txtUsername.val() == ""){
-                 $("#txtPrivKey").rules("add",{
+            if (adminEditObjects.ddlPrivProtocol.val().toLowerCase() != "nopriv" && adminEditObjects.txtUsername.val() != "") {
+                $("#txtPrivKey").rules("add", {
                     required: true,
-                    messages:{
+                    minlength: 8,
+                    messages: {
+                        required: "This field is required",
+                        minlength: "Please enter at least 8 characters.",
+                    }
+                })
+            }
+            else if (adminEditObjects.ddlPrivProtocol.val().toLowerCase() != "nopriv" && adminEditObjects.txtUsername.val() == "") {
+                $("#txtPrivKey").rules("add", {
+                    required: true,
+                    messages: {
                         required: "This field is required",
                     }
                 })
             }
 
 
-             if(!$("#frmAuthkey").valid()){
-                        e.preventDefault();
-                        e.stopPropagation();
+            if (!$("#frmAuthkey").valid()) {
+                e.preventDefault();
+                e.stopPropagation();
 
-                        adminEditObjects.txtAuthkey.focus();
+                adminEditObjects.txtAuthkey.focus();
 
-                        adminEditObjects.errorAuthkey.css("background-color", "yellow");
-                    setTimeout(function () {
-                        adminEditObjects.errorAuthkey.animate({ backgroundColor: 'white' }, 'slow');
-                    }, 2000);
-                    }
+                adminEditObjects.errorAuthkey.css("background-color", "yellow");
+                setTimeout(function () {
+                    adminEditObjects.errorAuthkey.animate({ backgroundColor: 'white' }, 'slow');
+                }, 2000);
+            }
 
 
-            if(!$("#frmPrivKey").valid()){
+            if (!$("#frmPrivKey").valid()) {
                 e.preventDefault();
                 e.stopPropagation();
 
                 adminEditObjects.txtPrivKey.focus();
 
-               adminEditObjects.errorPrivKey.css("background-color", "yellow");
-            setTimeout(function () {
-                adminEditObjects.errorPrivKey.animate({ backgroundColor: 'white' }, 'slow');
-            }, 2000);
+                adminEditObjects.errorPrivKey.css("background-color", "yellow");
+                setTimeout(function () {
+                    adminEditObjects.errorPrivKey.animate({ backgroundColor: 'white' }, 'slow');
+                }, 2000);
             }
         }
-        else{
+        else {
 
             $("#txtAuthkey").rules("remove");
             $("#txtPrivKey").rules("remove");
@@ -2057,7 +2057,7 @@ function loadAdminPage() {
         }
 
 
-        if(!$("#frmTarget").valid()){
+        if (!$("#frmTarget").valid()) {
             e.preventDefault();
             e.stopPropagation();
 
@@ -2071,109 +2071,109 @@ function loadAdminPage() {
     });
 
 
-    adminEditObjects.ddlAuthProtocol.on("change", function(e){
-        if(adminEditObjects.txtSnmp.text() == "Off"){
+    adminEditObjects.ddlAuthProtocol.on("change", function (e) {
+        if (adminEditObjects.txtSnmp.text() == "Off") {
             $("#txtAuthkey").rules("remove");
             $("#txtPrivKey").rules("remove");
             $("#txtTarget").rules("remove");
         }
-        else{
+        else {
 
-            if(adminEditObjects.ddlAuthProtocol.val().toLowerCase() != "noauth" && adminEditObjects.txtUsername.val() != ""){
-                    $("#txtAuthkey").rules("add",{
-                        required: true,
-                        minlength: 8,
-                        messages:{
-                            required: "This field is required",
-                            minlength: "Please enter at least 8 characters.",
-                        }
-                    })
-            }
-            else if(adminEditObjects.ddlAuthProtocol.val().toLowerCase() != "noauth" && adminEditObjects.txtUsername.val() == ""){
-                 $("#txtAuthkey").rules("add",{
+            if (adminEditObjects.ddlAuthProtocol.val().toLowerCase() != "noauth" && adminEditObjects.txtUsername.val() != "") {
+                $("#txtAuthkey").rules("add", {
                     required: true,
-                    messages:{
+                    minlength: 8,
+                    messages: {
+                        required: "This field is required",
+                        minlength: "Please enter at least 8 characters.",
+                    }
+                })
+            }
+            else if (adminEditObjects.ddlAuthProtocol.val().toLowerCase() != "noauth" && adminEditObjects.txtUsername.val() == "") {
+                $("#txtAuthkey").rules("add", {
+                    required: true,
+                    messages: {
                         required: "This field is required",
                     }
                 })
             }
-            else{
+            else {
                 $("#txtAuthkey").rules("remove");
             }
 
 
-            if(adminEditObjects.ddlPrivProtocol.val().toLowerCase() != "nopriv" && adminEditObjects.txtUsername.val() != ""){
-                    $("#txtPrivKey").rules("add",{
-                        required: true,
-                        minlength: 8,
-                        messages:{
-                            required: "This field is required",
-                            minlength: "Please enter at least 8 characters.",
-                        }
-                    })
-            }
-            else if(adminEditObjects.ddlPrivProtocol.val().toLowerCase() != "nopriv" && adminEditObjects.txtUsername.val() == ""){
-                 $("#txtPrivKey").rules("add",{
+            if (adminEditObjects.ddlPrivProtocol.val().toLowerCase() != "nopriv" && adminEditObjects.txtUsername.val() != "") {
+                $("#txtPrivKey").rules("add", {
                     required: true,
-                    messages:{
+                    minlength: 8,
+                    messages: {
+                        required: "This field is required",
+                        minlength: "Please enter at least 8 characters.",
+                    }
+                })
+            }
+            else if (adminEditObjects.ddlPrivProtocol.val().toLowerCase() != "nopriv" && adminEditObjects.txtUsername.val() == "") {
+                $("#txtPrivKey").rules("add", {
+                    required: true,
+                    messages: {
                         required: "This field is required",
                     }
                 })
             }
-            else{
+            else {
                 $("#txtPrivKey").rules("remove");
             }
 
-            $("#txtTarget").rules("add",{
+            $("#txtTarget").rules("add", {
                 required: true,
-                portRegex : /^[a-zA-Z0-9.-]+$/,
-                messages:{
-                    required:"This field is required",
-                    portRegex : "Please enter a valid value.(e.g, hostname:(1-65535))"
+                portRegex: /^[a-zA-Z0-9.-]+$/,
+                messages: {
+                    required: "This field is required",
+                    portRegex: "Please enter a valid value.(e.g, hostname:(1-65535))"
                 }
             })
         }
     })
 
-    adminEditObjects.ddlPrivProtocol.on("change", function(e){
-        if(adminEditObjects.ddlPrivProtocol.val().toLowerCase() == "nopriv"){
-             $("#txtPrivKey").rules("remove");
+    adminEditObjects.ddlPrivProtocol.on("change", function (e) {
+        if (adminEditObjects.ddlPrivProtocol.val().toLowerCase() == "nopriv") {
+            $("#txtPrivKey").rules("remove");
         }
     })
 
-    adminEditObjects.txtUsername.on("change", function(e){
+    adminEditObjects.txtUsername.on("change", function (e) {
         $("#txtAuthkey").rules("remove");
         $("#txtPrivKey").rules("remove");
-        if(adminEditObjects.txtSnmp.text() == "On"){
-             if(adminEditObjects.ddlAuthProtocol.val().toLowerCase() != "noauth" && adminEditObjects.txtUsername.val() != ""){
-                    $("#txtAuthkey").rules("add",{
-                        required: true,
-                        minlength: 8,
-                        messages:{
-                            required: "This field is required",
-                            minlength: "Please enter at least 8 characters.",
-                        }
-                    })
+        if (adminEditObjects.txtSnmp.text() == "On") {
+            if (adminEditObjects.ddlAuthProtocol.val().toLowerCase() != "noauth" && adminEditObjects.txtUsername.val() != "") {
+                $("#txtAuthkey").rules("add", {
+                    required: true,
+                    minlength: 8,
+                    messages: {
+                        required: "This field is required",
+                        minlength: "Please enter at least 8 characters.",
+                    }
+                })
             }
 
-            else if(adminEditObjects.ddlAuthProtocol.val().toLowerCase() != "noauth" && adminEditObjects.txtUsername.val() == ""){
-                 $("#txtAuthkey").rules("add",{
+            else if (adminEditObjects.ddlAuthProtocol.val().toLowerCase() != "noauth" && adminEditObjects.txtUsername.val() == "") {
+                $("#txtAuthkey").rules("add", {
                     required: true,
-                    messages:{
+                    messages: {
                         required: "This field is required",
                     }
                 })
             }
 
-            if(adminEditObjects.ddlPrivProtocol.val().toLowerCase() != "nopriv" && adminEditObjects.txtUsername.val() != ""){
-                    $("#txtPrivKey").rules("add",{
-                        required: true,
-                        minlength: 8,
-                        messages:{
-                            required: "This field is required",
-                            minlength: "Please enter at least 8 characters.",
-                        }
-                    })
+            if (adminEditObjects.ddlPrivProtocol.val().toLowerCase() != "nopriv" && adminEditObjects.txtUsername.val() != "") {
+                $("#txtPrivKey").rules("add", {
+                    required: true,
+                    minlength: 8,
+                    messages: {
+                        required: "This field is required",
+                        minlength: "Please enter at least 8 characters.",
+                    }
+                })
             }
 
         }
@@ -2232,11 +2232,11 @@ function loadAdminPage() {
     $("#frmPrivKey").validate()
 
     $("#frmTarget").validate({
-        rules:{
-            txtTarget : adminValidationRules.targetRules
+        rules: {
+            txtTarget: adminValidationRules.targetRules
         },
-        messages:{
-            txtTarget : adminValidationRules.targetMessages
+        messages: {
+            txtTarget: adminValidationRules.targetMessages
         }
     })
 
@@ -2341,21 +2341,21 @@ function loadAdminPage() {
                 voltDbRenderer.updateAdminConfiguration(adminConfigurations, function (result) {
                     if (result.status == "1") {
 
-                          adminEditObjects.txtTargetValue = adminEditObjects.txtTarget.val();
-                          adminEditObjects.txtCommunityValue = adminEditObjects.txtCommunity.val();
-                          adminEditObjects.txtUsernameValue = adminEditObjects.txtUsername.val();
-                          adminEditObjects.ddlPrivProtocolValue = adminEditObjects.ddlPrivProtocol.val();
-                          adminEditObjects.ddlAuthProtocolValue = adminEditObjects.ddlAuthProtocol.val();
-                          adminEditObjects.txtAuthkeyValue = adminEditObjects.txtAuthkey.val();
-                          adminEditObjects.txtPrivkeyValue = adminEditObjects.txtPrivKey.val();
+                        adminEditObjects.txtTargetValue = adminEditObjects.txtTarget.val();
+                        adminEditObjects.txtCommunityValue = adminEditObjects.txtCommunity.val();
+                        adminEditObjects.txtUsernameValue = adminEditObjects.txtUsername.val();
+                        adminEditObjects.ddlPrivProtocolValue = adminEditObjects.ddlPrivProtocol.val();
+                        adminEditObjects.ddlAuthProtocolValue = adminEditObjects.ddlAuthProtocol.val();
+                        adminEditObjects.txtAuthkeyValue = adminEditObjects.txtAuthkey.val();
+                        adminEditObjects.txtPrivkeyValue = adminEditObjects.txtPrivKey.val();
 
-                          adminEditObjects.targetSpan.html(adminEditObjects.targetSpanValue)
-                          adminEditObjects.usernameSpan.html(adminEditObjects.usernameSpanValue);
-                          adminEditObjects.communitySpan.html(adminEditObjects.communitySpanValue);
-                          adminEditObjects.authProtocolSpan.html(adminEditObjects.authProtocolSpanValue);
-                          adminEditObjects.privProtocolSpan.html(adminEditObjects.privProtocolSpanValue);
-                          adminEditObjects.authKeySpan.html(adminEditObjects.authKeySpanValue);
-                          adminEditObjects.privKeySpan.html(adminEditObjects.privKeySpanValue)
+                        adminEditObjects.targetSpan.html(adminEditObjects.targetSpanValue)
+                        adminEditObjects.usernameSpan.html(adminEditObjects.usernameSpanValue);
+                        adminEditObjects.communitySpan.html(adminEditObjects.communitySpanValue);
+                        adminEditObjects.authProtocolSpan.html(adminEditObjects.authProtocolSpanValue);
+                        adminEditObjects.privProtocolSpan.html(adminEditObjects.privProtocolSpanValue);
+                        adminEditObjects.authKeySpan.html(adminEditObjects.authKeySpanValue);
+                        adminEditObjects.privKeySpan.html(adminEditObjects.privKeySpanValue)
 
                         //Reload Admin configurations for displaying the updated value
                         voltDbRenderer.GetAdminDeploymentInformation(false, function (adminConfigValues, rawConfigValues) {
@@ -2402,8 +2402,8 @@ function loadAdminPage() {
     });
 
 
-    adminEditObjects.LinkSnmpEdit.click(function(){
-         var parent = $(this).parent().parent();
+    adminEditObjects.LinkSnmpEdit.click(function () {
+        var parent = $(this).parent().parent();
         parent.siblings('.child-' + parent.attr("id")).show();
         parent.find(".labelCollapsed").addClass("labelExpanded");
         toggleSnmpEdit(editStates.ShowOkCancel);
@@ -2815,7 +2815,7 @@ function loadAdminPage() {
                 toggleMemorySizeEdit(editStates.ShowLoading);
                 voltDbRenderer.updateAdminConfiguration(adminConfigurations, function (result) {
                     if (result.status == "1") {
-                        
+
                         //Reload Admin configurations for displaying the updated value
                         voltDbRenderer.GetAdminDeploymentInformation(false, function (adminConfigValues, rawConfigValues) {
                             adminEditObjects.btnDeleteMemory.show();
@@ -3021,7 +3021,7 @@ function loadAdminPage() {
                 '       <select id="txtType" name="txtType"> ';
 
             var customIndex = $.inArray('CUSTOM', exporttypes.type);
-            
+
             exporttypes.type.splice(customIndex, 1);
 
             exporttypes.type.push("CUSTOM");
@@ -3155,11 +3155,11 @@ function loadAdminPage() {
                 }
                 var count = 1;
                 var multiPropertyCount = 0;
-                var kafkaBootstrapServerStatus =  false;
+                var kafkaBootstrapServerStatus = false;
 
-                if(config.type.toLowerCase() == "kafka"){
-                    for (var j = 0; j < properties.length; j++){
-                        if (properties[j].name == "bootstrap.servers"){
+                if (config.type.toLowerCase() == "kafka") {
+                    for (var j = 0; j < properties.length; j++) {
+                        if (properties[j].name == "bootstrap.servers") {
                             kafkaBootstrapServerStatus = true;
                             break;
                         }
@@ -3167,7 +3167,7 @@ function loadAdminPage() {
                 }
 
                 for (var i = 0; i < properties.length; i++) {
-                    if (properties[i].name == "metadata.broker.list" && !kafkaBootstrapServerStatus){
+                    if (properties[i].name == "metadata.broker.list" && !kafkaBootstrapServerStatus) {
                         properties[i].name = "bootstrap.servers"
                         kafkaBootstrapServerStatus = true;
                     }
@@ -3375,7 +3375,7 @@ function loadAdminPage() {
                 '<tr>' +
                 '    <td style="width:25%">Type </td>' +
                 '    <td style="width:60%">' +
-                '       <select id="txtImportType" name="txtImportType"> '+
+                '       <select id="txtImportType" name="txtImportType"> ' +
                 '           <option value="KAFKA">KAFKA</option> ' +
                 '           <option value="KINESIS">KINESIS</option> ' +
                 '       </select>' +
@@ -3442,14 +3442,14 @@ function loadAdminPage() {
 
             $("#addImportConfigWrapper").html(contents);
 
-            $("#dropDownImg").on("click", function(){
-                if($("#ddlFormat").is(":visible")){
+            $("#dropDownImg").on("click", function () {
+                if ($("#ddlFormat").is(":visible")) {
                     $("#ddlFormat").hide();
                 } else {
                     $("#ddlFormat").show();
                 }
             })
-            $(".formatOption").on("click", function(){
+            $(".formatOption").on("click", function () {
                 $("#txtImportFormat").val($(this).text())
                 $("#ddlFormat").hide()
             });
@@ -3600,7 +3600,7 @@ function loadAdminPage() {
                 $("#saveImportConfigConfirmation").show();
             });
 
-            $(document).off("click","#btnSaveImportConfigOk");
+            $(document).off("click", "#btnSaveImportConfigOk");
             $(document).on("click", "#btnSaveImportConfigOk", function () {
                 var adminConfigurations = VoltDbAdminConfig.getLatestRawAdminConfigurations();
                 if ($("#importSaveConfigText").data("status") == "delete") {
@@ -3714,33 +3714,33 @@ function loadAdminPage() {
             $("#expotSaveDiskLimitText").text("save").data("status", "save");
 
             var contents = '<table width="100%" cellpadding="0" cellspacing="0" class="configurTbl">' +
-                 '<tr>' +
-                 '    <td class="configLabe1">' +
-                 '        <div class="featuresAlign">' +
-                 '            <div class="proLeft ">Feature</div>' +
-                 '            <div class="editBtn addProBtn"> ' +
-                 '                <a href="javascript:void(0)" id="lnkAddNewFeature" class="btnEd"> <span class="userPlus">+</span> Add Feature</a> ' +
-                 '            </div>' +
-                 '            <div class="clear"> </div>' +
-                 '        </div>' +
-                 '    </td>' +
-                 '</tr>' +
-                 '<tr>' +
-                 '    <td>' +
-                 '        <div class="addConfigProperWrapper">' +
-                 '            <table id="tblAddNewFeature" width="100%" cellpadding="0" cellspacing="0" class="addConfigProperTbl">' +
-                 '                <tr class="headerFeature">' +
-                 '                    <th width="50%">Name</th>' +
-                 '                    <th align="right" width="14%">Value</th>' +
-                 '                    <th align="right" width="14%">Unit</th>' +
-                 '                    <th width="5%">Delete</th>' +
-                 '                </tr>' +
+                '<tr>' +
+                '    <td class="configLabe1">' +
+                '        <div class="featuresAlign">' +
+                '            <div class="proLeft ">Feature</div>' +
+                '            <div class="editBtn addProBtn"> ' +
+                '                <a href="javascript:void(0)" id="lnkAddNewFeature" class="btnEd"> <span class="userPlus">+</span> Add Feature</a> ' +
+                '            </div>' +
+                '            <div class="clear"> </div>' +
+                '        </div>' +
+                '    </td>' +
+                '</tr>' +
+                '<tr>' +
+                '    <td>' +
+                '        <div class="addConfigProperWrapper">' +
+                '            <table id="tblAddNewFeature" width="100%" cellpadding="0" cellspacing="0" class="addConfigProperTbl">' +
+                '                <tr class="headerFeature">' +
+                '                    <th width="50%">Name</th>' +
+                '                    <th align="right" width="14%">Value</th>' +
+                '                    <th align="right" width="14%">Unit</th>' +
+                '                    <th width="5%">Delete</th>' +
+                '                </tr>' +
 
-                 '            </table>' +
-                 '        </div>' +
-                 '    </td>' +
-                 '</tr>' +
-                 '</table>';
+                '            </table>' +
+                '        </div>' +
+                '    </td>' +
+                '</tr>' +
+                '</table>';
 
             $("#addDiskLimitWrapper").html(contents);
 
@@ -3769,7 +3769,7 @@ function loadAdminPage() {
                     '       <input size="15" id="' + valueId + '" name="' + valueId + '" class="newFeatureValue newFeature" type="text" style="width:auto;">' +
                     '       <label id="errorValueDL' + count + '" for="' + valueId + '" class="error" style="display: none;"></label>' +
                     '   </td>' +
-                     '   <td><select id="' + unitId + '" name="' + unitId + '" class="newFeatureUnit newFeature" style="width:auto;"><option>GB</option><option>%</option></select>' +
+                    '   <td><select id="' + unitId + '" name="' + unitId + '" class="newFeatureUnit newFeature" style="width:auto;"><option>GB</option><option>%</option></select>' +
                     '       <label id="errorValueUnit' + count + '" for="' + unitId + '" class="error" style="display: none;"></label>' +
                     '   </td>' +
                     '   <td><div class="securityDelete" id="deleteFirstFeature" onclick="deleteRow(this)"></div></td>' +
@@ -3960,11 +3960,11 @@ function loadAdminPage() {
                         );
                     } else {
                         feature.push(
-                          {
-                              name: newFeatureNames[i].value,
-                              size: newFeatureValues[i].value + newFeatureUnits[i].value
-                          }
-                      );
+                            {
+                                name: newFeatureNames[i].value,
+                                size: newFeatureValues[i].value + newFeatureUnits[i].value
+                            }
+                        );
 
                     }
                 }
@@ -4539,8 +4539,8 @@ function loadAdminPage() {
         $td.html('<div class="securityDelete" onclick="deleteRow(this)"></div>');
     };
 
-    var setDefaultNormalImportDisplay = function(isType, txtBox){
-        if(isType){
+    var setDefaultNormalImportDisplay = function (isType, txtBox) {
+        if (isType) {
             setDefaultImportDisplay(txtBox)
         } else {
             setNormalImportDisplay(txtBox)
@@ -4562,38 +4562,38 @@ function loadAdminPage() {
                 $("#deleteUser").css('display', 'none');
             }
             var content = '<table width="100%" cellpadding="0" cellspacing="0" class="configurTbl">' +
-                            '<tbody>' +
-                                '<tr>' +
-                                    '<td width="30%">Username</td>' +
-                                    '<td width="10%">' +
-                                        '<input id="txtUser" name="txtUser" type="text" size="30" aria-required="true" class="error"/>' +
-                                        '<label id="errorUser" for="txtUser" class="error errorHeightFix" style="display:none">This field is required</label>' +
-                                        '<input id="txtOrgUser" name="txtOrgUser" type="text" size="30" aria-required="true" style="display:none"/>' +
-                                    '</td> ' +
-                                    '<td>&nbsp;</td> ' +
-                                    '<td>&nbsp;</td>' +
-                                '</tr>' +
-                                '<tr>' +
-                                    '<td><span id="labelPassword"></span> </td> ' +
-                                    '<td>' +
-                                        '<input id="txtPassword" name="txtPassword" type="password" size="30" aria-required="true" class="error"/> ' +
-                                        '<label id="errorPassword" for="txtPassword" class="error" style="display:none">This field is required</label> ' +
-                                    '</td>' +
-                                    '<td>&nbsp;</td> ' +
-                                    '<td>&nbsp;</td>' +
-                                '</tr>' +
-                                '<tr>' +
-                                    '<td>Roles </td> ' +
-                                    '<td>' +
-                                        '<select id="selectRole">' +
-                                            rolehtml() +
-                                        '</select>  ' +
-                                    '</td> ' +
-                                    '<td>&nbsp;</td>' +
-                                    '<td>&nbsp;</td>' +
-                                '</tr>' +
-                            '</tbody>' +
-                        '</table>';
+                '<tbody>' +
+                '<tr>' +
+                '<td width="30%">Username</td>' +
+                '<td width="10%">' +
+                '<input id="txtUser" name="txtUser" type="text" size="30" aria-required="true" class="error"/>' +
+                '<label id="errorUser" for="txtUser" class="error errorHeightFix" style="display:none">This field is required</label>' +
+                '<input id="txtOrgUser" name="txtOrgUser" type="text" size="30" aria-required="true" style="display:none"/>' +
+                '</td> ' +
+                '<td>&nbsp;</td> ' +
+                '<td>&nbsp;</td>' +
+                '</tr>' +
+                '<tr>' +
+                '<td><span id="labelPassword"></span> </td> ' +
+                '<td>' +
+                '<input id="txtPassword" name="txtPassword" type="password" size="30" aria-required="true" class="error"/> ' +
+                '<label id="errorPassword" for="txtPassword" class="error" style="display:none">This field is required</label> ' +
+                '</td>' +
+                '<td>&nbsp;</td> ' +
+                '<td>&nbsp;</td>' +
+                '</tr>' +
+                '<tr>' +
+                '<td>Roles </td> ' +
+                '<td>' +
+                '<select id="selectRole">' +
+                rolehtml() +
+                '</select>  ' +
+                '</td> ' +
+                '<td>&nbsp;</td>' +
+                '<td>&nbsp;</td>' +
+                '</tr>' +
+                '</tbody>' +
+                '</table>';
             $('#addUserWrapper').html(content);
 
 
@@ -4642,7 +4642,7 @@ function loadAdminPage() {
             });
 
             $(document).off("click", "#btnSaveSecUser");
-            $(document).on("click","#btnSaveSecUser", function () {
+            $(document).on("click", "#btnSaveSecUser", function () {
                 var username = $('#txtOrgUser').val();
                 var newUsername = $('#txtUser').val();
                 var password = encodeURIComponent($('#txtPassword').val());
@@ -4963,13 +4963,13 @@ function loadAdminPage() {
     $('#popServerSearchAdmin').keyup(function () {
         var that = this;
         $.each($('.tblshutdown tbody tr'),
-        function (i, val) {
-            if ($(val).text().indexOf($(that).val().toLowerCase()) == -1) {
-                $('.tblshutdown tbody tr').eq(i).hide();
-            } else {
-                $('.tblshutdown tbody tr').eq(i).show();
-            }
-        });
+            function (i, val) {
+                if ($(val).text().indexOf($(that).val().toLowerCase()) == -1) {
+                    $('.tblshutdown tbody tr').eq(i).hide();
+                } else {
+                    $('.tblshutdown tbody tr').eq(i).show();
+                }
+            });
     });
 
     // Hides opened serverlist
@@ -5025,20 +5025,20 @@ function loadAdminPage() {
         "Username already exists."
     );
 
-     $.validator.addMethod(
+    $.validator.addMethod(
         "portRegex",
-        function(value, element, regexp){
+        function (value, element, regexp) {
             var result = true
             var values = value.split(':');
             var re = new RegExp(regexp);
-           if(values.length == 2){
-                if(!$.isNumeric(values[1]) || !(values[1] > 1 && values[1] < 65536))
+            if (values.length == 2) {
+                if (!$.isNumeric(values[1]) || !(values[1] > 1 && values[1] < 65536))
                     result = false;
-                else{
-                    if(values[1].split('.').length > 1)
+                else {
+                    if (values[1].split('.').length > 1)
                         result = false;
                 }
-                if(!re.test(values[0]))
+                if (!re.test(values[0]))
                     result = false;
             } else {
                 result = false;
@@ -5049,11 +5049,11 @@ function loadAdminPage() {
         "Please enter only valid character."
     );
 
-    showHideIntSnapshotMsg = function(isProVersion){
-        if(!VoltDbAdminConfig.isCommandLogEnabled && isProVersion){
+    showHideIntSnapshotMsg = function (isProVersion) {
+        if (!VoltDbAdminConfig.isCommandLogEnabled && isProVersion) {
             $('#continueShutdownMsg').show()
             $('#shutdownWarningMsg').show()
-        }else{
+        } else {
             $('#shutdownWarningMsg').hide()
             $('#continueShutdownMsg').hide()
         }
@@ -5067,6 +5067,7 @@ function loadAdminPage() {
         this.isExportLoading = false;
         this.isCommandLogEnabled = false;
         this.isAdmin = false;
+        this.isSecurityEnabled = false;
         this.isRoleChanged = false;
         this.isReloadRequired = false;
         this.registeredElements = [];
@@ -5095,7 +5096,7 @@ function loadAdminPage() {
             "endpoint_ELASTICSEARCH": "#txtEndpointESValue"
         };
 
-        this.newImportStreamMinPropertyName= {
+        this.newImportStreamMinPropertyName = {
             "metadata.broker.list": "#txtImportMetadataBrokerListValue",
             "brokers": "#txtBrokersValue",
             "procedure_KAFKA": "#txtProcedureValue",
@@ -5270,47 +5271,47 @@ function loadAdminPage() {
             if (!VoltDbAdminConfig.isSnmpEditMode)
                 adminEditObjects.txtSnmp.text(adminConfigValues.enabled == true ? 'On' : 'Off');
 
-            if(adminConfigValues.enabled != null){
+            if (adminConfigValues.enabled != null) {
                 adminEditObjects.iconSnmpOption.removeClass().addClass(getOnOffClass(adminConfigValues.enabled));
             }
 
-            if(adminConfigValues.target!= null){
+            if (adminConfigValues.target != null) {
                 adminEditObjects.targetSpan.text(adminConfigValues.target);
                 adminEditObjects.txtTargetValue = adminConfigValues.target;
             }
 
-            if(adminConfigValues.community != null){
+            if (adminConfigValues.community != null) {
                 adminEditObjects.communitySpan.text(adminConfigValues.community);
                 adminEditObjects.txtCommunityValue = adminConfigValues.community;
             }
 
-            if(adminConfigValues.username != null){
+            if (adminConfigValues.username != null) {
                 adminEditObjects.usernameSpan.text(adminConfigValues.username);
                 adminEditObjects.txtUsernameValue = adminConfigValues.username;
             }
 
-            if(adminConfigValues.authprotocol != null){
+            if (adminConfigValues.authprotocol != null) {
                 adminEditObjects.authProtocolSpan.text(adminConfigValues.authprotocol)
                 adminEditObjects.ddlAuthProtocolValue = adminConfigValues.authprotocol;
             }
-            else{
+            else {
                 adminEditObjects.ddlAuthProtocolValue = "SHA";
             }
 
-             if(adminConfigValues.privacyprotocol != null){
+            if (adminConfigValues.privacyprotocol != null) {
                 adminEditObjects.privProtocolSpan.text(adminConfigValues.privacyprotocol)
                 adminEditObjects.ddlPrivProtocolValue = adminConfigValues.privacyprotocol;
             }
-            else{
+            else {
                 adminEditObjects.ddlPrivProtocolValue = "AES";
             }
 
-            if(adminConfigValues.authkey != null){
+            if (adminConfigValues.authkey != null) {
                 adminEditObjects.authKeySpan.text(adminConfigValues.authkey);
                 adminEditObjects.txtAuthkeyValue = adminConfigValues.authkey;
             }
 
-            if(adminConfigValues.privacykey != null){
+            if (adminConfigValues.privacykey != null) {
                 adminEditObjects.privKeySpan.text(adminConfigValues.privacykey);
                 adminEditObjects.txtPrivkeyValue = adminConfigValues.privacykey;
             }
@@ -5369,24 +5370,24 @@ function loadAdminPage() {
                     }
 
                     result += '<tr class="child-row-4 subLabelRow parentprop" id="' + rowId + '">' +
-                            '   <td class="configLabel expoStream" onclick="toggleProperties(this);" title="Click to expand/collapse">' +
-                            '       <a href="javascript:void(0)" class="labelCollapsed ' + additionalCss + '"> ' + stream + type + '</a>' +
-                            '   </td>' +
-                            '   <td align="right">' +
-                            '       <div class="' + getOnOffClass(enabled) + '"></div>' +
-                            '   </td>' +
-                            '   <td>' + getOnOffText(enabled) + '</td>' +
-                            '   <td>' +
-                            '       <div class="exportDelete" style="display:none;"></div>' +
-                            '       <a href="javascript:void(0)" id="exportEdit' + i + '" class="edit" onclick="editStream(' + i + ')" title="Edit">&nbsp;</a>' +
-                            '   </td>' +
-                            '</tr>';
+                        '   <td class="configLabel expoStream" onclick="toggleProperties(this);" title="Click to expand/collapse">' +
+                        '       <a href="javascript:void(0)" class="labelCollapsed ' + additionalCss + '"> ' + stream + type + '</a>' +
+                        '   </td>' +
+                        '   <td align="right">' +
+                        '       <div class="' + getOnOffClass(enabled) + '"></div>' +
+                        '   </td>' +
+                        '   <td>' + getOnOffText(enabled) + '</td>' +
+                        '   <td>' +
+                        '       <div class="exportDelete" style="display:none;"></div>' +
+                        '       <a href="javascript:void(0)" id="exportEdit' + i + '" class="edit" onclick="editStream(' + i + ')" title="Edit">&nbsp;</a>' +
+                        '   </td>' +
+                        '</tr>';
 
                     if (streamProperty && streamProperty.length > 0) {
                         var isBootstrapServer = false;
-                        if(data[i].type.toLowerCase() == 'kafka'){
-                            for(var k = 0; k < streamProperty.length; k++){
-                                if(streamProperty[k].name == 'bootstrap.servers'){
+                        if (data[i].type.toLowerCase() == 'kafka') {
+                            for (var k = 0; k < streamProperty.length; k++) {
+                                if (streamProperty[k].name == 'bootstrap.servers') {
                                     isBootstrapServer = true;
                                     break;
                                 }
@@ -5394,7 +5395,7 @@ function loadAdminPage() {
                         }
 
                         for (var j = 0; j < streamProperty.length; j++) {
-                            if(streamProperty[j].name == 'metadata.broker.list' && !isBootstrapServer){
+                            if (streamProperty[j].name == 'metadata.broker.list' && !isBootstrapServer) {
                                 streamProperty[j].name = 'bootstrap.servers';
                                 isBootstrapServer = true;
                             }
@@ -5421,9 +5422,9 @@ function loadAdminPage() {
 
             if (result == "") {
                 result += '<tr class="propertyLast subLabelRow">' +
-                        '<td width="67%" class="configLabel" colspan="3" id="noConfigExport">No configuration available.</td>' +
-                        '<td width="33%">&nbsp</td>' +
-                        '</tr>';
+                    '<td width="67%" class="configLabel" colspan="3" id="noConfigExport">No configuration available.</td>' +
+                    '<td width="33%">&nbsp</td>' +
+                    '</tr>';
             }
 
             $('#exportConfiguration').html(result);
@@ -5467,7 +5468,7 @@ function loadAdminPage() {
                                 '<td>&nbsp;</td>' +
                                 '</tr>';
 
-                            if(name == 'procedure' && isFirstProcedureProp){
+                            if (name == 'procedure' && isFirstProcedureProp) {
                                 isFirstProcedureProp = false;
                                 procedureName = value;
                             }
@@ -5480,27 +5481,27 @@ function loadAdminPage() {
                     }
 
                     resultProperty += '<tr class="child-row-5 subLabelRow parentprop" id="' + rowId + '">' +
-                            '   <td class="configLabel expoStream" onclick="toggleProperties(this);" title="Click to expand/collapse">' +
-                            '       <a href="javascript:void(0)" class="labelCollapsed ' + additionalCss + '"> ' + procedureName + ' (' + type + ')</a>' +
-                            '   </td>' +
-                            '   <td align="right">' +
-                            '       <div class="' + getOnOffClass(enabled) + '"></div>' +
-                            '   </td>' +
-                            '   <td>' + getOnOffText(enabled) + '</td>' +
-                            '   <td>' +
-                            '       <div class="exportDelete" style="display:none;"></div>' +
-                            '       <a href="javascript:void(0)" id="importEdit' + i + '" class="edit" onclick="editImportStream(' + i + ')" title="Edit">&nbsp;</a>' +
-                            '   </td>' +
-                            '</tr>';
-                result += resultProperty + resultSubProperty;
+                        '   <td class="configLabel expoStream" onclick="toggleProperties(this);" title="Click to expand/collapse">' +
+                        '       <a href="javascript:void(0)" class="labelCollapsed ' + additionalCss + '"> ' + procedureName + ' (' + type + ')</a>' +
+                        '   </td>' +
+                        '   <td align="right">' +
+                        '       <div class="' + getOnOffClass(enabled) + '"></div>' +
+                        '   </td>' +
+                        '   <td>' + getOnOffText(enabled) + '</td>' +
+                        '   <td>' +
+                        '       <div class="exportDelete" style="display:none;"></div>' +
+                        '       <a href="javascript:void(0)" id="importEdit' + i + '" class="edit" onclick="editImportStream(' + i + ')" title="Edit">&nbsp;</a>' +
+                        '   </td>' +
+                        '</tr>';
+                    result += resultProperty + resultSubProperty;
                 }
             }
 
             if (result == "") {
                 result += '<tr class="propertyLast subLabelRow">' +
-                        '<td width="67%" class="configLabel" colspan="3">No configuration available.</td>' +
-                        '<td width="33%">&nbsp</td>' +
-                        '</tr>';
+                    '<td width="67%" class="configLabel" colspan="3">No configuration available.</td>' +
+                    '<td width="33%">&nbsp</td>' +
+                    '</tr>';
             }
 
             $('#importConfiguration').html(result);
@@ -5522,19 +5523,19 @@ function loadAdminPage() {
 
                 var content = '';
 
-                if (!voltDbRenderer.kubernetes_con){
+                if (!voltDbRenderer.kubernetes_con) {
                     content = '<a id="btnEditDiskLimit" href="javascript:void(0)" onclick="editDiskLimit(1)" class="edit" title="Edit">&nbsp;</a>' +
-                    '<div id="loadingDiskLimit" class="loading-small loadExport" style="display: none;"></div>';
+                        '<div id="loadingDiskLimit" class="loading-small loadExport" style="display: none;"></div>';
                 }
 
                 result += '<tr class="child-row-6 subLabelRow parentprop" id="row-60">' +
-                       '   <td class="configLabel" id="diskLimit" onclick="toggleProperties(this);" title="Click to expand/collapse" style="cursor: pointer;">' +
-                       '   <a href="javascript:void(0)" class="labelCollapsed ' + additionalCss + '">  Disk Limit</a>  ' +
-                       '   </td>' +
-                       '   <td align="right"></td>' +
-                       '<td>&nbsp</td>' +
-                       '   <td>' + content + '</td>' +
-                       '</tr>';
+                    '   <td class="configLabel" id="diskLimit" onclick="toggleProperties(this);" title="Click to expand/collapse" style="cursor: pointer;">' +
+                    '   <a href="javascript:void(0)" class="labelCollapsed ' + additionalCss + '">  Disk Limit</a>  ' +
+                    '   </td>' +
+                    '   <td align="right"></td>' +
+                    '<td>&nbsp</td>' +
+                    '   <td>' + content + '</td>' +
+                    '</tr>';
 
                 var diskfeature = data.feature;
 
@@ -5562,21 +5563,21 @@ function loadAdminPage() {
 
             if (result == "") {
                 result += '<tr class="child-row-6 subLabelRow parentprop" id="row-60">' +
-                        '   <td id="diskLimit" class="configLabel" onclick="toggleProperties(this);" title="Click to expand/collapse" style="cursor: pointer">' +
-                        '   <a href="javascript:void(0)" class="labelCollapsed ' + additionalCss + '"" ;">Disk Limit</a>  ' +
-                        '   </td>' +
-                        '   <td align="right">' +
-                        '   </td>' +
-                        '<td>&nbsp</td>';
-                if(!voltDbRenderer.kubernetes_con){
+                    '   <td id="diskLimit" class="configLabel" onclick="toggleProperties(this);" title="Click to expand/collapse" style="cursor: pointer">' +
+                    '   <a href="javascript:void(0)" class="labelCollapsed ' + additionalCss + '"" ;">Disk Limit</a>  ' +
+                    '   </td>' +
+                    '   <td align="right">' +
+                    '   </td>' +
+                    '<td>&nbsp</td>';
+                if (!voltDbRenderer.kubernetes_con) {
                     result += '   <td><a id="btnEditDiskLimit" href="javascript:void(0)" onclick="editDiskLimit(1)" class="edit" title="Edit">&nbsp;</a>' +
-                    '<div id="loadingDiskLimit" class="loading-small loadExport" style="display: none;"></div></td>';
+                        '<div id="loadingDiskLimit" class="loading-small loadExport" style="display: none;"></div></td>';
                 }
                 result += '</tr>' +
-                        '<tr class="childprop-row-60 subLabelRow" ' + style + '>' +
-                        '<td width="67%" class="configLabel" colspan="3">&nbsp &nbsp &nbsp No features available.</td>' +
-                        '<td width="33%">&nbsp</td>' +
-                        '</tr>';
+                    '<tr class="childprop-row-60 subLabelRow" ' + style + '>' +
+                    '<td width="67%" class="configLabel" colspan="3">&nbsp &nbsp &nbsp No features available.</td>' +
+                    '<td width="33%">&nbsp</td>' +
+                    '</tr>';
             }
 
             $('#diskLimitConfiguration').html(result);
@@ -5593,10 +5594,10 @@ function loadAdminPage() {
                 '<tr>' +
                 '<th>Username</th>' +
                 '<th>Role</th>';
-            if (!voltDbRenderer.kubernetes_con){
+            if (!voltDbRenderer.kubernetes_con) {
                 tableHeader = tableHeader.concat(
-                '<th>&nbsp</th>' +
-                '<th><a href="#addUserPopup" id="addNewUserLink1" onclick="addUser(-1)" class="plusAdd" title="Add User">&nbsp;</a></th>'
+                    '<th>&nbsp</th>' +
+                    '<th><a href="#addUserPopup" id="addNewUserLink1" onclick="addUser(-1)" class="plusAdd" title="Add User">&nbsp;</a></th>'
                 )
             }
             tableHeader = tableHeader.concat(
@@ -5612,7 +5613,7 @@ function loadAdminPage() {
                         '<td>' + userName + '</td>' +
                         '<td>' + formatDisplayName(role) + '</td>' +
                         '<td>&nbsp</td>';
-                    if (!voltDbRenderer.kubernetes_con){
+                    if (!voltDbRenderer.kubernetes_con) {
                         result += '<td><a  href="javascript:void(0)" class="edit" title="Edit" onclick="addUser(1,\'' + userName + '\',\'' + role + '\');">&nbsp;</a></td>';
                     }
                     result += '</tr>';
@@ -5714,8 +5715,8 @@ function loadAdminPage() {
                     adminEditObjects.rowQueryTimeout.removeClass("child-row-5");
                 }
             }
-                //Expand the Querytimeout row to make it visible, only if its sibling 'Heartbeat Timeout' 
-                //is also visible. /Otherwise it is in collapsed form.
+            //Expand the Querytimeout row to make it visible, only if its sibling 'Heartbeat Timeout' 
+            //is also visible. /Otherwise it is in collapsed form.
             else if (adminEditObjects.rowHeartbeatTimeout.is(":visible")) {
                 adminEditObjects.rowQueryTimeout.show();
 
