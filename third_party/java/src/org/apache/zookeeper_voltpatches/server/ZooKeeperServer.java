@@ -303,7 +303,8 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider,
         Thread thisThread = new Thread(this, "ZooKeeperServer");
         thisThread.start();
 
-        registerJMX();
+        // Do not register with JMX
+        // registerJMX();
 
         synchronized (this) {
             running = true;
