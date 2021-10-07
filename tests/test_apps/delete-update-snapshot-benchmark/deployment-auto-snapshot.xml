@@ -17,9 +17,7 @@
         <jsonapi enabled="true"/>
     </httpd>
     <snapshot prefix="dusb-autosave" frequency="10s" retain="5" />
-    <commandlog enabled="true">
-        <frequency/>
-    </commandlog>
+    <commandlog enabled="false"/>
     <systemsettings>
         <temptables/>
         <snapshot/>

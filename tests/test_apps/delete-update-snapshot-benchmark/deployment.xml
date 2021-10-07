@@ -17,9 +17,7 @@
         <jsonapi enabled="true"/>
     </httpd>
     <snapshot enabled="false"/>
-    <commandlog enabled="true">
-        <frequency/>
-    </commandlog>
+    <commandlog enabled="false"/>
     <systemsettings>
         <temptables/>
         <snapshot/>

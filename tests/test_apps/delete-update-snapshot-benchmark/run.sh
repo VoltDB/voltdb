@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 
 APPNAME="delete-update-snapshot"
-CONFIGFILE="deployment.xml"
+if [ -z $CONFIGFILE]; then
+    # default value
+    CONFIGFILE="deployment.xml"
+fi
 
 # leader host for startup purposes only
 # (once running, all nodes are the same -- no leaders)
@@ -64,7 +67,7 @@ function server() {
     voltdb start -H $STARTUPLEADERHOST
 }
 
-# run the voltdb server locally
+# run the voltdb server locally, with auto-snapshots
 function server-auto-snapshot() {
     CONFIGFILE="deployment-auto-snapshot.xml"
     server
@@ -92,7 +95,7 @@ function client() {
 }
 
 function help() {
-    echo "Usage: ./run.sh {clean|cleanall|jars|jars-if-needed|server|init|client|client-help|help}"
+    echo "Usage: ./run.sh {clean|cleanall|jars|jars-if-needed|server|server-auto-snapshot|init|client|client-help|help}"
 }
 
 # If no first arg, run help
@@ -102,7 +105,7 @@ if [ $# -eq 0 ]; then help; exit; fi
 while [ -n "$1" ] ; do
     CMD="$1"
     ARGS=
-    if [[ "$1" == "client" || "$1" == "server" ]]; then
+    if [[ "$1" == "client" || "$1" == server* ]]; then
         while [[ "$2" == "--"* ]]; do
             ARGS="$ARGS $2 $3"
             shift
