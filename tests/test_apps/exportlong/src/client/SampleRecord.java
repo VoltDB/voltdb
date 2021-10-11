@@ -30,7 +30,7 @@ import org.voltdb.VoltType;
 import org.voltdb.types.TimestampType;
 
 public class SampleRecord {
-    public final long rowid;
+    public final long id;
     public final Object type_tinyint;
     public final Object type_smallint;
     public final Object type_integer;
@@ -39,9 +39,9 @@ public class SampleRecord {
     public final Object type_float;
     public final Object type_decimal;
     public final Object type_varchar1024;
-    public SampleRecord(long rowid, Random rand)
+    public SampleRecord(long id, Random rand)
     {
-        this.rowid = rowid;
+        this.id = id;
         this.type_tinyint          = nextTinyint(rand, false);
         this.type_smallint         = nextSmallint(rand, false);
         this.type_integer          = nextInteger(rand, false);

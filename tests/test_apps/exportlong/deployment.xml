@@ -1,6 +1,36 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <deployment>
-    <!--  simplest single-cluster config / -->
-    <cluster hostcount="1" sitesperhost="2"/>
+    <!--  single-cluster config with SPH like comviva / -->
+    <cluster hostcount="1" sitesperhost="12"/>
     <commandlog enabled="true" />
+    <export>
+	<!-- Export targeting OracleXE on volt17c - note port 1539 instead of 1521
+	 ALSO NOTE: the tables must be pre-created in Oracle e.g.
+	 CREATE TABLE "SOURCE00" ("ID" NUMBER(19), "TYPE_TINYINT" NUMBER(3), "TYPE_SMALLINT" NUMBER(5),
+	 	"TYPE_INTEGER" NUMBER(10), "TYPE_BIGINT" NUMBER(19), "TYPE_TIMESTAMP" TIMESTAMP WITH TIME ZONE,
+		"TYPE_FLOAT" DOUBLE PRECISION, "TYPE_DECIMAL" DECIMAL(38,12), "TYPE_VARCHAR1024" VARCHAR2(1024));
+	-->
+        <configuration target="TARGET00" enabled="true" type="jdbc" exportconnectorclass="">
+            <property name="jdbcdriver">oracle.jdbc.driver.OracleDriver</property>
+            <property name="jdbcurl">jdbc:oracle:thin:@//10.10.182.248:1539/XE</property>
+            <!-- when running on volt17c: property name="jdbcurl">jdbc:oracle:thin:@//localhost:1539/XE</property -->
+            <property name="jdbcuser">SYSTEM</property>
+            <property name="jdbcpassword">oracle</property>
+            <!-- property name="schema">ECAP_ECMP</property -->
+            <property name="createtable">false</property>
+            <property name="ignoregenerations">true</property>
+            <property name="skipinternals">true</property>
+        </configuration>
+        <configuration target="TARGET01" enabled="true" type="jdbc" exportconnectorclass="">
+            <property name="jdbcdriver">oracle.jdbc.driver.OracleDriver</property>
+            <property name="jdbcurl">jdbc:oracle:thin:@//10.10.182.248:1539/XE</property>
+            <!-- when running on volt17c: property name="jdbcurl">jdbc:oracle:thin:@//localhost:1539/XE</property -->
+            <property name="jdbcuser">SYSTEM</property>
+            <property name="jdbcpassword">oracle</property>
+            <!-- property name="schema">ECAP_ECMP</property -->
+            <property name="createtable">false</property>
+            <property name="ignoregenerations">true</property>
+            <property name="skipinternals">true</property>
+        </configuration>
+    </export>
 </deployment>

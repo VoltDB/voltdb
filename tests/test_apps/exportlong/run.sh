@@ -97,9 +97,55 @@ function server_common() {
 function client() {
   srccompile-ifneeded
   java -classpath exportlong-client.jar:$CLIENTCLASSPATH \
+      client.ExportLongClient
+}
+
+# duration 3600s, rate 1000/s (total 10000/s all streams/targets)
+function d3600r1000() {
+  srccompile-ifneeded
+  java -classpath exportlong-client.jar:$CLIENTCLASSPATH \
       client.ExportLongClient \
       --servers=localhost \
-      --duration=25
+      --duration=3600 
+}
+
+# duration 0 (infinite), rate 1000/s (total 10000/s all streams/targets)
+function d0r1000() {
+  srccompile-ifneeded
+  java -classpath exportlong-client.jar:$CLIENTCLASSPATH \
+      client.ExportLongClient \
+      --servers=localhost \
+      --duration=0 
+}
+
+# duration 0 (infinite), rate 500/s (total 5000/s all streams/targets)
+function d0r500() {
+  srccompile-ifneeded
+  java -classpath exportlong-client.jar:$CLIENTCLASSPATH \
+      client.ExportLongClient \
+      --servers=localhost \
+      --duration=0 \
+      --rate=500
+}
+
+# duration 3600s, rate 500/s (total 5000/s all streams/targets)
+function d3600r500() {
+  srccompile-ifneeded
+  java -classpath exportlong-client.jar:$CLIENTCLASSPATH \
+      client.ExportLongClient \
+      --servers=localhost \
+      --duration=3600 \
+      --rate=500
+}
+
+# duration 3600s, rate 100/s (total 1000/s all streams/targets)
+function d3600r100() {
+  srccompile-ifneeded
+  java -classpath exportlong-client.jar:$CLIENTCLASSPATH \
+      client.ExportLongClient \
+      --servers=localhost \
+      --duration=3600 \
+      --rate=100
 }
 
 function shutdown() {

@@ -56,14 +56,15 @@ public class ExportLongClient {
     final Client m_client;
 
     volatile long testStartTS;
+    volatile long lastLogTS = 0;
 
     final String HORIZONTAL_RULE =
             "----------" + "----------" + "----------" + "----------" +
             "----------" + "----------" + "----------" + "----------" + "\n";
 
     final String STREAM_TEMPLATE =
-            "CREATE STREAM SOURCE%02d PARTITION ON COLUMN rowid EXPORT TO TARGET TARGET%02d (\n"
-            + "  rowid            BIGINT        NOT NULL\n"
+            "CREATE STREAM SOURCE%02d PARTITION ON COLUMN id EXPORT TO TARGET TARGET%02d (\n"
+            + "  id               BIGINT        NOT NULL\n"
             + ", type_tinyint     TINYINT       NOT NULL\n"
             + ", type_smallint    SMALLINT      NOT NULL\n"
             + ", type_integer     INTEGER       NOT NULL\n"
@@ -83,6 +84,9 @@ public class ExportLongClient {
         @Option(desc = "Test duration, in seconds, 0 = infinite, default = 120s)")
         long duration = 120;
 
+        @Option(desc = "Logging interval, in seconds, 0 = no logging, default = 60s)")
+        long loginterval = 60;
+
         @Option(desc = "Number of source streams, default 10, up to 100, will be named SOURCE00, SOURCE01, etc..")
         int sources = 10;
 
@@ -100,7 +104,8 @@ public class ExportLongClient {
 
         @Override
         public void validate() {
-            if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
+            if (duration < 0) exitWithMessageAndUsage("duration must be >= 0");
+            if (loginterval < 0) exitWithMessageAndUsage("loginterval must be >= 0");
             if (sources <= 0 || sources > 100) exitWithMessageAndUsage("sources must be > 0 and <= 100");
             if (targets <= 0 || targets > 100) exitWithMessageAndUsage("targets must be > 0 and <= 100");
             if (rate <= 0) exitWithMessageAndUsage("rate must be > 0");
@@ -265,11 +270,14 @@ public class ExportLongClient {
         // To speed up invocations, each thread uses the same record contents
         SampleRecord record = new SampleRecord(0, r);
 
-        while (System.nanoTime() - testStartTS < durationNs) {
+        long now = 0;
+        do {
             if (rateLimiter != null) {
                 rateLimiter.acquire();
             }
+            now = System.nanoTime();
             try {
+                // Call procedure
                 m_client.callProcedure(m_callback, procName,
                         r.nextInt(idcount),
                         record.type_tinyint,
@@ -280,11 +288,22 @@ public class ExportLongClient {
                         record.type_float,
                         record.type_decimal,
                         record.type_varchar1024);
+
+                // Update total - thread at idx 0 does the logging
                 m_totalInvocations.incrementAndGet();
+                if (sourceIdx == 0 && m_config.loginterval > 0
+                        && now - lastLogTS > TimeUnit.SECONDS.toNanos(m_config.loginterval)) {
+                    String durationStr = m_config.duration == 0 ? "running for infinite time" :
+                        String.format("running for %d seconds", m_config.duration);
+                    System.out.println(String.format("%d invocations after %d seconds, %s",
+                            m_totalInvocations.get(), TimeUnit.NANOSECONDS.toSeconds(now - testStartTS),
+                            durationStr));
+                    lastLogTS = now;
+                }
             } catch (Exception e) {
                 exitWithException(String.format("Thread %d invoking %s failed", thId, procName), e, true);
             }
-        }
+        } while (now - testStartTS < durationNs);
     }
 
     void connectToOneServer(String server, Client client1, boolean logIt) {
