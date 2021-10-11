@@ -69,6 +69,7 @@ function set_kubernetes(server, port) {
     this.hostNames = [];
     this.currentHost = "";
     this.usersList = [];
+    this.usersRoles = [];
 
     this.isHost = false;
     this.userPreferences = {};
@@ -901,7 +902,7 @@ function set_kubernetes(server, port) {
     };
 
     this.checkRolesUpdate = function () {
-      const url = `api/1.0/?Procedure=%40SystemCatalog&Parameters=%5B"USERS"%5D&admin=true`;
+      const url = `api/1.0/?Procedure=%40SystemCatalog&Parameters=%5B"USERS"%5D`;
       var usersList = [];
       $.ajax({
         type: "get",

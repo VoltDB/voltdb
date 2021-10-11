@@ -11,48 +11,25 @@ var INT_MAX_VALUE = 2147483647;
 var client_port = 0;
 
 function getListOfRoles() {
-    // Got to figure out what roles are available.
-    // Get schema...
-    schematext = "";
-    try {
-        var schematext = $("#d").find(".dataBlockContent pre").html();
-    } catch (err) {
-        console.log("Can't get schema: " + err);
-    }
-
-    // Parse schema
-    var listOfRoles = ['ADMINISTRATOR', 'USER'];
-    var schemaLines = schematext.split("\n");
-    for (var i = 0; i < schemaLines.length; i++) {
-        var l = schemaLines[i];
-        // Throw away comments
-        var pos = l.indexOf("--");
-        if (pos >= 0) schemaLines[i] = l.substring(0, pos);
-    }
-    schematext = schemaLines.join(" ");
-    // compress spaces, split statements
-    var statements = schematext.replace(/\s+/g, ' ').split(";");
-
-    for (var j = 0; j < statements.length; j++) {
-        var tokens = statements[j].trim().split(" ");
-        if (tokens.length > 2) {
-            if (tokens[0].toUpperCase() == "CREATE") {
-                if (tokens[1].toUpperCase() == "ROLE") {
-                    listOfRoles.push(tokens[2].toUpperCase());
-                }
-            }
+    const url = `api/1.0/?Procedure=%40SystemCatalog&Parameters=%5B"ROLES"%5D`;
+    var rolesList = [];
+    $.ajax({
+        url: url,
+        type: 'get',
+        success: function (response) {
+            var result = response.results[0].data;
+            rolesList = result.map((item) => {
+                return item[0]
+            })
         }
-
-
-    }
-    var r = "";
-    for (var i = 0; i < listOfRoles.length; i++) r += listOfRoles[i] + ", ";
-    return listOfRoles;
+    }).done(function () {
+        voltDbRenderer.usersRoles = rolesList;
+    })
 
 }
 
 function rolehtml() {
-    var roles = getListOfRoles();
+    var roles = voltDbRenderer.usersRoles;
     var role_options = "";
     for (var i = 0; i < roles.length; i++) {
         role_options += '<option value="' + roles[i] + '">' + roles[i] + '</option>';
