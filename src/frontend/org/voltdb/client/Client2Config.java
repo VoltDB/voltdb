@@ -65,8 +65,8 @@ public class Client2Config {
 
     // Similarly for the valid priority range (from ProcedureInvocation)
 
-    public static final int HIGHEST_PRIORITY = ProcedureInvocation.HIGHEST_PRIORITY;
-    public static final int LOWEST_PRIORITY = ProcedureInvocation.LOWEST_PRIORITY;
+    public static final int HIGHEST_PRIORITY = Priority.HIGHEST_PRIORITY;
+    public static final int LOWEST_PRIORITY = Priority.LOWEST_PRIORITY;
 
     // All these have package access for use by Client2Impl
     // All times are in nanoseconds

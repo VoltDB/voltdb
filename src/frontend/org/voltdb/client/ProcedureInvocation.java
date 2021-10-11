@@ -45,17 +45,8 @@ public class ProcedureInvocation {
     //  self-contained (see Constants.UTF8ENCODING)
     private static final Charset UTF8Encoding = Charset.forName("UTF-8");
 
+    // Not partition-specific
     public static final int NO_PARTITION = -1;
-
-    // Maximum and minimum priority levels that clients can set.
-    // Serialized to a byte, signed in Java, therefore cannot exceed
-    // 127 in numerical value. A smaller priority range can be configured
-    // on the server (highest remains 1, lowest is numerically smaller).
-    public static final int HIGHEST_PRIORITY = 1;
-    public static final int LOWEST_PRIORITY = 8;
-
-    // This is the highest effective priority
-    public static final int SYSTEM_PRIORITY = 0;
 
     // This internally indicates that no priority field will be marshalled
     private static final int NO_PRIORITY = -1;
@@ -80,9 +71,9 @@ public class ProcedureInvocation {
         }
 
         // Careful: highest prio has lowest numerical value
-        if (requestPrio != NO_PRIORITY && (requestPrio < HIGHEST_PRIORITY || requestPrio > LOWEST_PRIORITY)) {
+        if (requestPrio != NO_PRIORITY && (requestPrio < Priority.HIGHEST_PRIORITY || requestPrio > Priority.LOWEST_PRIORITY)) {
             throw new IllegalArgumentException(String.format("Request priority must be in range %d to %d",
-                                                             HIGHEST_PRIORITY, LOWEST_PRIORITY));
+                                                             Priority.HIGHEST_PRIORITY, Priority.LOWEST_PRIORITY));
         }
 
         m_clientHandle = handle;

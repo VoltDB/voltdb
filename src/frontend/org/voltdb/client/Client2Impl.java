@@ -131,8 +131,8 @@ public class Client2Impl implements Client2 {
     // Default request priorities (larger number is lower priority)
     // User-request priority affects connection queue order, and is sent to server.
     // System requests are not queued, so priority is only used by server.
-    static final int DEFAULT_REQUEST_PRIORITY = ProcedureInvocation.LOWEST_PRIORITY / 2;
-    static final int DEFAULT_SYSREQ_PRIORITY = ProcedureInvocation.HIGHEST_PRIORITY + 1;
+    static final int DEFAULT_REQUEST_PRIORITY = Priority.LOWEST_PRIORITY / 2;
+    static final int DEFAULT_SYSREQ_PRIORITY = Priority.HIGHEST_PRIORITY + 1;
     private int defaultRequestPriority = DEFAULT_REQUEST_PRIORITY; // Override via config
     private int systemRequestPriority = DEFAULT_SYSREQ_PRIORITY; // No override yet
 
@@ -1082,9 +1082,9 @@ public class Client2Impl implements Client2 {
         }
 
         // Validate request priority
-        if (requestPrio < ProcedureInvocation.HIGHEST_PRIORITY || requestPrio > ProcedureInvocation.LOWEST_PRIORITY) {
+        if (requestPrio < Priority.HIGHEST_PRIORITY || requestPrio > Priority.LOWEST_PRIORITY) {
             String err = String.format("Invalid request priority %d; range is %d to %d",
-                                       requestPrio, ProcedureInvocation.HIGHEST_PRIORITY, ProcedureInvocation.LOWEST_PRIORITY);
+                                       requestPrio, Priority.HIGHEST_PRIORITY, Priority.LOWEST_PRIORITY);
             future.completeExceptionally(new IllegalArgumentException(err));
             return future;
         }
