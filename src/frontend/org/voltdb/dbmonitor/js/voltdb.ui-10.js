@@ -461,7 +461,6 @@ $(document).ready(function () {
   //If security is enabled, then it displays login popup. After user is verified, it calls loadPage().
   //If security is not enabled, then it simply calls loadPage().
   voltDbRenderer.HandleLogin(serverName, portid, function () {
-    voltDbRenderer.fetchUsersListDB();
     set_kubernetes($(location).attr("hostname"), $(location).attr("port"));
     loadPage(serverName, portid);
   });
@@ -4502,11 +4501,9 @@ var adjustExporterGraphSpacing = function () {
       });
 
     setInterval(() => {
+      console.log(VoltDbAdminConfig.isSecurityEnabled);
       if (VoltDbAdminConfig.isSecurityEnabled) {
-        voltDbRenderer.fetchUsersListDB();
-        if (VoltDbAdminConfig.isReloadRequired) {
-          showAdminPage();
-        }
+        voltDbRenderer.checkRolesUpdate();
       }
     }, 2000)
 

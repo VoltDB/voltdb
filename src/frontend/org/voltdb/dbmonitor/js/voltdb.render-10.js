@@ -68,7 +68,7 @@ function set_kubernetes(server, port) {
     this.kubernetes_con = false;
     this.hostNames = [];
     this.currentHost = "";
-    this.usersList = null;
+    this.usersList = [];
 
     this.isHost = false;
     this.userPreferences = {};
@@ -900,54 +900,56 @@ function set_kubernetes(server, port) {
       return isAdmin;
     };
 
-    this.fetchUsersListDB = function () {
+    this.checkRolesUpdate = function () {
       const url = `api/1.0/?Procedure=%40SystemCatalog&Parameters=%5B"USERS"%5D&admin=true`;
-      var usersList = $.ajax({
+      var usersList = [];
+      $.ajax({
         type: "get",
         url: url,
         success: function (response) {
           var result = response.results[0].data;
-          voltDbRenderer.usersList = result.map((user) => {
+          usersList = result.map((user) => {
             var user = {
               name: user[0],
               role: user[1],
             }
             return user;
           });
+          voltDbRenderer.usersList = usersList;
         }
       }).done(function () {
-        checkRolesUpdate(voltDbRenderer.usersList);
-      });
-    }
+        var currentUserRole = VoltDbUI.getCookie("role");
+        var currentUser = VoltDbUI.getCookie("username");
 
-    function checkRolesUpdate(usersList) {
+        if (currentUserRole !== 'null' && usersList.length > 0) {
+          var updatedUserRole = usersList.length > 0 && usersList.filter(user => user.name === currentUser)[0].role;
+          var isRoleChanged = currentUserRole === updatedUserRole ? false : true;
+          VoltDbAdminConfig.isAdmin = updatedUserRole.toLowerCase() === 'administrator' ? true : false;
+          VoltDbAdminConfig.isRoleChanged = isRoleChanged;
+          if (isRoleChanged) {
+            $("#rolePopup").trigger("click");
+            saveSessionCookie('role', updatedUserRole);
+            VoltDbAdminConfig.isReloadRequired = true;
 
-      var currentUserRole = VoltDbUI.getCookie("role");
-      var currentUser = VoltDbUI.getCookie("username");
-
-      if (currentUserRole !== 'null' && usersList.length > 0) {
-        var updatedUserRole = usersList.filter(user => user.name === currentUser)[0].role;
-        var isRoleChanged = currentUserRole === updatedUserRole ? false : true;
-
-        VoltDbAdminConfig.isRoleChanged = isRoleChanged;
-        if (isRoleChanged) {
-          $("#rolePopup").trigger("click");
-          saveSessionCookie('role', updatedUserRole);
-        }
-        if (updatedUserRole.toLowerCase() === 'administrator') {
-          VoltDbAdminConfig.isAdmin = true;
+            if (VoltDbAdminConfig.isAdmin) {
+              $("#navAdmin").show();
+              loadAdminPage();
+            } else {
+              $("#navAdmin").hide();
+            }
+          }
         } else {
-          VoltDbAdminConfig.isAdmin = false;
+          VoltDbAdminConfig.isAdmin = true;
+          VoltDbAdminConfig.isReloadRequired = false;
         }
-        VoltDbAdminConfig.isReloadRequired = true;
-      } else {
-        VoltDbAdminConfig.isAdmin = true;
-      }
+      });
     }
 
     var loadAdminDeploymentInformation = function (connection) {
       var adminConfigValues = {};
-      var currentUser = VoltDbUI.getCookie("username");
+      var currentUser = VoltDbUI.getCookie('username');
+      var currentRole = VoltDbUI.getCookie('role');
+
       if (
         connection != null &&
         connection.Metadata["SHORTAPI_DEPLOYMENT"] != null
@@ -956,13 +958,17 @@ function set_kubernetes(server, port) {
         var usersList = voltDbRenderer.usersList;
 
         //The user does not have permission to view admin details.
-        if (usersList.length === 0) {
+        if (currentUser !== 'null' && currentRole === 'administrator') {
+          console.log("When user is not null and is admin");
           adminConfigValues.VMCNoPermission = false;
           VoltDbAdminConfig.isAdmin = true;
         } else if (!hasAdminPrivileges) {
+          console.log("When user is not null and is not admin");
           adminConfigValues.VMCNoPermission = true;
           return adminConfigValues;
-        } else if (currentUser === 'null') {
+        } else if (usersList.length <= 0 && currentUser === 'null') {
+          console.log("When user is null");
+          saveSessionCookie('role', 'administrator')
           adminConfigValues.VMCNoPermission = false;
           VoltDbAdminConfig.isAdmin = true;
         }
