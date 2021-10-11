@@ -3470,8 +3470,8 @@ var loadPage = function (serverName, portid) {
 
   $("#rolePopup").popup({
     closeDialog: function () {
+      $("#rolePopup").unbind("click");
       $("#roleChangePopup").hide();
-      window.location.reload();
     },
   });
 
@@ -4502,7 +4502,6 @@ var adjustExporterGraphSpacing = function () {
       });
 
     setInterval(() => {
-      console.log(VoltDbAdminConfig.isSecurityEnabled);
       if (VoltDbAdminConfig.isSecurityEnabled) {
         voltDbRenderer.checkRolesUpdate();
       }

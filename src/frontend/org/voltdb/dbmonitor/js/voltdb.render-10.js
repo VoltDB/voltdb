@@ -960,15 +960,12 @@ function set_kubernetes(server, port) {
 
         //The user does not have permission to view admin details.
         if (currentUser !== 'null' && currentRole === 'administrator') {
-          console.log("When user is not null and is admin");
           adminConfigValues.VMCNoPermission = false;
           VoltDbAdminConfig.isAdmin = true;
         } else if (!hasAdminPrivileges) {
-          console.log("When user is not null and is not admin");
           adminConfigValues.VMCNoPermission = true;
           return adminConfigValues;
         } else if (usersList.length <= 0 && currentUser === 'null') {
-          console.log("When user is null");
           saveSessionCookie('role', 'administrator')
           adminConfigValues.VMCNoPermission = false;
           VoltDbAdminConfig.isAdmin = true;

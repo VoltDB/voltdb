@@ -279,11 +279,12 @@
       if (securityBtn != undefined) {
         securityBtn.unbind("click");
         $(document).on("click", "a[id='btnPopOk']", function (e) {
-          e.preventDefault();
           var currentTab = VoltDbUI.getCookie('current-tab');
           if (parseInt(currentTab) !== 1) {
             $("#navDbmonitor > a").trigger("click");
           }
+          e.preventDefault();
+          p.o.closeDialog();
           p.close();
         });
       }
