@@ -47,6 +47,8 @@
 #include "GeographyValue.hpp"
 #include "utf8.h"
 #include "murmur3/MurmurHash3.h"
+#define BOOST_STACKTRACE_GNU_SOURCE_NOT_REQUIRED
+#include <boost/stacktrace.hpp>
 
 namespace voltdb {
 
@@ -2814,6 +2816,7 @@ inline NValue NValue::initFromTupleStorage(const void *storage, ValueType type, 
             retval.getGeographyPointValue() = *reinterpret_cast<const GeographyPointValue*>(storage);
             break;
         default:
+            VOLT_WARN("NValue:invalid column. Stack: %s", boost::stacktrace::stacktrace().c_str());
             throwDynamicSQLException("NValue::initFromTupleStorage() invalid column type '%s'",
                     getTypeName(type).c_str());
     }
