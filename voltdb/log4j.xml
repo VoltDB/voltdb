@@ -31,9 +31,10 @@
         </filter>
     </appender>
     <!-- file appender captures all loggers messages. -->
-    <appender name="file" class="org.apache.log4j.DailyRollingFileAppender">
+    <appender name="file" class="org.apache.log4j.DailyMaxRollingFileAppender">
         <param name="file" value="log/volt.log"/>
-        <param name="DatePattern" value="'.'yyyy-MM-dd" />
+        <param name="MaxBackupIndex" value="30"/>
+	<param name="DatePattern" value="'.'yyyy-MM-dd" />
         <layout class="org.apache.log4j.PatternLayout">
             <param name="ConversionPattern" value="%d   %-5p [%t] %c: %m%n"/>
         </layout>

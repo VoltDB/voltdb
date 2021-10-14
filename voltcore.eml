@@ -31,6 +31,9 @@
 	<lib name="log4j-1.2.16.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/log4j-1.2.16.jar!/"/>
 	</lib>
+	<lib name="log4jext.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/log4jext.jar!/"/>
+	</lib>
 	<lib name="servlet-api-3.1.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/servlet-api-3.1.jar!/"/>
 	</lib>
@@ -118,9 +121,6 @@
 	<lib name="commons-logging-1.1.3.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/commons-logging-1.1.3.jar!/"/>
 	</lib>
-	<lib name="tomcat-jdbc-7.0.96.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/tomcat-jdbc-7.0.96.jar!/"/>
-	</lib>
 	<lib name="jackson-databind-2.11.3.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jackson-databind-2.11.3.jar!/"/>
 	</lib>
@@ -141,9 +141,6 @@
 	</lib>
 	<lib name="guava-30.0-jre.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/guava-30.0-jre.jar!/"/>
-	</lib>
-	<lib name="tomcat-juli-7.0.96.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/tomcat-juli-7.0.96.jar!/"/>
 	</lib>
 	<lib name="javassist-3.20.0-GA.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/javassist-3.20.0-GA.jar!/"/>
