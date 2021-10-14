@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -25,6 +25,8 @@ import java.io.IOException;
 import java.util.Properties;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
+
+import com.google_voltpatches.common.net.HostAndPort;
 
 import org.voltdb.CLIConfig;
 import org.voltdb.client.AutoReconnectListener;
@@ -325,8 +327,6 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
         BufferedReader br = null;
         m_config = cfg;
         configuration();
-        // Split server list
-        final String[] serverlist = m_config.servers.split(",");
 
         // read username and password from txt file
         if (m_config.credentials != null && !m_config.credentials.trim().isEmpty()) {
@@ -338,16 +338,8 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
         m_config.password = CLIConfig.readPasswordIfNeeded(m_config.user, m_config.password, "Enter VoltDB password: ");
 
         // Create connection
-        final ClientConfig c_config;
-        AutoReconnectListener listener = new AutoReconnectListener();
-        if (m_config.stopondisconnect) {
-            c_config = new ClientConfig(m_config.user, m_config.password, null);
-            // the following setting is ignored because getClient subsequently sets topo-change-aware
-            c_config.setReconnectOnConnectionLoss(false);
-        } else {
-            c_config = new ClientConfig(m_config.user, m_config.password, listener);
-            c_config.setReconnectOnConnectionLoss(true);
-        }
+        AutoReconnectListener listener = m_config.stopondisconnect ? null : new AutoReconnectListener();
+        final ClientConfig c_config = new ClientConfig(m_config.user, m_config.password, listener);
         if (m_config.ssl != null && !m_config.ssl.trim().isEmpty()) {
             c_config.setTrustStoreConfigFromPropertyFile(m_config.ssl);
             c_config.enableSSL();
@@ -355,7 +347,7 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
         c_config.setProcedureCallTimeout(0); // Set procedure all to infinite
         Client csvClient = null;
         try {
-            csvClient = JDBCLoader.getClient(c_config, serverlist, m_config.port);
+            csvClient = JDBCLoader.getClient(c_config, m_config.servers, m_config.port);
         } catch (Exception e) {
             System.err.println("Error connecting to the servers: "
                                + m_config.servers + ": " + e);
@@ -468,6 +460,9 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
 
     /**
      * Get connection to servers in cluster.
+     * Connects to the first available server, and uses
+     * the topology-awareness features to connect to the
+     * rest.
      *
      * @param config
      * @param servers
@@ -475,27 +470,33 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
      * @return
      * @throws Exception
      */
-    public static Client getClient(ClientConfig config, String[] servers,
-            int port) throws Exception {
+    public static Client getClient(ClientConfig config, String servers,
+                                   int port) throws IOException, InterruptedException {
         config.setTopologyChangeAware(true);
-        final Client client = ClientFactory.createClient(config);
+        Client client = ClientFactory.createClient(config);
+        try {
+            client.createAnyConnection(makeServerList(servers, port));
+            return client;
+        }
+        catch (IOException | RuntimeException ex) {
+            client.close();
+            throw ex;
+        }
+    }
 
-        for (String server : servers) {
-         // Try connecting servers one by one until we have a success
-            try {
-                client.createConnection(server.trim(), port);
-            } catch (IOException e) {
-                // Only swallow the exceptions from Java network or connection problems
-                // Unresolved hostname exceptions will be thrown
-            }
+    // Adjust conventions: we want a list of server:port values
+    private static String makeServerList(String servers, int port) {
+        if (port == Client.VOLTDB_SERVER_PORT) {
+            return servers; // implied default
         }
-        if (client.getConnectedHostList().isEmpty()) {
-            try {
-                client.close();
-            } catch (Exception ignore) {}
-            throw new Exception("Unable to connect to any servers.");
+        String[] list = servers.split(",");
+        for (int i=0; i<list.length; i++) {
+            list[i] = HostAndPort.fromString(list[i].trim())
+                                 .withDefaultPort(port)
+                                 .requireBracketsForIPv6()
+                                 .toString();
         }
-        return client;
+        return String.join(",", list);
     }
 
     private void produceFiles(long ackCount, long insertCount) {

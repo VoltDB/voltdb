@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -29,10 +29,12 @@ import java.util.Properties;
 import java.util.TimeZone;
 import java.util.concurrent.LinkedBlockingQueue;
 
+import com.google_voltpatches.common.net.HostAndPort;
 import org.supercsv.io.CsvListReader;
 import org.supercsv.io.ICsvListReader;
 import org.supercsv.prefs.CsvPreference;
 import org.supercsv_voltpatches.tokenizer.Tokenizer;
+
 import org.voltdb.CLIConfig;
 import org.voltdb.client.AutoReconnectListener;
 import org.voltdb.client.Client;
@@ -448,8 +450,6 @@ public class CSVLoader implements BulkLoaderErrorHandler {
             System.err.println("CSV file '" + config.file + "' could not be found.");
             System.exit(-1);
         }
-        // Split server list
-        final String[] serverlist = config.servers.split(",");
 
         // read username and password from txt file
         if (config.credentials != null && !config.credentials.trim().isEmpty()) {
@@ -462,16 +462,8 @@ public class CSVLoader implements BulkLoaderErrorHandler {
         config.password = CLIConfig.readPasswordIfNeeded(config.user, config.password, "Enter password: ");
 
         // Create connection
-        final ClientConfig c_config;
-        AutoReconnectListener listener = new AutoReconnectListener();
-        if (config.stopondisconnect) {
-            c_config = new ClientConfig(config.user, config.password, null);
-            // the following setting is ignored because getClient sets topo-change-aware
-            c_config.setReconnectOnConnectionLoss(false);
-        } else {
-            c_config = new ClientConfig(config.user, config.password, listener);
-            c_config.setReconnectOnConnectionLoss(true);
-        }
+        AutoReconnectListener listener = config.stopondisconnect ? null : new AutoReconnectListener();
+        final ClientConfig c_config = new ClientConfig(config.user, config.password, listener);
         if (config.ssl != null && !config.ssl.trim().isEmpty()) {
             c_config.setTrustStoreConfigFromPropertyFile(config.ssl);
             c_config.enableSSL();
@@ -479,10 +471,10 @@ public class CSVLoader implements BulkLoaderErrorHandler {
         if (!config.kerberos.trim().isEmpty()) {
             c_config.enableKerberosAuthentication(config.kerberos);
         }
-        c_config.setProcedureCallTimeout(0); // Set procedure all to infinite
+        c_config.setProcedureCallTimeout(0); // 0 => infinite
         Client csvClient = null;
         try {
-            csvClient = CSVLoader.getClient(c_config, serverlist, config.port);
+            csvClient = CSVLoader.getClient(c_config, config.servers, config.port);
         } catch (Exception e) {
             System.err.println("Error connecting to the servers: "
                     + config.servers);
@@ -602,31 +594,43 @@ public class CSVLoader implements BulkLoaderErrorHandler {
 
     /**
      * Get connection to servers in cluster.
+     * Connects to the first available server, and uses
+     * the topology-awareness features to connect to the
+     * rest.
      *
      * @param config
      * @param servers
      * @param port
      * @return
-     * @throws Exception
+     * @throws IOException
      */
-    public static Client getClient(ClientConfig config, String[] servers,
-            int port) throws Exception {
-        config.setTopologyChangeAware(true); // Set client to be topology-aware
-        final Client client = ClientFactory.createClient(config);
-        for (String server : servers) {
-            // Try connecting servers one by one until we have a success
-            try {
-                client.createConnection(server.trim(), port);
-                break;
-            } catch(IOException e) {
-                // Only swallow the exceptions from Java network or connection problems
-                // Unresolved hostname exceptions will be thrown
-            }
+    public static Client getClient(ClientConfig config, String servers,
+                                   int port) throws IOException, InterruptedException {
+        config.setTopologyChangeAware(true);
+        Client client = ClientFactory.createClient(config);
+        try {
+            client.createAnyConnection(makeServerList(servers, port));
+            return client;
         }
-        if (client.getConnectedHostList().isEmpty()) {
-            throw new Exception("Unable to connect to any servers.");
+        catch (IOException | RuntimeException ex) {
+            client.close();
+            throw ex;
         }
-        return client;
+    }
+
+    // Adjust conventions: we want a list of server:port values
+    private static String makeServerList(String servers, int port) {
+        if (port == Client.VOLTDB_SERVER_PORT) {
+            return servers; // implied default
+        }
+        String[] list = servers.split(",");
+        for (int i=0; i<list.length; i++) {
+            list[i] = HostAndPort.fromString(list[i].trim())
+                                 .withDefaultPort(port)
+                                 .requireBracketsForIPv6()
+                                 .toString();
+        }
+        return String.join(",", list);
     }
 
     private void produceFiles(long ackCount, long insertCount) {
