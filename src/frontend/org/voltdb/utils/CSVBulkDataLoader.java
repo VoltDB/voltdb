@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -22,7 +22,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.client.ClientImpl;
+import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.VoltBulkLoader.BulkLoaderFailureCallBack;
 import org.voltdb.client.VoltBulkLoader.BulkLoaderSuccessCallback;
@@ -39,23 +39,21 @@ public class CSVBulkDataLoader implements CSVDataLoader {
     private final AtomicLong m_failedInsertCount = new AtomicLong(0);
     private final BulkLoaderSuccessCallback m_successCallback;
 
-    public CSVBulkDataLoader(ClientImpl client, String tableName, int batchSize, boolean upsertMode,
+    public CSVBulkDataLoader(Client client, String tableName, int batchSize,
             BulkLoaderErrorHandler errHandler) throws Exception    {
-        m_loader = client.getNewBulkLoader(tableName, batchSize, upsertMode, new CsvFailureCallback());
-        m_errHandler = errHandler;
-        m_successCallback = null;
+        this(client, tableName, batchSize, false, errHandler, null);
     }
 
-    public CSVBulkDataLoader(ClientImpl client, String tableName, int batchSize, boolean upsertMode,
+    public CSVBulkDataLoader(Client client, String tableName, int batchSize, boolean upsertMode,
+            BulkLoaderErrorHandler errHandler) throws Exception    {
+        this(client, tableName, batchSize, upsertMode, errHandler, null);
+    }
+
+    public CSVBulkDataLoader(Client client, String tableName, int batchSize, boolean upsertMode,
             BulkLoaderErrorHandler errHandler, BulkLoaderSuccessCallback successCallback) throws Exception {
         m_loader = client.getNewBulkLoader(tableName, batchSize, upsertMode, new CsvFailureCallback(), successCallback);
         m_errHandler = errHandler;
         m_successCallback = successCallback;
-    }
-
-    public CSVBulkDataLoader(ClientImpl client, String tableName, int batchSize,
-            BulkLoaderErrorHandler errHandler) throws Exception    {
-        this(client, tableName, batchSize, false, errHandler);
     }
 
     @Override

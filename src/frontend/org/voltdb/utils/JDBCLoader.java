@@ -33,7 +33,6 @@ import org.voltdb.client.AutoReconnectListener;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
-import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 
 /**
@@ -366,9 +365,9 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
 
 
             if (m_config.useSuppliedProcedure) {
-                dataLoader = new CSVTupleDataLoader((ClientImpl) csvClient, m_config.procedure, errHandler);
+                dataLoader = new CSVTupleDataLoader(csvClient, m_config.procedure, errHandler);
             } else {
-                dataLoader = new CSVBulkDataLoader((ClientImpl) csvClient, m_config.table, m_config.batch, m_config.update, errHandler);
+                dataLoader = new CSVBulkDataLoader(csvClient, m_config.table, m_config.batch, m_config.update, errHandler);
             }
 
             if (!m_config.stopondisconnect) {

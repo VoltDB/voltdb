@@ -40,7 +40,6 @@ import org.voltdb.client.AutoReconnectListener;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
-import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 
 /**
@@ -493,9 +492,9 @@ public class CSVLoader implements BulkLoaderErrorHandler {
             errHandler.launchErrorFlushProcessor();
 
             if (config.useSuppliedProcedure) {
-                dataLoader = new CSVTupleDataLoader((ClientImpl) csvClient, config.procedure, errHandler);
+                dataLoader = new CSVTupleDataLoader(csvClient, config.procedure, errHandler);
             } else {
-                dataLoader = new CSVBulkDataLoader((ClientImpl) csvClient, config.table, config.batch, config.update, errHandler);
+                dataLoader = new CSVBulkDataLoader(csvClient, config.table, config.batch, config.update, errHandler);
             }
             if (!config.stopondisconnect) {
                 listener.setLoader(dataLoader);

@@ -40,7 +40,6 @@ import org.voltdb.client.AutoReconnectListener;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
-import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.importer.ImporterLifecycle;
 import org.voltdb.utils.BulkLoaderErrorHandler;
@@ -247,9 +246,9 @@ public class KafkaLoader implements ImporterLifecycle {
         m_client = getVoltClient(clientConfig, m_cliOptions.getVoltHosts());
 
         if (m_cliOptions.useSuppliedProcedure) {
-            m_loader = new CSVTupleDataLoader((ClientImpl) m_client, m_cliOptions.procedure, new KafkaBulkLoaderCallback());
+            m_loader = new CSVTupleDataLoader(m_client, m_cliOptions.procedure, new KafkaBulkLoaderCallback());
         } else {
-            m_loader = new CSVBulkDataLoader((ClientImpl) m_client, m_cliOptions.table, m_cliOptions.batch, m_cliOptions.update, new KafkaBulkLoaderCallback());
+            m_loader = new CSVBulkDataLoader(m_client, m_cliOptions.table, m_cliOptions.batch, m_cliOptions.update, new KafkaBulkLoaderCallback());
         }
         m_loader.setFlushInterval(m_cliOptions.flush, m_cliOptions.flush);
 
