@@ -209,6 +209,8 @@ public class VoltLog4jLogger implements CoreVoltLogger {
         FileAppender fileAppendr = null;
         // Default pattern for both.
         String fileAppendrDatePattern = "'.'yyyy-MM-dd";
+        // Default we use change this if default changes.
+        int maxBackupIndex = 30;
         while (appen.hasMoreElements()) {
             Appender appndr = appen.nextElement();
             if (appndr instanceof DailyMaxRollingFileAppender) {
@@ -218,6 +220,7 @@ public class VoltLog4jLogger implements CoreVoltLogger {
                 if (!logFH.isAbsolute()) {
                     fileAppendrDatePattern = oap.getDatePattern();
                     fileAppendr = oap;
+                    maxBackupIndex = oap.getMaxBackupIndex();
                     break;
                 }
             }
@@ -246,7 +249,9 @@ public class VoltLog4jLogger implements CoreVoltLogger {
                 throw new IllegalArgumentException("Cannot access " + logDH);
             }
             if (dailyMax) {
-                nap = new DailyMaxRollingFileAppender(fileAppendr.getLayout(), napFH.getPath(), fileAppendrDatePattern);
+                DailyMaxRollingFileAppender dfa = new DailyMaxRollingFileAppender(fileAppendr.getLayout(), napFH.getPath(), fileAppendrDatePattern);
+                dfa.setMaxBackupIndex(maxBackupIndex);
+                nap = dfa;
             } else {
                 nap = new DailyRollingFileAppender(fileAppendr.getLayout(), napFH.getPath(), fileAppendrDatePattern);
             }
