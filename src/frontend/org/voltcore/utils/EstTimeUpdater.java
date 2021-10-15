@@ -50,8 +50,11 @@ public class EstTimeUpdater {
                 }
                 if (s_pause) continue;
                 Long delta = EstTimeUpdater.update(System.currentTimeMillis());
-                if ( delta != null ) {
-                    hostLog.warn(delta +" estimated time update.");
+                if (delta != null) {
+                    hostLog.warnFmt("VoltDB's internal time-keeper thread has not been updated for %,.3f seconds." +
+                                    " This could be caused by contention, swapping, sleeping, or other environmental" +
+                                    " issues, and may lead to long transaction processing times and even node timeouts.",
+                                    delta / 1000.0);
                 }
             }
         }
