@@ -576,7 +576,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     message.getClientInterfaceHandle(),
                     message.getConnectionId(),
                     message.isForReplay());
-
+            msg.setShouldReturnResultTables(message.shouldReturnResultTables());
             msg.setSpHandle(newSpHandle);
             logRepair(msg);
             // Also, if this is a vanilla single-part procedure, make the TXNID
@@ -618,6 +618,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                             msg.getConnectionId(),
                             msg.isForReplay(),
                             true);
+                replmsg.setShouldReturnResultTables(false);
                 // Update the handle in the copy since the constructor doesn't set it
                 replmsg.setSpHandle(newSpHandle);
                 // K-safety cluster doesn't always mean partition has replicas,

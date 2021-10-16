@@ -58,10 +58,10 @@ abstract public class ProcedureTask extends TransactionTask
     abstract void completeInitiateTask(SiteProcedureConnection siteConnection);
 
     /** Mostly copy-paste of old ExecutionSite.processInitiateTask() */
-    protected InitiateResponseMessage processInitiateTask(Iv2InitiateTaskMessage task,
+    protected InitiateResponseMessage processInitiateTask(Iv2InitiateTaskMessage taskMessage,
             SiteProcedureConnection siteConnection)
     {
-        final InitiateResponseMessage response = new InitiateResponseMessage(task);
+        final InitiateResponseMessage response = new InitiateResponseMessage(taskMessage);
 
         try {
             Object[] callerParams = null;
@@ -70,7 +70,7 @@ abstract public class ProcedureTask extends TransactionTask
              * that the parameter set is corrupt
              */
             try {
-                callerParams = task.getParameters();
+                callerParams = taskMessage.getParameters();
             } catch (RuntimeException e) {
                 Writer result = new StringWriter();
                 PrintWriter pw = new PrintWriter(result);
@@ -112,7 +112,7 @@ abstract public class ProcedureTask extends TransactionTask
                 runner.setupTransaction(m_txnState);
 
                 // execute the procedure
-                cr = runner.call(callerParams);
+                cr = runner.call(callerParams, (taskMessage.shouldReturnResultTables() || taskMessage.isEveryPartition()));
 
                 // pass in the first value in the hashes array if it's not null
                 Integer hash = null;
@@ -121,23 +121,10 @@ abstract public class ProcedureTask extends TransactionTask
                     hash = hashes[0];
                 }
                 m_txnState.setHash(hash);
-                //Don't pay the cost of returning the result tables for a replicated write
-                //With reads don't apply the optimization just in case
-                //                    if (!task.shouldReturnResultTables() && !task.isReadOnly()) {
-                //                        cr.dropResultTable();
-                //                    }
-
                 response.setResults(cr);
-                // record the results of write transactions to the transaction state
-                // this may be used to verify the DR replica cluster gets the same value
-                // skip for multi-partition txns because only 1 of k+1 partitions will
-                //  have the real results
-                if ((!task.isReadOnly()) && task.isSinglePartition()) {
-                    m_txnState.storeResults(cr);
-                }
             } else {
                 // mis-partitioned invocation, reject it and let the ClientInterface restart it
-                response.setMispartitioned(true, task.getStoredProcedureInvocation(),
+                response.setMispartitioned(true, taskMessage.getStoredProcedureInvocation(),
                         TheHashinator.getCurrentVersionedConfig());
             }
         }

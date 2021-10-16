@@ -46,7 +46,6 @@ public abstract class TransactionState extends OrderableTransaction  {
     volatile protected boolean m_done = false;
     protected long m_beginUndoToken;
     volatile protected boolean m_needsRollback = false;
-    protected ClientResponseImpl m_response = null;
     protected final boolean m_isForReplay;
     protected int m_hash = -1; // -1 shows where the value comes from (they only have to match)
     // IZZY: make me protected/private
@@ -130,14 +129,6 @@ public abstract class TransactionState extends OrderableTransaction  {
 
     public void setHash(Integer hash) {
         m_hash = hash == null ? 0 : hash; // don't allow null
-    }
-
-    public void storeResults(ClientResponseImpl response) {
-        m_response = response;
-    }
-
-    public ClientResponseImpl getResults() {
-        return m_response;
     }
 
     public void setBeginUndoToken(long undoToken)

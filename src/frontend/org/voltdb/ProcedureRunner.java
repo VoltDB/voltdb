@@ -280,8 +280,12 @@ public class ProcedureRunner {
     /**
      * Wraps coreCall with statistics code.
      */
-    public ClientResponseImpl call(Object[] paramListIn) {
-        return call(true, paramListIn);
+    public ClientResponseImpl call(Object[] paramListIn, boolean returnResults) {
+        return call(true, paramListIn, returnResults);
+    }
+
+    public ClientResponseImpl call(boolean resetHash, Object[] paramListIn) {
+        return call(true, paramListIn, true);
     }
 
     /**
@@ -293,9 +297,10 @@ public class ProcedureRunner {
      *
      * @param resetHash   if {@code true} {@link #m_determinismHash} will be reset prior to the procedure call
      * @param paramListIn array of parameters to pass to the procedure
+     * @param returnResults if it is true, return result tables in the response
      * @return result of the procedure being invoked
      */
-    public ClientResponseImpl call(boolean resetHash, Object[] paramListIn) {
+    private ClientResponseImpl call(boolean resetHash, Object[] paramListIn, boolean returnResults) {
         m_perCallStats = m_statsCollector.beginProcedure();
 
         // if we're keeping track, calculate parameter size
@@ -305,7 +310,7 @@ public class ProcedureRunner {
             m_perCallStats.setParameterSize(params.getSerializedSize());
         }
 
-        ClientResponseImpl result = coreCall(resetHash, paramListIn);
+        ClientResponseImpl result = coreCall(resetHash, paramListIn, returnResults);
 
         // if we're keeping track, calculate result size
         if (m_perCallStats != null) {
@@ -332,7 +337,7 @@ public class ProcedureRunner {
     }
 
     @SuppressWarnings("finally")
-    private ClientResponseImpl coreCall(boolean resetHash, Object[] paramListIn) {
+    private ClientResponseImpl coreCall(boolean resetHash, Object[] paramListIn, boolean returnResults) {
         // verify per-txn state has been reset
         assert(m_statusCode == ClientResponse.SUCCESS);
         assert(m_statusString == null);
@@ -403,8 +408,9 @@ public class ProcedureRunner {
                     }
                     try {
                         Object rawResult = m_procMethod.invoke(m_procedure, paramList);
-
-                        results = ParameterConverter.getResultsFromRawResults(m_procedureName, rawResult);
+                        if (returnResults) {
+                            results = ParameterConverter.getResultsFromRawResults(m_procedureName, rawResult);
+                        }
                     } catch (IllegalAccessException e) {
                         // If reflection fails, invoke the same error handling that other exceptions do
                         throw new InvocationTargetException(e);

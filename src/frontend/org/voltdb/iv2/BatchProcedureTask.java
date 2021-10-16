@@ -215,11 +215,6 @@ abstract class BatchProcedureTask {
 
             response.setResults(cr);
 
-            // record the results of write transactions to the transaction state
-            // this may be used to verify the DR replica cluster gets the same value
-            // skip for multi-partition txns because only 1 of k+1 partitions will
-            // have the real results
-            txnState.storeResults(cr);
         } catch (final ExpectedProcedureException e) {
             execLog.l7dlog(Level.TRACE, LogKeys.org_voltdb_ExecutionSite_ExpectedProcedureException.name(), e);
             response.setResults(

@@ -185,6 +185,10 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         return m_shouldReturnResultTables;
     }
 
+    public void setShouldReturnResultTables(boolean shouldReturnResultTables) {
+        m_shouldReturnResultTables = shouldReturnResultTables;
+    }
+
     public StoredProcedureInvocation getStoredProcedureInvocation() {
         return m_invocation;
     }
