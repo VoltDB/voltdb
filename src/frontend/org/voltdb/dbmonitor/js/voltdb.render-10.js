@@ -226,35 +226,44 @@ function set_kubernetes(server, port) {
 
               $("#overlay").hide();
               if (result) {
-                $("#RoleChangeMsg").hide();
-                $("#PasswordChangeMsg").hide();
-                //Save user details to cookie.
-                set_kubernetes($(location).attr("hostname"), $(location).attr("port"));
-                loadAdminPage();
-                saveSessionCookie("username", usernameVal);
-                saveSessionCookie("password", passwordVal);
-                // saveSessionCookie("role",'user');
-                VoltDBService.GetShortApiDeployment(function (connection) {
-                  var currentUserRole = "user";
-                  var rawData = connection.Metadata["SHORTAPI_DEPLOYMENT"];
-                  var users = rawData !== undefined ? rawData.users : null;
-                  var usersList = users !== null ? users.user : null;
-
-                  if (usersList !== null) {
-                    currentUserRole = usersList.filter(user => user.name === usernameVal)[0].roles;
+                const url = `api/1.0/?Procedure=%40SystemCatalog&Parameters=%5B"USERS"%5D`;
+                var usersList = []
+                $.ajax({
+                  url: url,
+                  type: 'get',
+                  success: function (response) {
+                    var result = response.results[0].data;
+                    usersList = result.map((item) => {
+                      return {
+                        name: item[0],
+                        role: item[1],
+                      }
+                    })
+                  }
+                }).done(function () {
+                  voltDbRenderer.usersList = usersList;
+                  $("#RoleChangeMsg").hide();
+                  $("#PasswordChangeMsg").hide();
+                  //Save user details to cookie.
+                  set_kubernetes($(location).attr("hostname"), $(location).attr("port"));
+                  loadAdminPage();
+                  saveSessionCookie("username", usernameVal);
+                  saveSessionCookie("password", passwordVal);
+                  if (usersList.length > 0) {
+                    currentUserRole = usersList.filter(user => user.name === usernameVal)[0].role;
                   }
                   saveSessionCookie("role", currentUserRole)
+                  voltDbRenderer.ShowUsername(usernameVal);
+                  pageLoadCallback();
+                  popupCallback();
+                  $("#loginBoxDialogue").hide();
+                  setTimeout(function () {
+                    $("#username").val("");
+                    $("#password").val("");
+                  }, 300);
+                  $("#logOut").css("display", "block");
+                  $("#logOut").prop("title", VoltDbUI.getCookie("username"));
                 })
-                voltDbRenderer.ShowUsername(usernameVal);
-                pageLoadCallback();
-                popupCallback();
-                $("#loginBoxDialogue").hide();
-                setTimeout(function () {
-                  $("#username").val("");
-                  $("#password").val("");
-                }, 300);
-                $("#logOut").css("display", "block");
-                $("#logOut").prop("title", VoltDbUI.getCookie("username"));
               } else {
                 $("#RoleChangeMsg").hide();
                 $("#PasswordChangeMsg").hide();
@@ -922,8 +931,8 @@ function set_kubernetes(server, port) {
         var currentUserRole = VoltDbUI.getCookie("role");
         var currentUser = VoltDbUI.getCookie("username");
 
-        if (currentUserRole !== 'null' && voltDbRenderer.usersList.length > 0) {
-          var updatedUserRole = voltDbRenderer.usersList.length > 0 && voltDbRenderer.usersList.filter(user => user.name === currentUser)[0].role;
+        if (currentUserRole !== 'null' && usersList.length > 0) {
+          var updatedUserRole = usersList.length > 0 && usersList.filter(user => user.name === currentUser)[0].role;
           var isRoleChanged = currentUserRole === updatedUserRole ? false : true;
           VoltDbAdminConfig.isAdmin = updatedUserRole.toLowerCase() === 'administrator' ? true : false;
           VoltDbAdminConfig.isRoleChanged = isRoleChanged;
@@ -935,7 +944,7 @@ function set_kubernetes(server, port) {
 
             if (VoltDbAdminConfig.isAdmin) {
               $("#navAdmin").show();
-              // loadAdminPage();
+              loadAdminPage();
             } else {
               $("#navAdmin").hide();
             }
@@ -959,6 +968,10 @@ function set_kubernetes(server, port) {
         var data = connection.Metadata["SHORTAPI_DEPLOYMENT"];
         var usersList = voltDbRenderer.usersList;
 
+        if (usersList.length === 0) {
+          VoltDbAdminConfig.isSecurityEnabled = false;
+        } else VoltDbAdminConfig.isSecurityEnabled = true;
+
         //The user does not have permission to view admin details.
         if (currentUser !== 'null' && currentRole === 'administrator') {
           adminConfigValues.VMCNoPermission = false;
@@ -980,7 +993,6 @@ function set_kubernetes(server, port) {
             : false;
         adminConfigValues["securityEnabled"] =
           data.security != null ? data.security.enabled : false;
-        VoltDbAdminConfig.isSecurityEnabled = adminConfigValues["securityEnabled"];
 
         if (data.users != null && data.users.user != null)
           adminConfigValues["users"] =

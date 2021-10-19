@@ -145,9 +145,6 @@
                     if (shortApiCallDetails.apiPath == null || shortApiCallDetails.apiPath == "") {
                         callback({ "status": -1, "statusstring": "Error: Please specify apiPath.", "results": [] });
                     }
-                    if (shortApiCallDetails.apiPath.includes('deployment') && !VoltDbAdminConfig.isAdmin) {
-                        return;
-                    }
                     uri = window.location.protocol + '/\/' + this.server + ':' + this.port + '/' + shortApiCallDetails.apiPath + '/';
                 } else {
                     uri = window.location.protocol + '/\/' + this.server + ':' + this.port + '/api/1.0/';

@@ -462,6 +462,7 @@ $(document).ready(function () {
   //If security is not enabled, then it simply calls loadPage().
   voltDbRenderer.HandleLogin(serverName, portid, function () {
     getListOfRoles();
+    voltDbRenderer.checkRolesUpdate();
     set_kubernetes($(location).attr("hostname"), $(location).attr("port"));
     loadPage(serverName, portid);
   });
