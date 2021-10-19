@@ -922,11 +922,12 @@ function set_kubernetes(server, port) {
         var currentUserRole = VoltDbUI.getCookie("role");
         var currentUser = VoltDbUI.getCookie("username");
 
-        if (currentUserRole !== 'null' && usersList.length > 0) {
-          var updatedUserRole = usersList.length > 0 && usersList.filter(user => user.name === currentUser)[0].role;
+        if (currentUserRole !== 'null' && voltDbRenderer.usersList.length > 0) {
+          var updatedUserRole = voltDbRenderer.usersList.length > 0 && voltDbRenderer.usersList.filter(user => user.name === currentUser)[0].role;
           var isRoleChanged = currentUserRole === updatedUserRole ? false : true;
           VoltDbAdminConfig.isAdmin = updatedUserRole.toLowerCase() === 'administrator' ? true : false;
           VoltDbAdminConfig.isRoleChanged = isRoleChanged;
+
           if (isRoleChanged) {
             $("#rolePopup").trigger("click");
             saveSessionCookie('role', updatedUserRole);

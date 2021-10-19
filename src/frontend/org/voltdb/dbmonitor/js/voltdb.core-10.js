@@ -145,7 +145,9 @@
                     if (shortApiCallDetails.apiPath == null || shortApiCallDetails.apiPath == "") {
                         callback({ "status": -1, "statusstring": "Error: Please specify apiPath.", "results": [] });
                     }
-
+                    if (shortApiCallDetails.apiPath.includes('deployment') && !VoltDbAdminConfig.isAdmin) {
+                        return;
+                    }
                     uri = window.location.protocol + '/\/' + this.server + ':' + this.port + '/' + shortApiCallDetails.apiPath + '/';
                 } else {
                     uri = window.location.protocol + '/\/' + this.server + ':' + this.port + '/api/1.0/';
@@ -186,7 +188,6 @@
                         callback({ "status": -1, "statusstring": "Error: Please specify parameters", "results": [] });
                     }
                     uri = window.location.protocol + '/\/' + this.server + ':' + this.port + '/' + shortApiCallDetails.apiPath + '/?admin=true';
-
                     if (VoltDBCore.isServerConnected && VoltDbUI.hasPermissionToView && VoltDbAdminConfig.isAdmin) {
                         var ah = null;
                         if (this.authorization != null) {
