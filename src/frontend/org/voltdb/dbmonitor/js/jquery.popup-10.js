@@ -275,20 +275,6 @@
         });
       }
 
-      var securityBtn = $("a[id='btnPopOk']");
-      if (securityBtn != undefined) {
-        securityBtn.unbind("click");
-        $(document).on("click", "a[id='btnPopOk']", function (e) {
-          var currentTab = VoltDbUI.getCookie('current-tab');
-          if (parseInt(currentTab) !== 1) {
-            $("#navDbmonitor > a").trigger("click");
-          }
-          e.preventDefault();
-          p.o.closeDialog();
-          p.close();
-        });
-      }
-
       var serverShutdownBtn = $("a[id=btnServerShutdownOk]");
       if (serverShutdownBtn != undefined) {
         serverShutdownBtn.unbind("click");

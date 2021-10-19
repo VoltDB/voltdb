@@ -3469,7 +3469,22 @@ var loadPage = function (serverName, portid) {
   });
 
   $("#rolePopup").popup({
-    closeDialog: function () {
+    open: function (event, ui, ele) {
+    },
+    afterOpen: function () {
+      var popup = $(this)[0];
+      var securityBtn = document.getElementById("btnPopOk");
+      if (securityBtn != undefined) {
+        securityBtn.addEventListener('click', function () {
+          popup.close();
+          var currentTab = VoltDbUI.getCookie('current-tab');
+          if (parseInt(currentTab) !== 1) {
+            $("#navDbmonitor > a").trigger("click");
+          }
+        })
+      }
+    },
+    afterClose: function () {
       $("#rolePopup").unbind("click");
       $("#roleChangePopup").hide();
     },
