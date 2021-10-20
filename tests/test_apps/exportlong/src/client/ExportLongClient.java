@@ -34,6 +34,8 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ClientStats;
+import org.voltdb.client.ClientStatsContext;
 import org.voltdb.client.ClientStatusListenerExt;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
@@ -54,6 +56,7 @@ public class ExportLongClient {
 
     final ExportLongClientConfig m_config;
     final Client m_client;
+    final ClientStatsContext m_fullStatsContext;
 
     volatile long testStartTS;
     volatile long lastLogTS = 0;
@@ -189,6 +192,7 @@ public class ExportLongClient {
     public ExportLongClient(ExportLongClientConfig config ) {
         this.m_config = config;
         m_client = getClient();
+        m_fullStatsContext = m_client.createStatsContext();
     }
 
     private void runTest() throws Exception {
@@ -220,6 +224,7 @@ public class ExportLongClient {
 
             System.out.println("Starting test ...");
             testStartTS = System.nanoTime();
+            m_fullStatsContext.fetchAndResetBaseline();
             invocationThreads.forEach(t -> t.start());
 
             // Wait for all threads to finish, and all expected callbacks to be invoked
@@ -293,11 +298,14 @@ public class ExportLongClient {
                 m_totalInvocations.incrementAndGet();
                 if (sourceIdx == 0 && m_config.loginterval > 0
                         && now - lastLogTS > TimeUnit.SECONDS.toNanos(m_config.loginterval)) {
+                    ClientStats stats = m_fullStatsContext.fetchAndResetBaseline().getStats();
                     String durationStr = m_config.duration == 0 ? "running for infinite time" :
                         String.format("running for %d seconds", m_config.duration);
-                    System.out.println(String.format("%d invocations after %d seconds, %s",
+
+                    System.out.println(String.format(
+                            "%d invocations after %d seconds, latency %,9.2f ms, internal latency %,9.2f ms, %s",
                             m_totalInvocations.get(), TimeUnit.NANOSECONDS.toSeconds(now - testStartTS),
-                            durationStr));
+                            stats.getAverageLatency(), stats.getAverageInternalLatency(), durationStr));
                     lastLogTS = now;
                 }
             } catch (Exception e) {

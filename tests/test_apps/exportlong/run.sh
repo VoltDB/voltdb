@@ -93,7 +93,7 @@ function server_common() {
     VOLTDB_OPTS="${VOLTDB_OPTS}" ${VOLTDB} start -H $HOST -l ${LICENSE}
 }
 
-# Multinode --servers=localhost:21212,localhost:21213,localhost:21214
+# Default test: localhost, 10 sources, 2 targets, 120s
 function client() {
   srccompile-ifneeded
   java -classpath exportlong-client.jar:$CLIENTCLASSPATH \
