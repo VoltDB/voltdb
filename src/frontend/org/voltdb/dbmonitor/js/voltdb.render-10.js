@@ -968,6 +968,10 @@ function set_kubernetes(server, port) {
         var data = connection.Metadata["SHORTAPI_DEPLOYMENT"];
         var usersList = voltDbRenderer.usersList;
 
+        if (data.status === -1) {
+          return;
+        }
+
         if (usersList.length === 0) {
           VoltDbAdminConfig.isSecurityEnabled = false;
         } else VoltDbAdminConfig.isSecurityEnabled = true;
@@ -984,7 +988,6 @@ function set_kubernetes(server, port) {
           adminConfigValues.VMCNoPermission = false;
           VoltDbAdminConfig.isAdmin = true;
         }
-
         adminConfigValues["sitesperhost"] = data.cluster.sitesperhost;
         adminConfigValues["kSafety"] = data.cluster.kfactor;
         adminConfigValues["partitionDetection"] =

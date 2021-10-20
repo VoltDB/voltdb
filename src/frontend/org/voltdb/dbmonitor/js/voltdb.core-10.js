@@ -769,6 +769,9 @@ jQuery.extend({
                 }
             });
         } else {
+            if (url.includes('deployment') && !VoltDbAdminConfig.isAdmin) {
+                return;
+            }
             jQuery.ajax({
                 type: 'GET',
                 url: url,
