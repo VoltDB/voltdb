@@ -63,7 +63,7 @@ public class ExportLongClient {
             "----------" + "----------" + "----------" + "----------" + "\n";
 
     final String STREAM_TEMPLATE =
-            "CREATE STREAM SOURCE%02d PARTITION ON COLUMN id EXPORT TO TARGET TARGET%02d (\n"
+            "CREATE STREAM SOURCE%03d PARTITION ON COLUMN id EXPORT TO TARGET TARGET%02d (\n"
             + "  id               BIGINT        NOT NULL\n"
             + ", type_tinyint     TINYINT       NOT NULL\n"
             + ", type_smallint    SMALLINT      NOT NULL\n"
@@ -87,10 +87,10 @@ public class ExportLongClient {
         @Option(desc = "Logging interval, in seconds, 0 = no logging, default = 60s)")
         long loginterval = 60;
 
-        @Option(desc = "Number of source streams, default 10, up to 100, will be named SOURCE00, SOURCE01, etc..")
+        @Option(desc = "Number of source streams, default 10, up to 1000, will be named SOURCE000, SOURCE001, etc..")
         int sources = 10;
 
-        @Option(desc = "Number of export targets, default 2, up to 100, will be named TARGET00, TARGET01, etc..")
+        @Option(desc = "Number of export targets, default 2, up to , will be named TARGET00, TARGET01, etc..")
         int targets = 2;
 
         @Option(desc = "If true, create the source streams, default true")
@@ -106,7 +106,7 @@ public class ExportLongClient {
         public void validate() {
             if (duration < 0) exitWithMessageAndUsage("duration must be >= 0");
             if (loginterval < 0) exitWithMessageAndUsage("loginterval must be >= 0");
-            if (sources <= 0 || sources > 100) exitWithMessageAndUsage("sources must be > 0 and <= 100");
+            if (sources <= 0 || sources > 1000) exitWithMessageAndUsage("sources must be > 0 and <= 1000");
             if (targets <= 0 || targets > 100) exitWithMessageAndUsage("targets must be > 0 and <= 100");
             if (rate <= 0) exitWithMessageAndUsage("rate must be > 0");
             if (idcount <= 0) exitWithMessageAndUsage("idcount must be > 0");
@@ -263,7 +263,7 @@ public class ExportLongClient {
     private void doInvocations(long durationNs, int sourceIdx, int insertrate, int idcount) {
         long thId = Thread.currentThread().getId();
 
-        String procName = String.format("SOURCE%02d.insert", sourceIdx);
+        String procName = String.format("SOURCE%03d.insert", sourceIdx);
         RateLimiter rateLimiter = insertrate > 0 ? RateLimiter.create(insertrate) : null;
         Random r = new Random();
 

@@ -100,13 +100,22 @@ function client() {
       client.ExportLongClient
 }
 
+function ENG-21637() {
+  srccompile-ifneeded
+  java -classpath exportlong-client.jar:$CLIENTCLASSPATH \
+    client.ExportLongClient \
+    --servers=localhost \
+    --sources=150 \
+    --targets=4
+}
+
 # duration 3600s, rate 1000/s (total 10000/s all streams/targets)
 function d3600r1000() {
   srccompile-ifneeded
   java -classpath exportlong-client.jar:$CLIENTCLASSPATH \
       client.ExportLongClient \
       --servers=localhost \
-      --duration=3600 
+      --duration=3600
 }
 
 # duration 0 (infinite), rate 1000/s (total 10000/s all streams/targets)
@@ -115,7 +124,7 @@ function d0r1000() {
   java -classpath exportlong-client.jar:$CLIENTCLASSPATH \
       client.ExportLongClient \
       --servers=localhost \
-      --duration=0 
+      --duration=0
 }
 
 # duration 0 (infinite), rate 500/s (total 5000/s all streams/targets)
