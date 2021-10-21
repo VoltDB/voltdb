@@ -2782,7 +2782,7 @@ function loadAdminPage() {
                 //Set the new value to be saved.
                 var memoryLimitSize = "";
                 memoryLimitSize = adminEditObjects.txtMemoryLimitSize.val() + (adminEditObjects.ddlMemoryLimitSizeUnit.val() == "%" ? "%" : "");
-
+                console.log(memoryLimitSize);
                 if (adminEditObjects.txtMemoryLimitSize.val() != "") {
                     adminConfigurations.systemsettings.resourcemonitor.memorylimit.size = memoryLimitSize;
                 } else {
@@ -5122,8 +5122,8 @@ function loadAdminPage() {
 
         this.displayPortAndRefreshClusterState = function (portAndClusterValues, serverSettings) {
             if (portAndClusterValues != undefined && VoltDbAdminConfig.isAdmin) {
-                client_port = portAndClusterValues.clientPort;
                 configurePortAndOverviewValues(portAndClusterValues, serverSettings);
+                client_port = portAndClusterValues.clientPort;
                 refreshClusterValues(portAndClusterValues);
                 configurePromoteAction(portAndClusterValues);
             }
@@ -5709,14 +5709,14 @@ function loadAdminPage() {
 
         var configurePortAndOverviewValues = function (configValues, serverSettings) {
             VoltDbAdminConfig.adminPort = configValues.adminPort;
-            adminDOMObjects.clusterAdminPort.text(configValues.adminPort);
-            adminDOMObjects.clusterHttpPort.text(configValues.httpPort);
-            adminDOMObjects.clusterInternalPort.text(configValues.internalPort);
-            adminDOMObjects.clusterZookeeperPort.text(configValues.zookeeperPort);
-            adminDOMObjects.clusterReplicationPort.text(configValues.replicationPort);
-            adminDOMObjects.clusterClientPort.text(configValues.clientPort);
-            adminDOMObjects.maxJavaHeap.text((configValues.maxJavaHeap != null && configValues.maxJavaHeap != NaN) ? parseFloat(configValues.maxJavaHeap / 1024) : "");
-            adminDOMObjects.maxJavaHeapLabel.text((configValues.maxJavaHeap != null && configValues.maxJavaHeap != NaN) ? "MB" : "");
+            adminDOMObjects.clusterAdminPort !== undefined && adminDOMObjects.clusterAdminPort.text(configValues.adminPort);
+            adminDOMObjects.clusterHttpPort !== undefined && adminDOMObjects.clusterHttpPort.text(configValues.httpPort);
+            adminDOMObjects.clusterInternalPort !== undefined && adminDOMObjects.clusterInternalPort.text(configValues.internalPort);
+            adminDOMObjects.clusterZookeeperPort !== undefined && adminDOMObjects.clusterZookeeperPort.text(configValues.zookeeperPort);
+            adminDOMObjects.clusterReplicationPort !== undefined && adminDOMObjects.clusterReplicationPort.text(configValues.replicationPort);
+            adminDOMObjects.clusterClientPort !== undefined && adminDOMObjects.clusterClientPort.text(configValues.clientPort);
+            adminDOMObjects.maxJavaHeap !== undefined && adminDOMObjects.maxJavaHeap.text((configValues.maxJavaHeap != null && configValues.maxJavaHeap != NaN) ? parseFloat(configValues.maxJavaHeap / 1024) : "");
+            adminDOMObjects.maxJavaHeapLabel !== undefined && adminDOMObjects.maxJavaHeapLabel.text((configValues.maxJavaHeap != null && configValues.maxJavaHeap != NaN) ? "MB" : "");
 
             //if clusterwide settings are present
             if (serverSettings) {
@@ -5728,13 +5728,13 @@ function loadAdminPage() {
                 adminDOMObjects.replicationPort.text(configValues.replicationInterface);
                 adminDOMObjects.serverSettingHeader.text("Server Settings");
             } else {
-                adminDOMObjects.adminPort.text('');
-                adminDOMObjects.httpPort.text('');
-                adminDOMObjects.clientPort.text('');
-                adminDOMObjects.internalPort.text('');
-                adminDOMObjects.zookeeperPort.text('');
-                adminDOMObjects.replicationPort.text('');
-                adminDOMObjects.serverSettingHeader.text('');
+                adminDOMObjects.adminPort !== undefined && adminDOMObjects.adminPort.text('');
+                adminDOMObjects.httpPort !== undefined && adminDOMObjects.httpPort.text('');
+                adminDOMObjects.clientPort !== undefined && adminDOMObjects.clientPort.text('');
+                adminDOMObjects.internalPort !== undefined && adminDOMObjects.internalPort.text('');
+                adminDOMObjects.zookeeperPort !== undefined && adminDOMObjects.zookeeperPort.text('');
+                adminDOMObjects.replicationPort !== undefined && adminDOMObjects.replicationPort.text('');
+                adminDOMObjects.serverSettingHeader !== undefined && adminDOMObjects.serverSettingHeader.text('');
             }
         };
 

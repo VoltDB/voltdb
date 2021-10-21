@@ -872,7 +872,6 @@ var loadPage = function (serverName, portid) {
 
   var showAdminPage = function () {
     if (VoltDbAdminConfig.isAdmin) {
-      VoltDbAdminConfig.isAdmin = true;
       if (
         VoltDbUI.getCookie("sql_port_for_paused_db") ==
         sqlPortForPausedDB.UseAdminPort
