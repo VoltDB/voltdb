@@ -808,23 +808,6 @@ function changePassword(obj) {
     });
 }
 
-function showAdminPage() {
-  var userRole = VoltDbUI.getCookie("role");
-  if (VoltDbAdminConfig.isAdmin && userRole !== null && userRole.toLowerCase() === 'administrator') {
-    if (
-      VoltDbUI.getCookie("sql_port_for_paused_db") ==
-      sqlPortForPausedDB.UseAdminPort
-    ) {
-      VoltDBService.SetConnectionForSQLExecution(true);
-      SQLQueryRender.saveConnectionKey(true);
-    }
-    $("#navAdmin").show();
-    loadAdminPage();
-  } else {
-    $("#navAdmin").hide();
-  }
-};
-
 var loadPage = function (serverName, portid) {
   $(".drShowHide").show();
   $(".clpShowHide").show();
@@ -887,7 +870,20 @@ var loadPage = function (serverName, portid) {
     }
   }
 
-  showAdminPage();
+  var showAdminPage = function () {
+    if (VoltDbAdminConfig.isAdmin) {
+      VoltDbAdminConfig.isAdmin = true;
+      if (
+        VoltDbUI.getCookie("sql_port_for_paused_db") ==
+        sqlPortForPausedDB.UseAdminPort
+      ) {
+        VoltDBService.SetConnectionForSQLExecution(true);
+        SQLQueryRender.saveConnectionKey(true);
+      }
+      $("#navAdmin").show();
+      loadAdminPage();
+    }
+  };
 
   //Retains the current tab while page refreshing.
   var retainCurrentTab = function () {
@@ -958,7 +954,8 @@ var loadPage = function (serverName, portid) {
   voltDbRenderer.CheckAdminPriviledges(function (hasAdminPrivileges) {
     securityChecks.previlegesChecked = true;
     if (hasAdminPrivileges) {
-      showAdminPage();
+      $("#navAdmin").show();
+      // showAdminPage();
     } else if (!VoltDbAdminConfig.isAdmin) {
       $("#navAdmin").hide();
     }

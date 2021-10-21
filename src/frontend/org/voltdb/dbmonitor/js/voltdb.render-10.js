@@ -944,7 +944,7 @@ function set_kubernetes(server, port) {
 
             if (VoltDbAdminConfig.isAdmin) {
               $("#navAdmin").show();
-              loadAdminPage();
+              // loadAdminPage();
             } else {
               $("#navAdmin").hide();
             }
