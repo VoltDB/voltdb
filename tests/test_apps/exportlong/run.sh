@@ -109,6 +109,18 @@ function ENG-21637() {
     --targets=4
 }
 
+# Test case from volt17a cluster of 6 to volt17c running Oracle
+function ENG-21670() {
+  srccompile-ifneeded
+  java -classpath exportlong-client.jar:$CLIENTCLASSPATH \
+    client.ExportLongClient \
+    --servers=volt17ac1,volt17ac2,volt17ac3,volt17ac4,volt17ac5,volt17ac6 \
+    --sources=450 \
+    --targets=4 \
+    --rate=100 \
+    --duration=0
+}
+
 # duration 3600s, rate 1000/s (total 10000/s all streams/targets)
 function d3600r1000() {
   srccompile-ifneeded

@@ -10,7 +10,10 @@
       <configuration target="TARGET01" enabled="true" type="custom" exportconnectorclass="org.voltdb.exportclient.DiscardingExportClient" >
       </configuration>
 	    <!-- Exports targeting OracleXE on volt17c - note port 1539 instead of 1521
-	     ALSO NOTE: the tables must be pre-created in Oracle e.g. below, or use the createtable option but always ignoregenerations
+	     ALSO NOTE:
+          - the tables must be pre-created in Oracle e.g. below
+          - NEVER set the createtable to true
+
 	     CREATE TABLE "SOURCE00" ("ID" NUMBER(19), "TYPE_TINYINT" NUMBER(3), "TYPE_SMALLINT" NUMBER(5),
 	 	   "TYPE_INTEGER" NUMBER(10), "TYPE_BIGINT" NUMBER(19), "TYPE_TIMESTAMP" TIMESTAMP WITH TIME ZONE,
 		   "TYPE_FLOAT" DOUBLE PRECISION, "TYPE_DECIMAL" DECIMAL(38,12), "TYPE_VARCHAR1024" VARCHAR2(1024));
