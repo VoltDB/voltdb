@@ -54,10 +54,11 @@ import java.util.Random;
 public class DUSBenchmark {
 
     // Define these in just one place, besides the DDL file
-    public static final List<String> PARTITIONED_TABLES    = Arrays.asList("DUSB_P1", "DUSB_P2");
-    public static final List<String> PARTITIONED_BY_ID     = Arrays.asList("DUSB_P1");
-    public static final List<String> PARTITIONED_BY_MOD_ID = Arrays.asList("DUSB_P2");
-    public static final List<String> REPLICATED_TABLES     = Arrays.asList("DUSB_R1");
+    public static final List<String> PARTITIONED_TABLES      = Arrays.asList("DUSB_P1", "DUSB_P2", "DUSB_P3");
+    public static final List<String> PARTITIONED_BY_ID       = Arrays.asList("DUSB_P1");
+    public static final List<String> PARTITIONED_BY_MOD_ID   = Arrays.asList("DUSB_P2");
+    public static final List<String> PARTITIONED_BY_BLOCK_ID = Arrays.asList("DUSB_P3");
+    public static final List<String> REPLICATED_TABLES       = Arrays.asList("DUSB_R1");
 
     protected final DUSBConfig config;
     private Client client;
@@ -75,12 +76,15 @@ public class DUSBenchmark {
     private static int countOtherErrors = 0;
     private static Map<String,Long> countStoredProcCalls = new ConcurrentHashMap<String,Long>();
     private static Map<String,Long> countStoredProcResults = new ConcurrentHashMap<String,Long>();
+    private static Map<String,List<Long>> randomValues = new ConcurrentHashMap<String,List<Long>>();
 
     private long insertBlockSize = -1;
     private long minimumId = -1;
     private long maximumId = -1;
     private long minimumModId = -1;
     private long maximumModId = -1;
+    private long minimumBlockId = -1;
+    private long maximumBlockId = -1;
     private List<String> tableNamesForDeleteAndUpdate = null;
 
     /** Constructor **/
@@ -167,12 +171,15 @@ public class DUSBenchmark {
         String deleteupdatevalues = "single";
 
         @Option(desc = "The column to be used for delete and update: 'id' (e.g. using "
-                + "'WHERE ID = ?'); or 'modid' (e.g. using 'WHERE MOD_ID = ?'); case "
-                + "insensitive, default: 'modid'.")
+                + "'WHERE ID = ?'); or 'modid' (e.g. using 'WHERE MOD_ID = ?'); or "
+                + "'blockid' (e.g. using 'WHERE BLOCK_ID = ?'); case insensitive, "
+                + "default: 'modid'.")
         String deleteupdatecolumn = "modid";
 
         @Option(desc = "The order in which to delete and update values, either: 'ascending' "
-                + "(the default), 'descending' or 'random' [not yet implemented]; case insensitive.")
+                + "(the default), 'descending', 'random1' (updates and deletes in the same "
+                + "random order), or 'random2' (updates and deletes in 2 different random "
+                + "orders); case insensitive.")
         String deleteupdateorder = "ascending";
 
         @Option(desc = "Number of updates/deletes to do before starting the snapshot; "
@@ -188,19 +195,30 @@ public class DUSBenchmark {
 
         @Override
         public void validate() {
-            if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
-            if (servers.length() == 0) servers = "localhost";
-            if (statsfile.length() == 0) statsfile = "deleteupdatesnapshot.csv";
+            if (displayinterval <= 0) {
+                exitWithMessageAndUsage("displayinterval must be > 0");
+            }
+            if (servers.length() == 0) {
+                servers = "localhost";
+            }
+            if (statsfile.length() == 0) {
+                statsfile = "deleteupdatesnapshot.csv";
+            }
             checkKnownValues("tabletypes",  tabletypes,  "replicated", "partitioned" /*, "view"*/ );
             checkKnownValues("columntypes", columntypes, "inline", "outline", "varbinary", "geo");
             checkKnownValues("deleteupdatevalues", deleteupdatevalues, "single", "range");
-            checkKnownValues("deleteupdatecolumn", deleteupdatecolumn, "id", "modid");
-            checkKnownValues("deleteupdateorder",  deleteupdateorder,  "ascending", "descending" /*, "random"*/ );
-            if (ratelimit <= 0) exitWithMessageAndUsage("ratelimit must be > 0");
+            checkKnownValues("deleteupdatecolumn", deleteupdatecolumn, "id", "modid", "blockid");
+            checkKnownValues("deleteupdateorder",  deleteupdateorder,  "ascending", "descending",
+                             "random", "random1", "random2");
+            if (ratelimit <= 0) {
+                exitWithMessageAndUsage("ratelimit must be > 0");
+            }
         }
 
         private void checkKnownValues(String name, String values, String ... knownValues) {
-            if (values == null || values.isEmpty()) exitWithMessageAndUsage(name+" cannot be null or empty");
+            if (values == null || values.isEmpty()) {
+                exitWithMessageAndUsage(name+" cannot be null or empty");
+            }
             List<String> knownValuesList = Arrays.asList(knownValues);
             for (String val : values.split(",")) {
                 if (!knownValuesList.contains(val.trim().toLowerCase())) {
@@ -225,9 +243,12 @@ public class DUSBenchmark {
         if (tableTypesLower.contains("replicated")) {
             tableNamesForInsertFromSelect.add("DUSB_R1");
         }
+        String delUpdColumnLowerCase = config.deleteupdatecolumn.toLowerCase();
         if (tableTypesLower.contains("partitioned")) {
-            if ("modid".equals(config.deleteupdatecolumn.toLowerCase())) {
+            if ("modid".equals(delUpdColumnLowerCase)) {
                 tableNamesForInsertFromSelect.add("DUSB_P2");
+            } else if ("blockid".equals(delUpdColumnLowerCase)) {
+                tableNamesForInsertFromSelect.add("DUSB_P3");
             } else {
                 tableNamesForInsertFromSelect.add("DUSB_P1");
             }
@@ -243,6 +264,7 @@ public class DUSBenchmark {
         // Compute the number of "blocks" of rows to insert, from the total
         // number of rows, and the delete/update block size (num. rows):
         long minId = 0;
+        long minBlockId = 0;
         long numRows = config.insertnumrows;
         long numInsertBlocks = config.deleteupdatenumrows;
         // If it divides evenly, it's simple
@@ -253,6 +275,13 @@ public class DUSBenchmark {
             insertBlockSize = (long) Math.ceil( Math.round(10.0D * numRows / numInsertBlocks)
                                                          / 10.0D );
         }
+
+        // If we are deleting (& updating) by block, then the above values are reversed
+        if ("blockid".equals(delUpdColumnLowerCase)) {
+            numInsertBlocks = insertBlockSize;
+            insertBlockSize = config.deleteupdatenumrows;
+        }
+
 
         // Insert the initial rows (1 "block"), one at a time
         for (String tableName : tableNamesForInsertValues) {
@@ -289,7 +318,7 @@ public class DUSBenchmark {
                 }
 
                 // Insert one row
-                ClientResponse cr = client.callProcedure(procName, rowId,
+                ClientResponse cr = client.callProcedure(procName, rowId, minBlockId,
                                     tableName, colNamesArray, colValuesArray);
                 VoltTable vt = cr.getResults()[0];
 
@@ -312,15 +341,15 @@ public class DUSBenchmark {
             // a Partioned table needs to copy one extra "block" at the beginning,
             // whereas a Replicated table is copying from itself, so the first
             // "block" has already been populated
-            long minBlock = 0;
+            long minBlock = minBlockId;
             if (REPLICATED_TABLES.contains(tableName.toUpperCase())) {
-                minBlock = 1;
+                minBlock = minBlockId + 1;
             }
 
             // Insert lots more rows, using InsertFromSelect, i.e., queries of the form:
             // INSERT INTO <table1> SELECT ...  FROM <table2> WHERE ...
             long maxId = insertBlockSize;
-            for (long block = minBlock; block < numInsertBlocks; block++) {
+            for (long block = minBlock; block < numInsertBlocks + minBlockId; block++) {
                 long addToId = block * insertBlockSize;
 
                 // For the last block, only in the case where the insertBlockSize
@@ -331,7 +360,7 @@ public class DUSBenchmark {
 
                 // Insert many rows
                 ClientResponse cr = client.callProcedureWithTimeout( 60000,
-                        "InsertFromSelect", tableName, addToId, minId, maxId );
+                        "InsertFromSelect", tableName, addToId, block, minId, maxId );
                 VoltTable vt = cr.getResults()[0];
 
                 // Debug print: occasionally, or when something goes wrong
@@ -351,9 +380,11 @@ public class DUSBenchmark {
 
         // Set values needed by runBenchmark()
         minimumId = minimumModId = minId;
+        minimumBlockId = minBlockId;
         // Technically, these are one more than the maximum allowed value
         maximumId = numRows + minId;
         maximumModId = insertBlockSize + minId;
+        maximumBlockId = numInsertBlocks + minBlockId;
 
         // Debug print:
         System.out.println("\nEnd of DUSBenchmark.init()");
@@ -749,7 +780,6 @@ public class DUSBenchmark {
             }
         }
 
-        boolean useInlineOrOutline = (inlineOrOutline != null && !inlineOrOutline.isEmpty());
         boolean queued = true;
 
         if (callBack == null) {
@@ -763,7 +793,7 @@ public class DUSBenchmark {
                 } else if (procName.equals("DeleteOneValue")) {
                     cr = client.callProcedure(procName, minValue, tableName, columnName);
                 } else {
-                    cr = client.callProcedure(procName, minValue, tableName);
+                    cr = client.callProcedure(procName, minValue, maxValue, tableName);
                 }
 
             } else if (procName.startsWith("Update")) {
@@ -849,9 +879,60 @@ public class DUSBenchmark {
         } else if ("modid".equals(delUpdColumn.toLowerCase()) &&
                 PARTITIONED_BY_MOD_ID.contains(tableName.toUpperCase())) {
             partitioning = "PmodId";
+
+        } else if ("blockid".equals(delUpdColumn.toLowerCase()) &&
+                PARTITIONED_BY_MOD_ID.contains(tableName.toUpperCase())) {
+            partitioning = "PblockId";
         }
 
         return procType + oneOrMultiValues + partitioning;
+    }
+
+
+    /** Returns a list containing the Long values from 0 (inclusive) to
+     *  <i>size</i> (exclusive), in a random order. */
+    private List<Long> getRandomValuesList(int size) {
+        List<Long> orderedList = new ArrayList<Long>(size);
+        for (long i=0; i < size; i++) {
+            orderedList.add(i);
+        }
+
+        List<Long> randomList = new ArrayList<Long>(size);
+        for (long i=0; i < size; i++) {
+            int next = rand.nextInt(orderedList.size());
+            randomList.add(orderedList.remove(next));
+        }
+
+        return randomList;
+    }
+
+
+    /** Returns the next Long value in a named List of random (Long) values;
+     *  the first time called with a new <i>name</i>, it generates the List. */
+    private long getNextRandomValue(int i, int numIterations, String name) {
+        if (randomValues.get(name) == null) {
+            randomValues.put(name, getRandomValuesList(numIterations));
+
+            // TODO: temp. debug:
+            System.out.println("In getNextRandomValue:\n    name '"+name+"', numIterations "
+                    +numIterations+", i "+i+", randomValues.get("+name+"):");
+            if (numIterations <= 100) {
+                // Print the whole (fairly short) List of random (Long) values
+                System.out.println(randomValues.get(name));
+            } else {
+                // Print part of the (quite long) List of random (Long) values
+                int halfway = numIterations/2 - 1;
+                List<Long> all = randomValues.get(name);
+                List<Long> begin  = all.subList(0,10);
+                List<Long> middle = all.subList(halfway-5,halfway+5);
+                List<Long> end    = all.subList(numIterations-10,numIterations);
+                System.out.println(begin.toString().replace("]", ", ...") + "\n"
+                                 +middle.toString().replace("[", " ").replace("]", ", ...") + "\n"
+                                    +end.toString().replace("[", " ") );
+            }
+
+        }
+        return randomValues.get(name).get(i);
     }
 
 
@@ -862,16 +943,29 @@ public class DUSBenchmark {
 
         // Prepare values used in the for loop below
         String columnName = null;
-        long numIterations = -1, initMinValue = -1, minValueIncrement = 0, modIdIncrement = 0;
-        if ("id".equals(config.deleteupdatecolumn.toLowerCase())) {
+        long numIterations = -1, initMinValue = -1, minValueIncrement = 0,
+            modIdIncrement = 0, blockIdIncrement = 0;
+        String delUpdColumnLowerCase = config.deleteupdatecolumn.toLowerCase();
+        String delUpdValuesLowerCase = config.deleteupdatevalues.toLowerCase();
+        String delUpdOrderLowerCase  = config.deleteupdateorder.toLowerCase();
+        boolean randomOrder = false;
+        boolean random2Orders = false;
+        if (delUpdOrderLowerCase.startsWith("random")) {
+            randomOrder = true;
+            if ("random2".equals(delUpdOrderLowerCase)) {
+                random2Orders = true;
+            }
+        }
+
+        if ("id".equals(delUpdColumnLowerCase)) {
             columnName = "ID";
 
-            if ("single".equals(config.deleteupdatevalues.toLowerCase())) {
+            if ("single".equals(delUpdValuesLowerCase)) {
                 numIterations = maximumId - minimumId;
-                if ("ascending".equals(config.deleteupdateorder.toLowerCase())) {
+                if (randomOrder || "ascending".equals(delUpdOrderLowerCase)) {
                     initMinValue = minimumId;
                     minValueIncrement = 1;
-                } else if ("descending".equals(config.deleteupdateorder.toLowerCase())) {
+                } else if ("descending".equals(delUpdOrderLowerCase)) {
                     initMinValue = maximumId - 1;
                     minValueIncrement = -1;
                 } else {
@@ -879,12 +973,12 @@ public class DUSBenchmark {
                             +"parameter value", config.deleteupdateorder);
                 }
 
-            } else if ("range".equals(config.deleteupdatevalues.toLowerCase())) {
+            } else if ("range".equals(delUpdValuesLowerCase)) {
                 numIterations = (int) Math.ceil( (maximumId - minimumId)*1.0D / insertBlockSize );
-                if ("ascending".equals(config.deleteupdateorder.toLowerCase())) {
+                if (randomOrder || "ascending".equals(delUpdOrderLowerCase)) {
                     initMinValue = minimumId;
                     minValueIncrement = insertBlockSize;
-                } else if ("descending".equals(config.deleteupdateorder.toLowerCase())) {
+                } else if ("descending".equals(delUpdOrderLowerCase)) {
                     initMinValue = maximumId - insertBlockSize;
                     minValueIncrement = -insertBlockSize;
                 } else {
@@ -897,15 +991,15 @@ public class DUSBenchmark {
                         +"parameter value", config.deleteupdatecolumn);
             }
 
-        } else if ("modid".equals(config.deleteupdatecolumn.toLowerCase())) {
+        } else if ("modid".equals(delUpdColumnLowerCase)) {
             columnName = "MOD_ID";
 
-            if ("single".equals(config.deleteupdatevalues.toLowerCase())) {
+            if ("single".equals(delUpdValuesLowerCase)) {
                 numIterations = maximumModId - minimumModId;
-                if ("ascending".equals(config.deleteupdateorder.toLowerCase())) {
+                if (randomOrder || "ascending".equals(delUpdOrderLowerCase)) {
                     initMinValue = minimumModId;
                     minValueIncrement = 1;
-                } else if ("descending".equals(config.deleteupdateorder.toLowerCase())) {
+                } else if ("descending".equals(delUpdOrderLowerCase)) {
                     initMinValue = maximumModId - 1;
                     minValueIncrement = -1;
                 } else {
@@ -913,7 +1007,7 @@ public class DUSBenchmark {
                             +"parameter value", config.deleteupdateorder);
                 }
 
-            } else if ("range".equals(config.deleteupdatevalues.toLowerCase())) {
+            } else if ("range".equals(delUpdValuesLowerCase)) {
                 // When deleting (& updating) by a range of MOD_ID values, we need an
                 // equivalent to the 'insertBlockSize' used for ID values.  This MOD_ID
                 // value increment, which is used to delete (or update) roughly the
@@ -926,12 +1020,58 @@ public class DUSBenchmark {
                 modIdIncrement = Math.max(1, modIdIncrement);
 
                 numIterations = (long) Math.ceil( (maximumModId - minimumModId)*1.0D / modIdIncrement );
-                if ("ascending".equals(config.deleteupdateorder.toLowerCase())) {
+                if (randomOrder || "ascending".equals(delUpdOrderLowerCase)) {
                     initMinValue = minimumModId;
                     minValueIncrement = modIdIncrement;
-                } else if ("descending".equals(config.deleteupdateorder.toLowerCase())) {
+                } else if ("descending".equals(delUpdOrderLowerCase)) {
                     initMinValue = maximumModId - modIdIncrement;
                     minValueIncrement = -modIdIncrement;
+                } else {
+                    throwIllegalArgException("'deleteupdateorder' config "
+                            +"parameter value", config.deleteupdateorder);
+                }
+
+            } else {
+                throwIllegalArgException("'deleteupdatecolumn' config "
+                        +"parameter value", config.deleteupdatecolumn);
+            }
+
+        } else if ("blockid".equals(delUpdColumnLowerCase)) {
+            columnName = "BLOCK_ID";
+
+            if ("single".equals(delUpdValuesLowerCase)) {
+                numIterations = maximumBlockId - minimumBlockId;
+                if (randomOrder || "ascending".equals(delUpdOrderLowerCase)) {
+                    initMinValue = minimumBlockId;
+                    minValueIncrement = 1;
+                } else if ("descending".equals(delUpdOrderLowerCase)) {
+                    initMinValue = maximumBlockId - 1;
+                    minValueIncrement = -1;
+                } else {
+                    throwIllegalArgException("'deleteupdateorder' config "
+                            +"parameter value", config.deleteupdateorder);
+                }
+
+            } else if ("range".equals(delUpdValuesLowerCase)) {
+                // When deleting (& updating) by a range of BLOCK_ID values, we need an
+                // TODO
+                // equivalent to the 'insertBlockSize' used for ID values.  This MOD_ID
+                // value increment, which is used to delete (or update) roughly the
+                // intended number of rows with each stored proc call, should be the
+                // insertBlockSize times the ratio of the total number of rows and
+                // the total number of distinct MOD_ID values
+                blockIdIncrement = Math.round( (maximumBlockId - minimumBlockId) * 1.0D
+                                              / (maximumId - minimumId) );
+                // Cannot be less than one
+                blockIdIncrement = Math.max(1, blockIdIncrement);
+
+                numIterations = (long) Math.ceil( (maximumBlockId - minimumBlockId)*1.0D / blockIdIncrement );
+                if (randomOrder || "ascending".equals(delUpdOrderLowerCase)) {
+                    initMinValue = minimumBlockId;
+                    minValueIncrement = blockIdIncrement;
+                } else if ("descending".equals(delUpdOrderLowerCase)) {
+                    initMinValue = maximumBlockId - blockIdIncrement;
+                    minValueIncrement = -blockIdIncrement;
                 } else {
                     throwIllegalArgException("'deleteupdateorder' config "
                             +"parameter value", config.deleteupdateorder);
@@ -961,21 +1101,33 @@ public class DUSBenchmark {
                 +", minimumModId "+minimumModId
                 +", maximumModId "+maximumModId
                 +", modIdIncrement "+modIdIncrement
+                +", minimumBlockId "+minimumBlockId
+                +", maximumBlockId "+maximumBlockId
+                +", blockIdIncrement "+blockIdIncrement
+                +": randomOrder "+randomOrder
+                +": random2Orders "+random2Orders
                 +";\ncolumnName "+columnName
                 +", initMinValue "+initMinValue
                 +", minValueIncrement "+minValueIncrement
+                +", numIterations "+numIterations
                 +", startSnapshotAtIteration "+config.startSnapshotAtIteration
                 +", updateInlineOrOutlineColumns "+updateInlineOrOutlineColumns
                 +";\ntableNamesForDeleteAndUpdate: "+tableNamesForDeleteAndUpdate+"\n" );
 
-        stats.startBenchmark(config.displayinterval);
         long maxValueIncrement = Math.abs(minValueIncrement);
+        long halfway = numIterations/2 - 1;
+        stats.startBenchmark(config.displayinterval);
         for (long i=0; i < numIterations; i++) {
-            long minValue = initMinValue + i*minValueIncrement;
+            long next = i;
+            if (randomOrder) {
+                next = getNextRandomValue((int)i, (int)numIterations, "Update");
+            }
+            long minValue = initMinValue + next*minValueIncrement;
             long maxValue = minValue + maxValueIncrement;
 
             boolean debugPrint = false;
-            if (i == 0 || i == numIterations/2 || i == numIterations - 1) {
+            if (i < 3 || i > numIterations - 3 ||
+                    (i >= halfway-1 && i <= halfway+1)) {
                 debugPrint = true;
             }
 
@@ -999,9 +1151,17 @@ public class DUSBenchmark {
 
             for (String procType : Arrays.asList("Update", "Delete")) {
                 String inlineOrOutline = "Update".equals(procType) ? updateInlineOrOutlineColumns : null;
+                if (random2Orders) {
+                    next = getNextRandomValue((int)i, (int)numIterations, procType);
+                    minValue = initMinValue + next*minValueIncrement;
+                    maxValue = minValue + maxValueIncrement;
+                }
                 for (String tableName : tableNamesForDeleteAndUpdate) {
                     String procName = getProcName(procType, tableName, config.deleteupdatevalues,
                             config.deleteupdatecolumn);
+                    if (debugPrint) {
+                        System.out.println("\nIn runBenchmark(), calling callStoredProc, for i "+i+", next "+next+":");
+                    }
                     callStoredProc( new DUSBenchmarkCallback(procName),
                             procName, tableName, columnName, minValue,
                             maxValue, inlineOrOutline, debugPrint );

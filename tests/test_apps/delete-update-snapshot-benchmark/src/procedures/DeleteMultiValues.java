@@ -35,16 +35,31 @@ public class DeleteMultiValues extends VoltProcedure {
             "DELETE FROM DUSB_R1 WHERE ID >= ? AND ID < ?;");
     public static final SQLStmt DELETE_ROWS_DUSB_R1_BY_MOD_ID = new SQLStmt(
             "DELETE FROM DUSB_R1 WHERE MOD_ID >= ? AND MOD_ID < ?;");
+    public static final SQLStmt DELETE_ROWS_DUSB_R1_BY_BLOCK_ID = new SQLStmt(
+            "DELETE FROM DUSB_R1 WHERE BLOCK_ID >= ? AND BLOCK_ID < ?;");
 
     public static final SQLStmt DELETE_ROWS_DUSB_P1_BY_ID = new SQLStmt(
             "DELETE FROM DUSB_P1 WHERE ID >= ? AND ID < ?;");
     public static final SQLStmt DELETE_ROWS_DUSB_P1_BY_MOD_ID = new SQLStmt(
             "DELETE FROM DUSB_P1 WHERE MOD_ID >= ? AND MOD_ID < ?;");
+    public static final SQLStmt DELETE_ROWS_DUSB_P1_BY_BLOCK_ID = new SQLStmt(
+            "DELETE FROM DUSB_P1 WHERE BLOCK_ID >= ? AND BLOCK_ID < ?;");
 
     public static final SQLStmt DELETE_ROWS_DUSB_P2_BY_ID = new SQLStmt(
             "DELETE FROM DUSB_P2 WHERE ID >= ? AND ID < ?;");
     public static final SQLStmt DELETE_ROWS_DUSB_P2_BY_MOD_ID = new SQLStmt(
             "DELETE FROM DUSB_P2 WHERE MOD_ID >= ? AND MOD_ID < ?;");
+    public static final SQLStmt DELETE_ROWS_DUSB_P2_BY_BLOCK_ID = new SQLStmt(
+            "DELETE FROM DUSB_P2 WHERE BLOCK_ID >= ? AND BLOCK_ID < ?;");
+
+    public static final SQLStmt DELETE_ROWS_DUSB_P3_BY_ID = new SQLStmt(
+            "DELETE FROM DUSB_P3 WHERE ID >= ? AND ID < ?;");
+    public static final SQLStmt DELETE_ROWS_DUSB_P3_BY_MOD_ID = new SQLStmt(
+            "DELETE FROM DUSB_P3 WHERE MOD_ID >= ? AND MOD_ID < ?;");
+    public static final SQLStmt DELETE_ROWS_DUSB_P3_BY_BLOCK_ID = new SQLStmt(
+            "DELETE FROM DUSB_P3 WHERE BLOCK_ID >= ? AND BLOCK_ID < ?;");
+
+
 
 
     // The run() method, as required for each VoltProcedure
@@ -81,6 +96,8 @@ public class DeleteMultiValues extends VoltProcedure {
                 sqlStatement = DELETE_ROWS_DUSB_R1_BY_ID;
             } else if ( "MOD_ID".equals(columnNameUpperCase) ) {
                 sqlStatement = DELETE_ROWS_DUSB_R1_BY_MOD_ID;
+            } else if ( "BLOCK_ID".equals(columnNameUpperCase) ) {
+                sqlStatement = DELETE_ROWS_DUSB_R1_BY_BLOCK_ID;
             } else {
                 throw new VoltAbortException("Unknown column name: '"+columnName
                         +"' (with table name '"+tableName+"').");
@@ -92,6 +109,8 @@ public class DeleteMultiValues extends VoltProcedure {
                 sqlStatement = DELETE_ROWS_DUSB_P1_BY_ID;
             } else if ( "MOD_ID".equals(columnNameUpperCase) ) {
                 sqlStatement = DELETE_ROWS_DUSB_P1_BY_MOD_ID;
+            } else if ( "BLOCK_ID".equals(columnNameUpperCase) ) {
+                sqlStatement = DELETE_ROWS_DUSB_P1_BY_BLOCK_ID;
             } else {
                 throw new VoltAbortException("Unknown column name: '"+columnName
                         +"' (with table name '"+tableName+"').");
@@ -103,6 +122,21 @@ public class DeleteMultiValues extends VoltProcedure {
                 sqlStatement = DELETE_ROWS_DUSB_P2_BY_ID;
             } else if ( "MOD_ID".equals(columnNameUpperCase) ) {
                 sqlStatement = DELETE_ROWS_DUSB_P2_BY_MOD_ID;
+            } else if ( "BLOCK_ID".equals(columnNameUpperCase) ) {
+                sqlStatement = DELETE_ROWS_DUSB_P2_BY_BLOCK_ID;
+            } else {
+                throw new VoltAbortException("Unknown column name: '"+columnName
+                        +"' (with table name '"+tableName+"').");
+            }
+
+        // Delete from the third partitioned table (partitioned on BLOCK_ID)
+        } else if ( "DUSB_P3".equals(tableNameUpperCase) ) {
+            if ( "ID".equals(columnNameUpperCase) ) {
+                sqlStatement = DELETE_ROWS_DUSB_P3_BY_ID;
+            } else if ( "MOD_ID".equals(columnNameUpperCase) ) {
+                sqlStatement = DELETE_ROWS_DUSB_P3_BY_MOD_ID;
+            } else if ( "BLOCK_ID".equals(columnNameUpperCase) ) {
+                sqlStatement = DELETE_ROWS_DUSB_P3_BY_BLOCK_ID;
             } else {
                 throw new VoltAbortException("Unknown column name: '"+columnName
                         +"' (with table name '"+tableName+"').");

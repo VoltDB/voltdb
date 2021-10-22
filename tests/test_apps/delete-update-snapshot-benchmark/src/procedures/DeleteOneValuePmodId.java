@@ -39,7 +39,7 @@ public class DeleteOneValuePmodId extends DeleteOneValue {
     {
         // Check that the table is partitioned by MOD_ID
         if (tableName == null || !DUSBenchmark.PARTITIONED_BY_MOD_ID.contains(tableName.toUpperCase())) {
-            throw new VoltAbortException("Illegal table name ("+tableName+") for DeleteOneRowP.");
+            throw new VoltAbortException("Illegal table name '"+tableName+"' for DeleteOneValuePmodId.");
         }
 
         // Determine which SQLStmt to use

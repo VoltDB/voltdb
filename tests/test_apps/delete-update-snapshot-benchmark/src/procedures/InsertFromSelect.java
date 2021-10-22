@@ -26,31 +26,31 @@ package procedures;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
-import org.voltdb.types.GeographyPointValue;
-import org.voltdb.types.GeographyValue;
-
-import java.math.BigDecimal;
 
 public class InsertFromSelect extends VoltProcedure {
 
     // Declare the SQL Statements to be used
     public final SQLStmt INSERT_SELECT_DUSB_R1 = new SQLStmt(
-            "INSERT INTO DUSB_R1 SELECT ID + ?, "+InsertOneRow.COLUMN_NAMES_NO_ID
+            "INSERT INTO DUSB_R1 SELECT ID + ?, CAST(? AS BIGINT), "+InsertOneRow.COLUMN_NAMES_NO_ID
                 + " FROM DUSB_R1 WHERE ID >= ? AND ID < ? ORDER BY ID;");
     public final SQLStmt INSERT_SELECT_DUSB_P1 = new SQLStmt(
-            "INSERT INTO DUSB_P1 SELECT ID + ?, "+InsertOneRow.COLUMN_NAMES_NO_ID
+            "INSERT INTO DUSB_P1 SELECT ID + ?, CAST(? AS BIGINT), "+InsertOneRow.COLUMN_NAMES_NO_ID
                 + " FROM DUSB_R1 WHERE ID >= ? AND ID < ? ORDER BY ID;");
     public final SQLStmt INSERT_SELECT_DUSB_P2 = new SQLStmt(
-            "INSERT INTO DUSB_P2 SELECT ID + ?, "+InsertOneRow.COLUMN_NAMES_NO_ID
+            "INSERT INTO DUSB_P2 SELECT ID + ?, CAST(? AS BIGINT), "+InsertOneRow.COLUMN_NAMES_NO_ID
+                + " FROM DUSB_R1 WHERE ID >= ? AND ID < ? ORDER BY ID;");
+    public final SQLStmt INSERT_SELECT_DUSB_P3 = new SQLStmt(
+            "INSERT INTO DUSB_P3 SELECT ID + ?, CAST(? AS BIGINT), "+InsertOneRow.COLUMN_NAMES_NO_ID
                 + " FROM DUSB_R1 WHERE ID >= ? AND ID < ? ORDER BY ID;");
 
-    public VoltTable[] run(String tableName, long addToId, long minId, long maxId)
+    public VoltTable[] run(String tableName, long addToId, long blockId,
+                           long minId, long maxId)
                      throws VoltAbortException {
 
         // Determine which SQLStmt to use
         SQLStmt sqlStatement = getSqlStatement(tableName);
 
-        voltQueueSQL(sqlStatement, addToId, minId, maxId);
+        voltQueueSQL(sqlStatement, addToId, blockId, minId, maxId);
 
         // Execute the INSERT SELECT query
         return voltExecuteSQL(true);
@@ -64,6 +64,8 @@ public class InsertFromSelect extends VoltProcedure {
 
         if (tableName == null) {
             throw new VoltAbortException("Illegal null table name ("+tableName+").");
+        } else if ( "DUSB_P3".equals(tableName.toUpperCase()) ) {
+            sqlStatement = INSERT_SELECT_DUSB_P3;
         } else if ( "DUSB_P2".equals(tableName.toUpperCase()) ) {
             sqlStatement = INSERT_SELECT_DUSB_P2;
         } else if ( "DUSB_P1".equals(tableName.toUpperCase()) ) {

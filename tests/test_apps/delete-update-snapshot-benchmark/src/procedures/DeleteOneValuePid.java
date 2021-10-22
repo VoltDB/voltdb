@@ -38,7 +38,7 @@ public class DeleteOneValuePid extends DeleteOneValue {
     {
         // Check that the table is partitioned by ID
         if (tableName == null || !DUSBenchmark.PARTITIONED_BY_ID.contains(tableName.toUpperCase())) {
-            throw new VoltAbortException("Illegal table name ("+tableName+") for DeleteOneRowP.");
+            throw new VoltAbortException("Illegal table name '"+tableName+"' for DeleteOneRowPid.");
         }
 
         // Determine which SQLStmt to use

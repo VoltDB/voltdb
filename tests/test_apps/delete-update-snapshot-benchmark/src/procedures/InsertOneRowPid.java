@@ -35,7 +35,7 @@ import java.util.List;
 public class InsertOneRowPid extends InsertOneRow {
 
     // The run() method, as required for each VoltProcedure
-    public VoltTable[] run(long id, String tableName,
+    public VoltTable[] run(long id, long blockId, String tableName,
             String[] columnNames, String[] columnValues)
             throws VoltAbortException
     {
@@ -48,7 +48,7 @@ public class InsertOneRowPid extends InsertOneRow {
         SQLStmt sqlStatement = getInsertStatement(tableName);
 
         // Get the query args, as an Object array
-        Object[] args = getInsertArgs(id, columnNames, columnValues);
+        Object[] args = getInsertArgs(id, blockId, columnNames, columnValues);
 
         // Queue the query
         voltQueueSQL(sqlStatement, args);

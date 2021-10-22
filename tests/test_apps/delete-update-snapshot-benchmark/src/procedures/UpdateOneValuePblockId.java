@@ -29,20 +29,20 @@ import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
 
-/** Version of UpdateOneValue Partitioned on column MOD_ID */
-public class UpdateOneValuePmodId extends UpdateOneValue {
+/** Version of UpdateOneValue Partitioned on column BLOCK_ID */
+public class UpdateOneValuePblockId extends UpdateOneValue {
 
     // The run() method, as required for each VoltProcedure
     public VoltTable[] run(long modidValue, String tableName, String inlineOrOutline)
             throws VoltAbortException
     {
-        // Check that the table is partitioned by MOD_ID
-        if (tableName == null || !DUSBenchmark.PARTITIONED_BY_MOD_ID.contains(tableName.toUpperCase())) {
-            throw new VoltAbortException("Illegal table name '"+tableName+"' for UpdateOneRowPmodid.");
+        // Check that the table is partitioned by BLOCK_ID
+        if (tableName == null || !DUSBenchmark.PARTITIONED_BY_BLOCK_ID.contains(tableName.toUpperCase())) {
+            throw new VoltAbortException("Illegal table name '"+tableName+"' for UpdateOneValuePblockId.");
         }
 
         // Determine which SQLStmt to use
-        SQLStmt sqlStatement = getUpdateStatement(tableName, "MOD_ID", inlineOrOutline);
+        SQLStmt sqlStatement = getUpdateStatement(tableName, "BLOCK_ID", inlineOrOutline);
 
         // Queue the query
         voltQueueSQL(sqlStatement, modidValue);

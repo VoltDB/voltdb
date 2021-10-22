@@ -57,6 +57,10 @@ public class UpdateMultiValues extends VoltProcedure {
             "UPDATE DUSB_R1 "+SET_INLINE+" WHERE MOD_ID >= ? AND MOD_ID < ?;");
     public static final SQLStmt UPDATE_ROWS_DUSB_R1_OUT_BY_MOD_ID = new SQLStmt(
             "UPDATE DUSB_R1 "+SET_OUTLINE+" WHERE MOD_ID >= ? AND MOD_ID < ?;");
+    public static final SQLStmt UPDATE_ROWS_DUSB_R1_IN_BY_BLOCK_ID = new SQLStmt(
+            "UPDATE DUSB_R1 "+SET_INLINE+" WHERE BLOCK_ID >= ? AND BLOCK_ID < ?;");
+    public static final SQLStmt UPDATE_ROWS_DUSB_R1_OUT_BY_BLOCK_ID = new SQLStmt(
+            "UPDATE DUSB_R1 "+SET_OUTLINE+" WHERE BLOCK_ID >= ? AND BLOCK_ID < ?;");
 
     public static final SQLStmt UPDATE_ROWS_DUSB_P1_IN_BY_ID = new SQLStmt(
             "UPDATE DUSB_P1 "+SET_INLINE+" WHERE ID >= ? AND ID < ?;");
@@ -66,6 +70,10 @@ public class UpdateMultiValues extends VoltProcedure {
             "UPDATE DUSB_P1 "+SET_INLINE+" WHERE MOD_ID >= ? AND MOD_ID < ?;");
     public static final SQLStmt UPDATE_ROWS_DUSB_P1_OUT_BY_MOD_ID = new SQLStmt(
             "UPDATE DUSB_P1 "+SET_OUTLINE+" WHERE MOD_ID >= ? AND MOD_ID < ?;");
+    public static final SQLStmt UPDATE_ROWS_DUSB_P1_IN_BY_BLOCK_ID = new SQLStmt(
+            "UPDATE DUSB_P1 "+SET_INLINE+" WHERE BLOCK_ID >= ? AND BLOCK_ID < ?;");
+    public static final SQLStmt UPDATE_ROWS_DUSB_P1_OUT_BY_BLOCK_ID = new SQLStmt(
+            "UPDATE DUSB_P1 "+SET_OUTLINE+" WHERE BLOCK_ID >= ? AND BLOCK_ID < ?;");
 
     public static final SQLStmt UPDATE_ROWS_DUSB_P2_IN_BY_ID = new SQLStmt(
             "UPDATE DUSB_P2 "+SET_INLINE+" WHERE ID >= ? AND ID < ?;");
@@ -75,7 +83,23 @@ public class UpdateMultiValues extends VoltProcedure {
             "UPDATE DUSB_P2 "+SET_INLINE+" WHERE MOD_ID >= ? AND MOD_ID < ?;");
     public static final SQLStmt UPDATE_ROWS_DUSB_P2_OUT_BY_MOD_ID = new SQLStmt(
             "UPDATE DUSB_P2 "+SET_OUTLINE+" WHERE MOD_ID >= ? AND MOD_ID < ?;");
+    public static final SQLStmt UPDATE_ROWS_DUSB_P2_IN_BY_BLOCK_ID = new SQLStmt(
+            "UPDATE DUSB_P2 "+SET_INLINE+" WHERE BLOCK_ID >= ? AND BLOCK_ID < ?;");
+    public static final SQLStmt UPDATE_ROWS_DUSB_P2_OUT_BY_BLOCK_ID = new SQLStmt(
+            "UPDATE DUSB_P2 "+SET_OUTLINE+" WHERE BLOCK_ID >= ? AND BLOCK_ID < ?;");
 
+    public static final SQLStmt UPDATE_ROWS_DUSB_P3_IN_BY_ID = new SQLStmt(
+            "UPDATE DUSB_P3 "+SET_INLINE+" WHERE ID >= ? AND ID < ?;");
+    public static final SQLStmt UPDATE_ROWS_DUSB_P3_OUT_BY_ID = new SQLStmt(
+            "UPDATE DUSB_P3 "+SET_OUTLINE+" WHERE ID >= ? AND ID < ?;");
+    public static final SQLStmt UPDATE_ROWS_DUSB_P3_IN_BY_MOD_ID = new SQLStmt(
+            "UPDATE DUSB_P3 "+SET_INLINE+" WHERE MOD_ID >= ? AND MOD_ID < ?;");
+    public static final SQLStmt UPDATE_ROWS_DUSB_P3_OUT_BY_MOD_ID = new SQLStmt(
+            "UPDATE DUSB_P3 "+SET_OUTLINE+" WHERE MOD_ID >= ? AND MOD_ID < ?;");
+    public static final SQLStmt UPDATE_ROWS_DUSB_P3_IN_BY_BLOCK_ID = new SQLStmt(
+            "UPDATE DUSB_P3 "+SET_INLINE+" WHERE BLOCK_ID >= ? AND BLOCK_ID < ?;");
+    public static final SQLStmt UPDATE_ROWS_DUSB_P3_OUT_BY_BLOCK_ID = new SQLStmt(
+            "UPDATE DUSB_P3 "+SET_OUTLINE+" WHERE BLOCK_ID >= ? AND BLOCK_ID < ?;");
 
     // The run() method, as required for each VoltProcedure
     public VoltTable[] run(String tableName, String columnName,
@@ -125,6 +149,13 @@ public class UpdateMultiValues extends VoltProcedure {
                 } else {
                     sqlStatement = UPDATE_ROWS_DUSB_R1_IN_BY_MOD_ID;
                 }
+            } else if ( "BLOCK_ID".equals(columnNameUpperCase) ) {
+                if (inlineOrOutlineUpperCase.startsWith("OUT") ||
+                        inlineOrOutlineUpperCase.startsWith("NON")) {
+                    sqlStatement = UPDATE_ROWS_DUSB_R1_OUT_BY_BLOCK_ID;
+                } else {
+                    sqlStatement = UPDATE_ROWS_DUSB_R1_IN_BY_BLOCK_ID;
+                }
             } else {
                 throw new VoltAbortException("Unknown column name: '"+columnName
                         +"' (with table name '"+tableName+"').");
@@ -146,31 +177,73 @@ public class UpdateMultiValues extends VoltProcedure {
                     } else {
                         sqlStatement = UPDATE_ROWS_DUSB_P1_IN_BY_MOD_ID;
                     }
+            } else if ( "BLOCK_ID".equals(columnNameUpperCase) ) {
+                if (inlineOrOutlineUpperCase.startsWith("OUT") ||
+                        inlineOrOutlineUpperCase.startsWith("NON")) {
+                        sqlStatement = UPDATE_ROWS_DUSB_P1_OUT_BY_BLOCK_ID;
+                    } else {
+                        sqlStatement = UPDATE_ROWS_DUSB_P1_IN_BY_BLOCK_ID;
+                    }
             } else {
                 throw new VoltAbortException("Unknown column name: '"+columnName
                         +"' (with table name '"+tableName+"').");
             }
 
-            // Update the second partitioned table (partitioned on MOD_ID)
-            } else if ( "DUSB_P2".equals(tableNameUpperCase) ) {
-                if ( "ID".equals(columnNameUpperCase) ) {
-                    if (inlineOrOutlineUpperCase.startsWith("OUT") ||
-                            inlineOrOutlineUpperCase.startsWith("NON")) {
-                            sqlStatement = UPDATE_ROWS_DUSB_P2_OUT_BY_ID;
-                        } else {
-                            sqlStatement = UPDATE_ROWS_DUSB_P2_IN_BY_ID;
-                        }
-                } else if ( "MOD_ID".equals(columnNameUpperCase) ) {
-                    if (inlineOrOutlineUpperCase.startsWith("OUT") ||
-                            inlineOrOutlineUpperCase.startsWith("NON")) {
-                            sqlStatement = UPDATE_ROWS_DUSB_P2_OUT_BY_MOD_ID;
-                        } else {
-                            sqlStatement = UPDATE_ROWS_DUSB_P2_IN_BY_MOD_ID;
-                        }
-                } else {
-                    throw new VoltAbortException("Unknown column name: '"+columnName
-                            +"' (with table name '"+tableName+"').");
-                }
+        // Update the second partitioned table (partitioned on MOD_ID)
+        } else if ( "DUSB_P2".equals(tableNameUpperCase) ) {
+            if ( "ID".equals(columnNameUpperCase) ) {
+                if (inlineOrOutlineUpperCase.startsWith("OUT") ||
+                        inlineOrOutlineUpperCase.startsWith("NON")) {
+                        sqlStatement = UPDATE_ROWS_DUSB_P2_OUT_BY_ID;
+                    } else {
+                        sqlStatement = UPDATE_ROWS_DUSB_P2_IN_BY_ID;
+                    }
+            } else if ( "MOD_ID".equals(columnNameUpperCase) ) {
+                if (inlineOrOutlineUpperCase.startsWith("OUT") ||
+                        inlineOrOutlineUpperCase.startsWith("NON")) {
+                        sqlStatement = UPDATE_ROWS_DUSB_P2_OUT_BY_MOD_ID;
+                    } else {
+                        sqlStatement = UPDATE_ROWS_DUSB_P2_IN_BY_MOD_ID;
+                    }
+            } else if ( "BLOCK_ID".equals(columnNameUpperCase) ) {
+                if (inlineOrOutlineUpperCase.startsWith("OUT") ||
+                        inlineOrOutlineUpperCase.startsWith("NON")) {
+                        sqlStatement = UPDATE_ROWS_DUSB_P2_OUT_BY_BLOCK_ID;
+                    } else {
+                        sqlStatement = UPDATE_ROWS_DUSB_P2_IN_BY_BLOCK_ID;
+                    }
+            } else {
+                throw new VoltAbortException("Unknown column name: '"+columnName
+                        +"' (with table name '"+tableName+"').");
+            }
+
+        // Update the third partitioned table (partitioned on BLOCK_ID)
+        } else if ( "DUSB_P3".equals(tableNameUpperCase) ) {
+            if ( "ID".equals(columnNameUpperCase) ) {
+                if (inlineOrOutlineUpperCase.startsWith("OUT") ||
+                        inlineOrOutlineUpperCase.startsWith("NON")) {
+                        sqlStatement = UPDATE_ROWS_DUSB_P3_OUT_BY_ID;
+                    } else {
+                        sqlStatement = UPDATE_ROWS_DUSB_P3_IN_BY_ID;
+                    }
+            } else if ( "MOD_ID".equals(columnNameUpperCase) ) {
+                if (inlineOrOutlineUpperCase.startsWith("OUT") ||
+                        inlineOrOutlineUpperCase.startsWith("NON")) {
+                        sqlStatement = UPDATE_ROWS_DUSB_P3_OUT_BY_MOD_ID;
+                    } else {
+                        sqlStatement = UPDATE_ROWS_DUSB_P3_IN_BY_MOD_ID;
+                    }
+            } else if ( "BLOCK_ID".equals(columnNameUpperCase) ) {
+                if (inlineOrOutlineUpperCase.startsWith("OUT") ||
+                        inlineOrOutlineUpperCase.startsWith("NON")) {
+                        sqlStatement = UPDATE_ROWS_DUSB_P3_OUT_BY_BLOCK_ID;
+                    } else {
+                        sqlStatement = UPDATE_ROWS_DUSB_P3_IN_BY_BLOCK_ID;
+                    }
+            } else {
+                throw new VoltAbortException("Unknown column name: '"+columnName
+                        +"' (with table name '"+tableName+"').");
+            }
 
         } else {
             throw new VoltAbortException("Unknown table name: '"+tableName

@@ -38,12 +38,12 @@ public class InsertOneRow extends VoltProcedure {
 
     // We don't want to have to change these in more than one place (besides the DDL file)
     final static String COLUMN_NAMES_NO_ID = "MOD_ID, TINY, SMALL, INTEG, BIG, FLOT, DECML, TIMESTMP,"
-            + " VCHAR_INLINE,  VCHAR_INLINE_MAX,  VCHAR_OUTLINE_MIN,  VCHAR_OUTLINE,  VCHAR_DEFAULT,"
-            + "VARBIN_INLINE, VARBIN_INLINE_MAX, VARBIN_OUTLINE_MIN, VARBIN_OUTLINE, VARBIN_DEFAULT,"
+            + " VCHAR_INLINE,  VCHAR_INLINE_MAX,  VCHAR_OUTLINE_MIN,  VCHAR_OUTLINE,  VCHAR_DEFAULT, "
+            + "VARBIN_INLINE, VARBIN_INLINE_MAX, VARBIN_OUTLINE_MIN, VARBIN_OUTLINE, VARBIN_DEFAULT, "
             + "POINT, POLYGON";
-    private final static String COLUMN_NAME_LIST = "ID, " + COLUMN_NAMES_NO_ID;
-    private final static String VALUES_LIST = "?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?";
-    private final static int NUM_PARAMETERS = 21;
+    private final static String COLUMN_NAME_LIST = "ID, BLOCK_ID, " + COLUMN_NAMES_NO_ID;
+    private final static String VALUES_LIST = "?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?";
+    private final static int NUM_PARAMETERS = 22;
 
     // Declare the SQL Statements to be used
     private final static SQLStmt INSERT_VALUES_DUSB_R1 = new SQLStmt(
@@ -53,7 +53,7 @@ public class InsertOneRow extends VoltProcedure {
 
 
     // The run() method, as required for each VoltProcedure
-    public VoltTable[] run(long id, String tableName,
+    public VoltTable[] run(long id, long blockId, String tableName,
             String[] columnNames, String[] columnValues)
             throws VoltAbortException
     {
@@ -61,7 +61,7 @@ public class InsertOneRow extends VoltProcedure {
         SQLStmt sqlStatement = getInsertStatement(tableName);
 
         // Get the query args, as an Object array
-        Object[] args = getInsertArgs(id, columnNames, columnValues);
+        Object[] args = getInsertArgs(id, blockId, columnNames, columnValues);
 
         // Queue the query
         voltQueueSQL(sqlStatement, args);
@@ -88,7 +88,8 @@ public class InsertOneRow extends VoltProcedure {
 
 
     // Get the query args, as an Object array
-    Object[] getInsertArgs(long id, String[] columnNames, String[] columnValues) {
+    Object[] getInsertArgs(long id, long blockId,
+            String[] columnNames, String[] columnValues) {
 
         int numColumns = columnNames.length;
         if (numColumns != columnValues.length) {
@@ -104,16 +105,18 @@ public class InsertOneRow extends VoltProcedure {
         }
 
         // A few special cases ...
-        // The first two elements get the 'id' value (for columns ID and MOD_ID)
+        // The first and third elements get the 'id' value (for columns ID and MOD_ID)
         argsArray[0] = id;
-        argsArray[1] = id;
+        argsArray[2] = id;
+        // And the second gets the 'blockId' value (for column BLOCK_ID)
+        argsArray[1] = blockId;
 
         // Numerical columns whose types have a special null value in Volt
-        argsArray[2] = VoltType.TINYINT.getNullValue();
-        argsArray[3] = VoltType.SMALLINT.getNullValue();
-        argsArray[4] = VoltType.INTEGER.getNullValue();
-        argsArray[5] = VoltType.BIGINT.getNullValue();
-        argsArray[6] = VoltType.FLOAT.getNullValue();
+        argsArray[3] = VoltType.TINYINT.getNullValue();
+        argsArray[4] = VoltType.SMALLINT.getNullValue();
+        argsArray[5] = VoltType.INTEGER.getNullValue();
+        argsArray[6] = VoltType.BIGINT.getNullValue();
+        argsArray[7] = VoltType.FLOAT.getNullValue();
 
         // Determine which columns are non-null
         for (int i=0; i < numColumns; i++) {
@@ -121,73 +124,73 @@ public class InsertOneRow extends VoltProcedure {
                 switch (columnNames[i].toUpperCase()) {
                 case "TINY":
                 case "TINYINT":
-                    argsArray[2] = Byte.parseByte(columnValues[i]);
+                    argsArray[3] = Byte.parseByte(columnValues[i]);
                     break;
                 case "SMALL":
                 case "SMALLINT":
-                    argsArray[3] = Short.parseShort(columnValues[i]);
+                    argsArray[4] = Short.parseShort(columnValues[i]);
                     break;
                 case "INT":
                 case "INTEG":
                 case "INTEGER":
-                    argsArray[4] = Integer.parseInt(columnValues[i]);
+                    argsArray[5] = Integer.parseInt(columnValues[i]);
                     break;
                 case "BIG":
                 case "BIGINT":
-                    argsArray[5] = Long.parseLong(columnValues[i]);
+                    argsArray[6] = Long.parseLong(columnValues[i]);
                     break;
                 case "FLOT":
                 case "FLOAT":
-                    argsArray[6] = Double.parseDouble(columnValues[i]);
+                    argsArray[7] = Double.parseDouble(columnValues[i]);
                     break;
                 case "DECML":
                 case "DECIMAL":
-                    argsArray[7] = new BigDecimal(columnValues[i]);
+                    argsArray[8] = new BigDecimal(columnValues[i]);
                     break;
                 case "TIME":
                 case "TIMESTMP":
                 case "TIMESTAMP":
-                    argsArray[8] = columnValues[i];
-                    break;
-                case "VCHAR_INLINE":
                     argsArray[9] = columnValues[i];
                     break;
-                case "VCHAR_INLINE_MAX":
+                case "VCHAR_INLINE":
                     argsArray[10] = columnValues[i];
                     break;
-                case "VCHAR_OUTLINE_MIN":
+                case "VCHAR_INLINE_MAX":
                     argsArray[11] = columnValues[i];
                     break;
-                case "VCHAR_OUTLINE":
+                case "VCHAR_OUTLINE_MIN":
                     argsArray[12] = columnValues[i];
+                    break;
+                case "VCHAR_OUTLINE":
+                    argsArray[13] = columnValues[i];
                     break;
                 case "VCHAR_DEFAULT":
                 case "VARCHAR":
-                    argsArray[13] = columnValues[i];
+                    argsArray[14] = columnValues[i];
                     break;
                 case "VARBIN_INLINE":
-                    argsArray[14] = columnValues[i].getBytes().toString();
-                    break;
-                case "VARBIN_INLINE_MAX":
                     argsArray[15] = columnValues[i].getBytes().toString();
                     break;
-                case "VARBIN_OUTLINE_MIN":
+                case "VARBIN_INLINE_MAX":
                     argsArray[16] = columnValues[i].getBytes().toString();
                     break;
-                case "VARBIN_OUTLINE":
+                case "VARBIN_OUTLINE_MIN":
                     argsArray[17] = columnValues[i].getBytes().toString();
+                    break;
+                case "VARBIN_OUTLINE":
+                    argsArray[18] = columnValues[i].getBytes().toString();
                     break;
                 case "VARBIN_DEFAULT":
                 case "VARBINARY":
-                    argsArray[18] = columnValues[i].getBytes().toString();
+                    argsArray[19] = columnValues[i].getBytes().toString();
                     break;
                 case "POINT":
                 case "GEOGRAPHY_POINT":
-                    argsArray[19] = GeographyPointValue.fromWKT(columnValues[i]);
+                    argsArray[20] = GeographyPointValue.fromWKT(columnValues[i]);
                     break;
                 case "POLYGON":
                 case "GEOGRAPHY":
-                    argsArray[20] = new GeographyValue(columnValues[i]);
+                    argsArray[21] = new GeographyValue(columnValues[i]);
                     break;
                 default:
                     throw new VoltTypeException("Unknown column name: '"+columnNames[i]+"'.");
