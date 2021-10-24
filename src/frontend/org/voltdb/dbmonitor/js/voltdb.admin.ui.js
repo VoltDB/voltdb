@@ -5130,7 +5130,7 @@ function loadAdminPage() {
         };
 
         this.refreshServerList = function (serverList, serverCount) {
-            adminDOMObjects.adminServerList.html(serverList);
+            adminDOMObjects.adminServerList !== undefined && adminDOMObjects.adminServerList.html(serverList);
         };
 
         this.escapeHtml = function (value) {
@@ -5773,9 +5773,9 @@ function loadAdminPage() {
             if (enable != adminClusterObjects.enablePromote) {
                 adminClusterObjects.enablePromote = enable;
                 if (adminClusterObjects.enablePromote) {
-                    adminClusterObjects.btnClusterPromote.removeClass().addClass("promote");
+                    adminClusterObjects.btnClusterPromote !== undefined && adminClusterObjects.btnClusterPromote.removeClass().addClass("promote");
                 } else {
-                    adminClusterObjects.btnClusterPromote.removeClass().addClass("promote-disabled");
+                    adminClusterObjects.btnClusterPromote !== undefined && adminClusterObjects.btnClusterPromote.removeClass().addClass("promote-disabled");
                 }
             }
         };
