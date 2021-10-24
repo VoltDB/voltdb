@@ -426,16 +426,11 @@ function set_kubernetes(server, port) {
       });
     };
 
-    this.CheckAdminPriviledges = function (onInformationLoaded) {
-      VoltDBService.GetShortApiProfile(function (connection) {
-        onInformationLoaded(hasAdminPrivileges(connection));
-      });
-    };
-
     this.GetAdminDeploymentInformation = function (
       checkSecurity,
       onInformationLoaded
     ) {
+      console.log("From GetAdminDeploymentInformation");
       if (VoltDbAdminConfig.isAdmin || checkSecurity) {
         VoltDBService.GetShortApiDeployment(function (connection) {
           var rawData;
@@ -448,6 +443,13 @@ function set_kubernetes(server, port) {
         });
       }
     };
+
+    // this.CheckAdminPriviledges = function (onInformationLoaded) {
+    //   console.log("From CheckAdminPriviledges");
+    //   VoltDBService.GetShortApiProfile(function (connection) {
+    //     onInformationLoaded(hasAdminPrivileges(connection));
+    //   });
+    // };
 
     this.GetCommandLogStatus = function (onInformationLoaded) {
       if (VoltDbAdminConfig.isAdmin || checkSecurity) {

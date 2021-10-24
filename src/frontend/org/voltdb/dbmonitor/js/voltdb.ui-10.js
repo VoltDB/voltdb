@@ -950,17 +950,17 @@ var loadPage = function (serverName, portid) {
     }
   );
 
-  voltDbRenderer.CheckAdminPriviledges(function (hasAdminPrivileges) {
-    securityChecks.previlegesChecked = true;
-    if (hasAdminPrivileges) {
-      $("#navAdmin").show();
-      // showAdminPage();
-    } else if (!VoltDbAdminConfig.isAdmin) {
-      $("#navAdmin").hide();
-    }
+  // voltDbRenderer.CheckAdminPriviledges(function (hasAdminPrivileges) {
+  //   securityChecks.previlegesChecked = true;
+  //   if (hasAdminPrivileges) {
+  //     $("#navAdmin").show();
+  //     // showAdminPage();
+  //   } else if (!VoltDbAdminConfig.isAdmin) {
+  //     $("#navAdmin").hide();
+  //   }
 
-    retainCurrentTab();
-  });
+  //   retainCurrentTab();
+  // });
 
   $("#loginWarnPopup").popup({
     afterOpen: function (event, ui, ele) {
