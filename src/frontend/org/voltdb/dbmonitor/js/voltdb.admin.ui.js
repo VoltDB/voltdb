@@ -3227,95 +3227,100 @@ function loadAdminPage() {
             });
 
             $("#btnSaveConfigOk").unbind("click");
+            var conCounter = 0;
             $(document).on("click", "#btnSaveConfigOk", function () {
-                var adminConfigurations = VoltDbAdminConfig.getLatestRawAdminConfigurations();
-                if ($("#expotSaveConfigText").data("status") == "delete") {
-                    adminConfigurations["export"].configuration.splice(editId * 1, 1);
+                conCounter++;
+                if (conCounter === 1) {
+                    var adminConfigurations = VoltDbAdminConfig.getLatestRawAdminConfigurations();
+                    if ($("#expotSaveConfigText").data("status") == "delete") {
+                        adminConfigurations["export"].configuration.splice(editId * 1, 1);
+                    }
+                    else {
+                        var newConfig = {};
+                        newConfig["property"] = [];
+
+                        var newStreamProperties = $(".newStreamProperty");
+                        for (var i = 0; i < newStreamProperties.length; i += 2) {
+                            newConfig["property"].push({
+                                "name": encodeURIComponent($(newStreamProperties[i]).val()),
+                                "value": encodeURIComponent($(newStreamProperties[i + 1]).val()),
+                            });
+                        }
+                        newConfig["target"] = $("#txtStream").val();
+                        newConfig["type"] = $("#txtType").val().trim();
+                        newConfig["enabled"] = $("#chkStream").is(':checked');
+                        if ($("#txtType").val().trim().toUpperCase() == "CUSTOM") {
+                            newConfig["exportconnectorclass"] = $("#txtExportConnectorClass").val();
+                        }
+
+                        if (!adminConfigurations["export"]) {
+                            adminConfigurations["export"] = {};
+                            adminConfigurations["export"]["configuration"] = [];
+                        }
+
+                        //For editing an existing configuration
+                        if (editId == "-1") {
+                            adminConfigurations["export"].configuration.push(newConfig);
+                        } else {
+                            var updatedConfig = adminConfigurations["export"].configuration[editId * 1];
+                            updatedConfig.target = newConfig.target;
+                            updatedConfig.type = newConfig.type;
+                            updatedConfig.enabled = newConfig.enabled;
+                            updatedConfig.property = newConfig.property;
+                            updatedConfig.exportconnectorclass = newConfig.exportconnectorclass;
+                        }
+                    }
+
+                    var currentConfig = adminEditObjects.exportConfiguration.html();
+
+                    var loadingConfig = '<tr class="child-row-4 subLabelRow">' +
+                        '   <td colspan="4" style="position:relative">&nbsp;<div class="loading-small loadExportConfig"></div></td>' +
+                        '</tr>';
+
+                    adminEditObjects.addNewConfigLink.hide();
+                    adminEditObjects.exportConfiguration.html(loadingConfig);
+                    adminEditObjects.loadingConfiguration.show();
+                    VoltDbAdminConfig.isExportLoading = true;
+                    //Close the popup
+                    popup.close();
+
+                    voltDbRenderer.updateAdminConfiguration(adminConfigurations, function (result) {
+                        if (result.status == "1") {
+
+                            //Reload Admin configurations for displaying the updated value
+                            voltDbRenderer.GetAdminDeploymentInformation(false, function (adminConfigValues, rawConfigValues) {
+                                adminEditObjects.addNewConfigLink.show();
+                                adminEditObjects.loadingConfiguration.hide();
+                                adminEditObjects.exportConfiguration.data("status", "value");
+
+                                VoltDbAdminConfig.displayAdminConfiguration(adminConfigValues, rawConfigValues);
+                            });
+                        } else {
+                            setTimeout(function () {
+                                adminEditObjects.addNewConfigLink.show();
+                                adminEditObjects.loadingConfiguration.hide();
+                                adminEditObjects.exportConfiguration.data("status", "value");
+                                adminEditObjects.exportConfiguration.html(currentConfig);
+
+                                var msg = '"Export Configuration". ';
+                                if (result.status == "-1" && result.statusstring == "Query timeout.") {
+                                    msg += "The Database is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
+                                } else if (result.statusstring != "") {
+                                    msg += result.statusstring;
+                                } else {
+                                    msg += "Please try again later.";
+                                }
+
+                                $("#updateErrorFieldMsg").text(msg);
+
+                                $("#updateErrorPopupLink").trigger("click");
+                            }, 3000);
+                        }
+                        popup.close();
+                        $("#btnSaveConfigOk").unbind("click");
+                        VoltDbAdminConfig.isExportLoading = false;
+                    });
                 }
-                else {
-                    var newConfig = {};
-                    newConfig["property"] = [];
-
-                    var newStreamProperties = $(".newStreamProperty");
-                    for (var i = 0; i < newStreamProperties.length; i += 2) {
-                        newConfig["property"].push({
-                            "name": encodeURIComponent($(newStreamProperties[i]).val()),
-                            "value": encodeURIComponent($(newStreamProperties[i + 1]).val()),
-                        });
-                    }
-                    newConfig["target"] = $("#txtStream").val();
-                    newConfig["type"] = $("#txtType").val().trim();
-                    newConfig["enabled"] = $("#chkStream").is(':checked');
-                    if ($("#txtType").val().trim().toUpperCase() == "CUSTOM") {
-                        newConfig["exportconnectorclass"] = $("#txtExportConnectorClass").val();
-                    }
-
-                    if (!adminConfigurations["export"]) {
-                        adminConfigurations["export"] = {};
-                        adminConfigurations["export"]["configuration"] = [];
-                    }
-
-                    //For editing an existing configuration
-                    if (editId == "-1") {
-                        adminConfigurations["export"].configuration.push(newConfig);
-                    } else {
-                        var updatedConfig = adminConfigurations["export"].configuration[editId * 1];
-                        updatedConfig.target = newConfig.target;
-                        updatedConfig.type = newConfig.type;
-                        updatedConfig.enabled = newConfig.enabled;
-                        updatedConfig.property = newConfig.property;
-                        updatedConfig.exportconnectorclass = newConfig.exportconnectorclass;
-                    }
-                }
-
-                var currentConfig = adminEditObjects.exportConfiguration.html();
-
-                var loadingConfig = '<tr class="child-row-4 subLabelRow">' +
-                    '   <td colspan="4" style="position:relative">&nbsp;<div class="loading-small loadExportConfig"></div></td>' +
-                    '</tr>';
-
-                adminEditObjects.addNewConfigLink.hide();
-                adminEditObjects.exportConfiguration.html(loadingConfig);
-                adminEditObjects.loadingConfiguration.show();
-                VoltDbAdminConfig.isExportLoading = true;
-                //Close the popup
-                popup.close();
-
-                voltDbRenderer.updateAdminConfiguration(adminConfigurations, function (result) {
-                    if (result.status == "1") {
-
-                        //Reload Admin configurations for displaying the updated value
-                        voltDbRenderer.GetAdminDeploymentInformation(false, function (adminConfigValues, rawConfigValues) {
-                            adminEditObjects.addNewConfigLink.show();
-                            adminEditObjects.loadingConfiguration.hide();
-                            adminEditObjects.exportConfiguration.data("status", "value");
-
-                            VoltDbAdminConfig.displayAdminConfiguration(adminConfigValues, rawConfigValues);
-                        });
-
-                    } else {
-                        setTimeout(function () {
-                            adminEditObjects.addNewConfigLink.show();
-                            adminEditObjects.loadingConfiguration.hide();
-                            adminEditObjects.exportConfiguration.data("status", "value");
-                            adminEditObjects.exportConfiguration.html(currentConfig);
-
-                            var msg = '"Export Configuration". ';
-                            if (result.status == "-1" && result.statusstring == "Query timeout.") {
-                                msg += "The Database is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
-                            } else if (result.statusstring != "") {
-                                msg += result.statusstring;
-                            } else {
-                                msg += "Please try again later.";
-                            }
-
-                            $("#updateErrorFieldMsg").text(msg);
-
-                            $("#updateErrorPopupLink").trigger("click");
-                        }, 3000);
-                    }
-                    VoltDbAdminConfig.isExportLoading = false;
-                });
             });
 
             $("#btnSaveConfigCancel").unbind("click");
@@ -3328,6 +3333,7 @@ function loadAdminPage() {
                 if (editId != "-1") {
                     $("#deleteAddConfig").show();
                 }
+                popup.close();
             });
         }
     });

@@ -555,34 +555,36 @@
                 updatedData.systemsettings.resourcemonitor.disklimit.feature[i]
               ) {
                 var diskAlert = "";
-                if (
-                  updatedData.systemsettings.resourcemonitor.disklimit.feature[
-                    i
-                  ].alert.indexOf("%") > -1
-                ) {
-                  diskAlert = parseInt(
+                if (updatedData.systemsettings.resourcemonitor.disklimit.feature[i].alert !== null) {
+                  if (
                     updatedData.systemsettings.resourcemonitor.disklimit.feature[
                       i
-                    ].alert.replace("%", "")
-                  );
-                  updatedData.systemsettings.resourcemonitor.disklimit.feature[
-                    i
-                  ].alert = diskAlert + encodeURIComponent("%");
-                } else {
-                  updatedData.systemsettings.resourcemonitor.disklimit.feature[
-                    i
-                  ].alert = encodeURIComponent(
-                    parseInt(
+                    ].alert.indexOf("%") > -1
+                  ) {
+                    diskAlert = parseInt(
+                      updatedData.systemsettings.resourcemonitor.disklimit.feature[
+                        i
+                      ].alert.replace("%", "")
+                    );
+                    updatedData.systemsettings.resourcemonitor.disklimit.feature[
+                      i
+                    ].alert = diskAlert + encodeURIComponent("%");
+                  } else {
+                    updatedData.systemsettings.resourcemonitor.disklimit.feature[
+                      i
+                    ].alert = encodeURIComponent(
+                      parseInt(
+                        updatedData.systemsettings.resourcemonitor.disklimit
+                          .feature[i].alert
+                      )
+                    );
+                  }
+                  features.push({
+                    alert:
                       updatedData.systemsettings.resourcemonitor.disklimit
-                        .feature[i].alert
-                    )
-                  );
+                        .feature[i].alert,
+                  });
                 }
-                features.push({
-                  alert:
-                    updatedData.systemsettings.resourcemonitor.disklimit
-                      .feature[i].alert,
-                });
               }
             }
             updatedData.systemsettings.resourcemonitor.disklimit.feature =
