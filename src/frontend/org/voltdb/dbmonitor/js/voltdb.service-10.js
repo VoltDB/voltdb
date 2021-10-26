@@ -413,7 +413,7 @@
             parameters,
             values,
             processName,
-            function (connection, status) {},
+            function (connection, status) { },
             null,
             false
           );
@@ -467,14 +467,10 @@
                 "%"
               ) > -1
             ) {
-              memorySize = parseInt(
-                updatedData.systemsettings.resourcemonitor.memorylimit.size.replace(
-                  "%",
-                  ""
-                )
-              );
-              updatedData.systemsettings.resourcemonitor.memorylimit.size =
-                memorySize + encodeURIComponent("%");
+              rawMemSize = updatedData.systemsettings.resourcemonitor.memorylimit.size;
+              memorySize = rawMemSize.slice(0, rawMemSize.indexOf("%") + 1)
+              memorySize = parseInt(memorySize.replace("%", ""));
+              updatedData.systemsettings.resourcemonitor.memorylimit.size = memorySize + encodeURIComponent("%");
             } else {
               updatedData.systemsettings.resourcemonitor.memorylimit.size =
                 encodeURIComponent(
@@ -493,12 +489,9 @@
                   "%"
                 ) > -1
               ) {
-                memoryAlert = parseInt(
-                  updatedData.systemsettings.resourcemonitor.memorylimit.alert.replace(
-                    "%",
-                    ""
-                  )
-                );
+                rawMemAlert = updatedData.systemsettings.resourcemonitor.memorylimit.alert;
+                memoryAlert = rawMemAlert.slice(0, rawMemAlert.indexOf("%") + 1)
+                memoryAlert = parseInt(memoryAlert.replace("%", ""));
                 updatedData.systemsettings.resourcemonitor.memorylimit.alert =
                   memoryAlert + encodeURIComponent("%");
               } else {
@@ -562,34 +555,36 @@
                 updatedData.systemsettings.resourcemonitor.disklimit.feature[i]
               ) {
                 var diskAlert = "";
-                if (
-                  updatedData.systemsettings.resourcemonitor.disklimit.feature[
-                    i
-                  ].alert.indexOf("%") > -1
-                ) {
-                  diskAlert = parseInt(
+                if (updatedData.systemsettings.resourcemonitor.disklimit.feature[i].alert !== null) {
+                  if (
                     updatedData.systemsettings.resourcemonitor.disklimit.feature[
                       i
-                    ].alert.replace("%", "")
-                  );
-                  updatedData.systemsettings.resourcemonitor.disklimit.feature[
-                    i
-                  ].alert = diskAlert + encodeURIComponent("%");
-                } else {
-                  updatedData.systemsettings.resourcemonitor.disklimit.feature[
-                    i
-                  ].alert = encodeURIComponent(
-                    parseInt(
+                    ].alert.indexOf("%") > -1
+                  ) {
+                    diskAlert = parseInt(
+                      updatedData.systemsettings.resourcemonitor.disklimit.feature[
+                        i
+                      ].alert.replace("%", "")
+                    );
+                    updatedData.systemsettings.resourcemonitor.disklimit.feature[
+                      i
+                    ].alert = diskAlert + encodeURIComponent("%");
+                  } else {
+                    updatedData.systemsettings.resourcemonitor.disklimit.feature[
+                      i
+                    ].alert = encodeURIComponent(
+                      parseInt(
+                        updatedData.systemsettings.resourcemonitor.disklimit
+                          .feature[i].alert
+                      )
+                    );
+                  }
+                  features.push({
+                    alert:
                       updatedData.systemsettings.resourcemonitor.disklimit
-                        .feature[i].alert
-                    )
-                  );
+                        .feature[i].alert,
+                  });
                 }
-                features.push({
-                  alert:
-                    updatedData.systemsettings.resourcemonitor.disklimit
-                      .feature[i].alert,
-                });
               }
             }
             updatedData.systemsettings.resourcemonitor.disklimit.feature =
@@ -666,7 +661,7 @@
             connection.Metadata["@StopNode_" + nodeId.toString() + "_status"];
           statusString =
             connection.Metadata[
-              "@StopNode_" + nodeId.toString() + "_statusString"
+            "@StopNode_" + nodeId.toString() + "_statusString"
             ];
           if (!(status == "" || status == undefined)) {
             onConnectionAdded(connection, status, statusString);

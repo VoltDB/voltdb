@@ -304,7 +304,7 @@ function QueryUI(queryTab) {
         this.Callback = callback;
     }
 
-    function executeMethod() {
+    function executeMethod(query) {
         var query_id = this.QueryTab[0].id.split('-')[1]
         var target = $('.queryResult-' + query_id);
         var format = $('#exportType-' + query_id).val();
@@ -370,6 +370,11 @@ function QueryUI(queryTab) {
         function atEnd(state, success) {
             var totalDuration = (new Date()).getTime() - state;
             if (success) {
+                if(query === 'create' || query === 'update'){
+                    setTimeout(()=>{
+                        VoltDbUI.refreshSqlAndSchemaTab();
+                    },1500)
+                }
                 $('#queryResults-' + query_id).removeClass('errorValue');
                 $('#queryResults-' + query_id).html('Query Duration: ' + (totalDuration / 1000.0) + 's');
             } else {

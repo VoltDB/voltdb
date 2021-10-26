@@ -1,11 +1,11 @@
 /*-------------------------------
 
-	POPUP.JS
+  POPUP.JS
 
-	Simple Popup plugin for jQuery
+  Simple Popup plugin for jQuery
 
-	@author Todd Francis
-	@version 2.2.0
+  @author Todd Francis
+  @version 2.2.0
 
 -------------------------------*/
 
@@ -74,15 +74,15 @@
         heightParam: "ph",
 
         // Callbacks
-        beforeOpen: function (type) {},
-        afterOpen: function () {},
-        beforeClose: function () {},
-        afterClose: function () {},
-        error: function () {},
-        save: function () {},
-        login: function () {},
-        autoLogin: function () {},
-        closeDialog: function () {},
+        beforeOpen: function (type) { },
+        afterOpen: function () { },
+        beforeClose: function () { },
+        afterClose: function () { },
+        error: function () { },
+        save: function () { },
+        login: function () { },
+        autoLogin: function () { },
+        closeDialog: function () { },
 
         show: function ($popup, $back) {
           var plugin = this;
@@ -267,7 +267,7 @@
       var connectionBtn = $("a[id='btnConOk']");
       if (connectionBtn != undefined) {
         connectionBtn.unbind("click");
-        $(document).on("click","a[id='btnConOk']", function (e) {
+        $(document).on("click", "a[id='btnConOk']", function (e) {
           e.preventDefault();
           p.o.closeDialog();
           VoltDBCore.isServerConnected = true;

@@ -29,12 +29,12 @@
             this.BuildParamSetForClusterState = function (procedure, parameters) {
                 var credentials = [];
                 credentials[credentials.length] = encodeURIComponent('Procedure') + '=' + encodeURIComponent(procedure);
-                if(parameters != undefined)
+                if (parameters != undefined)
                     credentials[credentials.length] = encodeURIComponent('Parameters') + '=' + encodeURIComponent('[' + parameters + ']');
                 if (this.admin)
                     credentials[credentials.length] = 'admin=true';
                 var param = '';
-                if(procedure != '@PrepareShutdown')
+                if (procedure != '@PrepareShutdown')
                     param = credentials.join('&') + '&jsonp=?';
                 else
                     param = credentials.join('&')
@@ -119,8 +119,8 @@
                     paramSet = s.join('&');
                 }
 
-                if(isSqlQuery && timeoutTime != undefined)
-                    paramSet +=   '&Querytimeout=' + timeoutTime;
+                if (isSqlQuery && timeoutTime != undefined)
+                    paramSet += '&Querytimeout=' + timeoutTime;
 
                 if (VoltDBCore.shortApiCredentials == "" && VoltDBCore.isLoginVerified) {
                     var credentials = [];
@@ -145,13 +145,12 @@
                     if (shortApiCallDetails.apiPath == null || shortApiCallDetails.apiPath == "") {
                         callback({ "status": -1, "statusstring": "Error: Please specify apiPath.", "results": [] });
                     }
-
                     uri = window.location.protocol + '/\/' + this.server + ':' + this.port + '/' + shortApiCallDetails.apiPath + '/';
                 } else {
                     uri = window.location.protocol + '/\/' + this.server + ':' + this.port + '/api/1.0/';
                 }
                 var params = '';
-                if (procedure == '@Pause' || procedure == '@Resume' || procedure == '@Shutdown' || procedure == '@Promote' || procedure == '@PrepareShutdown' || procedure == '@Quiesce'  ) {
+                if (procedure == '@Pause' || procedure == '@Resume' || procedure == '@Shutdown' || procedure == '@Promote' || procedure == '@PrepareShutdown' || procedure == '@Quiesce') {
                     params = this.BuildParamSetForClusterState(procedure, parameters);
                 } else {
                     params = this.BuildParamSet(procedure, parameters, shortApiCallDetails, false);
@@ -186,8 +185,7 @@
                         callback({ "status": -1, "statusstring": "Error: Please specify parameters", "results": [] });
                     }
                     uri = window.location.protocol + '/\/' + this.server + ':' + this.port + '/' + shortApiCallDetails.apiPath + '/?admin=true';
-
-                    if (VoltDBCore.isServerConnected && VoltDbUI.hasPermissionToView) {
+                    if (VoltDBCore.isServerConnected && VoltDbUI.hasPermissionToView && VoltDbAdminConfig.isAdmin) {
                         var ah = null;
                         if (this.authorization != null) {
                             ah = this.authorization;
@@ -271,31 +269,31 @@
                         var shortApiCallDetails = item[3];
                         var isHighTimeout = (item[0] == "@SnapshotRestore" || item[0] == "@AdHoc" || item[4] === true);
                         var callback =
-                        (new callbackWrapper(
-                            (function (queue, item) {
-                                return function (response, headerInfo) {
-                                    try {
-                                        if ($.type(response) == "string") {
-                                            response = json_parse(response, function (key, value) {
-                                                return value;
-                                            });
-                                        }
-                                        if (VoltDBCore.hostIP == "") {
-                                            VoltDBCore.hostIP = headerInfo;
-                                        }
+                            (new callbackWrapper(
+                                (function (queue, item) {
+                                    return function (response, headerInfo) {
+                                        try {
+                                            if ($.type(response) == "string") {
+                                                response = json_parse(response, function (key, value) {
+                                                    return value;
+                                                });
+                                            }
+                                            if (VoltDBCore.hostIP == "") {
+                                                VoltDBCore.hostIP = headerInfo;
+                                            }
 
-                                        if (response.status != 1)
+                                            if (response.status != 1)
+                                                success = false;
+                                            if (item[2] != null)
+                                                item[2](response);
+
+                                            queue.EndExecute();
+                                        } catch (x) {
                                             success = false;
-                                        if (item[2] != null)
-                                            item[2](response);
-
-                                        queue.EndExecute();
-                                    } catch (x) {
-                                        success = false;
-                                        queue.EndExecute();
-                                    }
-                                };
-                            })(this, item), isHighTimeout)).Callback;
+                                            queue.EndExecute();
+                                        }
+                                    };
+                                })(this, item), isHighTimeout)).Callback;
 
                         if ((shortApiCallDetails != null && shortApiCallDetails.isShortApiCall && shortApiCallDetails.isUpdateConfiguration) || item[4] === true) {
                             Connection.CallExecuteUpdate(item[0], item[1], callback, item[3], item[4], item[5]);
@@ -349,8 +347,8 @@
                 '@GetPartitionKeys': { '1': ['varchar'] },
                 '@GC': { '0': [] },
                 '@StopNode': { '1': ['int'] },
-                '@Trace': { '2': ['varchar', 'varchar'], '1': ['varchar']},
-                '@SwapTables': { '2': ['varchar', 'varchar']}
+                '@Trace': { '2': ['varchar', 'varchar'], '1': ['varchar'] },
+                '@SwapTables': { '2': ['varchar', 'varchar'] }
             };
             return this;
         };
@@ -453,15 +451,15 @@
             conn.BeginExecute('@Statistics', ['TABLE', 0], function (response) {
                 try {
                     clearTimeout(timeout);
-                    if(response == undefined){
+                    if (response == undefined) {
                         callback(false, response, isLoginTest);
                     }
                     else if (response.status == 1) {
                         VoltDBCore.isLoginVerified = true;
                         callback(true, response, isLoginTest);
-                    } else if(response.status == 401){
+                    } else if (response.status == 401) {
                         callback(true, response, isLoginTest);
-                    }else {
+                    } else {
                         callback(false, response, isLoginTest);
                     }
                 } catch (x) {
@@ -494,14 +492,14 @@
                     }
                 },
                 error: function (e) {
-                    if (e.status != 200)
-                    {
+                    if (e.status != 200) {
                         checkConnection(false);
                     }
                 },
-                statusCode:{
-                    401: function(response){
-                        alert('Failed to authenticate to the server. Please check the configuration of your client/browser')
+                statusCode: {
+                    401: function (response) {
+                        saveSessionCookie("password", -1);
+                        // alert('Failed to authenticate to the server. Please authenticate again in next window.')
                     }
                 },
                 timeout: 60000
@@ -542,7 +540,6 @@
             var i = 0;
             var connectionQueue = connection.getQueue();
             connectionQueue.Start();
-
             if (shortApiCallDetails != null && shortApiCallDetails.isShortApiCall) {
                 connectionQueue.BeginExecute([], [], function (data) {
                     connection.Metadata[processName] = data;
@@ -551,7 +548,7 @@
             } else {
                 jQuery.each(connection.procedureCommands.procedures, function (id, procedure) {
                     connectionQueue.BeginExecute(procedure['procedure'], (procedure['value'] === undefined ? procedure['parameter'] : [procedure['parameter'], procedure['value']]), function (data) {
-                        var suffix = (processName == "GRAPH_MEMORY" || processName == "GRAPH_TRANSACTION") || processName == "TABLE_INFORMATION" || processName == "TABLE_INFORMATION_CLIENTPORT" || processName == "CLUSTER_INFORMATION" || processName == "CLUSTER_REPLICA_INFORMATION" || processName == "GET_HOST_SITE_COUNT" || processName == "EXPORT_TABLE_INFORMATION" || processName == "TABLE_INFORMATION_ONLY"? "_" + processName : "";
+                        var suffix = (processName == "GRAPH_MEMORY" || processName == "GRAPH_TRANSACTION") || processName == "TABLE_INFORMATION" || processName == "TABLE_INFORMATION_CLIENTPORT" || processName == "CLUSTER_INFORMATION" || processName == "CLUSTER_REPLICA_INFORMATION" || processName == "GET_HOST_SITE_COUNT" || processName == "EXPORT_TABLE_INFORMATION" || processName == "TABLE_INFORMATION_ONLY" ? "_" + processName : "";
 
                         if (processName == "SYSTEMINFORMATION_STOPSERVER") {
                             connection.Metadata[procedure['procedure'] + "_" + procedure['parameter'] + suffix + "_status"] = data.status;
@@ -561,7 +558,7 @@
                             connection.Metadata[procedure['procedure'] + "_" + "status"] = data.status;
                         }
                         else if (processName == "SYSTEMINFORMATION_SAVESNAPSHOT" || processName == "SYSTEMINFORMATION_RESTORESNAPSHOT" || processName == "PREPARE_SHUTDOWN_CLUSTER"
-                        || processName == "QUIESCE_CLUSTER") {
+                            || processName == "QUIESCE_CLUSTER") {
                             connection.Metadata[procedure['procedure'] + "_" + "status"] = data.status;
                             connection.Metadata[procedure['procedure'] + "_data"] = data.results[0];
                             connection.Metadata[procedure['procedure'] + "_statusstring"] = data.statusstring;
@@ -607,7 +604,7 @@
                     '@Promote': { '0': ['Returns bit'] },
                     '@ValidatePartitioning': { '2': ['HashinatorType (int)', 'Config (varbinary)', 'Returns Table[]'] },
                     '@GetPartitionKeys': { '1': ['VoltType (varchar)', 'Returns Table[]'] },
-                    '@Trace': { '2': ['Trace Category State (varchar)', 'Category (varchar)', 'Returns Table[]'], '1': ['Trace State (varchar)', 'Returns Table[]']},
+                    '@Trace': { '2': ['Trace Category State (varchar)', 'Category (varchar)', 'Returns Table[]'], '1': ['Trace State (varchar)', 'Returns Table[]'] },
                     '@SwapTables': { '2': ['Table Name (varchar)', 'Table Name (varchar)', 'Returns Table[]'] }
                 };
 
@@ -724,22 +721,22 @@ jQuery.extend({
                     callback(data, host);
                 },
                 error: function (e) {
-                    e.hasOwnProperty('message')? console.log(e.message) : '';
+                    e.hasOwnProperty('message') ? console.log(e.message) : '';
                 },
-                statusCode:{
-                    401: function(jqXHR, textStatus, errorThrown){
+                statusCode: {
+                    401: function (jqXHR, textStatus, errorThrown) {
                         var data = jqXHR.responseJSON;
                         callback(data, (jqXHR.getResponseHeader("Host") != null ? jqXHR.getResponseHeader("Host").split(":")[0] : "-1"))
-                        if(data != undefined){
-                            if(data.statusstring.includes("kerberos")){
-                            console.log('Failed to authenticate to the server via Kerberos. Please check the configuration of your client/browser')
+                        if (data != undefined) {
+                            if (data.statusstring.includes("kerberos")) {
+                                console.log('Failed to authenticate to the server via Kerberos. Please check the configuration of your client/browser')
                             }
                         }
 
                     }
                 }
             });
-        } else if(formData.indexOf('PrepareShutdown') > -1){
+        } else if (formData.indexOf('PrepareShutdown') > -1) {
             jQuery.ajax({
                 type: 'GET',
                 url: url,
@@ -752,19 +749,19 @@ jQuery.extend({
                 },
                 success: function (data) {
                     final_data = json_parse(data, function (key, value) {
-                                                return value;
-                                            });
+                        return value;
+                    });
                     final_data.results[0].data[0][0] = final_data.results[0].data[0][0]['c'].join('')
                     callback(final_data);
                 },
                 error: function (e) {
                     console.log(e.message);
                 },
-                 statusCode:{
-                    401: function(jqXHR, textStatus, errorThrown){
+                statusCode: {
+                    401: function (jqXHR, textStatus, errorThrown) {
                         var data = jqXHR.responseJSON;
                         callback(data, (jqXHR.getResponseHeader("Host") != null ? jqXHR.getResponseHeader("Host").split(":")[0] : "-1"))
-                        if (data.statusstring.includes("kerberos")){
+                        if (data.statusstring.includes("kerberos")) {
                             console.log('Failed to authenticate to the server via Kerberos. Please check the configuration of your client/browser')
                         }
 
@@ -772,6 +769,9 @@ jQuery.extend({
                 }
             });
         } else {
+            if (url.includes('deployment') && !VoltDbAdminConfig.isAdmin) {
+                return;
+            }
             jQuery.ajax({
                 type: 'GET',
                 url: url,
@@ -786,11 +786,11 @@ jQuery.extend({
                 error: function (e) {
                     console.log(e.message);
                 },
-                statusCode:{
-                    401: function(jqXHR, textStatus, errorThrown){
+                statusCode: {
+                    401: function (jqXHR, textStatus, errorThrown) {
                         var data = jqXHR.responseJSON;
                         callback(data, (jqXHR.getResponseHeader("Host") != null ? jqXHR.getResponseHeader("Host").split(":")[0] : "-1"))
-                        if (data.statusstring.includes("kerberos")){
+                        if (data !== undefined && data.statusstring.includes("kerberos")) {
                             console.log('Failed to authenticate to the server via Kerberos. Please check the configuration of your client/browser')
                         }
 

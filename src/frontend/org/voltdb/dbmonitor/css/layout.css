@@ -4848,3 +4848,21 @@ table.dataTable {top:0;}
 #admin.kubernetes .k8s_hidden {
     display: none !important;
 }
+
+.errMsgBox {
+    width: auto;
+    height: 40px;
+    background: #EAEAEA;
+    border-left:5px;
+    border-style: solid;
+    border-color: #aa1f2f;
+    display: flex;
+    align-items: center;
+}
+
+.errMsg {
+    font-size: 12px;
+    line-height: 19px;
+    padding: 0px 10px;
+    text-align: center;
+}
