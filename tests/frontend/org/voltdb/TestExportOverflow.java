@@ -35,7 +35,6 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.voltdb.client.Client;
-import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
@@ -97,9 +96,8 @@ public class TestExportOverflow extends RegressionSuite {
             return;
         }
         Client client = getClient();
-        while (!((ClientImpl) client).isHashinatorInitialized()) {
-            Thread.sleep(1000);
-            System.out.println("Waiting for hashinator to be initialized...");
+        if (!client.waitForTopology(60_000)) {
+            throw new RuntimeException("Timed out waiting for topology info");
         }
 
         // insert rows

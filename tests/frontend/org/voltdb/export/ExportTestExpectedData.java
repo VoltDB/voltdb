@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -78,12 +78,9 @@ public class ExportTestExpectedData {
         if (partition != -1) {
             return partition;
         }
-        int sleptTimes = 0;
-        while (!((ClientImpl) client).isHashinatorInitialized() && sleptTimes < 6000) {
-            Uninterruptibles.sleepUninterruptibly(10, TimeUnit.MILLISECONDS);
-            ++sleptTimes;
+        if (!client.waitForTopology(60_000)) {
+            throw new RuntimeException("Timed out waiting for topology info");
         }
-        assertTrue(sleptTimes < 6000);
         partition = ((ClientImpl) client).getPartitionForParameter(
                 VoltType.typeFromObject(partitionValue).getValue(), partitionValue);
         assertTrue(partition != -1);

@@ -30,7 +30,6 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
-import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
@@ -169,13 +168,8 @@ public class CSVTupleDataLoader implements CSVDataLoader {
         }
         m_columnTypes = typeList.toArray(new VoltType[0]);
 
-        int sleptTimes = 0;
-        // TODO: remove reliance on implementation
-        while (!((ClientImpl)client).isHashinatorInitialized() && sleptTimes < 120) {
-            try {
-                Thread.sleep(500);
-                sleptTimes++;
-            } catch (InterruptedException ex) {}
+        if (!m_client.waitForTopology(60_000)) {
+            throw new RuntimeException("Unable to start due to uninitialized Client.");
         }
     }
 

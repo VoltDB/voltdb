@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -37,7 +37,6 @@ import java.util.concurrent.CountDownLatch;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
-import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.export.TestExportBaseSocketExport.ServerListener;
 import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
@@ -98,16 +97,7 @@ public class ExportLocalClusterBase extends JUnit4LocalClusterTest {
         for (String connectStr : cluster.getListenerAddresses()) {
             client.createConnection(connectStr);
         }
-        int sleptTimes = 0;
-        while (!((ClientImpl) client).isHashinatorInitialized() && sleptTimes < 60000) {
-            try {
-                Thread.sleep(1);
-                sleptTimes++;
-            } catch (InterruptedException ex) {
-                ;
-            }
-        }
-        if (sleptTimes >= 60000) {
+        if (!client.waitForTopology(60_000)) {
             throw new IOException("Failed to Initialize Hashinator.");
         }
         return client;

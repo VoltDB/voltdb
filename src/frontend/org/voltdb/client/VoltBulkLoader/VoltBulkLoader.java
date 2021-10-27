@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -142,19 +142,10 @@ public class VoltBulkLoader {
         // Check the primary key if upsert is enabled
         VoltTable pkeyInfo = null;
         if (m_upsert) {
-            pkeyInfo = m_clientImpl.callProcedure("@SystemCatalog",
-                "PRIMARYKEYS").getResults()[0];
+            pkeyInfo = m_clientImpl.callProcedure("@SystemCatalog", "PRIMARYKEYS").getResults()[0];
         }
 
-        int sleptTimes = 0;
-        while (!m_clientImpl.isHashinatorInitialized() && sleptTimes < 120) {
-            try {
-                Thread.sleep(500);
-                sleptTimes++;
-            } catch (InterruptedException ex) {}
-        }
-
-        if (sleptTimes >= 120) {
+        if (!m_clientImpl.waitForTopology(60_000)) {
             throw new IllegalStateException("VoltBulkLoader unable to start due to uninitialized Client.");
         }
 

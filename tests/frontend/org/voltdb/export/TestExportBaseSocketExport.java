@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -49,7 +49,6 @@ import org.apache.commons.lang3.mutable.MutableLong;
 import org.voltdb.ProcedurePartitionData;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
-import org.voltdb.client.ClientImpl;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
 import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
@@ -307,16 +306,7 @@ public class TestExportBaseSocketExport extends RegressionSuite {
     @Override
     public Client getClient() throws IOException {
         Client client = super.getClient();
-        int sleptTimes = 0;
-        while (!((ClientImpl) client).isHashinatorInitialized() && sleptTimes < 60000) {
-            try {
-                Thread.sleep(1);
-                sleptTimes++;
-            } catch (InterruptedException ex) {
-                ;
-            }
-        }
-        if (sleptTimes >= 60000) {
+        if (!client.waitForTopology(60_000)) {
             throw new IOException("Failed to Initialize Hashinator.");
         }
         return client;
