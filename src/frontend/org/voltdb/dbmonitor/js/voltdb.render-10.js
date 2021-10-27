@@ -232,14 +232,16 @@ function set_kubernetes(server, port) {
                   url: url,
                   type: 'get',
                   success: function (response) {
-                    if(response !== undefined){
-                      var result = response.results[0].data;
-                      usersList = result.map((item) => {
-                        return {
-                          name: item[0],
-                          role: item[1],
-                        }
-                      })
+                    if (response !== undefined) {
+                      var result = response.results[0];
+                      if (result !== undefined) {
+                        usersList = result.data.map((item) => {
+                          return {
+                            name: item[0],
+                            role: item[1],
+                          }
+                        })
+                      }
                     }
                   }
                 }).done(function () {
