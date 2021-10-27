@@ -2448,7 +2448,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
             if (message.isCheckHostMessage() && db.getLeaderSites().isEmpty()) {
                 VoltDB.crashLocalVoltDB("The cluster will transfer to master-only state after hash mismatch is found." +
-                        " There is no partition leaders on this host. As a result, the host is shutdown.");
+                        " There are no partition leaders on this host. As a result, the host is shutdown.");
             }
             return;
         } else if (message.isCheckHostMessage()) {
