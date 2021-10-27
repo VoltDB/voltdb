@@ -443,6 +443,16 @@ public interface Client {
     public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, boolean upsertMode, BulkLoaderFailureCallBack failureCallback, BulkLoaderSuccessCallback successCallback) throws Exception;
 
     /**
+     * Wait until the VoltDB cluster topology has been determined, which
+     * may take a few seconds after the initial connection. This is primarily
+     * of internal interest to bulk loaders.
+     *
+     * @param timeout timeout in milliseconds
+     * @return true if client has determined cluster topology.
+     */
+    public boolean waitForTopology(long timeout);
+
+    /**
      * Synchronously execute a stored procedure on a set of partitions, one partition at a time.
      * <p>
      * The method uses system procedure <code>@GetPartitionKeys</code> to get a set of partition values, and

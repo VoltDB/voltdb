@@ -116,7 +116,7 @@ public final class ClientImpl implements Client {
     private boolean m_newConnectEpoch;
 
     // For bulk-loader use
-    private final BulkLoaderState m_vblGlobals = new BulkLoaderState(this);
+    private BulkLoaderState m_vblGlobals;
 
     // Client shutdown flag
     private volatile boolean m_isShutdown;
@@ -1100,26 +1100,43 @@ public final class ClientImpl implements Client {
     }
 
     @Override
-    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, boolean upsertMode, BulkLoaderFailureCallBack failureCallback) throws Exception
-    {
-        synchronized(m_vblGlobals) {
-            return new VoltBulkLoader(m_vblGlobals, tableName, maxBatchSize, upsertMode, failureCallback, null);
-        }
+    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, boolean upsertMode, BulkLoaderFailureCallBack failureCallback) throws Exception {
+        return getNewBulkLoader(tableName, maxBatchSize, upsertMode, failureCallback, null);
     }
 
     @Override
-    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, BulkLoaderFailureCallBack failureCallback) throws Exception
-    {
-        synchronized(m_vblGlobals) {
-            return new VoltBulkLoader(m_vblGlobals, tableName, maxBatchSize, failureCallback);
-        }
+    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, BulkLoaderFailureCallBack failureCallback) throws Exception {
+        return getNewBulkLoader(tableName, maxBatchSize, false, failureCallback, null);
     }
 
     @Override
-    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, boolean upsertMode, BulkLoaderFailureCallBack failureCallback, BulkLoaderSuccessCallback successCallback) throws Exception {
-        synchronized(m_vblGlobals) {
+    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, boolean upsertMode, BulkLoaderFailureCallBack failureCallback,
+                                           BulkLoaderSuccessCallback successCallback) throws Exception {
+        synchronized (this) {
+            if (m_vblGlobals == null) {
+                m_vblGlobals = new BulkLoaderState(this);
+            }
+        }
+        synchronized (m_vblGlobals) {
             return new VoltBulkLoader(m_vblGlobals, tableName, maxBatchSize, upsertMode, failureCallback, successCallback);
         }
+    }
+
+    @Override
+    public boolean waitForTopology(long timeout) {
+        boolean ready = false;
+        long start = System.currentTimeMillis();
+        long delta = Math.min(timeout, 500);
+        try {
+            while (!(ready = m_distributer.isHashinatorInitialized()) &&
+                   System.currentTimeMillis() - start < timeout) {
+                Thread.sleep(delta);
+            }
+        }
+        catch (InterruptedException ex) {
+            // treat like timed out
+        }
+        return ready;
     }
 
     @Override
