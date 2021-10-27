@@ -9,7 +9,7 @@ function QueryUI(queryTab) {
         var selectedText = "";
         if (typeof window.getSelection != "undefined") {
             var sel = window.getSelection(), rangeCount;
-            if ( (rangeCount = sel.rangeCount) > 0 ) {
+            if ((rangeCount = sel.rangeCount) > 0) {
                 var range = document.createRange();
                 for (var i = 0, selRange; i < rangeCount; ++i) {
                     range.selectNodeContents(el);
@@ -71,13 +71,13 @@ function QueryUI(queryTab) {
             token = token.toUpperCase();
 
             if (
-                (position == 0 || buffer.charAt(position-1).match(letterNumber) == null )
+                (position == 0 || buffer.charAt(position - 1).match(letterNumber) == null)
                 && (buffer.charAt(position) == firstLo || buffer.charAt(position) == firstHi)
                 && (position <= bufLength - tokLength)
                 // the substring starting from 'position' should match token, so the matched index will be 0
                 && (buffer.toUpperCase().substring(position).indexOf(token) == 0)
                 && (position + tokLength == bufLength || buffer.charAt(position + tokLength).match(letterNumber) == null)
-                ) {
+            ) {
                 return true;
             }
             return false;
@@ -86,10 +86,10 @@ function QueryUI(queryTab) {
         function findEndOfMultiStmtProc(src, idx) {
             var inCase = 0;
             for (var i = idx; i < src.length; i++) {
-                if ( matchToken(src, i, "CASE") ) {
+                if (matchToken(src, i, "CASE")) {
                     inCase++;
                     i += 4
-                } else if ( matchToken(src, i, "END") ) {
+                } else if (matchToken(src, i, "END")) {
                     if (inCase > 0) {
                         inCase--;
                         i += 3;
@@ -134,7 +134,7 @@ function QueryUI(queryTab) {
                 }
                 nonceNum = parseInt(nextNonce[1], 10);
                 src = src.replace(QuotedStringNonceLiteral + nonceNum,
-                            stringBank[QuotedStringNonceLiteral + nonceNum]);
+                    stringBank[QuotedStringNonceLiteral + nonceNum]);
             }
             return src;
         }
@@ -174,7 +174,7 @@ function QueryUI(queryTab) {
                 }
                 nonceNum = parseInt(nextNonce[1], 10);
                 src = src.replace(MultiStmtProcNonceLiteral + nonceNum,
-                            stringBank[MultiStmtProcNonceLiteral + nonceNum]);
+                    stringBank[MultiStmtProcNonceLiteral + nonceNum]);
             }
             return src;
         }
@@ -308,7 +308,7 @@ function QueryUI(queryTab) {
         var query_id = this.QueryTab[0].id.split('-')[1]
         var target = $('.queryResult-' + query_id);
         var format = $('#exportType-' + query_id).val();
-        
+
         var dataSource = VoltDbUI.getCookie('connectionkey') == undefined ? '' : VoltDbUI.getCookie('connectionkey');
         if (!VoltDBCore.connections.hasOwnProperty(dataSource)) {
             $(target).html('Connect to a datasource first.');
@@ -317,15 +317,15 @@ function QueryUI(queryTab) {
 
         var connection = VoltDBCore.connections[dataSource];
         var source = getSelectedTextWithin(document.getElementById('querybox-' + query_id))
-//        $('#querybox-' + query_id).getSelectedText();
-        if (source != null){
-            source = source.replace(/^\s+|\s+$/g,'');
+        //        $('#querybox-' + query_id).getSelectedText();
+        if (source != null) {
+            source = source.replace(/^\s+|\s+$/g, '');
             if (source == '')
                 source = $('#querybox-' + query_id)[0].innerText;
         } else
             source = $('#querybox-' + query_id)[0].innerText;
 
-        source = source.replace(/^\s+|\s+$/g,'');
+        source = source.replace(/^\s+|\s+$/g, '');
         source = source.replace(/\\/g, "\\\\");
         if (source == '')
             return;
@@ -370,10 +370,10 @@ function QueryUI(queryTab) {
         function atEnd(state, success) {
             var totalDuration = (new Date()).getTime() - state;
             if (success) {
-                if(query === 'create' || query === 'update'){
-                    setTimeout(()=>{
+                if (query === 'create' || query === 'update') {
+                    setTimeout(() => {
                         VoltDbUI.refreshSqlAndSchemaTab();
-                    },1500)
+                    }, 1500)
                 }
                 $('#queryResults-' + query_id).removeClass('errorValue');
                 $('#queryResults-' + query_id).html('Query Duration: ' + (totalDuration / 1000.0) + 's');
@@ -402,9 +402,10 @@ function QueryUI(queryTab) {
             // See http://stackoverflow.com/questions/18749591/encode-html-entities-in-javascript#18750001
             var encodedStatus = response.statusstring.replace(/[\u00A0-\u9999<>\&]/gim,
                 function (i) { return '&#' + i.charCodeAt(0) + ';'; });
-            if (encodedStatus.indexOf("PrepareStatement error:")>=0){
-                encodedStatus = encodedStatus.slice(0, -3) + ')';
-            }
+            // if (encodedStatus.indexOf("PrepareStatement error:") >= 0) {
+            //     encodedStatus = encodedStatus.slice(0, -1) + ')';
+            //     console.log(encodedStatus);
+            // }
             target.append('<span class="errorValue">Error: ' + encodedStatus + '\r\n</span>');
         }
     }
@@ -472,8 +473,8 @@ function QueryUI(queryTab) {
                         + lPadZero(dt.getUTCSeconds(), 2) + "."
                         + lPadZero((dt.getUTCMilliseconds()) * 1000 + us, 6);
                     typ = 9;  //code for varchar
-                } else if(typ == 22){
-                    if(val!= null){
+                } else if (typ == 22) {
+                    if (val != null) {
                         val = parseFloat(val).toFixed(12)
                     }
                 }
