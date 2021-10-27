@@ -24,6 +24,10 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
+import org.voltdb.client.VoltBulkLoader.BulkLoaderFailureCallBack;
+import org.voltdb.client.VoltBulkLoader.BulkLoaderSuccessCallback;
+import org.voltdb.client.VoltBulkLoader.VoltBulkLoader;
+
 /**
  * <code>Client2</code> provides the so-called "version 2" client API.
  * The overall intent is to provide an easier way to asynchronously
@@ -379,4 +383,33 @@ public interface Client2 extends Closeable {
      * @see ClientStatsContext
      */
     ClientStatsContext createStatsContext();
+
+    /**
+     * Creates a new instance of a {@link org.voltdb.client.VoltBulkLoader.VoltBulkLoader}
+     * bound to this client. Multiple instances of a {@code VoltBulkLoader}
+     * created by a single client will share some resources, particularly if
+     * they are inserting into the same table.
+     *
+     * @param tableName table to which bulk inserts are to be applied
+     * @param maxBatchSize size of a batch for bulk insert calls
+     * @param upsertMode set to true for upsert instead of insert
+     * @param failureCallback callback used for failure notification
+     * @param successCallback callback on successful loads (null ok)
+     * @return the {@code VoltBulkLoader} instance
+     * @throws Exception if tableName can't be found in the catalog.
+     */
+    VoltBulkLoader newBulkLoader(String tableName, int maxBatchSize, boolean upsertMode,
+                                 BulkLoaderFailureCallBack failureCallback,
+                                 BulkLoaderSuccessCallback successCallback) throws Exception;
+
+    /**
+     * Wait until the VoltDB cluster topology has been determined, which
+     * may take a few seconds after the initial connection. This is primarily
+     * of internal interest to bulk loaders. It is inherently synchronous.
+     *
+     * @param timeout time limit on waiting
+     * @param unit time unit for timeout
+     * @return true if topology information available
+     */
+    boolean waitForTopology(long timeout, TimeUnit unit);
 }

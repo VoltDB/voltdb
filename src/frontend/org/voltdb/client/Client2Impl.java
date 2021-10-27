@@ -44,7 +44,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -60,20 +59,24 @@ import javax.security.auth.Subject;
 import com.google_voltpatches.common.net.HostAndPort;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
-import io.netty.buffer.ByteBufAllocator;
-import io.netty.handler.ssl.SslContext;
-
 import org.voltcore.network.CipherExecutor;
 import org.voltcore.network.Connection;
 import org.voltcore.network.QueueMonitor;
 import org.voltcore.network.VoltNetworkPool;
 import org.voltcore.network.VoltProtocolHandler;
+import org.voltcore.utils.Pair;
+import org.voltcore.utils.ssl.SSLConfiguration;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.common.Constants;
+import org.voltdb.client.VoltBulkLoader.BulkLoaderFailureCallBack;
+import org.voltdb.client.VoltBulkLoader.BulkLoaderState;
+import org.voltdb.client.VoltBulkLoader.BulkLoaderSuccessCallback;
+import org.voltdb.client.VoltBulkLoader.VoltBulkLoader;
 import org.voltdb.utils.Encoder;
-import org.voltcore.utils.Pair;
-import org.voltcore.utils.ssl.SSLConfiguration;
+
+import io.netty.buffer.ByteBufAllocator;
+import io.netty.handler.ssl.SslContext;
 
 /**
  * Client2Impl implements the so-called "version 2" client interface.
@@ -131,7 +134,7 @@ public class Client2Impl implements Client2 {
     // Default request priorities (larger number is lower priority)
     // User-request priority affects connection queue order, and is sent to server.
     // System requests are not queued, so priority is only used by server.
-    static final int DEFAULT_REQUEST_PRIORITY = Priority.LOWEST_PRIORITY / 2;
+    static final int DEFAULT_REQUEST_PRIORITY = Priority.DEFAULT_PRIORITY;
     static final int DEFAULT_SYSREQ_PRIORITY = Priority.HIGHEST_PRIORITY + 1;
     private int defaultRequestPriority = DEFAULT_REQUEST_PRIORITY; // Override via config
     private int systemRequestPriority = DEFAULT_SYSREQ_PRIORITY; // No override yet
@@ -149,6 +152,7 @@ public class Client2Impl implements Client2 {
 
     // Data for client affinity operation; constructed on topology updates
     private final AtomicReference<HashinatorLite> hashinator = new AtomicReference<>();
+    private final Object hashinatorReady = new Object();
     private static final Map<Integer,ClientConnection> noPartitionLeaders = Collections.emptyMap();
     private final AtomicReference<Map<Integer,ClientConnection>> partitionLeaders = new AtomicReference<>(noPartitionLeaders);
     private final Map<Integer,ClientAffinityStats> clientAffinityStats = new HashMap<>();
@@ -229,6 +233,7 @@ public class Client2Impl implements Client2 {
     // Comparator for priority ordering of requests. Uses request
     // sequence to ensure FIFO for equal-priority entries.
     private static class PrioOrder implements Comparator<RequestContext> {
+        @Override
         public int compare(RequestContext a, RequestContext b) {
             int cmp = Integer.compare(a.invocation.getRequestPriority(), b.invocation.getRequestPriority());
             if (cmp == 0) cmp = Long.compare(a.sequence, b.sequence);
@@ -468,6 +473,9 @@ public class Client2Impl implements Client2 {
 
     // Client is shutting down
     private volatile boolean isShutdown;
+
+    // Bulk loader support (hook for shared state)
+    private BulkLoaderState bulkState;
 
     ////////////////////////////////////////
     // PUBLIC METHODS
@@ -1990,6 +1998,9 @@ public class Client2Impl implements Client2 {
         VoltTable hashConfig = resp.getResults()[1];
         hashConfig.advanceRow();
         hashinator.set(new HashinatorLite(hashConfig.getVarbinary("HASHCONFIG"), false));
+        synchronized (hashinatorReady) {
+            hashinatorReady.notifyAll();
+        }
 
         // Partition leadership data
         VoltTable partInfo = resp.getResults()[0];
@@ -2446,6 +2457,54 @@ public class Client2Impl implements Client2 {
             }
         }
         return retval;
+    }
+
+    /*
+     * Bulk loader support; loaders are allocated via the client
+     * in order to manage the shared state. Other public methods
+     * are not part of the Client2 interface, but are needed by
+     * the VoltBulkLoader implementation.
+     */
+    @Override
+    public VoltBulkLoader newBulkLoader(String tableName, int maxBatchSize, boolean upsertMode,
+                                        BulkLoaderFailureCallBack failureCallback,
+                                        BulkLoaderSuccessCallback successCallback) throws Exception {
+        synchronized (this) {
+            if (bulkState == null) {
+                bulkState = new BulkLoaderState(this);
+            }
+        }
+        return bulkState.newBulkLoader(tableName, maxBatchSize, upsertMode, failureCallback, successCallback);
+    }
+
+    @Override
+    public boolean waitForTopology(long timeout, TimeUnit unit) {
+        boolean ready = false;
+        long remaining = unit.toMillis(Math.max(timeout, 0));
+        long start = System.currentTimeMillis();
+        try {
+            synchronized (hashinatorReady) {
+                while (!(ready = hashinator.get() != null) && remaining > 0) {
+                    hashinatorReady.wait(remaining);
+                    long now = System.currentTimeMillis();
+                    remaining -= Math.max(now - start, 1);
+                    start = now;
+                }
+            }
+        }
+        catch (InterruptedException ex) {
+            // treat like timed out
+        }
+        return ready;
+    }
+
+    public boolean autoConnectionMgmt() {
+        return autoConnectionMgmt;
+    }
+
+    public int getPartitionForParameter(byte type, Object value) {
+        HashinatorLite hashi = hashinator.get(); // local reference for thread safety
+        return hashi != null ? hashi.getHashedPartitionForParameter(type, value) : -1;
     }
 
     /*

@@ -41,6 +41,8 @@ public class Priority {
     public static final int HIGHEST_PRIORITY = 1;
     public static final int LOWEST_PRIORITY = 8;
 
+    public static final int DEFAULT_PRIORITY = LOWEST_PRIORITY / 2;
+
     // This is the highest effective priority
     public static final int SYSTEM_PRIORITY = 0;
 }

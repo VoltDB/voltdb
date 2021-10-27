@@ -33,7 +33,6 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.VoltTypeException;
-import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 
 import com.google_voltpatches.common.collect.ImmutableSortedMap;
@@ -60,8 +59,10 @@ import com.google_voltpatches.common.collect.ImmutableSortedMap;
 public class VoltBulkLoader {
     private static final VoltLogger loaderLog = new VoltLogger("LOADER");
 
+    // Shared state and client
     final BulkLoaderState m_vblGlobals;
-    final ClientImpl m_clientImpl;
+    final LoaderAdapter m_client;
+
     // Batch size requested for this instance of VoltBulkLoader
     final int m_maxBatchSize;
     // Flag to indicate to use upsert instead of insert
@@ -108,31 +109,34 @@ public class VoltBulkLoader {
     //Number of rows for which we have received a definitive success or failure.
     final AtomicLong m_loaderCompletedCnt = new AtomicLong(0);
 
-    // Constructor allocated through the Client to ensure consistency of VoltBulkLoaderGlobals
+    // Constructors; these are generally called from BulkLoaderState, which
+    // manages the shared state passed to use as 'vblGlobals'.
     public VoltBulkLoader(BulkLoaderState vblGlobals, String tableName, int maxBatchSize,
-            BulkLoaderFailureCallBack blfcb) throws Exception {
-        this(vblGlobals,tableName,maxBatchSize,false,blfcb);
+            BulkLoaderFailureCallBack failureCallback) throws Exception {
+        this(vblGlobals, tableName, maxBatchSize, false, failureCallback, null);
     }
 
     public VoltBulkLoader(BulkLoaderState vblGlobals, String tableName, int maxBatchSize, boolean upsertMode,
             BulkLoaderFailureCallBack failureCallback) throws Exception {
         this(vblGlobals, tableName, maxBatchSize, upsertMode, failureCallback, null);
     }
+
     public VoltBulkLoader(BulkLoaderState vblGlobals, String tableName, int maxBatchSize, boolean upsertMode,
-                BulkLoaderFailureCallBack failureCallback, BulkLoaderSuccessCallback successCallback) throws Exception {
-        this.m_clientImpl = vblGlobals.m_clientImpl;
+            BulkLoaderFailureCallBack failureCallback, BulkLoaderSuccessCallback successCallback) throws Exception {
+
+        this.m_vblGlobals = vblGlobals;
+        this.m_client = m_vblGlobals.m_client2Impl != null ?
+            new Client2LoaderAdapter(m_vblGlobals.m_client2Impl) :
+            new Client1LoaderAdapter(m_vblGlobals.m_clientImpl);
         this.m_maxBatchSize = maxBatchSize;
         this.m_notificationCallBack = failureCallback;
         this.m_upsert = upsertMode;
-
-        m_vblGlobals = vblGlobals;
 
         // Get table details and then build partition and column information.
         // Table analysis could be done once per unique table name but then the
         // m_TableNameToLoader lock would have to be held for a much longer.
         m_tableName = tableName;
-        VoltTable procInfo = m_clientImpl.callProcedure("@SystemCatalog",
-                "COLUMNS").getResults()[0];
+        VoltTable procInfo = m_client.callProcedure("@SystemCatalog", "COLUMNS").getResults()[0];
 
         m_mappedColumnTypes = new TreeMap<Integer, VoltType>();
         m_colNames = new TreeMap<Integer, String>();
@@ -142,10 +146,10 @@ public class VoltBulkLoader {
         // Check the primary key if upsert is enabled
         VoltTable pkeyInfo = null;
         if (m_upsert) {
-            pkeyInfo = m_clientImpl.callProcedure("@SystemCatalog", "PRIMARYKEYS").getResults()[0];
+            pkeyInfo = m_client.callProcedure("@SystemCatalog", "PRIMARYKEYS").getResults()[0];
         }
 
-        if (!m_clientImpl.waitForTopology(60_000)) {
+        if (!m_client.waitForTopology()) {
             throw new IllegalStateException("VoltBulkLoader unable to start due to uninitialized Client.");
         }
 
@@ -201,8 +205,7 @@ public class VoltBulkLoader {
         int sitesPerHost = 1;
         int kfactor = 0;
         int hostcount = 1;
-        procInfo = m_clientImpl.callProcedure("@SystemInformation",
-                "deployment").getResults()[0];
+        procInfo = m_client.callProcedure("@SystemInformation", "deployment").getResults()[0];
         while (procInfo.advanceRow()) {
             String prop = procInfo.getString("PROPERTY");
             if (prop != null && prop.equalsIgnoreCase("sitesperhost")) {
@@ -237,8 +240,8 @@ public class VoltBulkLoader {
             m_partitionTable = new PerPartitionTable[m_maxPartitionProcessors];
             // Set up the BulkLoaderPerPartitionTables
             for(int i=m_firstPartitionTable; i<=m_lastPartitionTable; i++) {
-                m_partitionTable[i] = new PerPartitionTable(m_clientImpl, m_tableName,
-                        i, i == m_maxPartitionProcessors-1, this, maxBatchSize, successCallback);
+                m_partitionTable[i] = new PerPartitionTable(m_client, m_tableName,
+                    i, i == m_maxPartitionProcessors-1, this, maxBatchSize, successCallback);
             }
             loaderList = new ArrayList<VoltBulkLoader>();
             loaderList.add(this);
@@ -327,8 +330,8 @@ public class VoltBulkLoader {
         }
         else {
             try {
-                partitionId = (int)m_clientImpl.getPartitionForParameter(
-                        m_partitionColumnType.getValue(), fieldList[m_partitionedColumnIndex]);
+                partitionId = m_client.getPartitionForParameter(m_partitionColumnType.getValue(),
+                                                                fieldList[m_partitionedColumnIndex]);
                 m_partitionTable[partitionId].insertRowInTable(newRow);
             } catch (VoltTypeException e) {
                 generateError(rowHandle, fieldList, e.getMessage());
@@ -370,7 +373,7 @@ public class VoltBulkLoader {
         // Draining the client doesn't guarantee that all failed rows are re-inserted, need to
         // loop until the outstanding row count reaches 0.
         while (m_outstandingRowCount.get() != 0) {
-            m_clientImpl.drain();
+            m_client.drainClient();
             Thread.yield();
         }
     }

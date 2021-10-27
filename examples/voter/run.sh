@@ -83,7 +83,7 @@ function nbclient() {
 
 # run the 'Client2' version
 function client2() {
-    client2-benchmark
+    client2-async-benchmark
 }
 
 # Asynchronous benchmark sample
@@ -118,9 +118,10 @@ function nonblocking-benchmark() {
         --contestants=6 \
         --maxvotes=2
 }
-# latencyreport: default is OFF
-# ratelimit: must be a reasonable value if latencyreport is ON
-function client2-benchmark() {
+
+# Client2 variants
+
+function client2-async-benchmark() {
     jars-ifneeded
     java -classpath voter-client.jar:$CLIENTCLASSPATH voter.Client2AsyncBenchmark \
         --displayinterval=5 \
@@ -129,6 +130,18 @@ function client2-benchmark() {
         --servers=$SERVERS \
         --contestants=6 \
         --maxvotes=2
+}
+
+function client2-sync-benchmark() {
+    jars-ifneeded
+    java -classpath voter-client.jar:$CLIENTCLASSPATH voter.Client2SyncBenchmark \
+        --displayinterval=5 \
+        --warmup=5 \
+        --duration=120 \
+        --servers=$SERVERS \
+        --contestants=6 \
+        --maxvotes=2 \
+        --threads=40
 }
 
 # trivial client code for illustration purposes

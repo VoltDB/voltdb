@@ -24,10 +24,13 @@ import org.voltcore.utils.EstTimeUpdater;
  * Factory for constructing instances of the {@link Client} interface
  *
  */
-public abstract class ClientFactory {
+public class ClientFactory {
 
     static int m_activeClientCount = 0;
     static boolean m_preserveResources = false;
+
+    private static boolean m_forceClient2 =
+        Boolean.parseBoolean(System.getenv("CLIENT2_COMPATIBILITY_API"));
 
     /**
      * Create a {@link Client} with no connections and all default options.
@@ -50,8 +53,13 @@ public abstract class ClientFactory {
      * @return A configured {@link Client}
      */
     public static Client createClient(ClientConfig config) {
-        start();
-        return new ClientImpl(config);
+        if (m_forceClient2) { // backdoor for testing
+            return createCompatibleClient(config, 0);
+        }
+        else {
+            start();
+            return new ClientImpl(config);
+        }
     }
 
     /**
@@ -71,11 +79,37 @@ public abstract class ClientFactory {
         return new Client2Impl(config);
     }
 
+    /*
+     * Allocate common resources on first client creation
+     */
     private static synchronized void start() {
         if (m_activeClientCount++ == 0 && !m_preserveResources) {
             EstTimeUpdater.start();
             ReverseDNSCache.start();
         }
+    }
+
+    /**
+     * Create a <code>Client</code> interface to the implementation
+     * of the newer <code>Client2</code> API.
+     * <p>
+     * It can therefore give a convenient transition to the newer code.
+     * However, due to underlying differences in the old and new APIs,
+     * the adapter may not be completely transparent. In any case, not
+     * all old <code>Client</code> methods are supported. This is
+     * intended <strong>only</strong> for internal VoltDB use.
+     * <p>
+     * No Client2-only methods are exposed through this
+     * compatibility interface. A fixed request priority
+     * can be set at the time of creation.
+     *
+     * @param config A {@link ClientConfig} object
+     * @param prio request priority for <code>Client2</code> (0=default)
+     * @return A configured {@link Client}
+     */
+    public static Client createCompatibleClient(ClientConfig config, int prio) {
+        start();
+        return new ClientAdapter(config, prio);
     }
 
     /**

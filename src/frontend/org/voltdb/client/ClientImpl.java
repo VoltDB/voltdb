@@ -1117,9 +1117,7 @@ public final class ClientImpl implements Client {
                 m_vblGlobals = new BulkLoaderState(this);
             }
         }
-        synchronized (m_vblGlobals) {
-            return new VoltBulkLoader(m_vblGlobals, tableName, maxBatchSize, upsertMode, failureCallback, successCallback);
-        }
+        return m_vblGlobals.newBulkLoader(tableName, maxBatchSize, upsertMode, failureCallback, successCallback);
     }
 
     @Override

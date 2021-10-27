@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
@@ -38,7 +39,6 @@ import org.voltdb.ParameterConverter;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.VoltTypeException;
-import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 
@@ -46,11 +46,12 @@ import org.voltdb.client.ProcedureCallback;
  * Partition specific table potentially shared by multiple VoltBulkLoader instances,
  * provided that they are all inserting to the same table.
  */
-public class PerPartitionTable {
+class PerPartitionTable {
     private static final VoltLogger loaderLog = new VoltLogger("LOADER");
 
     // Client we are tied to
-    final ClientImpl m_clientImpl;
+    final LoaderAdapter m_client;
+
     //The index in loader tables and the PartitionProcessor number
     final int m_partitionId;
     final boolean m_isMP;
@@ -63,8 +64,6 @@ public class PerPartitionTable {
     final int m_partitionedColumnIndex;
     //Partitioned column type
     final VoltType m_partitionColumnType;
-    //Table used to build up requests to the PartitionProcessor
-    VoltTable m_table;
     //Column information
     final VoltTable.ColumnInfo m_columnInfo[];
     //Column types
@@ -82,20 +81,29 @@ public class PerPartitionTable {
     //Whether to retry insertion when the connection is lost
     final boolean m_autoReconnect;
 
+    // Lookaside list for VoltTable allocation
+    static final int LOOKASIDE_LIMIT = 10;
+    final LinkedList<VoltTable> m_tableLookaside = new LinkedList<>();
+
     // Callback for batch submissions to the Client. A failed request submits the entire
     // batch of rows to m_failedQueue for row by row processing on m_failureProcessor.
     class PartitionProcedureCallback implements ProcedureCallback {
         final List<VoltBulkLoaderRow> m_batchRowList;
         final Map<VoltBulkLoader, Long> m_batchSizes;
+        VoltTable m_voltTable;
 
-        PartitionProcedureCallback(List<VoltBulkLoaderRow> batchRowList, Map<VoltBulkLoader, Long> batchSizes) {
+        PartitionProcedureCallback(List<VoltBulkLoaderRow> batchRowList, Map<VoltBulkLoader, Long> batchSizes, VoltTable voltTable) {
             m_batchRowList = batchRowList;
             m_batchSizes = batchSizes;
+            m_voltTable = voltTable;
         }
 
         // Called by Client to inform us of the status of the bulk insert.
         @Override
         public void clientCallback(final ClientResponse response) throws InterruptedException {
+            deallocateTable(m_voltTable);
+            m_voltTable = null;
+
             if (response.getStatus() != ClientResponse.SUCCESS) {
                 // Queue up all rows for individual processing by originating BulkLoader's FailureProcessor.
                 m_es.execute(new Runnable() {
@@ -131,9 +139,9 @@ public class PerPartitionTable {
         }
     }
 
-    PerPartitionTable(ClientImpl clientImpl, String tableName, int partitionId, boolean isMP,
+    PerPartitionTable(LoaderAdapter client, String tableName, int partitionId, boolean isMP,
             VoltBulkLoader firstLoader, int minBatchTriggerSize, BulkLoaderSuccessCallback successCallback) {
-        m_clientImpl = clientImpl;
+        m_client = client;
         m_partitionId = partitionId;
         m_isMP = isMP;
         m_procName = firstLoader.m_procName;
@@ -146,9 +154,7 @@ public class PerPartitionTable {
         m_partitionColumnType = firstLoader.m_partitionColumnType;
         m_tableName = tableName;
         m_successCallback = successCallback;
-        m_table = new VoltTable(m_columnInfo);
-        m_autoReconnect = m_clientImpl.isAutoReconnectEnabled();
-
+        m_autoReconnect = m_client.autoconnectEnabled();
         m_es = CoreUtils.getSingleThreadExecutor(tableName + "-" + partitionId);
     }
 
@@ -175,7 +181,8 @@ public class PerPartitionTable {
                 public void run() {
                     try {
                         while (m_partitionRowQueue.size() >= m_minBatchTriggerSize) {
-                            loadTable(buildTable(), m_table);
+                            PartitionProcedureCallback cb = buildTable();
+                            loadTable(cb, cb.m_voltTable);
                         }
                     } catch (Exception e) {
                         loaderLog.error("Failed to load batch", e);
@@ -194,7 +201,8 @@ public class PerPartitionTable {
         return m_es.submit(new Callable<Boolean>() {
             @Override
             public Boolean call() throws Exception {
-                loadTable(buildTable(), m_table);
+                PartitionProcedureCallback cb = buildTable();
+                loadTable(cb, cb.m_voltTable);
                 return true;
             }
         });
@@ -208,11 +216,12 @@ public class PerPartitionTable {
         }
         m_es.shutdown();
         m_es.awaitTermination(365, TimeUnit.DAYS);
+        m_tableLookaside.clear();
     }
 
     private void reinsertFailed(List<VoltBulkLoaderRow> rows) throws Exception {
-        VoltTable tmpTable = new VoltTable(m_columnInfo);
         for (final VoltBulkLoaderRow row : rows) {
+            VoltTable tmpTable = new VoltTable(m_columnInfo);
             // No need to check error here if a correctedLine has come here it was
             // previously successful.
             try {
@@ -227,7 +236,7 @@ public class PerPartitionTable {
                 // Should never happened because the bulk conversion in PerPartitionProcessor
                 // should have caught this.
                 loaderLog.error("Type conversion exception", ex);
-                assert false: "Type conversion exception" + ex.getMessage();
+                assert false: "Type conversion exception: " + ex.getMessage();
                 continue;
             }
 
@@ -264,6 +273,7 @@ public class PerPartitionTable {
         ArrayList<VoltBulkLoaderRow> buf = new ArrayList<VoltBulkLoaderRow>(m_minBatchTriggerSize);
         m_partitionRowQueue.drainTo(buf, m_minBatchTriggerSize);
 
+        VoltTable voltTable = allocateTable();
         Map<VoltBulkLoader, Long> batchSizes = new HashMap<>();
         ListIterator<VoltBulkLoaderRow> it = buf.listIterator();
         while (it.hasNext()) {
@@ -277,7 +287,7 @@ public class PerPartitionTable {
                     row_args[i] = ParameterConverter.tryToMakeCompatible(type.classFromType(),
                             currRow.m_rowData[i]);
                 }
-                m_table.addRow(row_args);
+                voltTable.addRow(row_args);
             } catch (Exception e) {
                 loader.generateError(currRow.m_rowHandle, currRow.m_rowData, e.getMessage());
                 loader.m_outstandingRowCount.decrementAndGet();
@@ -285,13 +295,42 @@ public class PerPartitionTable {
                 continue;
             }
 
-            Long prevValue;
-            if ((prevValue = batchSizes.put(loader, 1L)) != null) {
+            Long prevValue = batchSizes.put(loader, 1L);
+            if (prevValue != null) {
                 batchSizes.put(loader, prevValue + 1);
             }
         }
 
-        return new PartitionProcedureCallback(buf, batchSizes);
+        return new PartitionProcedureCallback(buf, batchSizes, voltTable);
+    }
+
+    /*
+     * Each async procedure call needs a VoltTable, which must
+     * remain dedicated to that call until it completes. We will
+     * keep a small list of tables ready for reuse.
+     *
+     * The previous implementation was able to get by with just
+     * one table, which it immediately reused. This is no longer
+     * safe for all client interfaces.
+     */
+    private VoltTable allocateTable() {
+        VoltTable table;
+        synchronized (m_tableLookaside) {
+            table = m_tableLookaside.poll();
+        }
+        if (table == null) {
+            table = new VoltTable(m_columnInfo);
+        }
+        return table;
+    }
+
+    private void deallocateTable(VoltTable table) {
+        table.clearRowData();
+        synchronized (m_tableLookaside) {
+            if (m_tableLookaside.size() < LOOKASIDE_LIMIT) {
+                m_tableLookaside.add(table);
+            }
+        }
     }
 
     private void loadTable(ProcedureCallback callback, VoltTable toSend) throws Exception {
@@ -322,16 +361,15 @@ public class PerPartitionTable {
                 callback.clientCallback(r);
             }
         }
-        toSend.clearRowData();
     }
 
     private void load(ProcedureCallback callback, VoltTable toSend) throws Exception {
         if (m_isMP) {
-            m_clientImpl.callProcedure(callback, m_procName, m_tableName, m_upsert, toSend);
+            m_client.callProcedure(callback, m_procName, m_tableName, m_upsert, toSend);
         } else {
-            Object rpartitionParam = VoltType.valueToBytes(toSend.fetchRow(0).get(
-                    m_partitionedColumnIndex, m_partitionColumnType));
-            m_clientImpl.callProcedure(callback, m_procName, rpartitionParam, m_tableName, m_upsert, toSend);
+            Object rpartitionParam = VoltType.valueToBytes(toSend.fetchRow(0).get(m_partitionedColumnIndex,
+                                                                                  m_partitionColumnType));
+            m_client.callProcedure(callback, m_procName, rpartitionParam, m_tableName, m_upsert, toSend);
         }
     }
 }
