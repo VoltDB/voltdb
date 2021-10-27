@@ -216,7 +216,6 @@ function set_kubernetes(server, port) {
             passwordVal,
             true,
             function (result, response) {
-              console.log(result, response);
               if (
                 responseObtained ||
                 (response != undefined &&
