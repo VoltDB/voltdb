@@ -972,6 +972,7 @@ function set_kubernetes(server, port) {
       ) {
         var data = connection.Metadata["SHORTAPI_DEPLOYMENT"];
         var usersList = voltDbRenderer.usersList;
+        getListOfRoles();
 
         if (data.status === -1) {
           return;
