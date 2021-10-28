@@ -388,6 +388,12 @@ class FastSerializer:
                                ssl_version=protocol,
                                ca_certs=self.ssl_config['ca_certs'])
 
+    def __get_name_from_path(self, path):
+        x = re.sub('/','-', path)
+        y = re.sub('^-', '', x)
+        tmpdir = os.getenv('TMPDIR', '/tmp')
+        return tmpdir + '/' + y
+
     def __convert_jks_files(self, ss, jks_config):
         if not pyjks_available:
             error("To use Java KeyStore please install the 'pyjks' module")
@@ -403,37 +409,54 @@ class FastSerializer:
         if 'keystore' in jks_config and jks_config['keystore'] and \
                'keystorepassword' in jks_config and jks_config['keystorepassword']:
             ks = jks.KeyStore.load(jks_config['keystore'], jks_config['keystorepassword'])
-            keyfile = self.__create(jks_config['keystore'] + '.key.pem')
-            certfile = self.__create(jks_config['keystore'] + '.cert.pem')
+            kfname = self.__get_name_from_path(jks_config['keystore'])
+            keyfilename = kfname + '.key.pem'
+            keyfile = None
+            if not os.path.exists(keyfilename):
+                keyfile = self.__create(keyfilename)
+            certfilename = kfname + '.cert.pem'
+            certfile = None
+            if not os.path.exists(certfilename):
+                certfile = self.__create(certfilename)
             for alias, pk in list(ks.private_keys.items()):
                 # print("Private key: %s" % pk.alias)
-                if pk.algorithm_oid == jks.util.RSA_ENCRYPTION_OID:
-                    write_pem(pk.pkey, "RSA PRIVATE KEY", keyfile)
-                else:
-                    write_pem(pk.pkey_pkcs8, "PRIVATE KEY", keyfile)
+                if keyfile is not None:
+                    if pk.algorithm_oid == jks.util.RSA_ENCRYPTION_OID:
+                        write_pem(pk.pkey, "RSA PRIVATE KEY", keyfile)
+                    else:
+                        write_pem(pk.pkey_pkcs8, "PRIVATE KEY", keyfile)
 
-                for c in pk.cert_chain:
-                    write_pem(c[1], "CERTIFICATE", certfile)
+                if certfile is not None:
+                    for c in pk.cert_chain:
+                        write_pem(c[1], "CERTIFICATE", certfile)
                 use_key_cert = True
-            keyfile.close()
-            certfile.close()
+            if keyfile is not None:
+                keyfile.close()
+            if certfile is not None:
+                certfile.close()
             if use_key_cert:
-                self.ssl_config['keyfile'] = keyfile.name
-                self.ssl_config['certfile'] = certfile.name
+                self.ssl_config['keyfile'] = keyfilename
+                self.ssl_config['certfile'] = certfilename
 
         # extract ca certs
         use_ca_cert = False
         if 'truststore' in jks_config and jks_config['truststore'] and \
                'truststorepassword' in jks_config and jks_config['truststorepassword']:
             ts = jks.KeyStore.load(jks_config['truststore'], jks_config['truststorepassword'])
-            cafile = self.__create(jks_config['truststore'] + '.ca.cert.pem')
+            tfname = self.__get_name_from_path(jks_config['truststore'])
+            cafilename = tfname + '.ca.cert.pem'
+            cafile = None
+            if not os.path.exists(cafilename):
+                cafile = self.__create(cafilename)
+
             for alias, c in list(ts.certs.items()):
                 # print("Certificate: %s" % c.alias)
-                write_pem(c.cert, "CERTIFICATE", cafile)
+                if cafile is not None:
+                    write_pem(c.cert, "CERTIFICATE", cafile)
+                    cafile.close()
                 use_ca_cert = True
-            cafile.close()
             if use_ca_cert:
-                self.ssl_config['ca_certs'] = cafile.name
+                self.ssl_config['ca_certs'] = cafilename
                 self.ssl_config['cert_reqs'] = ssl.CERT_REQUIRED
 
     def __create(self, filename):
