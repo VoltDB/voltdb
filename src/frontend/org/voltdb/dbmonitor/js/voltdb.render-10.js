@@ -162,6 +162,7 @@ function set_kubernetes(server, port) {
         '<div class="overlay-title">Login</div>' +
         '<div id="UnableToLoginMsg" class="errMsgBox" style=" display: none;"><div class="errMsg">Unable to connect. Please try to login using another username/password.</div></div>' +
         '<div id="PasswordChangeMsg" class="errMsgBox" style="display: none;"><div class="errMsg">Your credentials has been changed. Please login with new credentials.</div></div>' +
+        '<div id="dbNotReadyMsg" class="errMsgBox" style="display: none;"><div class="errMsg">Database is not ready. Please wait few seconds.</div></div>' +
         '<div class="clear"></div>' +
         '<div  class="overlay-content" style="height:auto; min-width: auto; padding: 0" >' +
         '<div id="loginBox">' +
@@ -232,22 +233,24 @@ function set_kubernetes(server, port) {
                   url: url,
                   type: 'get',
                   success: function (response) {
-                    if (response !== undefined) {
-                      var result = response.results[0];
-                      if (result !== undefined) {
-                        usersList = result.data.map((item) => {
-                          return {
-                            name: item[0],
-                            role: item[1],
-                          }
-                        })
+                    var result = response.results[0];
+                    usersList = result.data.map((item) => {
+                      return {
+                        name: item[0],
+                        role: item[1],
                       }
-                    }
+                    })
+                  },
+                  error: function (response) {
+                    $("#RoleChangeMsg").hide();
+                    $("#PasswordChangeMsg").hide();
+                    $("#dbNotReadyMsg").show();
                   }
                 }).done(function () {
                   voltDbRenderer.usersList = usersList;
                   $("#RoleChangeMsg").hide();
                   $("#PasswordChangeMsg").hide();
+                  $("#dbNotReadyMsg").hide();
                   //Save user details to cookie.
                   set_kubernetes($(location).attr("hostname"), $(location).attr("port"));
                   loadAdminPage();
@@ -272,6 +275,7 @@ function set_kubernetes(server, port) {
               } else {
                 $("#RoleChangeMsg").hide();
                 $("#PasswordChangeMsg").hide();
+                $("#dbNotReadyMsg").hide();
 
                 //Error: Server is not available(-100) or Connection refused(-5) but is not "Authentication rejected(-3)"
                 if (response != undefined && response.status != -3) {

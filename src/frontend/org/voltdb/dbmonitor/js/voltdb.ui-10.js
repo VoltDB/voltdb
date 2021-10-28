@@ -4530,7 +4530,8 @@ var adjustExporterGraphSpacing = function () {
               !$("#shutdownPop").is(":visible")
             ) {
               window.clearInterval(VoltDbUI.connectionTimeInterval);
-              $("#conPopup").trigger("click");
+              // $("#conPopup").trigger("click");
+              window.location.reload();
             }
           } else {
             VoltDbUI.isConnectionChecked = false;
