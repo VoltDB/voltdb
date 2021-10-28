@@ -55,7 +55,7 @@ public class QueryStats extends AdHocNTBase {
             Arrays.stream(StatsSelector.getAllStatsCollector())
             .collect(Collectors.toMap(Enum::name, a -> a, (a, b) -> b));
     private static final Pattern PROC_PATTERN =
-            Pattern.compile("statistics\\s*\\(\\s*([a-z]+)\\s*,\\s*(\\d+)\\s*(,\\s*(\\d+)\\s*)?\\)", Pattern.CASE_INSENSITIVE);
+            Pattern.compile("statistics\\s*\\(\\s*(\\w+)\\s*,\\s*(\\d+)\\s*(,\\s*(\\d+)\\s*)?\\)", Pattern.CASE_INSENSITIVE);
     private static final String tempTableAlias = "TT";
 
     @Override
