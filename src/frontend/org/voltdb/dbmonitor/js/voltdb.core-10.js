@@ -499,6 +499,7 @@
                 statusCode: {
                     401: function (response) {
                         saveSessionCookie("password", -1);
+                        window.location.reload();
                         // alert('Failed to authenticate to the server. Please authenticate again in next window.')
                     }
                 },
