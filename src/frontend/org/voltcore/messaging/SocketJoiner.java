@@ -53,6 +53,7 @@ import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.ReverseDNSCache;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.RateLimitedLogger;
 import org.voltcore.utils.VersionChecker;
 import org.voltcore.utils.ssl.MessagingChannel;
 import org.voltdb.client.TLSHandshaker;
@@ -337,7 +338,7 @@ public class SocketJoiner {
             while (m_coordIp == null) {
                 try {
                     leaderAddr = addressFromHost(leader); // may throw for unresolved host name
-                    consoleLog.info("Connecting to the VoltDB cluster leader " + leaderAddr);
+                    infoInfrequently("Connecting to the VoltDB cluster leader " + leaderAddr);
                     connectToPrimary(leaderAddr);
                 } catch (UnknownHostException e) {
                     warnInfrequently("Unknown host name '%s', retrying", leader);
@@ -428,22 +429,20 @@ public class SocketJoiner {
     /*
      * Handles repetitive logging from the retry loops in start().
      * Prevents the same message from being logged more frequently
-     * than once every 30 secs. This implicitly assumes that
-     * we're not interleaving different messages (which is true;
-     * we get past "unknown hostname" before "connect failed"
-     * can happen).
+     * than once every 30 secs.
      */
-    private String m_lastWarning;
-    private long m_lastWarnTime;
-
     private void warnInfrequently(String format, Object... args) {
-        long now = System.currentTimeMillis();
-        if (now > m_lastWarnTime + 30_000 || !format.equals(m_lastWarning)) {
-            String msg = String.format(format, args);
-            LOG.warn(msg);
-        }
-        m_lastWarning = format;
-        m_lastWarnTime = now;
+        RateLimitedLogger.tryLogForMessage(System.currentTimeMillis(),
+                                           30, TimeUnit.SECONDS,
+                                           LOG, Level.WARN,
+                                           format, args);
+    }
+
+    private void infoInfrequently(String format, Object... args) {
+        RateLimitedLogger.tryLogForMessage(System.currentTimeMillis(),
+                                           30, TimeUnit.SECONDS,
+                                           consoleLog, Level.INFO,
+                                           format, args);
     }
 
     /*
