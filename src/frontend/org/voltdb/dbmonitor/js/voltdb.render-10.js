@@ -439,6 +439,9 @@ function set_kubernetes(server, port) {
       checkSecurity,
       onInformationLoaded
     ) {
+      voltDbRenderer.CheckAdminPriviledges(function (hasAdminPrivileges) {
+        VoltDbAdminConfig.isAdmin = true;
+      });
       if (VoltDbAdminConfig.isAdmin || checkSecurity) {
         VoltDBService.GetShortApiDeployment(function (connection) {
           var rawData;

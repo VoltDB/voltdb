@@ -941,7 +941,7 @@ var loadPage = function (serverName, portid) {
         adminConfigValues.VMCNoPermission != true &&
         !adminConfigValues.security
       ) {
-        showAdminPage();
+        $("#navAdmin").show();
       } else if (!VoltDbAdminConfig.isAdmin) {
         $("#navAdmin").hide();
       }
@@ -954,7 +954,7 @@ var loadPage = function (serverName, portid) {
     securityChecks.previlegesChecked = true;
     if (hasAdminPrivileges) {
       $("#navAdmin").show();
-      // showAdminPage();
+      loadAdminPage();
     } else if (!VoltDbAdminConfig.isAdmin) {
       $("#navAdmin").hide();
     }
