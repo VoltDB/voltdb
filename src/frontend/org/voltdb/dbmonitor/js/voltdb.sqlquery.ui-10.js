@@ -1058,6 +1058,9 @@ $(document).ready(function () {
             $($("#worktabs div.ui-tabs-panel")[$tabs.tabs("option", "active")])
           );
           queryUI.execute(query);
+          setTimeout(function(){
+            getListOfRoles();
+          }, 5000);
         }
       });
 
