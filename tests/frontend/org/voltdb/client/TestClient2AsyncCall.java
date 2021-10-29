@@ -154,20 +154,6 @@ public class TestClient2AsyncCall extends TestCase {
         assertFalse(threw);
         validateTmo(start1, 1200, TimeUnit.MILLISECONDS, 2500, TimeUnit.MILLISECONDS);
 
-        // proc runs for 2.5 sec, timeout after 123 usec
-        long shortTmo = 123; // us
-        goodResponse = threw = false;
-        Client2CallOptions opts = new Client2CallOptions().clientTimeout(shortTmo, TimeUnit.MICROSECONDS);
-        CompletableFuture<ClientResponse> fut2 = client.callProcedureAsync(opts, "ArbitraryDurationProc", 2500);
-        long start2 = System.nanoTime();
-        fut2.thenAccept(this::checkTimedOut)
-            .exceptionally(this::screamAndShout)
-            .join();
-
-        assertTrue(goodResponse);
-        assertFalse(threw);
-        validateTmo(start2, shortTmo, TimeUnit.MICROSECONDS, 10, TimeUnit.MILLISECONDS);
-
         client.close();
     }
 
@@ -180,6 +166,47 @@ public class TestClient2AsyncCall extends TestCase {
                           respStatus);
         long limNs = limitUnit.toNanos(limit);
         assertTrue("Timeout took too long to time out", elapsed <= limNs);
+    }
+
+    /**
+     * Short timeouts
+     */
+    public void testShortTimeouts() throws Exception {
+        Client2Config config = new Client2Config()
+            .procedureCallTimeout(1200, TimeUnit.MILLISECONDS);
+
+        Client2 client = ClientFactory.createClient(config);
+        client.connectSync("localhost");
+
+        // proc runs for 2.5 sec, timeout after 123 usec, typically before sent
+        long shortTmo2 = 123; // us
+        goodResponse = threw = false;
+        Client2CallOptions opts2 = new Client2CallOptions().clientTimeout(shortTmo2, TimeUnit.MICROSECONDS);
+        CompletableFuture<ClientResponse> fut2 = client.callProcedureAsync(opts2, "ArbitraryDurationProc", 2500);
+        long start2 = System.nanoTime();
+        fut2.thenAccept(this::checkTimedOut)
+            .exceptionally(this::screamAndShout)
+            .join();
+
+        assertTrue(goodResponse);
+        assertFalse(threw);
+        validateTmo(start2, shortTmo2, TimeUnit.MICROSECONDS, 10, TimeUnit.MILLISECONDS);
+
+        // proc runs for 2.5 sec, timeout after 50 msec, typically after sent
+        long shortTmo3 = 50; // ms
+        goodResponse = threw = false;
+        Client2CallOptions opts3 = new Client2CallOptions().clientTimeout(shortTmo3, TimeUnit.MILLISECONDS);
+        CompletableFuture<ClientResponse> fut3 = client.callProcedureAsync(opts3, "ArbitraryDurationProc", 2500);
+        long start3 = System.nanoTime();
+        fut3.thenAccept(this::checkTimedOut)
+            .exceptionally(this::screamAndShout)
+            .join();
+
+        assertTrue(goodResponse);
+        assertFalse(threw);
+        validateTmo(start3, shortTmo3, TimeUnit.MILLISECONDS, 200, TimeUnit.MILLISECONDS);
+
+        client.close();
     }
 
     /**

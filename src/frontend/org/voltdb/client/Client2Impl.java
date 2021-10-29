@@ -41,6 +41,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
@@ -111,6 +112,15 @@ public class Client2Impl implements Client2 {
     private static class UnavailableException extends Exception {
         UnavailableException(String msg) {
             super(msg);
+        }
+    }
+
+    private static class LocalTimeoutException extends Exception {
+        long elapsed, timeout;
+        LocalTimeoutException(long el, long tmo) {
+            super("timeout");
+            elapsed = el;
+            timeout = tmo;
         }
     }
 
@@ -195,6 +205,7 @@ public class Client2Impl implements Client2 {
         final long timeout;
         final ClientConnection cxn;
         boolean holdsPermit;
+        volatile Future<?> timer;
         public RequestContext(CompletableFuture<ClientResponse> future,
                               ProcedureInvocation invocation, long timeout,
                               ClientConnection cxn) {
@@ -445,6 +456,8 @@ public class Client2Impl implements Client2 {
 
     // Background executor used for timeout tasks and for
     // all system procedure calls issued by Client2 itself
+    private ScheduledExecutorService timerService =
+        Executors.newSingleThreadScheduledExecutor((r) -> new Thread(r, "Client2-Timer"));
     private ScheduledExecutorService execService =
         Executors.newSingleThreadScheduledExecutor((r) -> new Thread(r, "Client2-Exec"));
 
@@ -546,7 +559,7 @@ public class Client2Impl implements Client2 {
         setOutstandingTxnLimit(config.outstandingTxnLimit);
         setRequestLimits(config.requestHardLimit, config.requestWarningLevel, config.requestResumeLevel);
         backpressureQueueLimit = config.networkBackpressureLevel;
-        execService.scheduleAtFixedRate(new TimeoutTask(), 1, 1, TimeUnit.SECONDS);
+        timerService.scheduleAtFixedRate(new TimeoutTask(), 1, 1, TimeUnit.SECONDS);
 
         reconnectDelay = config.reconnectDelay;
         reconnectRetryDelay = config.reconnectRetryDelay;
@@ -1289,6 +1302,11 @@ public class Client2Impl implements Client2 {
             // ignore
         }
 
+        if (timerService != null) {
+            stopService(timerService);
+            timerService = null;
+        }
+
         if (execService != null) {
             stopService(execService);
             execService = null;
@@ -1356,24 +1374,25 @@ public class Client2Impl implements Client2 {
                     rateLimiter.limitSendRate();
                 }
                 ByteBuffer buf = serializeInvocation(req.invocation);
+                long timeLeft = remainingTime(req.startTime, req.timeout);
                 req.holdsPermit = sendPermits.tryAcquire();
-                if (!req.holdsPermit) {
-                    req.holdsPermit = sendPermits.tryAcquire(remainingTime(req.startTime, req.timeout), TimeUnit.NANOSECONDS);
-                    if (!req.holdsPermit) {
-                        completeRequestOnLocalFailure(req, true, "Procedure call timed out before sending");
-                        continue;
-                    }
+                while (!req.holdsPermit) {
+                    req.holdsPermit = sendPermits.tryAcquire(timeLeft, TimeUnit.NANOSECONDS);
+                    timeLeft = remainingTime(req.startTime, req.timeout);
                 }
-                if (!clearToSend(cxn, req.startTime, req.timeout)) {
-                    completeRequestOnLocalFailure(req, true, "Procedure call timed out before sending");
-                    continue;
+                if (awaitClearToSend(cxn, req.startTime, req.timeout)) {
+                    timeLeft = remainingTime(req.startTime, req.timeout);
                 }
                 activeHandles.add(req.invocation.getHandle());
-                if (req.timeout < ONE_SECOND_NANOS && shortTimeoutExpired(req)) {
-                    completeRequestOnLocalFailure(req, true, "Procedure call timed out before sending");
-                    continue;
+                if (req.timeout < ONE_SECOND_NANOS) {
+                    setShortTimeoutTask(req, timeLeft);
                 }
                 cxn.writeToNetwork(buf);
+            }
+            catch (LocalTimeoutException ex) {
+                String err = String.format("Procedure call timed out before sending (timeout %s, elapsed %s)",
+                                           timeoutString(ex.timeout), timeoutString(ex.elapsed));
+                completeRequestOnLocalFailure(req, true, err);
             }
             catch (SerializationException ex) {
                 completeRequestOnLocalFailure(req, false, ex.getMessage());
@@ -1394,19 +1413,23 @@ public class Client2Impl implements Client2 {
     }
 
     /*
-     * Considerations for sub-second timeouts. Checks whether we already
-     * timed out, and if not, queues up a task to handle this specific request.
+     * Considerations for sub-second timeouts. We queue up a task to
+     * handle this specific request.  Known "long" sysprocs are excluded.
      */
-    private boolean shortTimeoutExpired(RequestContext req) {
-        boolean expired = false;
+    private void setShortTimeoutTask(RequestContext req, long remaining) {
         if (!isLongOp(req.invocation.getProcName())) {
-            long remaining = remainingTime(req.startTime, req.timeout);
-            expired = remaining <= 0;
-            if (!expired) {
-                execService.schedule(new SingleTimeoutTask(req), remaining, TimeUnit.NANOSECONDS);
+            req.timer = timerService.schedule(new SingleTimeoutTask(req), remaining, TimeUnit.NANOSECONDS);
+        }
+    }
+
+    private void cancelShortTimeoutTask(RequestContext req) {
+        if (req != null) {
+            Future<?> timer = req.timer; // read once
+            if (timer != null) { // the race is ok here
+                req.timer = null;
+                timer.cancel(false);
             }
         }
-        return expired;
     }
 
     /*
@@ -1420,19 +1443,22 @@ public class Client2Impl implements Client2 {
     }
 
     /*
-     * Await no backpressure on a particular connection
+     * Await no backpressure on a particular connection.
+     * Returns 'true' if waiting was needed; caller may need
+     * to adjust time spent so far. Throws exception if
+     * timeout period exceeded.
      */
-    private boolean clearToSend(ClientConnection cxn, long startTime, long timeout) throws InterruptedException {
+    private boolean awaitClearToSend(ClientConnection cxn, long startTime, long timeout)
+    throws LocalTimeoutException, InterruptedException {
+        boolean waited = false;
         synchronized (cxn.backpressureLock) {
             while (cxn.backpressure) {
+                waited = true;
                 long remaining = remainingTime(startTime, timeout);
-                if (remaining <= 0) {
-                    return false;
-                }
                 cxn.backpressureLock.wait(remaining / 1_000_000, (int)(remaining % 1_000_000));
             }
         }
-        return true;
+        return waited;
     }
 
     /*
@@ -1560,7 +1586,9 @@ public class Client2Impl implements Client2 {
      */
     private RequestContext removeRequest(long handle) {
         activeHandles.remove(handle); // if present
-        return requestMap.remove(handle);
+        RequestContext req = requestMap.remove(handle);
+        cancelShortTimeoutTask(req); // if queued
+        return req;
     }
 
     /*
@@ -1658,6 +1686,7 @@ public class Client2Impl implements Client2 {
         }
         @Override
         public void run() {
+            req.timer = null;
             if (activeHandles.contains(req.invocation.getHandle())) {
                 long delta = Math.max(System.nanoTime() - req.startTime, 1);
                 completeRequestOnTimeout(req, delta);
@@ -1670,6 +1699,7 @@ public class Client2Impl implements Client2 {
      * Make the minimum timeout for certain long running system procedures
      * higher than the default 2 minutes.
      * You can still set the default timeout higher than even this value.
+     * Better, specify a sensible per-call timeout for long-running ops.
      */
     private static boolean isLongOp(String procName) {
         return procName.charAt(0) == '@' &&
@@ -1790,10 +1820,16 @@ public class Client2Impl implements Client2 {
     }
 
     /*
-     * Utility: compute time remaining until timeout expired
+     * Utility: compute time remaining until timeout expired.
+     * Throws exception if already timed out.
      */
-    private long remainingTime(long startTime, long timeout) {
-        return Math.max(startTime + timeout - System.nanoTime(), 0);
+    private long remainingTime(long startTime, long timeout) throws LocalTimeoutException {
+        long now = System.nanoTime();
+        long remaining = Math.max(startTime + timeout - now, 0);
+        if (remaining <= 0) {
+            throw new LocalTimeoutException(now - startTime, timeout);
+        }
+        return remaining;
     }
 
     /*
@@ -1833,8 +1869,8 @@ public class Client2Impl implements Client2 {
     private void completeRequestOnTimeout(RequestContext req, long elapsed) {
         long handle = req.invocation.getHandle();
         if (removeRequest(handle) != null) {
-            String err = String.format("No response received in the allotted time (set to %,d ms)",
-                                       TimeUnit.NANOSECONDS.toMillis(req.timeout));
+            String err = String.format("No response received in the allotted time (timeout %s, elapsed %s)",
+                                       timeoutString(req.timeout), timeoutString(elapsed));
             ClientResponseImpl resp = new ClientResponseImpl(ClientResponse.CLIENT_RESPONSE_TIMEOUT,
                                                              new VoltTable[0], err);
             resp.setClientHandle(handle);
@@ -1847,6 +1883,22 @@ public class Client2Impl implements Client2 {
             releasePermit(req);
             req.future.complete(resp);
         }
+    }
+
+    /*
+     * String for timeout in error messages: generally millisecs,
+     * but secs for timeouts longer than 10 secs, and microsecs
+     * or even nanosecs for timeouts shorter than 1 millisec.
+     */
+    private static String timeoutString(long nanos) {
+        long[] lim = { 10_000_000_000L,  1_000_000L, 1000L, 0L };
+        int[] div =  { 1_000_000_000, 1_000_000, 1000, 1 };
+        String[] unit = { "sec", "ms", "\u00b5s", "ns" };
+        int i = 0;
+        while (i < lim.length-1 && nanos < lim[i]) {
+            i++;
+        }
+        return String.format("%d %s", nanos/div[i], unit[i]);
     }
 
     /*
