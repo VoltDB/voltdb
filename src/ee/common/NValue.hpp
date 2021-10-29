@@ -1271,8 +1271,23 @@ private:
                     break;
                 }
             case ValueType::tVARCHAR:
-                retval.getBigInt() = static_cast<int64_t>(getNumberFromString());
+            {
+                int32_t length;
+                const char* buf = getObject_withoutNull(length);
+                char safeBuffer[length+1];
+                memcpy(safeBuffer, buf, length);
+                safeBuffer[length] = '\0';
+                std::string str(safeBuffer);
+                boost::trim(str);
+                try {
+                    retval.getBigInt() = static_cast<int64_t>(stold(str));
+                } catch (std::exception &e) {
+                    std::ostringstream oss;
+                    oss << "Could not convert to number." << str << " contains invalid character value.";
+                    throw SQLException(SQLException::data_exception_invalid_character_value_for_cast, oss.str().c_str());
+                }
                 break;
+            }
             case ValueType::tVARBINARY:
             default:
                 throwCastSQLException(type, ValueType::tBIGINT);

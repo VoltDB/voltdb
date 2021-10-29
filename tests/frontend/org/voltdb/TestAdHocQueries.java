@@ -325,6 +325,33 @@ public class TestAdHocQueries extends AdHocQueryTester {
     public static String m_pathToDeployment = Configuration.getPathToCatalogForTest("adhoc.xml");
 
     @Test
+    public void testENG21651() {
+        final TestEnv env = new TestEnv("CREATE TABLE PROD (ID int NOT NULL, EXT_ID varchar(30));",
+                m_catalogJar, m_pathToDeployment, 2, 2, 1);
+        long ids[] = {1617463880188133744L,1617463880188133743L,1617463880188133742L,1617463880188134165L,7463880188133420L};
+        try {
+            env.setUp();
+            for (int i = 0; i < ids.length; i++) {
+                env.m_client.callProcedure("@AdHoc",
+                        "INSERT INTO PROD (ID, EXT_ID) VALUES(" + i + ",'" + Long.toString(ids[i]) + "')");
+            }
+
+            VoltTable result = env.m_client.callProcedure("@AdHoc",
+                    "select ID, EXT_ID, CAST(EXT_ID AS BIGINT) FROM PROD").getResults()[0];
+            while (result.advanceRow()) {
+                int id = (int) result.getLong(0);
+                long extId = result.getLong(2);
+                System.out.println("cast " + ids[id] + " to:" + extId);
+                assert(ids[id] == extId);
+            }
+        } catch (IOException | ProcCallException e) {
+            fail("failed: " + e.getMessage());
+        } finally {
+            env.tearDown();
+        }
+    }
+
+    @Test
     public void testENG15335() {
         final TestEnv env = new TestEnv("CREATE TABLE P0(id INTEGER NOT NULL);\n" +
                 "PARTITION TABLE P0 ON COLUMN id;\n" +
@@ -372,19 +399,6 @@ public class TestAdHocQueries extends AdHocQueryTester {
         } finally {
             env.tearDown();
         }
-    }
-
-    private static Long[] getNthColumnAsLong(int colIndex, VoltTable tbl) {
-        final int colCount = tbl.getColumnCount();
-        assertTrue("Asking for" + colIndex + "-th column from a " + colCount + "-column table",
-                colCount > colIndex);
-        final int rowCount = tbl.getRowCount();
-        final Long[] result = new Long[rowCount];
-        for(int i = 0; i < rowCount; ++i) {
-            result[i] = tbl.getLong(colIndex);
-            tbl.advanceRow();
-        }
-        return result;
     }
 
     @Test
