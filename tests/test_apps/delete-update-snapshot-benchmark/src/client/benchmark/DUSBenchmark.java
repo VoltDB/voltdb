@@ -37,6 +37,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.MathContext;
 import java.io.IOException;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -94,6 +95,7 @@ public class DUSBenchmark {
         // Echo input option values (useful for debugging):
         System.out.println("\nIn DUSBenchmark constructor:");
         System.out.println("  displayinterval: "+config.displayinterval);
+        System.out.println("  seed           : "+config.seed);
         System.out.println("  tabletypes     : "+config.tabletypes);
         System.out.println("  columntypes    : "+config.columntypes);
         System.out.println("  insertnumrows  : "+config.insertnumrows);
@@ -105,6 +107,7 @@ public class DUSBenchmark {
         System.out.println("  statsfile      : "+config.statsfile);
         System.out.println("  servers        : "+config.servers);
 
+        rand.setSeed(config.seed);
         DUSBClientListener dusbcl = new DUSBClientListener(config.insertnumrows);
         ClientConfig cc = new ClientConfig(null, null, dusbcl);
         cc.setMaxTransactionsPerSecond(config.ratelimit);
@@ -139,9 +142,16 @@ public class DUSBenchmark {
         @Option(desc = "Interval for performance feedback, in seconds; default: 5.")
         int displayinterval = 5;
 
+        @Option(desc = "Benchmark maximum duration, in seconds; default: 180 (3 minutes).")
+        int duration = 180;
+
         @Option(desc = "Comma-separated list of the form server[:port] to "
                 + "connect to database for queries; default: 'localhost'.")
         String servers = "localhost";
+
+        @Option(desc = "Random seed, used to generate random numbers; default: "
+                + "6,782,743,657,833,577,466.")
+        long seed = 6782743657833577466L;  // taken from a recent run of grammar-gen
 
         @Option(desc = "Comma-separated list of one or more of the following: 'partitioned' "
                 + "(the default), 'replicated', or 'view' [not yet implemented].")
@@ -296,6 +306,7 @@ public class DUSBenchmark {
                     +", tableNames(select) "+tableNamesForInsertFromSelect
                     +", tableNames(del&upd) "+tableNamesForDeleteAndUpdate
                     +", tableName "+tableName
+                    +", duration(max) "+config.duration
                     +"\ncolumnNames: "+Arrays.toString(colNamesArray)
                     +"\nminId "+minId
                     +", insertnumrows "+numRows
@@ -1114,10 +1125,19 @@ public class DUSBenchmark {
                 +", updateInlineOrOutlineColumns "+updateInlineOrOutlineColumns
                 +";\ntableNamesForDeleteAndUpdate: "+tableNamesForDeleteAndUpdate+"\n" );
 
+        // Set a few final values before starting the actual benchmark
         long maxValueIncrement = Math.abs(minValueIncrement);
         long halfway = numIterations/2 - 1;
+        LocalDateTime startTime = LocalDateTime.now();
+        LocalDateTime maxEndTime = startTime.plusSeconds(config.duration);
+
         stats.startBenchmark(config.displayinterval);
         for (long i=0; i < numIterations; i++) {
+            // Do not exceed the maximum duration
+            if (LocalDateTime.now().isAfter(maxEndTime)) {
+                break;
+            }
+
             long next = i;
             if (randomOrder) {
                 next = getNextRandomValue((int)i, (int)numIterations, "Update");
@@ -1171,6 +1191,7 @@ public class DUSBenchmark {
         }
 
         // End of the DUS Benchmark
+        LocalDateTime endTime = LocalDateTime.now();
         stats.endBenchmark(config.statsfile);
         client.drain();
         DUSBenchmarkCallback.printAllResults();
