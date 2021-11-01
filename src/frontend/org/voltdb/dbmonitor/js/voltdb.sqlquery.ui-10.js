@@ -1059,7 +1059,6 @@ $(document).ready(function () {
           );
           queryUI.execute(query);
           setTimeout(function(){
-            getListOfRoles();
           }, 5000);
         }
       });

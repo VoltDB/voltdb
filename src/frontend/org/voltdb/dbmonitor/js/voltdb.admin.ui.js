@@ -4548,6 +4548,7 @@ function loadAdminPage() {
     var orguser = '';
     $("#addNewUserLink").popup({
         open: function (event, ui, ele) {
+            getListOfRoles();
             $("#addUserControl").show();
             $("#deleteSecUser").show();
             $("#saveUserControl").hide();
