@@ -17,6 +17,7 @@
 
 package org.voltdb.sysprocs;
 
+import java.net.InetSocketAddress;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.ExecutionException;
@@ -38,9 +39,14 @@ public class LogNote  extends VoltNTSystemProcedure {
 
     public long run(String message) throws InterruptedException, ExecutionException {
         String username = getUsername();
-        String remote = getRemoteAddress().getHostString();
+        String remote = null;
+        InetSocketAddress remoteAddr = getRemoteAddress();
+        if (remoteAddr != null) {
+            remote = remoteAddr.getHostString();
+        }
         Map<Integer, ClientResponse> result;
-        result = callNTProcedureOnAllHosts("@LogNoteOnHost", username == null ? "unknown" : username, remote, message).get();
+        result = callNTProcedureOnAllHosts("@LogNoteOnHost", username == null ? "unknown" : username,
+                remote == null ? "unknown" : remote, message).get();
         String err = checkResult(result);
         if (err != null) {
             log.warn(err);
