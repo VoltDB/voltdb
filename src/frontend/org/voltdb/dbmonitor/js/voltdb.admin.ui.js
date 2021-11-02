@@ -4582,7 +4582,7 @@ function loadAdminPage() {
                 '<tr>' +
                 '<td>Roles </td> ' +
                 '<td>' +
-                '<select id="selectRole">' +
+                '<select id="selectRole" multiple>' +
                 rolehtml() +
                 '</select>  ' +
                 '</td> ' +
@@ -4650,7 +4650,7 @@ function loadAdminPage() {
                 if ($("#userSaveDelete").data('status') == 'save') {
                     var userObject = {
                         "name": newUsername,
-                        "roles": role,
+                        "roles": role.join(),
                         "password": password,
                         "plaintext": true
                     };
