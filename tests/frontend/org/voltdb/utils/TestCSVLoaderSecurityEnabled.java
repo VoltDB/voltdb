@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -48,7 +48,10 @@ import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestName;
+
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.ServerThread;
 import org.voltdb.TheHashinator;
@@ -88,6 +91,9 @@ public class TestCSVLoaderSecurityEnabled {
         new UserInfo("operator", "mech", new String[] {"Operator"}),
         new UserInfo("operator2", "mech!!!", new String[] {"Operator"})
     };
+
+    @Rule
+    public TestName testName = new TestName();
 
     public static void prepare() {
         if (!reportDir.endsWith("/"))
@@ -163,6 +169,7 @@ public class TestCSVLoaderSecurityEnabled {
     @Before
     public void setup() throws IOException, ProcCallException
     {
+        System.out.printf("=-=-=-= Start %s =-=-=-=\n", testName.getMethodName());
         //TODO
     }
 
@@ -171,6 +178,7 @@ public class TestCSVLoaderSecurityEnabled {
     {
         final ClientResponse response = client.callProcedure("@AdHoc", "TRUNCATE TABLE BLAH;");
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        System.out.printf("=-=-=-= End %s =-=-=-=\n", testName.getMethodName());
     }
 
     // test with username / password

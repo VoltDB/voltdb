@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -48,7 +48,10 @@ import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestName;
+
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB.Configuration;
@@ -77,6 +80,9 @@ public class TestCSVLoader {
     protected static String reportDir = String.format("/tmp/%s_csv", userName);
     protected static String path_csv = String.format("%s/%s", reportDir, "test.csv");
     protected static String dbName = String.format("mydb_%s", userName);
+
+    @Rule
+    public TestName testName = new TestName();
 
     public static void prepare() {
         if (!reportDir.endsWith("/")) {
@@ -156,6 +162,7 @@ public class TestCSVLoader {
     @Before
     public void setup() throws IOException, ProcCallException
     {
+        System.out.printf("=-=-=-= Start %s =-=-=-=\n", testName.getMethodName());
         final ClientResponse response = client.callProcedure("@AdHoc", "SELECT COUNT(*) FROM BLAH;");
         assertEquals(0, response.getResults()[0].asScalarLong());
     }
@@ -165,6 +172,7 @@ public class TestCSVLoader {
     {
         final ClientResponse response = client.callProcedure("@AdHoc", "TRUNCATE TABLE BLAH;");
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        System.out.printf("=-=-=-= End %s =-=-=-=\n", testName.getMethodName());
     }
 
     @Test
@@ -1866,9 +1874,21 @@ public class TestCSVLoader {
 
         // clear the table then try to load the csv file
         client.callProcedure("@AdHoc", "DELETE FROM BLAH;");
-        String[] my_options = { "-f" + "/tmp/" + dbName + "-BLAH-host_0.csv", "--maxerrors=50", "--user=",
-                "--password=", "--port=", "--separator=,", "--quotechar=\"", "--escape=\\", "--skip=0", "BLAH" };
+
+        String[] my_options = {
+            "-f" + "/tmp/" + dbName + "-BLAH-host_0.csv",
+            "--reportdir=" + reportDir,
+            "--maxerrors=50",
+            "--user=",
+            "--password=",
+            "--port=",
+            "--separator=,",
+            "--quotechar=\"",
+            "--escape=\\",
+            "--skip=0",
+            "BLAH" };
         prepare();
+
         // put CSVLoader in test mode so it wont exit after done.
         CSVLoader.testMode = true;
         CSVLoader.main(my_options);

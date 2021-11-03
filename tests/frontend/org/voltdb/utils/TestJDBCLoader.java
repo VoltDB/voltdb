@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -37,7 +37,10 @@ import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestName;
+
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.ServerThread;
 import org.voltdb.TheHashinator;
@@ -63,6 +66,9 @@ public class TestJDBCLoader {
     protected static String driver_class = "org.voltdb.jdbc.Driver";
     protected static String jdbc_url = "jdbc:voltdb://localhost";
     protected static String dbName = String.format("mydb_%s", userName);
+
+    @Rule
+    public TestName testName = new TestName();
 
     public static void prepare() {
         if (!reportDir.endsWith("/"))
@@ -145,6 +151,7 @@ public class TestJDBCLoader {
     @Before
     public void setup() throws IOException, ProcCallException
     {
+        System.out.printf("=-=-=-= Start %s =-=-=-=\n", testName.getMethodName());
         ClientResponse response = client.callProcedure("@AdHoc", "SELECT COUNT(*) FROM BLAH;");
         assertEquals(0, response.getResults()[0].asScalarLong());
         response = client.callProcedure("@AdHoc", "SELECT COUNT(*) FROM JBLAH;");
@@ -158,6 +165,7 @@ public class TestJDBCLoader {
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
         response = client.callProcedure("@AdHoc", "TRUNCATE TABLE JBLAH;");
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        System.out.printf("=-=-=-= End %s =-=-=-=\n", testName.getMethodName());
     }
 
     @Test
