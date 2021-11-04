@@ -11,19 +11,20 @@ var INT_MAX_VALUE = 2147483647;
 var client_port = 0;
 
 function getListOfRoles() {
-    const url = `api/1.0/?Procedure=%40SystemCatalog&Parameters=%5B"ROLES"%5D`;
+    const url = `api/1.0/?Procedure=%40SystemCatalog&Parameters=%5D"ROLES"%5D`;
     var rolesList = [];
     $.ajax({
         url: url,
         type: 'get',
         success: function (response) {
+            console.log(response);
             var result = response.results[0].data;
             rolesList = result.map((item) => {
                 return item[0]
             })
         }
-    }).done(function () {
-        voltDbRenderer.usersRoles = rolesList;
+        }).done(function () {
+            voltDbRenderer.usersRoles = rolesList;
     })
 
 }
