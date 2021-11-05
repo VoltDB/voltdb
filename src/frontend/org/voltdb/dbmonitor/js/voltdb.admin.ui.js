@@ -28,11 +28,21 @@ function getListOfRoles() {
 
 }
 
+// function rolehtml() {
+//     var roles = voltDbRenderer.usersRoles;
+//     var role_options = "";
+//     for (var i = 0; i < roles.length; i++) {
+//         role_options += '<option value="' + roles[i] + '">' + roles[i] + '</option>';
+//     }
+//     return role_options
+// }
+
 function rolehtml() {
     var roles = voltDbRenderer.usersRoles;
     var role_options = "";
     for (var i = 0; i < roles.length; i++) {
-        role_options += '<option value="' + roles[i] + '">' + roles[i] + '</option>';
+        role_options += '<label>' + '<input type="checkbox" id="' + roles[i] + '" value="' + roles[i] + '"/>'
+            + "<span style='margin-left: 4px'>" + roles[i] + "</span>" + '</label>';
     }
     return role_options
 }
@@ -4582,9 +4592,9 @@ function loadAdminPage() {
                 '<tr>' +
                 '<td>Roles </td> ' +
                 '<td>' +
-                '<select id="selectRole" multiple>' +
+                '<div id="selectRole" class="roleBox">' +
                 rolehtml() +
-                '</select>  ' +
+                '</div>  ' +
                 '</td> ' +
                 '<td>&nbsp;</td>' +
                 '<td>&nbsp;</td>' +
@@ -4607,6 +4617,9 @@ function loadAdminPage() {
         },
         afterOpen: function () {
             var popup = $(this)[0];
+            $("#selectRole > label > input[type='checkbox']").iCheck({
+                checkboxClass: 'icheckbox_square-aero customCheckbox',
+            })
             if (editUserState == -1) {
                 $('#labelPassword').html('Password');
                 $('#addUserHeader').html('Add User');
@@ -4640,10 +4653,13 @@ function loadAdminPage() {
 
             $(document).off("click", "#btnSaveSecUser");
             $(document).on("click", "#btnSaveSecUser", function () {
+                var role = [];
+                $("#selectRole > label > div > input[type='checkbox']:checked").each(function () {
+                    role.push(this.value)
+                });
                 var username = $('#txtOrgUser').val();
                 var newUsername = $('#txtUser').val();
                 var password = encodeURIComponent($('#txtPassword').val());
-                var role = $('#selectRole').val();
                 var requestType = "POST";
                 var requestUser = "";
                 popup.close();

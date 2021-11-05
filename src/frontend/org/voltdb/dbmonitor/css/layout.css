@@ -4866,3 +4866,12 @@ table.dataTable {top:0;}
     padding: 0px 10px;
     text-align: center;
 }
+
+.roleBox {
+    border: 1px solid #ccc; 
+    border-radius: 3px;
+    padding: 4px 0px 4px 4px;
+    max-height: 125px;
+    overflow: hidden;
+    overflow-y: scroll;
+}
