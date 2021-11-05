@@ -626,7 +626,7 @@ class FastSerializer:
     def flush(self):
         if self.socket is None:
             error("ERROR: not connected to server.")
-            exit(-1)
+            raise IOError("No Connection")
 
         if self.dump_file != None:
             self.dump_file.write(self.wbuf)
@@ -637,7 +637,7 @@ class FastSerializer:
     def bufferForRead(self):
         if self.socket is None:
             error("ERROR: not connected to server.")
-            exit(-1)
+            raise IOError("No Connection")
 
         # fully buffer a new length preceded message from socket
         # read the length. the read until the buffer is completed.
@@ -662,14 +662,14 @@ class FastSerializer:
     def read(self, type):
         if type not in self.READER:
             error("ERROR: can't read wire type(%d) yet." % (type))
-            exit(-2)
+            raise IOError("ERROR: can't read wire type(%d) yet." % (type))
 
         return self.READER[type]()
 
     def write(self, type, value):
         if type not in self.WRITER:
             error("ERROR: can't write wire type(%d) yet." % (type))
-            exit(-2)
+            raise IOError("ERROR: can't write wire type(%d) yet." % (type))
 
         return self.WRITER[type](value)
 
@@ -680,7 +680,7 @@ class FastSerializer:
     def writeWireType(self, type, value):
         if type not in self.WRITER:
             error("ERROR: can't write wire type(%d) yet." % (type))
-            exit(-2)
+            raise IOError("ERROR: can't write wire type(%d) yet." % (type))
 
         self.writeByte(type)
         return self.write(type, value)
@@ -700,7 +700,7 @@ class FastSerializer:
     def readArray(self, type):
         if type not in self.ARRAY_READER:
             error("ERROR: can't read wire type(%d) yet." % (type))
-            exit(-2)
+            raise IOError("ERROR: can't write wire type(%d) yet." % (type))
 
         return self.ARRAY_READER[type]()
 
@@ -716,7 +716,7 @@ class FastSerializer:
 
         if type not in self.ARRAY_READER:
             error("ERROR: Unsupported date type (%d)." % (type))
-            exit(-2)
+            raise IOError("ERROR: Unsupported date type (%d)." % (type))
 
         # serialize arrays of bytes as larger values to support
         # strings and varbinary input
@@ -731,7 +731,7 @@ class FastSerializer:
     def writeWireTypeArray(self, type, array):
         if type not in self.ARRAY_READER:
             error("ERROR: can't write wire type(%d) yet." % (type))
-            exit(-2)
+            raise IOError("ERROR: Unsupported date type (%d)." % (type))
 
         self.writeByte(type)
         self.writeArray(type, array)
