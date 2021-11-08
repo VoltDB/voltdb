@@ -1434,49 +1434,44 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             collectLocalNetworkMetadata();
 
             // Initialize stats
+            StatsAgent statsAgent = getStatsAgent();
+
             m_ioStats = new IOStats();
-            getStatsAgent().registerStatsSource(StatsSelector.IOSTATS,
-                    0, m_ioStats);
+            statsAgent.registerStatsSource(StatsSelector.IOSTATS, 0, m_ioStats);
             m_memoryStats = new MemoryStats();
-            getStatsAgent().registerStatsSource(StatsSelector.MEMORY,
-                    0, m_memoryStats);
-            getStatsAgent().registerStatsSource(StatsSelector.TOPO, 0, m_cartographer);
+            statsAgent.registerStatsSource(StatsSelector.MEMORY,  0, m_memoryStats);
+            statsAgent.registerStatsSource(StatsSelector.TOPO, 0, m_cartographer);
             m_partitionCountStats = new PartitionCountStats(m_cartographer);
-            getStatsAgent().registerStatsSource(StatsSelector.PARTITIONCOUNT,
-                    0, m_partitionCountStats);
+            statsAgent.registerStatsSource(StatsSelector.PARTITIONCOUNT, 0, m_partitionCountStats);
             m_initiatorStats = new InitiatorStats(m_myHostId);
             m_liveClientsStats = new LiveClientsStats();
-            getStatsAgent().registerStatsSource(StatsSelector.LIVECLIENTS, 0, m_liveClientsStats);
+            statsAgent.registerStatsSource(StatsSelector.LIVECLIENTS, 0, m_liveClientsStats);
 
             m_latencyStats = new LatencyStats();
-            getStatsAgent().registerStatsSource(StatsSelector.LATENCY, 0, m_latencyStats);
+            statsAgent.registerStatsSource(StatsSelector.LATENCY, 0, m_latencyStats);
             m_latencyCompressedStats = new LatencyHistogramStats(m_myHostId);
-            getStatsAgent().registerStatsSource(StatsSelector.LATENCY_COMPRESSED, 0, m_latencyCompressedStats);
+            statsAgent.registerStatsSource(StatsSelector.LATENCY_COMPRESSED, 0, m_latencyCompressedStats);
             m_latencyHistogramStats = new LatencyUncompressedHistogramStats(m_myHostId);
-            getStatsAgent().registerStatsSource(StatsSelector.LATENCY_HISTOGRAM,
-                    0, m_latencyHistogramStats);
-
+            statsAgent.registerStatsSource(StatsSelector.LATENCY_HISTOGRAM, 0, m_latencyHistogramStats);
 
             BalancePartitionsStatistics rebalanceStats = new BalancePartitionsStatistics();
-            getStatsAgent().registerStatsSource(StatsSelector.REBALANCE, 0, rebalanceStats);
+            statsAgent.registerStatsSource(StatsSelector.REBALANCE, 0, rebalanceStats);
 
             KSafetyStats kSafetyStats = new KSafetyStats();
-            getStatsAgent().registerStatsSource(StatsSelector.KSAFETY, 0, kSafetyStats);
+            statsAgent.registerStatsSource(StatsSelector.KSAFETY, 0, kSafetyStats);
             m_cpuStats = new CpuStats();
-            getStatsAgent().registerStatsSource(StatsSelector.CPU,
-                    0, m_cpuStats);
+            statsAgent.registerStatsSource(StatsSelector.CPU, 0, m_cpuStats);
             m_gcStats = new GcStats();
-            getStatsAgent().registerStatsSource(StatsSelector.GC,
-                    0, m_gcStats);
-            // ENG-6321
+            statsAgent.registerStatsSource(StatsSelector.GC, 0, m_gcStats);
+
             m_commandLogStats = new CommandLogStats(m_commandLog);
-            getStatsAgent().registerStatsSource(StatsSelector.COMMANDLOG, 0, m_commandLogStats);
+            statsAgent.registerStatsSource(StatsSelector.COMMANDLOG, 0, m_commandLogStats);
 
             // Dummy DRCONSUMER stats
             replaceDRConsumerStatsWithDummy();
 
             // Operator function helpers
-            m_operatorSupport.registerStatistics(getStatsAgent());
+            m_operatorSupport.registerStatistics(statsAgent);
 
             /*
              * Initialize the command log on rejoin and join before configuring the IV2
@@ -1536,7 +1531,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
 
             VoltDB.getExportManager().startListeners(m_clientInterface);
-            m_taskManager = new TaskManager(m_clientInterface, getStatsAgent(), m_myHostId,
+            m_taskManager = new TaskManager(m_clientInterface, statsAgent, m_myHostId,
                     m_config.m_startAction == StartAction.JOIN,
                     // Task manager is read only if db is paused or this is a replica
                     () -> m_mode == OperationMode.PAUSED || getReplicationRole() == ReplicationRole.REPLICA);
@@ -1557,15 +1552,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
             else {
                 // set up empty stats for the DR Producer
-                getStatsAgent().registerStatsSource(StatsSelector.DRPRODUCERNODE, 0,
+                statsAgent.registerStatsSource(StatsSelector.DRPRODUCERNODE, 0,
                         new DRProducerStatsBase.DRProducerNodeStatsBase());
-                getStatsAgent().registerStatsSource(StatsSelector.DRPRODUCERPARTITION, 0,
+                statsAgent.registerStatsSource(StatsSelector.DRPRODUCERPARTITION, 0,
                         new DRProducerStatsBase.DRProducerPartitionStatsBase());
-                getStatsAgent().registerStatsSource(StatsSelector.DRPRODUCERCLUSTER, 0,
+                statsAgent.registerStatsSource(StatsSelector.DRPRODUCERCLUSTER, 0,
                         new DRProducerStatsBase.DRProducerClusterStatsBase());
             }
             m_drRoleStats = new DRRoleStats(this);
-            getStatsAgent().registerStatsSource(StatsSelector.DRROLE, 0, m_drRoleStats);
+            statsAgent.registerStatsSource(StatsSelector.DRROLE, 0, m_drRoleStats);
 
             /*
              * Configure and start all the IV2 sites
@@ -1579,7 +1574,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             serializedCatalog,
                             m_configuredNumberOfPartitions,
                             m_config.m_startAction,
-                            getStatsAgent(),
+                            statsAgent,
                             m_memoryStats,
                             m_commandLog,
                             m_config.m_executionCoreBindings.poll(),
@@ -1717,7 +1712,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             assert (m_clientInterface != null);
             m_clientInterface.initializeSnapshotDaemon(m_messenger, m_globalServiceElector);
-            getStatsAgent().registerStatsSource(StatsSelector.TTL, 0, VoltDB.getTTLManager());
+            statsAgent.registerStatsSource(StatsSelector.TTL, 0, VoltDB.getTTLManager());
             // Start elastic services
             try {
                 if (m_config.m_isEnterprise) {
@@ -4504,14 +4499,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     private void replaceDRConsumerStatsWithDummy()
     {
-        getStatsAgent().deregisterStatsSourcesFor(StatsSelector.DRCONSUMERCLUSTER, 0);
-        getStatsAgent().deregisterStatsSourcesFor(StatsSelector.DRCONSUMERNODE, 0);
-        getStatsAgent().deregisterStatsSourcesFor(StatsSelector.DRCONSUMERPARTITION, 0);
-        getStatsAgent().registerStatsSource(StatsSelector.DRCONSUMERCLUSTER, 0,
+        StatsAgent statsAgent = getStatsAgent();
+        statsAgent.deregisterStatsSourcesFor(StatsSelector.DRCONSUMERCLUSTER, 0);
+        statsAgent.deregisterStatsSourcesFor(StatsSelector.DRCONSUMERNODE, 0);
+        statsAgent.deregisterStatsSourcesFor(StatsSelector.DRCONSUMERPARTITION, 0);
+        statsAgent.registerStatsSource(StatsSelector.DRCONSUMERCLUSTER, 0,
                 new DRConsumerStatsBase.DRConsumerClusterStatsBase());
-        getStatsAgent().registerStatsSource(StatsSelector.DRCONSUMERNODE, 0,
+        statsAgent.registerStatsSource(StatsSelector.DRCONSUMERNODE, 0,
                 new DRConsumerStatsBase.DRConsumerNodeStatsBase());
-        getStatsAgent().registerStatsSource(StatsSelector.DRCONSUMERPARTITION, 0,
+        statsAgent.registerStatsSource(StatsSelector.DRCONSUMERPARTITION, 0,
                 new DRConsumerStatsBase.DRConsumerPartitionStatsBase());
     }
 
