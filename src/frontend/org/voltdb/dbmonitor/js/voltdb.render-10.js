@@ -440,7 +440,9 @@ function set_kubernetes(server, port) {
       onInformationLoaded
     ) {
       voltDbRenderer.CheckAdminPriviledges(function (hasAdminPrivileges) {
-        VoltDbAdminConfig.isAdmin = true;
+        if (hasAdminPrivileges) {
+          VoltDbAdminConfig.isAdmin = true;
+        }
       });
       if (VoltDbAdminConfig.isAdmin || checkSecurity) {
         VoltDBService.GetShortApiDeployment(function (connection) {
@@ -946,9 +948,8 @@ function set_kubernetes(server, port) {
         if (currentUserRole !== 'null' && usersList.length > 0) {
           var updatedUserRole = usersList.length > 0 && usersList.filter(user => user.name === currentUser)[0].role;
           var isRoleChanged = currentUserRole === updatedUserRole ? false : true;
-          VoltDbAdminConfig.isAdmin = updatedUserRole.toLowerCase() === 'administrator' ? true : false;
+          VoltDbAdminConfig.isAdmin = updatedUserRole.toLowerCase().includes('administrator');
           VoltDbAdminConfig.isRoleChanged = isRoleChanged;
-
           if (isRoleChanged) {
             $("#rolePopup").trigger("click");
             saveSessionCookie('role', updatedUserRole);
