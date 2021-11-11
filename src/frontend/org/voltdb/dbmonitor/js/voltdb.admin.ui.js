@@ -4629,7 +4629,15 @@ function loadAdminPage() {
                 $('#txtUser').val($('#addUserInnerPopup').data('username'));
                 $('#txtOrgUser').val($('#addUserInnerPopup').data('username'));
                 orguser = $('#addUserInnerPopup').data('username');
-                $('#selectRole').val($('#addUserInnerPopup').data('role').toLowerCase());
+                var roles = $('#addUserInnerPopup').data('role').split(",");
+                UserRoles = roles.map(roles => roles.toLowerCase())
+                roles = voltDbRenderer.usersRoles;
+                for (var i = 0; i < UserRoles.length; i++) {
+                    if (roles.includes(UserRoles[i]),UserRoles[i]){
+                        var selector = "#" + UserRoles[i];
+                        $(selector).iCheck("check");
+                    }
+                }
             }
 
             $("#btnSaveUser").unbind("click");
