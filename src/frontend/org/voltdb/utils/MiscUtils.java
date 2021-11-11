@@ -268,17 +268,18 @@ public class MiscUtils {
         return "";
     }
 
-    // cache whether we're running pro code
+    // Cache whether we're running Pro code.
     private static Boolean m_isPro = null;
-    // check if we're running pro code
+
+    // Check for Pro build.
     public static boolean isPro() {
         if (m_isPro == null) {
-            //Allow running pro kit as community.
-            if (!Boolean.parseBoolean(System.getProperty("community", "false"))) {
-                m_isPro = ProClass.load("org.voltdb.CommandLogImpl", "Command logging", ProClass.HANDLER_IGNORE)
-                        .hasProClass();
-            } else {
-                m_isPro = false;
+            m_isPro = ProClass.load("org.voltdb.CommandLogImpl", "Command logging", ProClass.HANDLER_IGNORE)
+                              .hasProClass();
+            // It used to be possible to pretend Pro code was Community, but that
+            // hasn't worked correctly since about V10. Ignore but warn.
+            if (m_isPro && Boolean.parseBoolean(System.getProperty("community", "false"))) {
+                hostLog.warn("Property 'community' is set but has no effect on Pro code");
             }
         }
         return m_isPro.booleanValue();
