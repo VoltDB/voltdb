@@ -4595,6 +4595,7 @@ function loadAdminPage() {
                 '<div id="selectRole" class="roleBox">' +
                 rolehtml() +
                 '</div>  ' +
+                '<div id="errorRole" class="roleerror" style="display:none">Role cannot be set to empty</div>' +
                 '</td> ' +
                 '<td>&nbsp;</td>' +
                 '<td>&nbsp;</td>' +
@@ -4617,6 +4618,8 @@ function loadAdminPage() {
         },
         afterOpen: function () {
             var popup = $(this)[0];
+            var count = 0;
+            $("#errorRole").hide();
             $("#selectRole > label > input[type='checkbox']").iCheck({
                 checkboxClass: 'icheckbox_square-aero customCheckbox',
             })
@@ -4642,15 +4645,30 @@ function loadAdminPage() {
 
             $("#btnSaveUser").unbind("click");
             $("#btnSaveUser").on("click", function (e) {
+                $("#errorRole").hide();
+                $("#selectRole > label > div > input[type='checkbox']:checked").each(function () {
+                    count += 1;
+                });
+                var con = false;
+                if (count == 0){
+                    con = true;
+                }
                 if (!$("#frmAddUser").valid()) {
                     e.preventDefault();
                     e.stopPropagation();
                 } else {
-                    $("#userSaveDelete").data('status', 'save');
-                    $("#userSaveDelete").html("save");
-                    $("#addUserControl").hide();
-                    $("#deleteSecUser").hide();
-                    $("#saveUserControl").show();
+                    if(con){
+                        e.preventDefault();
+                        e.stopPropagation();
+                        $("#errorRole").show();
+                    }else{
+                        $("#errorRole").hide();
+                        $("#userSaveDelete").data('status', 'save');
+                        $("#userSaveDelete").html("save");
+                        $("#addUserControl").hide();
+                        $("#deleteSecUser").hide();
+                        $("#saveUserControl").show();
+                    }
                 }
             });
 

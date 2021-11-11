@@ -2158,6 +2158,16 @@ label.error {
     margin: 0 0 6px 0;
     height: auto;
 }
+.roleerror {
+    color: #c70000;
+    width: auto;
+    display: block;
+    line-height: 15px;
+    font-size: 11px;
+    padding: 10px 5px 0 0;
+    margin: 0 0 6px 0;
+    height: auto;
+}
 .adminWrapper {
     margin: 0;
     padding: 15px 20px;
