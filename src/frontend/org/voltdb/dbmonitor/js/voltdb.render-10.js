@@ -948,7 +948,20 @@ function set_kubernetes(server, port) {
         if (currentUserRole !== 'null' && usersList.length > 0) {
           var updatedUserRole = usersList.length > 0 && usersList.filter(user => user.name === currentUser)[0].role;
           var isRoleChanged = currentUserRole === updatedUserRole ? false : true;
-          VoltDbAdminConfig.isAdmin = updatedUserRole.toLowerCase().includes('administrator');
+          if (updatedUserRole.toLowerCase().includes('administrator')) {
+            VoltDbAdminConfig.isAdmin = true;
+          } else {
+            VoltDBService.GetShortApiProfile(function (connection) {
+              var permissionList = connection.Metadata["SHORTAPI_PROFILE"].permissions;
+              $.each(permissionList, function (index, value) {
+                if (value.toUpperCase() === "ADMIN") {
+                  VoltDbAdminConfig.isAdmin = true;
+                } else {
+                  VoltDbAdminConfig.isAdmin = false;
+                }
+              })
+            });
+          }
           VoltDbAdminConfig.isRoleChanged = isRoleChanged;
           if (isRoleChanged) {
             $("#rolePopup").trigger("click");

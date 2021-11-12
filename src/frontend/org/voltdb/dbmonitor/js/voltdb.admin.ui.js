@@ -430,7 +430,7 @@ function loadAdminPage() {
             checkDuplicate: []
         },
         userNameMessage: {
-            required: "This field is required",
+            required: "Username field is required",
             regex: 'Only alphabets, numbers, _ and . are allowed.',
             checkDuplicate: 'This username already exists.'
         },
@@ -439,7 +439,7 @@ function loadAdminPage() {
 
         },
         passwordMessage: {
-            required: "This field is required",
+            required: "Password field is required",
         },
         queryTimeoutRules: {
             required: true,
@@ -4574,7 +4574,7 @@ function loadAdminPage() {
                 '<td width="30%">Username</td>' +
                 '<td width="10%">' +
                 '<input id="txtUser" name="txtUser" type="text" size="30" aria-required="true" class="error"/>' +
-                '<label id="errorUser" for="txtUser" class="error errorHeightFix" style="display:none">This field is required</label>' +
+                '<label id="errorUser" for="txtUser" class="error" style="display:none">Username field is required</label>' +
                 '<input id="txtOrgUser" name="txtOrgUser" type="text" size="30" aria-required="true" style="display:none"/>' +
                 '</td> ' +
                 '<td>&nbsp;</td> ' +
@@ -4584,7 +4584,7 @@ function loadAdminPage() {
                 '<td><span id="labelPassword"></span> </td> ' +
                 '<td>' +
                 '<input id="txtPassword" name="txtPassword" type="password" size="30" aria-required="true" class="error"/> ' +
-                '<label id="errorPassword" for="txtPassword" class="error" style="display:none">This field is required</label> ' +
+                '<label id="errorPassword" for="txtPassword" class="error" style="display:none">Password field is required</label> ' +
                 '</td>' +
                 '<td>&nbsp;</td> ' +
                 '<td>&nbsp;</td>' +
@@ -4636,7 +4636,7 @@ function loadAdminPage() {
                 UserRoles = roles.map(roles => roles.toLowerCase())
                 roles = voltDbRenderer.usersRoles;
                 for (var i = 0; i < UserRoles.length; i++) {
-                    if (roles.includes(UserRoles[i]),UserRoles[i]){
+                    if (roles.includes(UserRoles[i]), UserRoles[i]) {
                         var selector = "#" + UserRoles[i];
                         $(selector).iCheck("check");
                     }
@@ -4650,18 +4650,19 @@ function loadAdminPage() {
                     count += 1;
                 });
                 var con = false;
-                if (count == 0){
+                if (count == 0) {
                     con = true;
                 }
                 if (!$("#frmAddUser").valid()) {
+                    if (con) $("#errorRole").show();
                     e.preventDefault();
                     e.stopPropagation();
                 } else {
-                    if(con){
+                    if (con) {
                         e.preventDefault();
                         e.stopPropagation();
                         $("#errorRole").show();
-                    }else{
+                    } else {
                         $("#errorRole").hide();
                         $("#userSaveDelete").data('status', 'save');
                         $("#userSaveDelete").html("save");

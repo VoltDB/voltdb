@@ -600,7 +600,7 @@ select,textarea,input[type="text"],input[type="password"],input[type="datetime"]
     display: inline-block;
     height: 20px;
     padding: 4px 6px;
-    margin-bottom: 10px;
+    /* margin-bottom: 10px; */
     font-size: 14px;
     line-height: 20px;
     color: #555;
