@@ -1052,7 +1052,7 @@ $(document).ready(function () {
         var queryTab = $(
           $("#worktabs div.ui-tabs-panel")[$tabs.tabs("option", "active")]
         );
-        var query = queryTab.text().split(' ')[0].toLowerCase();
+        var query = queryTab.text().split(' ');
         if (queryTab.length == 1) {
           var queryUI = new QueryUI(
             $($("#worktabs div.ui-tabs-panel")[$tabs.tabs("option", "active")])

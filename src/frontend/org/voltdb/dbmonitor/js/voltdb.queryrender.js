@@ -370,10 +370,12 @@ function QueryUI(queryTab) {
         function atEnd(state, success) {
             var totalDuration = (new Date()).getTime() - state;
             if (success) {
-                if (query === 'create' || query === 'update') {
-                    setTimeout(() => {
-                        VoltDbUI.refreshSqlAndSchemaTab();
-                    }, 1500)
+                if (query[0].toLowerCase() === 'create' || query[0].toLowerCase() === 'update') {
+                    if (query[1].toLowerCase() === 'table' || query[1].toLowerCase() === 'tables'){
+                        setTimeout(() => {
+                            VoltDbUI.refreshSqlAndSchemaTab();
+                        }, 1500)
+                    }
                 }
                 $('#queryResults-' + query_id).removeClass('errorValue');
                 $('#queryResults-' + query_id).html('Query Duration: ' + (totalDuration / 1000.0) + 's');
