@@ -172,9 +172,17 @@ public interface Client {
      * Invoke a procedure with specified query timeout. This is a synchronous call:
      * it blocks until a result is available.
      * <p>
+     * The specified query timeout applies to a read-only query or batch of read-only
+     * queries, and may override the global <code>querytimeout</code> value in the
+     * VoltDB cluster's configuration file. Only callers with admin privilege are
+     * permitted to use a timeout longer than the global setting.
+     * <p>
+     * A query timeout of zero means there is no timeout applied to the query
+     * or batch of queries.
+     * <p>
      * For more details, refer to {@link #callProcedure(String, Object...)}.
      *
-     * @param queryTimeout timeout (in milliseconds) for queries in a batch for read-only procedures.
+     * @param queryTimeout timeout (in milliseconds) for read-only queries or batches of queries.
      * @param procName <code>class</code> name (not qualified by package) of the procedure to execute.
      * @param parameters vararg list of procedure's parameter values.
      * @return {@link ClientResponse} instance of procedure call results.
@@ -191,10 +199,18 @@ public interface Client {
      * queued within the configured timeout. Check the return value to determine
      * if queueing actually took place.
      * <p>
+     * The specified query timeout applies to a read-only query or batch of read-only
+     * queries, and may override the global <code>querytimeout</code> value in the
+     * VoltDB cluster's configuration file. Only callers with admin privilege are
+     * permitted to use a timeout longer than the global setting.
+     * <p>
+     * A query timeout of zero means there is no timeout applied to the query
+     * or batch of queries.
+     * <p>
      * For more details, refer to {@link #callProcedure(ProcedureCallback, String, Object...)}.
      *
      * @param callback {@link ProcedureCallback} that will be invoked with procedure results.
-     * @param queryTimeout timeout (in milliseconds) for queries in a batch for read-only procedures.
+     * @param queryTimeout timeout (in milliseconds) for read-only queries or batches of queries.
      * @param procName class name (not qualified by package) of the procedure to execute.
      * @param parameters vararg list of procedure's parameter values.
      * @return <code>true</code> if the procedure was queued and <code>false</code> otherwise.
@@ -206,9 +222,14 @@ public interface Client {
 
     /**
      * Synchronously invoke a procedure call, blocking until a result is available,
-     * with caller-specified procedure timeout.
+     * with caller-specified client timeout and query timeout.
+     * <p>
+     * The client timeout overrides the default set up by {@link ClientConfig#setProcedureCallTimeout}.
+     * <p>
+     * See {@link #callProcedureWithTimeout(int, String, Object...)} for details
+     * of the query timeout.
      *
-     * @param batchTimeout procedure invocation batch timeout (milliseconds)
+     * @param queryTimeout timeout (in milliseconds) for read-only queries or batches of queries
      * @param procName class name (not qualified by package) of the procedure to execute.
      * @param clientTimeout timeout for the procedure
      * @param unit TimeUnit of procedure timeout
@@ -218,7 +239,7 @@ public interface Client {
      * @throws NoConnectionsException if this {@link Client} instance is not connected to any servers.
      * @throws IOException if there is a Java network or connection problem.
      */
-    public ClientResponse callProcedureWithClientTimeout(int batchTimeout,
+    public ClientResponse callProcedureWithClientTimeout(int queryTimeout,
                                                          String procName,
                                                          long clientTimeout,
                                                          TimeUnit unit,
@@ -226,10 +247,15 @@ public interface Client {
     throws IOException, NoConnectionsException, ProcCallException;
 
     /**
-     * Asynchronously invoke a procedure call with specified batch and query timeouts.
+     * Asynchronously invoke a procedure call with specified client and query timeouts.
+     * <p>
+     * The client timeout overrides the default set up by {@link ClientConfig#setProcedureCallTimeout}.
+     * <p>
+     * See {@link #callProcedureWithTimeout(ProcedureCallback, int, String, Object...)} for details
+     * of the query timeout.
      *
      * @param callback TransactionCallback that will be invoked with procedure results.
-     * @param batchTimeout procedure invocation batch timeout (in milliseconds)
+     * @param queryTimeout timeout (in milliseconds) for read-only queries or batches of queries
      * @param procName class name (not qualified by package) of the procedure to execute.
      * @param clientTimeout query timeout
      * @param clientTimeoutUnit units for query timeout
@@ -239,7 +265,7 @@ public interface Client {
      * @throws IOException if there is a Java network or connection problem.
      */
     public boolean callProcedureWithClientTimeout(ProcedureCallback callback,
-                                                  int batchTimeout,
+                                                  int queryTimeout,
                                                   String procName,
                                                   long clientTimeout,
                                                   TimeUnit clientTimeoutUnit,
