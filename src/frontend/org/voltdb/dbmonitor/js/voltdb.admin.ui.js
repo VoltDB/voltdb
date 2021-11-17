@@ -3252,8 +3252,7 @@ function loadAdminPage() {
             $("#btnSaveConfigOk").unbind("click");
             var conCounter = 0;
             $(document).on("click", "#btnSaveConfigOk", function () {
-                conCounter++;
-                if (conCounter === 1) {
+                if (conCounter === 0) {
                     var adminConfigurations = VoltDbAdminConfig.getLatestRawAdminConfigurations();
                     if ($("#expotSaveConfigText").data("status") == "delete") {
                         adminConfigurations["export"].configuration.splice(editId * 1, 1);
@@ -3344,6 +3343,7 @@ function loadAdminPage() {
                         VoltDbAdminConfig.isExportLoading = false;
                     });
                 }
+                conCounter++;
             });
 
             $("#btnSaveConfigCancel").unbind("click");
