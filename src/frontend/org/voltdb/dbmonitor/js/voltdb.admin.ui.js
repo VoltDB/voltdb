@@ -1863,10 +1863,28 @@ function loadAdminPage() {
             adminEditObjects.txtCommunity.show();
             adminEditObjects.txtUsername.show();
             adminEditObjects.ddlAuthProtocol.html('');
-            adminEditObjects.ddlAuthProtocol.append("<option>SHA</option><option>MD5</option><option>NoAuth</option>")
+            if ($("#authProtocolSpan").text() === 'SHA'){
+                adminEditObjects.ddlAuthProtocol.append("<option selected='selected'>SHA</option><option>MD5</option><option>NoAuth</option>")
+            } else if ($("#authProtocolSpan").text() === 'MD5') {
+                adminEditObjects.ddlAuthProtocol.append("<option>SHA</option><option selected='selected'>MD5</option><option>NoAuth</option>")
+            } else {
+                adminEditObjects.ddlAuthProtocol.append("<option>SHA</option><option>MD5</option><option selected='selected'>NoAuth</option>")
+            }
             adminEditObjects.ddlAuthProtocol.show();
             adminEditObjects.ddlPrivProtocol.html('');
-            adminEditObjects.ddlPrivProtocol.append("<option>AES</option><option>DES</option><option>NoPriv</option><option>3DES</option><option>AES192</option><option>AES256</option>")
+            if ($("#privProtocolSpan").text() === "AES") {
+                adminEditObjects.ddlPrivProtocol.append("<option selected='selected'>AES</option><option>DES</option><option>NoPriv</option><option>3DES</option><option>AES192</option><option>AES256</option>");
+            } else if ($("#privProtocolSpan").text() === "DES") {
+                adminEditObjects.ddlPrivProtocol.append("<option>AES</option><option selected='selected'>DES</option><option>NoPriv</option><option>3DES</option><option>AES192</option><option>AES256</option>");
+            } else if ($("#privProtocolSpan").text() === "NoPriv") {
+                adminEditObjects.ddlPrivProtocol.append("<option>AES</option><option>DES</option><option selected='selected'>NoPriv</option><option>3DES</option><option>AES192</option><option>AES256</option>");
+            } else if ($("#privProtocolSpan").text() === "3DES") {
+                adminEditObjects.ddlPrivProtocol.append("<option>AES</option><option>DES</option><option>NoPriv</option><option selected='selected'>3DES</option><option>AES192</option><option>AES256</option>");
+            } else if ($("#privProtocolSpan").text() === "AES192") {
+                adminEditObjects.ddlPrivProtocol.append("<option>AES</option><option>DES</option><option>NoPriv</option><option>3DES</option><option selected='selected'>AES192</option><option>AES256</option>");
+            } else {
+                adminEditObjects.ddlPrivProtocol.append("<option>AES</option><option>DES</option><option>NoPriv</option><option>3DES</option><option>AES192</option><option selected='selected'>AES256</option>");
+            }
             adminEditObjects.ddlPrivProtocol.show();
 
             adminEditObjects.loadingSnmp.hide();
