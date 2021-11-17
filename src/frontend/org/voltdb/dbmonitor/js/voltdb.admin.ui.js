@@ -3270,8 +3270,7 @@ function loadAdminPage() {
             $("#btnSaveConfigOk").unbind("click");
             var conCounter = 0;
             $(document).on("click", "#btnSaveConfigOk", function () {
-                conCounter++;
-                if (conCounter === 1) {
+                if (conCounter === 0) {
                     var adminConfigurations = VoltDbAdminConfig.getLatestRawAdminConfigurations();
                     if ($("#expotSaveConfigText").data("status") == "delete") {
                         adminConfigurations["export"].configuration.splice(editId * 1, 1);
@@ -3362,6 +3361,7 @@ function loadAdminPage() {
                         VoltDbAdminConfig.isExportLoading = false;
                     });
                 }
+                conCounter++;
             });
 
             $("#btnSaveConfigCancel").unbind("click");
@@ -4636,9 +4636,9 @@ function loadAdminPage() {
         },
         afterOpen: function () {
             var popup = $(this)[0];
-            var count = 0;
+            var roleCheckBox = $("#selectRole > label > input[type='checkbox']");
             $("#errorRole").hide();
-            $("#selectRole > label > input[type='checkbox']").iCheck({
+            roleCheckBox.iCheck({
                 checkboxClass: 'icheckbox_square-aero customCheckbox',
             })
             if (editUserState == -1) {
@@ -4664,19 +4664,13 @@ function loadAdminPage() {
             $("#btnSaveUser").unbind("click");
             $("#btnSaveUser").on("click", function (e) {
                 $("#errorRole").hide();
-                $("#selectRole > label > div > input[type='checkbox']:checked").each(function () {
-                    count += 1;
-                });
-                var con = false;
-                if (count == 0) {
-                    con = true;
-                }
                 if (!$("#frmAddUser").valid()) {
-                    if (con) $("#errorRole").show();
+                    if (!roleCheckBox.is(":checked")) $("#errorRole").show();
+                    else $("#errorRole").hide();
                     e.preventDefault();
                     e.stopPropagation();
                 } else {
-                    if (con) {
+                    if (!roleCheckBox.is(":checked")) {
                         e.preventDefault();
                         e.stopPropagation();
                         $("#errorRole").show();
@@ -4807,7 +4801,7 @@ function loadAdminPage() {
                 $("#deleteSecUser").hide();
                 $("#saveUserControl").show();
             });
-        }
+        },
     });
 
     $("#updateErrorPopupLink").popup({
