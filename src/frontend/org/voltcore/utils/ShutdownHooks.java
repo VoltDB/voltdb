@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -131,7 +131,7 @@ public class ShutdownHooks
         if (m_iAmAServer && !m_crashing && VoltDB.getShutdownHooks().m_crashMessage) {
             VoltLogger voltLogger = new VoltLogger("CONSOLE");
             String msg = "The VoltDB server will shut down due to a control-C or other JVM exit.";
-            CoreUtils.printAsciiArtLog(voltLogger, msg, Level.INFO);
+            CoreUtils.logWithEmphasis(voltLogger, msg, Level.INFO);
         }
         for (Entry<Integer, List<ShutdownTask>> tasks : m_shutdownTasks.entrySet()) {
             for (ShutdownTask task : tasks.getValue()) {

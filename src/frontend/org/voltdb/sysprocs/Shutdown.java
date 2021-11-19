@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -83,7 +83,7 @@ public class Shutdown extends VoltSystemProcedure {
             voltLogger.info("Timed out waiting for shutdown completion; proceeding.");
         }
         String msg = "VoltDB shutting down as requested by @Shutdown command.";
-        CoreUtils.printAsciiArtLog(voltLogger, msg, Level.INFO);
+        CoreUtils.logWithEmphasis(voltLogger, msg, Level.INFO);
         if (VoltDB.instanceOnServerThread()) {
             // Using shutdown from the localServerThread requires
             // the statics to be reinitialized for their next use
@@ -114,7 +114,7 @@ public class Shutdown extends VoltSystemProcedure {
                 s_failsafe.start(); // exit after 10 seconds no matter what
                 VoltLogger voltLogger = new VoltLogger("HOST");
                 String msg = "VoltDB shutdown operation requested and in progress. Cluster will terminate shortly.";
-                CoreUtils.printAsciiArtLog(voltLogger, msg, Level.INFO);
+                CoreUtils.logWithEmphasis(voltLogger, msg, Level.INFO);
             }
             VoltTable rslt = new VoltTable(new ColumnInfo[] { new ColumnInfo("HA", VoltType.STRING) });
             return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_shutdownSync, rslt);

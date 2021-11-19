@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -1203,13 +1203,14 @@ public class CoreUtils {
     }
 
     /**
-     * Print beautiful logs surrounded by stars. Please use only spaces and newline
-     * characters for word separation.
+     * Print beautiful (sic) logs surrounded by stars.
+     * Single line only. Use only space characters for word separation.
+     *
      * @param vLogger   The provided VoltLogger
      * @param msg   Message to be printed out beautifully
      * @param level Logging level
      */
-    public static void printAsciiArtLog(VoltLogger vLogger, String msg, Level level) {
+    public static void logWithEmphasis(VoltLogger vLogger, String msg, Level level) {
         if (vLogger == null || msg == null || level == Level.OFF) { return; }
 
         // Length of stars = msg length, plus 4 for the surrounding "* " and " *"
@@ -1222,47 +1223,16 @@ public class CoreUtils {
         String xmsg = "* " + msg + " *";
 
         // Wrap the message with 2 lines of stars
-        switch (level) {
-            case DEBUG:
-                vLogger.debug(stars);
-                vLogger.debug(xmsg);
-                vLogger.debug(stars);
-                break;
-            case WARN:
-                vLogger.warn(stars);
-                vLogger.warn(xmsg);
-                vLogger.warn(stars);
-                break;
-            case ERROR:
-                vLogger.error(stars);
-                vLogger.error(xmsg);
-                vLogger.error(stars);
-                break;
-            case FATAL:
-                vLogger.fatal(stars);
-                vLogger.fatal(xmsg);
-                vLogger.fatal(stars);
-                break;
-            case INFO:
-                vLogger.info(stars);
-                vLogger.info(xmsg);
-                vLogger.info(stars);
-                break;
-            case TRACE:
-                vLogger.trace(stars);
-                vLogger.trace(xmsg);
-                vLogger.trace(stars);
-                break;
-            default:
-                break;
-        }
+        vLogger.log(level, stars, null);
+        vLogger.log(level, xmsg, null);
+        vLogger.log(level, stars, null);
     }
 
     public static void logProcedureInvocation(VoltLogger log, String userName, String where, String procedure) {
         String msg = "User " + userName + " from " + where +
                 " issued a " + procedure;
         if ("@PrepareShutdown".equals(procedure))
-            printAsciiArtLog(log, msg, Level.INFO);
+            logWithEmphasis(log, msg, Level.INFO);
         else
             log.info(msg);
     }
