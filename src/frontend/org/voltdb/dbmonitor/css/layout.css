@@ -2316,6 +2316,9 @@ ul.adminClusterList li a.shutdown {
     padding: 8px;
     font-weight: bold;
 }
+.btnDown:focus {
+    color : #000 !important;
+}
 .adminServer {
     float: left;
 }
