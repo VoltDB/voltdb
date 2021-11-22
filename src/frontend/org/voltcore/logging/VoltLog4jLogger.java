@@ -216,22 +216,26 @@ public class VoltLog4jLogger implements CoreVoltLogger {
             if (appndr instanceof DailyMaxRollingFileAppender) {
                 dailyMax = true;
                 DailyMaxRollingFileAppender oap = (DailyMaxRollingFileAppender) appndr;
-                File logFH = new File(oap.getFile());
-                if (!logFH.isAbsolute()) {
-                    fileAppendrDatePattern = oap.getDatePattern();
-                    fileAppendr = oap;
-                    maxBackupIndex = oap.getMaxBackupIndex();
-                    break;
+                if (oap.getFile() != null) {
+                    File logFH = new File(oap.getFile());
+                    if (!logFH.isAbsolute()) {
+                        fileAppendrDatePattern = oap.getDatePattern();
+                        fileAppendr = oap;
+                        maxBackupIndex = oap.getMaxBackupIndex();
+                        break;
+                    }
                 }
             }
             // For older log4j
             if (appndr instanceof DailyRollingFileAppender) {
                 DailyRollingFileAppender oap = (DailyRollingFileAppender) appndr;
-                File logFH = new File(oap.getFile());
-                if (!logFH.isAbsolute()) {
-                    fileAppendrDatePattern = oap.getDatePattern();
-                    fileAppendr = oap;
-                    break;
+                if (oap.getFile() != null) {
+                    File logFH = new File(oap.getFile());
+                    if (!logFH.isAbsolute()) {
+                        fileAppendrDatePattern = oap.getDatePattern();
+                        fileAppendr = oap;
+                        break;
+                    }
                 }
             }
         }
