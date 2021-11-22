@@ -109,6 +109,12 @@ set $PREV snapshotpriority 6
 set $PREV elasticduration 50
 set $PREV elasticthroughput 2
 set $PREV querytimeout 10000
+add /clusters#cluster/deployment#deployment/systemsettings#systemsettings priorities priorities
+set /clusters#cluster/deployment#deployment/systemsettings#systemsettings/priorities#priorities enabled false
+set $PREV maxwait 0
+set $PREV batchsize 0
+set $PREV drpriority 0
+set $PREV snapshotpriority 0
 add /clusters#cluster logconfig log
 set /clusters#cluster/logconfig#log enabled false
 set $PREV synchronous false
