@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -122,7 +122,7 @@ public class JDBC4ClientConnection implements Closeable {
                     throws UnknownHostException, IOException
     {
         this(clientConnectionKeyBase, clientConnectionKey, servers, user, password, isHeavyWeight,
-             maxOutstandingTxns, reconnectOnConnectionLoss, null, null, false);
+             maxOutstandingTxns, reconnectOnConnectionLoss, null, null, false, -1);
     }
 
     /**
@@ -173,7 +173,7 @@ public class JDBC4ClientConnection implements Closeable {
             SSLConfiguration.SslConfig sslConfig, String kerberosConfig)
                     throws UnknownHostException, IOException {
         this(clientConnectionKeyBase, clientConnectionKey, servers, user, password, isHeavyWeight,
-                maxOutstandingTxns, reconnectOnConnectionLoss, sslConfig, kerberosConfig, false);
+             maxOutstandingTxns, reconnectOnConnectionLoss, sslConfig, kerberosConfig, false, -1);
 
     }
 
@@ -217,6 +217,9 @@ public class JDBC4ClientConnection implements Closeable {
      *            Uses specified JAAS file entry id for kerberos authentication if set.
      * @param topologyChangeAware
      *            make client aware of changes in topology.
+     * @param priority
+     *            request priority if > 0, or any value <= 0 for not specified
+     *
      * @throws IOException
      * @throws UnknownHostException
      */
@@ -224,7 +227,8 @@ public class JDBC4ClientConnection implements Closeable {
             String clientConnectionKeyBase, String clientConnectionKey,
             String[] servers, String user, String password, boolean isHeavyWeight,
             int maxOutstandingTxns, boolean reconnectOnConnectionLoss,
-            SSLConfiguration.SslConfig sslConfig, String kerberosConfig, boolean topologyChangeAware)
+            SSLConfiguration.SslConfig sslConfig, String kerberosConfig,
+            boolean topologyChangeAware, int priority)
             throws UnknownHostException, IOException
     {
         // Save the list of trimmed non-empty server names.
@@ -250,6 +254,10 @@ public class JDBC4ClientConnection implements Closeable {
         config.setMaxOutstandingTxns(maxOutstandingTxns);
         config.setReconnectOnConnectionLoss(reconnectOnConnectionLoss);
         config.setTopologyChangeAware(topologyChangeAware);
+
+        if (priority > 0) {
+            config.setRequestPriority(priority);
+        }
 
         if (enableSSL) {
             if (sslConfig.trustStorePath != null && sslConfig.trustStorePath.trim().length() > 0) {

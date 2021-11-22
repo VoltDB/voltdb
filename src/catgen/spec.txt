@@ -34,12 +34,24 @@ begin ThreadPool javaonly         "Thread Pool configuration"
   int size                        "The size of the thread pool"
 end
 
+// Note: Systemsettings does not contain all elements defined in DeploymentFileSchema.xsd
+// but only those that appear in @SystemInformation
+
 begin Systemsettings javaonly "Container for deployment systemsettings element"
   int temptablemaxsize        "The maximum allocation size for temp tables in the EE"
   int snapshotpriority        "The priority of snapshot work"
   int elasticduration         "Maximum duration time for rebalancing"
   int elasticthroughput       "Target throughput in megabytes for elasticity"
   int querytimeout            "The maximum latency for a query batch before timing out"
+  Priorities* priorities      "The server settings for priorities"
+end
+
+begin Priorities javaonly   "The server settings for priorities"
+  bool enabled              "Are priorities enabled"
+  int maxwait               "Max wait time in queue, in milliseconds"
+  int batchsize             "Batch processing size from queue"
+  int drpriority            "Priority of DR operations"
+  int snapshotpriority      "Priority of snapshot operations"
 end
 
 begin Database                       "A set of schema, procedures and other metadata that together comprise an application"
@@ -198,6 +210,7 @@ begin Topic                                  "A topic in the database"
   string procedureName                       "Stored procedure for the topic"
   int retentionPolicy                        "Retention policy of the topic"
   int retentionLimit                         "Retention limit of the topic"
+  int priority                               "Priority of the procedure calls"
   string retentionUnit                       "Retention unit of the topic"
   string roles                               "A CSV string of the roles to access this topic"
   removed profile                            "The deployment profile of the topic"

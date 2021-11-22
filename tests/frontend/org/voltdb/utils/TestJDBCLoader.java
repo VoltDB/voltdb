@@ -211,6 +211,50 @@ public class TestJDBCLoader {
     }
 
     @Test
+    public void testWithPriority() throws Exception
+    {
+        String []myOptions = {
+            "-f" + path_csv,
+            "--reportdir=" + reportDir,
+            "--maxerrors=50",
+            "--user=",
+            "--password=",
+            "--port=",
+            "--separator=,",
+            "--quotechar=\"",
+            "--escape=\\",
+            "--skip=1",
+            "--priority=6",
+            "BlAh"
+        };
+
+        String[] jdbcOptions = {
+            "--jdbcdriver=" + driver_class,
+            "--jdbcurl=" + jdbc_url,
+            "--jdbctable=" + "BlAh",
+            "--reportdir=" + reportDir,
+            "--maxerrors=50",
+            "--user=",
+            "--password=",
+            "--port=",
+            "--priority=6",
+            "JBlAh"
+        };
+
+        String currentTime = new TimestampType().toString();
+        String []myData = {
+            "1,2,2,222222,second,3.30,NULL," + currentTime,
+            "2,3,3,333333, third ,NULL, 3.33," + currentTime,
+            "3,4,4,444444, NULL ,4.40 ,4.44," + currentTime,
+            "4,5,5,5555555,  \"abcde\"g, 5.50, 5.55," + currentTime,
+            "5,6,NULL,666666, sixth, 6.60, 6.66," + currentTime
+        };
+        int invalidLineCnt = 0;
+        int validLineCnt = 4;
+        test_Interface(myOptions, jdbcOptions, myData, invalidLineCnt, validLineCnt);
+    }
+
+    @Test
     public void testColumnSizeFailure() throws Exception
     {
         String []myOptions = {

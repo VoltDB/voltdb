@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -35,6 +35,7 @@ import java.util.Properties;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
 
+import org.voltdb.client.Priority;
 import org.voltcore.utils.ssl.SSLConfiguration;
 
 public class Driver implements java.sql.Driver
@@ -53,6 +54,7 @@ public class Driver implements java.sql.Driver
     public static final String HEAVYWEIGHT_PROP = "heavyweight";
     public static final String USER_PROP = "user";
     public static final String PASSWORD_PROP = "password";
+    public static final String PRIORITY_PROP = "priority";
 
     //Driver URL prefix.
     private static final String URL_PREFIX = "jdbc:voltdb:";
@@ -152,6 +154,7 @@ public class Driver implements java.sql.Driver
                 String truststorePassword = null;
                 String kerberosConfig = null;
                 boolean topologyChangeAware = false;
+                int priority = -1;
 
                 for (Enumeration<?> e = info.propertyNames(); e.hasMoreElements();)
                 {
@@ -188,6 +191,12 @@ public class Driver implements java.sql.Driver
                     else if (key.equalsIgnoreCase(TOPOLOGY_CHANGE_AWARE_PROP)){
                         topologyChangeAware = Boolean.valueOf(value);
                     }
+                    else if (key.equalsIgnoreCase(PRIORITY_PROP)){
+                        priority = Integer.valueOf(value);
+                        if (priority < Priority.HIGHEST_PRIORITY || priority > Priority.LOWEST_PRIORITY) {
+                            throw SQLError.get(SQLError.ILLEGAL_ARGUMENT);
+                        }
+                    }
                     // else - unknown; ignore
                 }
                 SSLConfiguration.SslConfig sslConfig = null;
@@ -198,9 +207,11 @@ public class Driver implements java.sql.Driver
                 // Return JDBC connection wrapper for the client
                 return  new JDBC4Connection(JDBC4ClientConnectionPool.get(servers, user, password,
                                                                           heavyweight, maxoutstandingtxns, reconnectOnConnectionLoss, sslConfig,
-                                                                          kerberosConfig, topologyChangeAware),
+                                                                          kerberosConfig, topologyChangeAware, priority),
                                             info);
 
+            } catch (SQLException x) {
+                throw x;
             } catch (Exception x) {
                 throw SQLError.get(x, SQLError.CONNECTION_UNSUCCESSFUL);
             }

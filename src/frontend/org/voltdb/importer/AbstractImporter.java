@@ -51,9 +51,11 @@ public abstract class AbstractImporter
     private static final int LOG_SUPPRESSION_INTERVAL_SECONDS = 60;
 
     private final VoltLogger m_logger;
+    private int m_priority;
     private ImporterServerAdapter m_importServerAdapter;
     private volatile boolean m_stopping;
     private final Predicate<Integer> m_backPressurePredicate = (x) -> shouldRun();
+
 
     protected AbstractImporter() {
         m_logger = new VoltLogger(getName());
@@ -62,6 +64,15 @@ public abstract class AbstractImporter
     @Override
     public boolean hasTransaction() {
         return true;
+    }
+
+    public final void setPriority(int priority) {
+        m_priority = priority;
+    }
+
+    @Override
+    public int getPriority() {
+        return m_priority;
     }
 
     /**

@@ -99,8 +99,8 @@ public class Client2Impl implements Client2 {
 
     private final AtomicLong handleGenerator = new AtomicLong(0);
     private final AtomicLong sysHandleGenerator = new AtomicLong(0);
-    private final static boolean tracing = false; // compile-time debug option
-    private final static boolean datadump = false; // likewise (needs tracing true)
+    private final static boolean debugging = false; // compile-time debug option
+    private final static boolean datadump = false; // likewise (needs debugging true)
 
     // Internal-only exceptions, not exposed to client user
     private static class SerializationException extends Exception {
@@ -612,8 +612,8 @@ public class Client2Impl implements Client2 {
                 newLimit = outLimit - drained;
             }
         }
-        if (tracing) {
-            trace("Outstanding txn limit %d, available permits %d",
+        if (debugging) {
+            debug("Outstanding txn limit %d, available permits %d",
                   newLimit, sendPermits.availablePermits());
         }
         outLimit = newLimit;
@@ -737,14 +737,14 @@ public class Client2Impl implements Client2 {
     @Override
     public CompletableFuture<ClientResponse> callProcedureAsync(Client2CallOptions options, String procName, Object... parameters) {
         long clientTmo = procedureCallTimeout;
-        long batchTmo = BatchTimeoutOverrideType.NO_TIMEOUT;
+        long queryTmo = BatchTimeoutOverrideType.NO_TIMEOUT;
         int reqPrio = defaultRequestPriority;
         if (options != null) {
             if (options.clientTimeout != null) clientTmo = options.clientTimeout;
-            if (options.batchTimeout != null) batchTmo = options.batchTimeout;
+            if (options.queryTimeout != null) queryTmo = options.queryTimeout;
             if (options.requestPriority != null) reqPrio = options.requestPriority;
         }
-        return doProcCall(clientTmo, batchTmo, ProcedureInvocation.NO_PARTITION, reqPrio, procName, parameters);
+        return doProcCall(clientTmo, queryTmo, ProcedureInvocation.NO_PARTITION, reqPrio, procName, parameters);
     }
 
     @Override
@@ -759,14 +759,14 @@ public class Client2Impl implements Client2 {
     @Override
     public CompletableFuture<ClientResponseWithPartitionKey[]> callAllPartitionProcedureAsync(Client2CallOptions options, String procName, Object... parameters) {
         long clientTmo = procedureCallTimeout;
-        long batchTmo = BatchTimeoutOverrideType.NO_TIMEOUT;
+        long queryTmo = BatchTimeoutOverrideType.NO_TIMEOUT;
         int reqPrio = defaultRequestPriority;
         if (options != null) {
             if (options.clientTimeout != null) clientTmo = options.clientTimeout;
-            if (options.batchTimeout != null) batchTmo = options.batchTimeout;
+            if (options.queryTimeout != null) queryTmo = options.queryTimeout;
             if (options.requestPriority != null) reqPrio = options.requestPriority;
         }
-        return doAllPartitionCall(clientTmo, batchTmo, reqPrio, procName, parameters);
+        return doAllPartitionCall(clientTmo, queryTmo, reqPrio, procName, parameters);
     }
 
     @Override
@@ -1044,26 +1044,26 @@ public class Client2Impl implements Client2 {
      * called with any locks (synchronization) held.
      */
     private void notifyConnectFailure(String host, int port) {
-        if (tracing || notificationConnectFailure != null) {
-            trace("Connect failed: %s port %d", host, port);
+        if (debugging || notificationConnectFailure != null) {
+            debug("Connect failed: %s port %d", host, port);
             notifyConnectionEvent(notificationConnectFailure, host, port);
         }
     }
 
     private void notifyConnectionUp(ClientConnection cxn) {
-        if (tracing || notificationConnectionUp != null) {
+        if (debugging || notificationConnectionUp != null) {
             String host = cxn.connection.getHostnameOrIP();
             int port = cxn.connection.getRemotePort();
-            trace("Connection up: %s port %d", host, port);
+            debug("Connection up: %s port %d", host, port);
             notifyConnectionEvent(notificationConnectionUp, host, port);
         }
     }
 
     private void notifyConnectionDown(ClientConnection cxn) {
-        if (tracing || notificationConnectionDown != null) {
+        if (debugging || notificationConnectionDown != null) {
             String host = cxn.connection.getHostnameOrIP();
             int port = cxn.connection.getRemotePort();
-            trace("Connection down: %s port %d", host, port);
+            debug("Connection down: %s port %d", host, port);
             notifyConnectionEvent(notificationConnectionDown, host, port);
         }
     }
@@ -1086,7 +1086,7 @@ public class Client2Impl implements Client2 {
      * The destination partition is usually NO_PARTITION, allowing it to
      * be determined from procedure parameters where appropriate.
      */
-    private CompletableFuture<ClientResponse> doProcCall(long clientTimeout, long batchTimeout, int destinationPartition,
+    private CompletableFuture<ClientResponse> doProcCall(long clientTimeout, long queryTimeout, int destinationPartition,
                                                          int requestPrio, String procName, Object... params) {
         CompletableFuture<ClientResponse> future = new CompletableFuture<>();
 
@@ -1121,8 +1121,8 @@ public class Client2Impl implements Client2 {
 
         // Locate the appropriate connection
         long handle = handleGenerator.incrementAndGet();
-        int batchTmoMs = (int)(batchTimeout > 0 ? TimeUnit.NANOSECONDS.toMillis(batchTimeout) : batchTimeout);
-        ProcedureInvocation invocation = new ProcedureInvocation(handle, batchTmoMs, destinationPartition,
+        int queryTmoMs = (int)(queryTimeout > 0 ? TimeUnit.NANOSECONDS.toMillis(queryTimeout) : queryTimeout);
+        ProcedureInvocation invocation = new ProcedureInvocation(handle, queryTmoMs, destinationPartition,
                                                                  requestPrio, procName, params);
         ClientConnection cxn = findConnection(invocation);
         if (cxn == null) {
@@ -1177,10 +1177,10 @@ public class Client2Impl implements Client2 {
      *
      * Execution starts by requesting an up-to-date list of knpwn partitions.
      */
-    private CompletableFuture<ClientResponseWithPartitionKey[]> doAllPartitionCall(long clientTimeout, long batchTimeout,
+    private CompletableFuture<ClientResponseWithPartitionKey[]> doAllPartitionCall(long clientTimeout, long queryTimeout,
                                                                                    int requestPrio,
                                                                                    String procName, Object... params) {
-        AllPartitionCallContext context = new AllPartitionCallContext(clientTimeout, batchTimeout, requestPrio, procName, params);
+        AllPartitionCallContext context = new AllPartitionCallContext(clientTimeout, queryTimeout, requestPrio, procName, params);
         if (isShutdown) {
             context.future.completeExceptionally(new IllegalStateException("shutting down"));
         }
@@ -1199,14 +1199,14 @@ public class Client2Impl implements Client2 {
     private class AllPartitionCallContext {
         final CompletableFuture<ClientResponseWithPartitionKey[]> future;
         final long clientTimeout;
-        final long batchTimeout;
+        final long queryTimeout;
         final int requestPrio;
         final String procName;
         final Object[] params;
-        AllPartitionCallContext(long ct, long bt, int rp, String proc, Object[] pars) {
+        AllPartitionCallContext(long ct, long qt, int rp, String proc, Object[] pars) {
             future = new CompletableFuture<ClientResponseWithPartitionKey[]>();
             clientTimeout = ct;
-            batchTimeout = bt;
+            queryTimeout = qt;
             requestPrio = rp;
             procName = proc;
             params = pars;
@@ -1226,7 +1226,7 @@ public class Client2Impl implements Client2 {
             Integer partitionKey = ent.getValue();
             args[0] = partitionKey; // this is safe: the args are synchronously copied in to a ProcedureInvocation
             final int thisIndex = index;
-            doProcCall(context.clientTimeout, context.batchTimeout, partitionId, context.requestPrio, context.procName, args)
+            doProcCall(context.clientTimeout, context.queryTimeout, partitionId, context.requestPrio, context.procName, args)
                 .whenComplete((resp, th) -> onePartitionComplete(context.future, responses, thisIndex, count, partitionKey, resp, th));
             index++;
         }
@@ -1529,8 +1529,8 @@ public class Client2Impl implements Client2 {
 
                 String procName = context.invocation.getProcName();
                 context.cxn.clientStats(procName).update(elapsedTime, clusterRTT, abort, fail, false);
-                if (tracing && abort|fail) {
-                    trace("Procedure %s failed, %d", procName, response.getStatus());
+                if (debugging && abort|fail) {
+                    debug("Procedure %s failed, %d", procName, response.getStatus());
                 }
                 context.future.complete(response);
             }
@@ -1554,15 +1554,15 @@ public class Client2Impl implements Client2 {
         // Maybe it's a notification we subscribed to?
         // These are identified by magic handle numbers.
         else if (handle == ASYNC_TOPO_HANDLE) {
-            if (tracing) {
-                trace("Received notification of topology change");
+            if (debugging) {
+                debug("Received notification of topology change");
             }
             topoStatsCompletion(response, null);
         }
 
         else if (handle == ASYNC_PROC_HANDLE) {
-            if (tracing) {
-                trace("Received notification of catalog change");
+            if (debugging) {
+                debug("Received notification of catalog change");
             }
             procedureCatalogCompletion(response, null);
         }
@@ -1596,12 +1596,12 @@ public class Client2Impl implements Client2 {
      * on a response thread.
      */
     private void notifyLateResponse(ClientResponse resp, ClientConnection cxn) {
-        if (tracing || notificationLateResponse != null) {
+        if (debugging || notificationLateResponse != null) {
             String host = cxn.connection.getHostnameOrIP();
             int port = cxn.connection.getRemotePort();
             int status = resp.getStatus();
-            if (tracing) {
-                trace("Late response received from %s port %d with status %d", host, port, status);
+            if (debugging) {
+                debug("Late response received from %s port %d with status %d", host, port, status);
             }
             if (notificationLateResponse != null) {
                 try {
@@ -1934,7 +1934,8 @@ public class Client2Impl implements Client2 {
         CompletableFuture<ClientResponse> future = new CompletableFuture<>();
         future.whenComplete((resp, th) -> completion.accept(resp, unwrapThrowable(th)));
         long handle = sysHandleGenerator.decrementAndGet();
-        ProcedureInvocation pi = new ProcedureInvocation(handle, BatchTimeoutOverrideType.NO_TIMEOUT, -1,
+        ProcedureInvocation pi = new ProcedureInvocation(handle, BatchTimeoutOverrideType.NO_TIMEOUT,
+                                                         ProcedureInvocation.NO_PARTITION,
                                                          systemRequestPriority, procName, procParams);
         ByteBuffer buf = serializeInvocation(pi);
         RequestContext reqCtx = new RequestContext(future, pi, procedureCallTimeout, cxn);
@@ -2030,8 +2031,8 @@ public class Client2Impl implements Client2 {
         if (!checkSystemResponse(resp, th, "@Subscribe", 0)) {
             ensureSubscription(resubscriptionDelay); // recover by retry?
         }
-        else if (tracing) {
-            trace("Subscribing to topology changes");
+        else if (debugging) {
+            debug("Subscribing to topology changes");
         }
     }
 
@@ -2039,8 +2040,8 @@ public class Client2Impl implements Client2 {
         if (!checkSystemResponse(resp, th, "@Statistics TOPO", 2)) {
             return; // no immediate recovery
         }
-        if (tracing) {
-            trace("Processing new topology data");
+        if (debugging) {
+            debug("Processing new topology data");
         }
 
         // Invalidate partition keys cache
@@ -2080,7 +2081,7 @@ public class Client2Impl implements Client2 {
                         where = "at " + cxn.connection.getHostnameOrIP() +
                                 " " + cxn.connection.getRemotePort();
                     }
-                    trace("  Partition %2d : leader %d, %s", partition, leaderId, where);
+                    debug("  Partition %2d : leader %d, %s", partition, leaderId, where);
                 }
                 if (cxn != null) {
                     newPartitionLeaders.put(partition, cxn);
@@ -2093,7 +2094,7 @@ public class Client2Impl implements Client2 {
 
         // Schedule the connector task
         if (!unconnected.isEmpty()) {
-            trace("%d hosts are not currently connected", unconnected.size());
+            debug("%d hosts are not currently connected", unconnected.size());
             scheduleConnectionTask(unconnected, 0);
         }
     }
@@ -2102,8 +2103,8 @@ public class Client2Impl implements Client2 {
         if (!checkSystemResponse(resp, th, "@SystemCatalog PROCEDURES", 1)) {
             return; // no immediate recovery
         }
-        if (tracing) {
-            trace("Processing new procedure catalogue");
+        if (debugging) {
+            debug("Processing new procedure catalogue");
         }
 
         int badJson = 0;
@@ -2124,10 +2125,10 @@ public class Client2Impl implements Client2 {
                 }
                 if (datadump) {
                     if (single) {
-                        trace("  Proc %s : SP, param %d, type %d", procName, partitionParam, paramType);
+                        debug("  Proc %s : SP, param %d, type %d", procName, partitionParam, paramType);
                     }
                     else {
-                        trace("  Proc %s : MP", procName);
+                        debug("  Proc %s : MP", procName);
                     }
                 }
                 newProcInfoMap.put(procName, new ProcInfo(!single, readOnly, partitionParam, paramType));
@@ -2194,12 +2195,12 @@ public class Client2Impl implements Client2 {
                     partitionKeysWaiters.add(waiter);
                 }
                 if (!partitionKeysUpdateInProgress.getAndSet(true)) {
-                    if (tracing) trace("Refreshing partition keys list");
+                    if (debugging) debug("Refreshing partition keys list");
                     execService.schedule(new PartitionKeysTask(), 0, TimeUnit.NANOSECONDS);
                 }
             }
             else {
-                if (tracing) trace("Using cached partition keys list");
+                if (debugging) debug("Using cached partition keys list");
                 waiter.accept(null);
             }
         }
@@ -2232,8 +2233,8 @@ public class Client2Impl implements Client2 {
             notifyPartitionKeysWaiters(th);
             return;
         }
-        if (tracing) {
-            trace("Processing partition keys data");
+        if (debugging) {
+            debug("Processing partition keys data");
         }
         Map<Integer,Integer> newMap = new HashMap<>();
         VoltTable keyInfo = resp.getResults()[0];
@@ -2460,8 +2461,8 @@ public class Client2Impl implements Client2 {
             }
         }
         info.resetRowPosition();
-        if (tracing && peons != 0 && admins != 0) {
-            trace("Client/admin heuristic indeterminate: %d connections using admin port, %d not", admins, peons);
+        if (debugging && peons != 0 && admins != 0) {
+            debug("Client/admin heuristic indeterminate: %d connections using admin port, %d not", admins, peons);
         }
         return peons == 0 && admins != 0 ? "ADMINPORT" : "CLIENTPORT";
     }
@@ -2644,11 +2645,13 @@ public class Client2Impl implements Client2 {
     }
 
     /*
-     * Debug tracing, normally disabled. Not subject to
-     * intercept by application handler.
+     * Internal programmer debugging, normally disabled. Not subject to
+     * intercept by application handler. We don't base this on the usual
+     * logger settings, since this API code intentionally does not have
+     * a logger (it's up to the application).
      */
-    private void trace(String msg, Object... args) {
-        if (tracing) {
+    private void debug(String msg, Object... args) {
+        if (debugging) {
             System.err.printf("--- " + msg + '\n', args);
         }
     }

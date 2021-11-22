@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -28,7 +28,6 @@ import org.supercsv.exception.SuperCsvException;
 import org.supercsv.io.ICsvListReader;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltType;
-import org.voltdb.client.Client;
 import org.voltdb.common.Constants;
 
 import com.google_voltpatches.common.collect.BiMap;
@@ -57,7 +56,6 @@ class CSVFileReader implements Runnable {
     static AtomicLong m_totalRowCount = new AtomicLong(0);
     static AtomicLong m_totalLineCount = new AtomicLong(0);
     static CSVLoader.CSVConfig m_config = null;
-    static Client m_csvClient = null;
     static ICsvListReader m_listReader = null;
     long m_parsingTime = 0;
     private static final Map<VoltType, String> m_blankStrings = new EnumMap<VoltType, String>(VoltType.class);
@@ -81,9 +79,8 @@ class CSVFileReader implements Runnable {
         m_blankStrings.put(VoltType.VARBINARY, "");
     }
 
-    public static void initializeReader(CSVLoader.CSVConfig config, Client csvClient, ICsvListReader reader) {
+    public static void initializeReader(CSVLoader.CSVConfig config, ICsvListReader reader) {
         m_config = config;
-        m_csvClient = csvClient;
         m_listReader = reader;
     }
 

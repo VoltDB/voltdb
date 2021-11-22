@@ -252,9 +252,27 @@ function server() {
     $VOLTDB start -l $LICENSE -H $HOST
 }
 
+# run the voltdb server locally with priority queues enabled
+function server-priority() {
+    jars-ifneeded
+    # run the server
+    $VOLTDB init -C deployment2.xml --force
+    $VOLTDB start -l $LICENSE -H $HOST
+}
+
 # run the client that drives the example
 function client() {
     async-benchmark
+}
+
+# run the client that drives the example, using V2 client
+function client2() {
+    async-benchmark2
+}
+
+# run the client that drives the example, using V2 client, with random priorities
+function client2p() {
+    async-benchmark2p
 }
 
 # Asynchronous benchmark sample
@@ -273,6 +291,57 @@ function async-benchmark() {
         --servers=localhost \
         --threads=20 \
         --threadoffset=0 \
+        --minvaluesize=1024 \
+        --maxvaluesize=1024 \
+        --entropy=127 \
+        --fillerrowsize=10240 \
+        --replfillerrowmb=32 \
+        --partfillerrowmb=128 \
+        --progresstimeout=20 \
+        --usecompression=false \
+        --allowinprocadhoc=false
+        # --enabledthreads=partttlMigratelt,replttlMigratelt
+        # --disabledthreads=ddlt,partBiglt,replBiglt,partCappedlt,replCappedlt,replLoadlt,partLoadlt,adHocMayhemThread,idpt,partTrunclt,replTrunclt
+#ddlt,clients,partBiglt,replBiglt,partCappedlt,replCappedlt,replLoadlt,partLoadlt,adHocMayhemThread,idpt,readThread,partTrunclt,replTrunclt
+        # --sslfile=./keystore.props
+}
+
+function async-benchmark2() {
+    jars-ifneeded
+    java -ea -classpath txnid.jar:$CLASSPATH: -Dlog4j.configuration=file://$CLIENTLOG4J \
+        txnIdSelfCheck.Benchmark $ARGS \
+        --displayinterval=1 \
+        --duration=100 \
+        --servers=localhost \
+        --threads=20 \
+        --threadoffset=0 \
+        --useclientv2=true \
+        --minvaluesize=1024 \
+        --maxvaluesize=1024 \
+        --entropy=127 \
+        --fillerrowsize=10240 \
+        --replfillerrowmb=32 \
+        --partfillerrowmb=128 \
+        --progresstimeout=20 \
+        --usecompression=false \
+        --allowinprocadhoc=false
+        # --enabledthreads=partttlMigratelt,replttlMigratelt
+        # --disabledthreads=ddlt,partBiglt,replBiglt,partCappedlt,replCappedlt,replLoadlt,partLoadlt,adHocMayhemThread,idpt,partTrunclt,replTrunclt
+#ddlt,clients,partBiglt,replBiglt,partCappedlt,replCappedlt,replLoadlt,partLoadlt,adHocMayhemThread,idpt,readThread,partTrunclt,replTrunclt
+        # --sslfile=./keystore.props
+}
+
+function async-benchmark2p() {
+    jars-ifneeded
+    java -ea -classpath txnid.jar:$CLASSPATH: -Dlog4j.configuration=file://$CLIENTLOG4J \
+        txnIdSelfCheck.Benchmark $ARGS \
+        --displayinterval=1 \
+        --duration=100 \
+        --servers=localhost \
+        --threads=20 \
+        --threadoffset=0 \
+        --useclientv2=true \
+        --usepriorities=true \
         --minvaluesize=1024 \
         --maxvaluesize=1024 \
         --entropy=127 \

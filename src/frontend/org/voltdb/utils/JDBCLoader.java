@@ -225,6 +225,10 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
 
         @Option(desc = "Fetch Size for JDBC request (default: 100)")
         int fetchsize = 100;
+
+        @Option(desc = "Priority for VoltDB client requests (0=none/default)")
+        int priority = 0;
+
         /**
          * Batch size for processing batched operations.
          */
@@ -343,7 +347,10 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
             c_config.setTrustStoreConfigFromPropertyFile(m_config.ssl);
             c_config.enableSSL();
         }
-        c_config.setProcedureCallTimeout(0); // Set procedure all to infinite
+        c_config.setProcedureCallTimeout(0); // 0 => infinite
+        if (m_config.priority > 0) {
+            c_config.setRequestPriority(m_config.priority);
+        }
         Client csvClient = null;
         try {
             csvClient = JDBCLoader.getClient(c_config, m_config.servers, m_config.port);
@@ -466,11 +473,11 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
      * @param config
      * @param servers
      * @param port
-     * @return
+     * @return client
      * @throws Exception
      */
-    public static Client getClient(ClientConfig config, String servers,
-                                   int port) throws IOException, InterruptedException {
+    private static Client getClient(ClientConfig config, String servers,
+                                    int port) throws IOException, InterruptedException {
         config.setTopologyChangeAware(true);
         Client client = ClientFactory.createClient(config);
         try {

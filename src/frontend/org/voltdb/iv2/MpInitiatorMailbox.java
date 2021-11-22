@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -19,28 +19,55 @@ package org.voltdb.iv2;
 
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.Callable;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.VoltMessage;
+import org.voltdb.client.Priority;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.iv2.MpTerm.RepairType;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
+import org.voltdb.utils.Prioritized;
 
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Throwables;
 
 /**
- * InitiatorMailbox accepts initiator work and proxies it to the
- * configured InitiationRole.
+ * MpInitiatorMailbox accepts MP initiator work and proxies it to the
+ * configured InitiationRole. Uses 2 threads:
+ * <ul>
+ * <li>MpInitiator deliver runs tasks initiating MPs, repairing MPs, transitioning MP intiator leadership</li>
+ * <li>MPInitiator send runs tasks delivering completions</li>
+ * </ul>
  */
 public class MpInitiatorMailbox extends InitiatorMailbox
 {
-    private final LinkedBlockingQueue<Runnable> m_taskQueue = new LinkedBlockingQueue<Runnable>();
+    // A class for MPI tasks: needs a settable priority
+    static abstract class MpiTask implements Runnable, Comparable<MpiTask>, Prioritized {
+
+        private int priority = Priority.SYSTEM_PRIORITY;
+
+        @Override
+        public int compareTo(MpiTask other) {
+            return Integer.compare(this.priority, other.priority);
+        }
+
+        @Override
+        public void setPriority(int prio) {
+            priority = prio;
+        }
+
+        @Override
+        public int getPriority() {
+            return priority;
+        }
+    }
+    private final BlockingQueue<MpiTask> m_taskQueue = PriorityPolicy.getMpTaskQueue();
+
     @SuppressWarnings("serial")
     private static class TerminateThreadException extends RuntimeException {};
     private long m_taskThreadId = 0;
@@ -83,34 +110,39 @@ public class MpInitiatorMailbox extends InitiatorMailbox
 
     @Override
     public RepairAlgo constructRepairAlgo(final Supplier<List<Long>> survivors, int deadHost, final String whoami, boolean skipTxnRestart) {
-        RepairAlgo ra = null;
         if (Thread.currentThread().getId() != m_taskThreadId) {
-            FutureTask<RepairAlgo> ft = new FutureTask<RepairAlgo>(new Callable<RepairAlgo>() {
+            final AtomicReference<RepairAlgo> ra = new AtomicReference<>();
+            final CountDownLatch cdl = new CountDownLatch(1);
+
+            m_taskQueue.offer(new MpiTask() {
                 @Override
-                public RepairAlgo call() throws Exception {
-                    RepairAlgo ra = new MpPromoteAlgo(survivors.get(), deadHost, MpInitiatorMailbox.this,
-                            m_restartSeqGenerator, whoami, skipTxnRestart);
-                    setRepairAlgoInternal(ra);
-                    return ra;
-                }
-            });
-            m_taskQueue.offer(ft);
+                public void run() {
+                    try {
+                        RepairAlgo ralgo = new MpPromoteAlgo(survivors.get(), deadHost, MpInitiatorMailbox.this,
+                                m_restartSeqGenerator, whoami, skipTxnRestart);
+                        setRepairAlgoInternal(ralgo);
+                        ra.set(ralgo);
+                    } finally {
+                        cdl.countDown();
+                    }
+                }});
             try {
-                ra = ft.get();
+                cdl.await();
             } catch (Exception e) {
                 Throwables.propagate(e);
             }
+            return ra.get();
         } else {
-            ra = new MpPromoteAlgo(survivors.get(), deadHost, this, m_restartSeqGenerator, whoami, skipTxnRestart);
+            RepairAlgo ra = new MpPromoteAlgo(survivors.get(), deadHost, this, m_restartSeqGenerator, whoami, skipTxnRestart);
             setRepairAlgoInternal(ra);
+            return ra;
         }
-        return ra;
     }
 
     public void setLeaderState(final long maxSeenTxnId, final long repairTruncationHandle)
     {
         final CountDownLatch cdl = new CountDownLatch(1);
-        m_taskQueue.offer(new Runnable() {
+        m_taskQueue.offer(new MpiTask() {
             @Override
             public void run() {
                 try {
@@ -132,7 +164,7 @@ public class MpInitiatorMailbox extends InitiatorMailbox
     @Override
     public void setMaxLastSeenMultipartTxnId(final long txnId) {
         final CountDownLatch cdl = new CountDownLatch(1);
-        m_taskQueue.offer(new Runnable() {
+        m_taskQueue.offer(new MpiTask() {
             @Override
             public void run() {
                 try {
@@ -153,7 +185,7 @@ public class MpInitiatorMailbox extends InitiatorMailbox
     @Override
     public void setMaxLastSeenTxnId(final long txnId) {
         final CountDownLatch cdl = new CountDownLatch(1);
-        m_taskQueue.offer(new Runnable() {
+        m_taskQueue.offer(new MpiTask() {
             @Override
             public void run() {
                 try {
@@ -173,7 +205,7 @@ public class MpInitiatorMailbox extends InitiatorMailbox
     @Override
     public void enableWritingIv2FaultLog() {
         final CountDownLatch cdl = new CountDownLatch(1);
-        m_taskQueue.offer(new Runnable() {
+        m_taskQueue.offer(new MpiTask() {
             @Override
             public void run() {
                 try {
@@ -204,7 +236,7 @@ public class MpInitiatorMailbox extends InitiatorMailbox
 
     @Override
     public void shutdown() throws InterruptedException {
-        m_taskQueue.offer(new Runnable() {
+        m_taskQueue.offer(new MpiTask() {
             @Override
             public void run() {
                 try {
@@ -214,7 +246,7 @@ public class MpInitiatorMailbox extends InitiatorMailbox
                 }
             }
         });
-        m_taskQueue.offer(new Runnable() {
+        m_taskQueue.offer(new MpiTask() {
             @Override
             public void run() {
                 throw new TerminateThreadException();
@@ -233,7 +265,7 @@ public class MpInitiatorMailbox extends InitiatorMailbox
     @Override
     public long[] updateReplicas(final List<Long> replicas, final Map<Integer, Long> partitionMasters,
             TransactionState snapshotTransactionState) {
-        m_taskQueue.offer(new Runnable() {
+        m_taskQueue.offer(new MpiTask() {
             @Override
             public void run() {
                 updateReplicasInternal(replicas, partitionMasters, snapshotTransactionState);
@@ -243,7 +275,7 @@ public class MpInitiatorMailbox extends InitiatorMailbox
     }
 
     public void updateReplicas(final List<Long> replicas, final Map<Integer, Long> partitionMasters, RepairType repairType) {
-        m_taskQueue.offer(new Runnable() {
+        m_taskQueue.offer(new MpiTask() {
             @Override
             public void run() {
                 assert(lockingVows());
@@ -267,12 +299,20 @@ public class MpInitiatorMailbox extends InitiatorMailbox
 
     @Override
     public void deliver(final VoltMessage message) {
-        m_taskQueue.offer(new Runnable() {
+        // Offer a task but set priority from Iv2InitiateTaskMessage
+        m_taskQueue.offer(new MpiTask() {
             @Override
             public void run() {
                 deliverInternal(message);
             }
-        });
+            private MpiTask init(VoltMessage message) {
+                if (message instanceof Iv2InitiateTaskMessage
+                        && ((Iv2InitiateTaskMessage) message).getStoredProcedureInvocation() != null) {
+                    setPriority(((Iv2InitiateTaskMessage) message).getStoredProcedureInvocation().getRequestPriority());
+                }
+                return this;
+            }
+        }.init(message));
     }
 
     @Override
@@ -284,7 +324,7 @@ public class MpInitiatorMailbox extends InitiatorMailbox
         } else {
             //When called from MpInitiator.acceptPromotion
             final CountDownLatch cdl = new CountDownLatch(1);
-            m_taskQueue.offer(new Runnable() {
+            m_taskQueue.offer(new MpiTask() {
                 @Override
                 public void run() {
                     try {

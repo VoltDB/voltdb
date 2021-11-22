@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -81,17 +81,30 @@ public class InternalConnectionHandler {
         return VoltDB.instance().getCatalogContext();
     }
 
+    // Basic
     public boolean callProcedure(
             AuthUser user,
             boolean isAdmin,
             int timeout,
             ProcedureCallback cb,
             String procName,
-            Object...args)
-    {
-        return callProcedure(user, isAdmin, timeout, cb, false, null, procName, args);
+            Object...args) {
+        return callProcedure(null, user, isAdmin, timeout, -1, cb, false, null, procName, args);
     }
 
+    // Basic plus hostname
+    public boolean callProcedure(
+            String hostname,
+            AuthUser user,
+            boolean isAdmin,
+            int timeout,
+            ProcedureCallback cb,
+            String procName,
+            Object...args) {
+        return callProcedure(hostname, user, isAdmin, timeout, -1, cb, false, null, procName, args);
+    }
+
+    // Basic plus ntPriority and backPressurePredicate
     public boolean callProcedure(
             AuthUser user,
             boolean isAdmin,
@@ -100,11 +113,11 @@ public class InternalConnectionHandler {
             boolean ntPriority,
             Predicate<Integer> backPressurePredicate,
             String procName,
-            Object...args)
-    {
-        return callProcedure(null, user, isAdmin, timeout, cb, ntPriority, backPressurePredicate, procName, args);
+            Object...args) {
+        return callProcedure(null, user, isAdmin, timeout, -1, cb, ntPriority, backPressurePredicate, procName, args);
     }
 
+    // Basic plus hostname, ntPriority, and backPressurePredicate
     public boolean callProcedure(
             String hostname,
             AuthUser user,
@@ -115,6 +128,23 @@ public class InternalConnectionHandler {
             Predicate<Integer> backPressurePredicate,
             String procName,
             Object... args) {
+        return callProcedure(hostname, user, isAdmin, timeout, -1, cb, ntPriority, backPressurePredicate, procName, args);
+
+    }
+
+    // Once with everything: the above plus requestPriority
+    public boolean callProcedure(
+            String hostname,
+            AuthUser user,
+            boolean isAdmin,
+            int timeout, // or NO_TIMEOUT
+            int requestPriority, // if negative: StoredProcedureInvocation will use SYSTEM_PRIORITY
+            ProcedureCallback cb,
+            boolean ntPriority,
+            Predicate<Integer> backPressurePredicate,
+            String procName,
+            Object... args) {
+
         Procedure catProc = InvocationDispatcher.getProcedureFromName(procName, getCatalogContext());
         if (catProc == null) {
             String fmt = "Cannot invoke procedure %s. Procedure not found.";
@@ -131,9 +161,14 @@ public class InternalConnectionHandler {
             task.setBatchTimeout(timeout);
         }
 
+        if (requestPriority >= 0) {
+            task.setRequestPriority(requestPriority);
+        }
+
         return callProcedure(hostname, user, isAdmin, task, catProc, cb, ntPriority, backPressurePredicate);
     }
 
+    // With prefabricated StoredProcedureInvocation
     public boolean callProcedure(String hostname, AuthUser user, boolean isAdmin, StoredProcedureInvocation task,
             Procedure catProc, ProcedureCallback cb, boolean ntPriority, Predicate<Integer> backPressurePredicate) {
         assert task.getProcName().equals(catProc.getTypeName()) || catProc.getSystemproc();
@@ -192,6 +227,7 @@ public class InternalConnectionHandler {
         StoredProcedureInvocation task = new StoredProcedureInvocation();
 
         task.setProcName(proc);
+        task.setRequestPriority(caller.getPriority());
         task.setParams(fieldList);
         try {
             task = MiscUtils.roundTripForCL(task);

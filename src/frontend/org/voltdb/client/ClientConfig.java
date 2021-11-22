@@ -52,6 +52,9 @@ public class ClientConfig {
     static final int DEFAULT_BACKPRESSURE_QUEUE_REQUEST_LIMIT = 100; // default request limit
     static final int DEFAULT_BACKPRESSURE_QUEUE_BYTE_LIMIT = 256 * 1024; // default byte limit, 256K
 
+    static final int HIGHEST_PRIORITY = Priority.HIGHEST_PRIORITY;
+    static final int LOWEST_PRIORITY = Priority.LOWEST_PRIORITY;
+
     final ClientAuthScheme m_hashScheme;
     final String m_username;
     final String m_password;
@@ -74,6 +77,7 @@ public class ClientConfig {
     long m_asyncBlockingTimeout = DEFAULT_NONBLOCKING_ASYNC_TIMEOUT_NANOS;
     int m_backpressureQueueRequestLimit = DEFAULT_BACKPRESSURE_QUEUE_REQUEST_LIMIT;
     int m_backpressureQueueByteLimit = DEFAULT_BACKPRESSURE_QUEUE_BYTE_LIMIT;
+    int m_requestPriority = -1;
 
     //For unit testing. This should really be in Environment class we should assemble all such there.
     public static final boolean ENABLE_SSL_FOR_TEST = Boolean.valueOf(
@@ -572,4 +576,25 @@ public class ClientConfig {
         }
     }
 
+   /**
+     * Sets the request priority for all procedure calls from
+     * a <code>Client</code> created using this configuration.
+     * <p>
+     * This will be used only if priorities are enabled by the
+     * VoltDB cluster, and then it affects the order in which
+     * requests are dispatched.
+     * <p>
+     * The valid priority range is from 1 to 8, inclusive.
+     * Higher priorities have lower numerical values.
+     *
+     * @param prio priority
+     */
+    public void setRequestPriority(int prio) {
+        if (prio < HIGHEST_PRIORITY || prio > LOWEST_PRIORITY) {
+            String err = String.format("Invalid request priority %d; range is %d to %d",
+                                       prio, HIGHEST_PRIORITY, LOWEST_PRIORITY);
+            throw new IllegalArgumentException(err);
+        }
+        m_requestPriority = prio;
+    }
 }

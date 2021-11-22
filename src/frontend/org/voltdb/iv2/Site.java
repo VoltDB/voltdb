@@ -137,8 +137,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     // HSId of this site's initiator.
     final long m_siteId;
 
-    final int m_snapshotPriority;
-
     // Partition count is important on SPIs, MPI doesn't use it.
     int m_numberOfPartitions;
 
@@ -706,7 +704,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             int partitionId,
             int numPartitions,
             StartAction startAction,
-            int snapshotPriority,
             InitiatorMailbox initiatorMailbox,
             StatsAgent agent,
             MemoryStats memStats,
@@ -721,7 +718,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_pendingSiteTasks = pendingSiteTasks;
         m_backend = backend;
         m_runningState = startAction.doesJoin() ? RunningState.REJOINING : RunningState.RUNNING;
-        m_snapshotPriority = snapshotPriority;
         // need this later when running in the final thread.
         m_startupConfig = new StartupConfig(serializedCatalog, context.m_genId);
         m_lastCommittedSpHandle = TxnEgo.makeZero(partitionId).getTxnId();
@@ -796,7 +792,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_ee.loadFunctions(m_context);
 
         m_snapshotter = new SnapshotSiteProcessor(m_pendingSiteTasks,
-        m_snapshotPriority,
         new SnapshotSiteProcessor.IdlePredicate() {
             @Override
             public boolean idle(long now) {
@@ -931,6 +926,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         m_currentTxnId = ((TransactionTask)task).getTxnId();
                         m_lastTxnTime = EstTime.currentTimeMillis();
                     }
+                    Iv2Trace.logSiteTaskerQueueTake(task, false, false);
                     task.run(getSiteProcedureConnection());
                 } else if (m_runningState.isReplaying()) {
                     // Rejoin operation poll and try to do some catchup work. Tasks
@@ -952,6 +948,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         // Otherwise, keep the task in the scheduler and let the next loop take and handle it
                         if (!m_runningState.isRunning()) {
                             m_pendingSiteTasks.poll();
+                            Iv2Trace.logSiteTaskerQueueTake(task, true, false);
                             task.runForRejoin(getSiteProcedureConnection(), m_rejoinTaskLog);
                         }
                     } else {
@@ -963,6 +960,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     }
                 } else if (m_runningState.isRejoining()){
                     SiteTasker task = m_pendingSiteTasks.take();
+                    Iv2Trace.logSiteTaskerQueueTake(task, false, true);
                     task.runForRejoin(getSiteProcedureConnection(), m_rejoinTaskLog);
                 } else if (m_runningState.isDecommissioning()) {
                     Thread.currentThread().join();

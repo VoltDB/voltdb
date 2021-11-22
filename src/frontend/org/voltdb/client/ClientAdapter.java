@@ -55,11 +55,7 @@ public class ClientAdapter implements Client {
     private int maxTransactionsPerSecond;
 
     public ClientAdapter(ClientConfig config) {
-        this(config, 0);
-    }
-
-    public ClientAdapter(ClientConfig config, int prio) {
-        this.client = new Client2Impl(convertConfig(config, prio));
+        this.client = new Client2Impl(convertConfig(config));
         this.autoConnect = config.m_topologyChangeAware | config.m_reconnectOnConnectionLoss;
         this.maxOutstandingTxns = config.m_maxOutstandingTxns;
         this.maxTransactionsPerSecond = config.m_maxTransactionsPerSecond;
@@ -107,14 +103,14 @@ public class ClientAdapter implements Client {
     @Override
     public ClientResponse callProcedureWithTimeout(int queryTimeout, String procName, Object... parameters)
         throws IOException, ProcCallException {
-        Client2CallOptions opts = new Client2CallOptions().batchTimeout(queryTimeout, TimeUnit.MILLISECONDS);
+        Client2CallOptions opts = new Client2CallOptions().queryTimeout(queryTimeout, TimeUnit.MILLISECONDS);
         return client.callProcedureSync(opts, procName, parameters);
     }
 
     @Override
     public boolean callProcedureWithTimeout(ProcedureCallback callback, int queryTimeout, String procName, Object... parameters) {
         AtomicBoolean refused = new AtomicBoolean();
-        Client2CallOptions opts = new Client2CallOptions().batchTimeout(queryTimeout, TimeUnit.MILLISECONDS);
+        Client2CallOptions opts = new Client2CallOptions().queryTimeout(queryTimeout, TimeUnit.MILLISECONDS);
         client.callProcedureAsync(opts, procName, parameters)
               .thenAccept((r) -> callback(r, callback))
               .exceptionally((x) -> except(x, refused));
@@ -122,29 +118,29 @@ public class ClientAdapter implements Client {
      }
 
     @Override
-    public ClientResponse callProcedureWithClientTimeout(int batchTimeout,
+    public ClientResponse callProcedureWithClientTimeout(int queryTimeout,
                                                          String procName,
                                                          long clientTimeout,
                                                          TimeUnit unit,
                                                          Object... parameters)
         throws IOException, ProcCallException {
         Client2CallOptions opts = new Client2CallOptions()
-            .batchTimeout(batchTimeout, TimeUnit.MILLISECONDS)
-            .clientTimeout(batchTimeout, unit);
+            .queryTimeout(queryTimeout, TimeUnit.MILLISECONDS)
+            .clientTimeout(clientTimeout, unit);
         return client.callProcedureSync(opts, procName, parameters);
      }
 
     @Override
     public boolean callProcedureWithClientTimeout(ProcedureCallback callback,
-                                                  int batchTimeout,
+                                                  int queryTimeout,
                                                   String procName,
                                                   long clientTimeout,
                                                   TimeUnit unit,
                                                   Object... parameters) {
         AtomicBoolean refused = new AtomicBoolean();
         Client2CallOptions opts = new Client2CallOptions()
-            .batchTimeout(batchTimeout, TimeUnit.MILLISECONDS)
-            .clientTimeout(batchTimeout, unit);
+            .queryTimeout(queryTimeout, TimeUnit.MILLISECONDS)
+            .clientTimeout(clientTimeout, unit);
         client.callProcedureAsync(opts, procName, parameters)
               .thenAccept((r) -> callback(r, callback))
                .exceptionally((x) -> except(x, refused));
@@ -300,7 +296,7 @@ public class ClientAdapter implements Client {
         }
     }
 
-    private Client2Config convertConfig(ClientConfig c1, int prio) {
+    private Client2Config convertConfig(ClientConfig c1) {
         Client2Config c2 = new Client2Config();
 
         c2.username(c1.m_username);
@@ -347,8 +343,8 @@ public class ClientAdapter implements Client {
             c2.lateResponseHandler(c1.m_listener::lateProcedureResponse);
         }
 
-        if (prio > 0) {
-            c2.requestPriority(prio);
+        if (c1.m_requestPriority > 0) {
+            c2.requestPriority(c1.m_requestPriority);
         }
 
         return c2;

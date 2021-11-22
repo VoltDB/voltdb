@@ -65,7 +65,8 @@ public class CatalogValidator {
             new Entry("org.voltdb.e3.topics.TopicsValidator", true),
             new Entry("org.voltdb.e3.topics.TopicsGatewayValidator", true),
             new Entry("org.voltdb.task.TaskValidator", false),
-            new Entry("org.voltdb.dr2.DRCatalogValidator", true)
+            new Entry("org.voltdb.dr2.DRCatalogValidator", true),
+            new Entry("org.voltdb.iv2.PriorityPolicyValidator", false)
     };
 
     /**

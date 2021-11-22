@@ -54,7 +54,7 @@ public class ClientFactory {
      */
     public static Client createClient(ClientConfig config) {
         if (m_forceClient2) { // backdoor for testing
-            return createCompatibleClient(config, 0);
+            return createCompatibleClient(config);
         }
         else {
             start();
@@ -100,16 +100,14 @@ public class ClientFactory {
      * intended <strong>only</strong> for internal VoltDB use.
      * <p>
      * No Client2-only methods are exposed through this
-     * compatibility interface. A fixed request priority
-     * can be set at the time of creation.
+     * compatibility interface.
      *
      * @param config A {@link ClientConfig} object
-     * @param prio request priority for <code>Client2</code> (0=default)
      * @return A configured {@link Client}
      */
-    public static Client createCompatibleClient(ClientConfig config, int prio) {
+    private static Client createCompatibleClient(ClientConfig config) {
         start();
-        return new ClientAdapter(config, prio);
+        return new ClientAdapter(config);
     }
 
     /**

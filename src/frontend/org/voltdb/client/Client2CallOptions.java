@@ -45,7 +45,7 @@ public class Client2CallOptions {
     // All times are in nanoseconds
 
     Long clientTimeout;
-    Long batchTimeout;
+    Long queryTimeout;
     Integer requestPriority;
 
     /**
@@ -72,15 +72,21 @@ public class Client2CallOptions {
     }
 
     /**
-     * Sets the query timeout for a batch of procedure calls.
-     * A zero or negative value means there is no limit.
+     * Sets the server-side query timeout for a read-only procedure call
+     * or batch of procedure calls. This has no effect on read-write
+     * transactions. A zero or negative value means there is no limit.
+     * <p>
+     * This timeout may override the value specified for <code>querytimeout</code>
+     * in the <code>systemsettings</code> element of the VoltDB cluster
+     * configuration file. Admin privilege is required to set a timeout
+     * longer than the global value.
      *
      * @param timeout the timeout interval
      * @param unit the units in which the timeout was expressed
      * @return this
      */
-    public Client2CallOptions batchTimeout(long timeout, TimeUnit unit) {
-        batchTimeout = timeout > 0 ? unit.toNanos(timeout) : Long.MAX_VALUE;
+    public Client2CallOptions queryTimeout(long timeout, TimeUnit unit) {
+        queryTimeout = timeout > 0 ? unit.toNanos(timeout) : Long.MAX_VALUE;
         return this;
     }
 

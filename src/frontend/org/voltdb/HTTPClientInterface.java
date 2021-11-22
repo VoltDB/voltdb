@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -49,6 +49,7 @@ import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.ClientAuthScheme;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.Priority;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.security.AuthenticationRequest;
 import org.voltdb.utils.Base64;
@@ -306,6 +307,7 @@ public class HTTPClientInterface {
             String procName = request.getParameter("Procedure");
             String params = request.getParameter("Parameters");
             String timeoutStr = request.getParameter(QUERY_TIMEOUT_PARAM);
+            String prioStr = request.getParameter("Priority");
 
             // null procs are bad news
             if (procName == null) {
@@ -317,12 +319,20 @@ public class HTTPClientInterface {
             int queryTimeout = -1;
             if (timeoutStr != null) {
                 try {
-                    queryTimeout = Integer.parseInt(timeoutStr);
-                    if (queryTimeout <= 0) {
-                        throw new NumberFormatException("negative query timeout");
-                    }
+                    queryTimeout = parseIntegerParam(timeoutStr, 1, Integer.MAX_VALUE);
                 } catch(NumberFormatException e) {
                     badRequest(jsonp, "invalid query timeout: " + timeoutStr, response);
+                    request.setHandled(true);
+                    return;
+                }
+            }
+
+            int priority = Priority.DEFAULT_PRIORITY;
+            if (prioStr != null) {
+                try {
+                    priority = parseIntegerParam(prioStr, Priority.HIGHEST_PRIORITY, Priority.LOWEST_PRIORITY);
+                } catch(NumberFormatException e) {
+                    badRequest(jsonp, "invalid priority: " + prioStr, response);
                     request.setHandled(true);
                     return;
                 }
@@ -377,10 +387,10 @@ public class HTTPClientInterface {
                     continuation.complete();
                     return;
                 }
-                success = callProcedure(hostname, authResult, queryTimeout, cb, procName, paramSet.toArray());
+                success = callProcedure(hostname, authResult, queryTimeout, priority, cb, procName, paramSet.toArray());
             }
             else {
-                success = callProcedure(hostname, authResult, queryTimeout, cb, procName);
+                success = callProcedure(hostname, authResult, queryTimeout, priority, cb, procName);
             }
             if (!success) {
                 ok(jsonp, "Server is not accepting work at this time.", response);
@@ -403,13 +413,34 @@ public class HTTPClientInterface {
         }
     }
 
-    public boolean callProcedure(String hostname, final AuthenticationResult ar, int timeout, ProcedureCallback cb, String procName, Object...args) {
-        InternalConnectionHandler internal=m_invocationHandler.get();
-        return internal.callProcedure(hostname, ar.m_authUser, ar.m_adminMode, timeout, cb, false, null, procName, args);
+    private static int parseIntegerParam(String str, int low, int high) {
+        int val = Integer.parseInt(str); // may throw
+        if (val < low || val > high) {
+            throw new NumberFormatException(String.format("value %d out of range (%d, %d)",
+                                                          val, low, high));
+        }
+        return val;
     }
 
-    public boolean callProcedure(String hostname, final AuthUser user, boolean adminMode, int timeout, ProcedureCallback cb, String procName, Object...args) {
-        return m_invocationHandler.get().callProcedure(hostname, user, adminMode, timeout, cb, false, null, procName, args);
+    // With request priority, defaulted to Priority.DEFAULT_PRIORITY.
+    // Always resolved before we call InternalConnectionHandler since we do not want
+    // the priority to default to SYSTEM_PRIORITY as it's a user request.
+    private boolean callProcedure(String hostname, AuthenticationResult ar, int timeout, int priority, ProcedureCallback cb, String procName, Object...args) {
+        assert priority > 0;
+        InternalConnectionHandler internal = m_invocationHandler.get();
+        return internal.callProcedure(hostname, ar.m_authUser, ar.m_adminMode, timeout, priority, cb, false, null, procName, args);
+    }
+
+    // Called from utils/DeploymentRequestServlet for @UpdateApplicationCatalog
+    public boolean callProcedure(String hostname, AuthenticationResult ar, int timeout, ProcedureCallback cb, String procName, Object...args) {
+        InternalConnectionHandler internal = m_invocationHandler.get();
+        return internal.callProcedure(hostname, ar.m_authUser, ar.m_adminMode, timeout, Priority.DEFAULT_PRIORITY, cb, false, null, procName, args);
+    }
+
+    // TODO - Apparently unused
+    private boolean callProcedure(String hostname, AuthUser user, boolean adminMode, int timeout, ProcedureCallback cb, String procName, Object...args) {
+        InternalConnectionHandler internal = m_invocationHandler.get();
+        return internal.callProcedure(hostname, user, adminMode, timeout, cb, procName, args);
     }
 
     Configuration getVoltDBConfig() {

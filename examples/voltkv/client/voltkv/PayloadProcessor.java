@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -64,6 +64,7 @@ public class PayloadProcessor
         }
     }
 
+    private final int KeyOffset;
     private final int KeySize;
     private final int MinValueSize;
     private final int MaxValueSize;
@@ -97,6 +98,19 @@ public class PayloadProcessor
             int poolSize,
             boolean useCompression)
     {
+        this(0, keySize, minValueSize, maxValueSize, entropy, poolSize, useCompression);
+    }
+
+    public PayloadProcessor(
+            int keyOffset,
+            int keySize,
+            int minValueSize,
+            int maxValueSize,
+            int entropy,
+            int poolSize,
+            boolean useCompression)
+    {
+        this.KeyOffset = keyOffset;
         this.KeySize = keySize;
         this.MinValueSize = minValueSize;
         this.MaxValueSize = maxValueSize;
@@ -115,7 +129,7 @@ public class PayloadProcessor
 
     public Pair generateForStore()
     {
-        final String key = String.format(this.KeyFormat, this.Rand.nextInt(this.PoolSize));
+        final String key = String.format(this.KeyFormat, this.Rand.nextInt(this.PoolSize) + this.KeyOffset);
         final byte[] rawValue = new byte[this.MinValueSize+this.Rand.nextInt(this.MaxValueSize-this.MinValueSize+1)];
         if (entropyBytes.get().remaining() > rawValue.length){
             entropyBytes.get().get(rawValue);
@@ -138,7 +152,7 @@ public class PayloadProcessor
         int start = this.Rand.nextInt(this.PoolSize);
 
         for (int i = 0; i < count; ++i) {
-            int keyNo = (start + i) % this.PoolSize;
+            int keyNo = ((start + i) % this.PoolSize) + this.KeyOffset;
             keys[i] =  String.format(this.KeyFormat, keyNo);
         }
         return keys;
@@ -146,7 +160,7 @@ public class PayloadProcessor
 
     synchronized public String generateRandomKeyForRetrieval()
     {
-        return String.format(this.KeyFormat, this.Rand.nextInt(this.PoolSize));
+        return String.format(this.KeyFormat, this.Rand.nextInt(this.PoolSize) + this.KeyOffset);
     }
 
     public Pair retrieveFromStore(String key, byte[] storeValue)

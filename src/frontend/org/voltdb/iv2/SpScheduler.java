@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -56,6 +56,7 @@ import org.voltdb.VoltDBInterface;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltZK;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.Priority;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.exceptions.TransactionRestartException;
@@ -239,7 +240,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
     @Override
     public void configureDurableUniqueIdListener(final DurableUniqueIdListener listener, final boolean install) {
-        m_tasks.offer(new SiteTaskerRunnable() {
+        SiteTaskerRunnable task = new SiteTaskerRunnable() {
             @Override
             void run()
             {
@@ -249,7 +250,10 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 taskInfo = listener.getClass().getSimpleName();
                 return this;
             }
-        }.init(listener));
+        }.init(listener);
+
+        Iv2Trace.logSiteTaskerQueueOffer(task);
+        m_tasks.offer(task);
     }
 
     @Override
@@ -513,8 +517,18 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         long newSpHandle;
         long uniqueId = Long.MIN_VALUE;
         Iv2InitiateTaskMessage msg = message;
-        if (m_isLeader || message.isReadOnly()) {
 
+        /*
+         * Reset invocation priority to system (highest) priority: this initiate message has been
+         * taken from the queue and will be assigned transaction numbers. The original priority
+         * should be forgotten when this message is copied to downstream destinations: repair log,
+         * command log, replicas...
+         */
+        if (msg.getStoredProcedureInvocation() != null) {
+            msg.getStoredProcedureInvocation().setRequestPriority(Priority.SYSTEM_PRIORITY);
+        }
+
+        if (m_isLeader || message.isReadOnly()) {
             /*
              * If this is for CL replay or DR, update the unique ID generator
              */
@@ -1716,9 +1730,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             }
         };
         if (InitiatorMailbox.SCHEDULE_IN_SITE_THREAD) {
-            if (hostLog.isDebugEnabled()) {
+            if (hostLog.isDebugEnabled() || Iv2Trace.IV2_QUEUE_TRACE_ENABLED) {
                 r.taskInfo = currentChecks.getClass().getSimpleName();
             }
+
+            Iv2Trace.logSiteTaskerQueueOffer(r);
             m_tasks.offer(r);
         } else {
             r.run();
@@ -1831,9 +1847,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 }
             }
         };
-        if (hostLog.isDebugEnabled()) {
+        if (hostLog.isDebugEnabled() || Iv2Trace.IV2_QUEUE_TRACE_ENABLED) {
             r.taskInfo = "Repair Log Truncate Message Handle:" + TxnEgo.txnIdToString(m_repairLogTruncationHandle);
         }
+
+        Iv2Trace.logSiteTaskerQueueOffer(r);
         m_tasks.offer(r);
     }
 

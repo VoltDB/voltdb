@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -115,6 +115,12 @@ public class AsyncBenchmark {
         @Option(desc = "Number of keys to preload.")
         int poolsize = 100000;
 
+        // Allows separating keys when multiple clients are running, e.g against
+        // different clusters in XDCR configurations. Combine with poolSize to separate
+        // key values entirely, or allow partial or complete overlap.
+        @Option(desc = "Key offset, default = 0")
+        int offset = 0;
+
         @Option(desc = "Whether to preload a specified number of keys and values.")
         boolean preload = true;
 
@@ -160,6 +166,7 @@ public class AsyncBenchmark {
             if (warmup < 0) exitWithMessageAndUsage("warmup must be >= 0");
             if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
             if (poolsize <= 0) exitWithMessageAndUsage("poolsize must be > 0");
+            if (offset < 0) exitWithMessageAndUsage("offset must be >= 0");
             if (getputratio < 0) exitWithMessageAndUsage("getputratio must be >= 0");
             if (getputratio > 1) exitWithMessageAndUsage("getputratio must be <= 1");
 
@@ -213,7 +220,7 @@ public class AsyncBenchmark {
         periodicStatsContext = client.createStatsContext();
         fullStatsContext = client.createStatsContext();
 
-        processor = new PayloadProcessor(config.keysize, config.minvaluesize,
+        processor = new PayloadProcessor(config.offset, config.keysize, config.minvaluesize,
                 config.maxvaluesize, config.entropy, config.poolsize, config.usecompression);
 
         System.out.print(HORIZONTAL_RULE);
@@ -464,7 +471,7 @@ public class AsyncBenchmark {
         if (config.preload) {
             System.out.println("Preloading data store...");
             for(int i=0; i < config.poolsize; i++) {
-                String keyStr = String.format(processor.KeyFormat, i);
+                String keyStr = String.format(processor.KeyFormat, i + config.offset);
                 byte[] valArr = processor.generateForStore().getStoreValue();
                 if (config.multisingleratio != 0.00) {
                     client.callProcedure(new NullCallback(),

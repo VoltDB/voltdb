@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -24,6 +24,8 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientInterfaceHandleManager;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.Priority;
+import org.voltdb.iv2.SiteTasker.SiteTaskerRunnable;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.CompleteTransactionResponseMessage;
 import org.voltdb.messaging.DummyTransactionResponseMessage;
@@ -189,7 +191,9 @@ public class Iv2Trace
             long spHandle)
     {
         if (IV2_TRACE_ENABLED) {
-            String logmsg = "rxInitMsg %s from %s ciHandle %s txnId %s spHandle %s trunc %s";
+            String logmsg = "rxInitMsg %s from %s priority %d ciHandle %s txnId %s spHandle %s trunc %s";
+            int priority = itask.getStoredProcedureInvocation() != null ?
+                    itask.getStoredProcedureInvocation().getRequestPriority() : Priority.SYSTEM_PRIORITY;
             if (itask.getTxnId() != Long.MIN_VALUE && itask.getTxnId() != txnid) {
                 iv2log.error("Iv2InitiateTaskMessage TXN ID conflict.  Message: " + itask.getTxnId() +
                         ", locally held: " + txnid + " local: " + CoreUtils.hsIdToString(localHSId) +
@@ -202,6 +206,7 @@ public class Iv2Trace
             }
             iv2log.trace(String.format(logmsg, CoreUtils.hsIdToString(localHSId),
                         CoreUtils.hsIdToString(itask.m_sourceHSId),
+                        priority,
                         ClientInterfaceHandleManager.handleToString(itask.getClientInterfaceHandle()),
                         txnIdToString(txnid),
                         txnIdToString(spHandle),
@@ -294,9 +299,9 @@ public class Iv2Trace
     public static void logTransactionTaskQueueOffer(TransactionTask task)
     {
         if (IV2_QUEUE_TRACE_ENABLED) {
-            String logmsg = "txnQOffer txnId %s spHandle %s type %s";
-            iv2queuelog.trace(String.format(logmsg, txnIdToString(task.getTxnId()),
-                        txnIdToString(task.getSpHandle()),
+            String logmsg = "txnQOffer %s txnId %s spHandle %s type %s";
+            iv2queuelog.trace(String.format(logmsg, task.getClass().getSimpleName(),
+                    txnIdToString(task.getTxnId()), txnIdToString(task.getSpHandle()),
                     (task.m_txnState != null && task.m_txnState.isSinglePartition()) ? "SP" : "MP"));
         }
     }
@@ -304,10 +309,38 @@ public class Iv2Trace
     public static void logSiteTaskerQueueOffer(TransactionTask task)
     {
         if (IV2_QUEUE_TRACE_ENABLED) {
-            String logmsg = "tskQOffer txnId %s spHandle %s type %s";
-            iv2queuelog.trace(String.format(logmsg, txnIdToString(task.getTxnId()),
-                            txnIdToString(task.getSpHandle()),
+            String logmsg = "tskQOffer p: %d, %s txnId %s spHandle %s type %s";
+            iv2queuelog.trace(String.format(logmsg,  task.getPriority(), task.getClass().getSimpleName(),
+                    txnIdToString(task.getTxnId()), txnIdToString(task.getSpHandle()),
                     (task.m_txnState != null && task.m_txnState.isSinglePartition()) ? "SP" : "MP"));
+        }
+    }
+
+    public static void logSiteTaskerQueueOffer(SiteTaskerRunnable task, VoltMessage message, long myHsId, boolean setTaskInfo)
+    {
+        if (IV2_QUEUE_TRACE_ENABLED || setTaskInfo) {
+            task.taskInfo = message.getMessageInfo()
+                    + " Source:" + CoreUtils.hsIdToString(message.m_sourceHSId)
+                    + " MyHsId: " + CoreUtils.hsIdToString(myHsId);
+        }
+        logSiteTaskerQueueOffer(task);
+    }
+
+    public static void logSiteTaskerQueueOffer(SiteTaskerRunnable task)
+    {
+        if (IV2_QUEUE_TRACE_ENABLED) {
+            String logmsg = "tskQOffer p: %d, %s";
+            iv2queuelog.trace(String.format(logmsg, task.getPriority(), task.getTaskInfo()));
+        }
+    }
+
+    // Used to log both take() and poll()
+    public static void logSiteTaskerQueueTake(SiteTasker task, boolean replaying, boolean rejoining)
+    {
+        if (IV2_QUEUE_TRACE_ENABLED) {
+            String logmsg = "tskQTake p: %d, replay: %b, rejoin: %b, %s";
+            iv2queuelog.trace(String.format(logmsg, task.getPriority(), replaying, rejoining,
+                    task.getTaskInfo()));
         }
     }
 }

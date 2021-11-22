@@ -20,9 +20,11 @@ package org.voltdb.importer;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ImporterServerAdapterImpl;
@@ -31,7 +33,6 @@ import org.voltdb.importer.formatter.FormatterBuilder;
 import org.voltdb.utils.CatalogUtil.ImportConfiguration;
 
 import com.google_voltpatches.common.base.Throwables;
-import java.util.concurrent.ExecutionException;
 
 public class ImportProcessor implements ImportDataProcessor {
 
@@ -58,11 +59,11 @@ public class ImportProcessor implements ImportDataProcessor {
         private AbstractImporterFactory m_importerFactory;
         private ImporterLifeCycleManager m_importerTypeMgr;
 
-        public ImporterWrapper(AbstractImporterFactory importerFactory) {
+        public ImporterWrapper(AbstractImporterFactory importerFactory, int priority) {
             m_importerFactory = importerFactory;
             m_importerFactory.setImportServerAdapter(m_importServerAdapter);
             m_importerTypeMgr = new ImporterLifeCycleManager(
-                    m_importerFactory, m_distributer, m_clusterTag);
+                    priority, m_importerFactory, m_distributer, m_clusterTag);
         }
 
         public String getImporterType() {
@@ -169,7 +170,7 @@ public class ImportProcessor implements ImportDataProcessor {
             ImporterWrapper wrapper = m_importers.get(bundleJar);
             if (wrapper == null) {
                 AbstractImporterFactory importFactory = importerModules.get(bundleJar);
-                wrapper = new ImporterWrapper(importFactory);
+                wrapper = new ImporterWrapper(importFactory, config.getPriority());
                 String name = wrapper.getImporterType();
                 if (name == null || name.trim().isEmpty()) {
                     throw new RuntimeException("Importer must implement and return a valid unique name.");

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<deployment>
+    <!--  multi-node config  -->
+    <!--  cluster hostcount="3" sitesperhost="8" kfactor="1" / -->
+    <cluster hostcount="1" sitesperhost="8"/>
+    <commandlog enabled="true" />
+    <systemsettings>
+      <priorities enabled="true" maxwait="0" />
+    </systemsettings>
+</deployment>

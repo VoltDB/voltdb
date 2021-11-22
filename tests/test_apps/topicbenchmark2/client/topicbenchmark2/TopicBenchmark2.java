@@ -330,7 +330,8 @@ public class TopicBenchmark2 {
         String[] serverArray = config.servers.split(",");
         for (String server : serverArray) {
             if (!StringUtils.isBlank(server)) {
-                m_brokers.add(server + ":" + config.topicPort);
+                String[] split = server.split(":");
+                m_brokers.add(split[0] + ":" + config.topicPort);
             }
         }
         log.info("Test using brokers: " + m_brokers);
@@ -724,6 +725,7 @@ public class TopicBenchmark2 {
         try {
             Properties props = new Properties();
             props.put("bootstrap.servers", m_brokers);
+            props.put("bootstrap.servers.voltdb", m_config.servers);
             props.put("acks", "all");
             props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, org.apache.kafka.common.serialization.LongSerializer.class);
             if (m_config.useavro) {

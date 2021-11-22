@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<deployment>
+    <!-- extra-low SPH to increase contention on site queues -->
+    <cluster hostcount="1" sitesperhost="2"/>
+    <commandlog enabled="true" />
+    <systemsettings>
+      <priorities enabled="true" />
+    </systemsettings>
+    <import>
+      <!-- importing from another voltdb instance impersonating dream112 kafka on port 9095 -->
+      <!-- configuration type="kafka" enabled="true" priority="5" -->
+      <!-- configuration type="kafka" enabled="true" -->
+      <configuration type="kafka" enabled="true" priority="5" >
+        <property name="brokers">localhost:9095</property>
+        <property name="topics">TEST_TOPIC</property>
+        <property name="procedure">test_topic</property>
+      </configuration>
+      <configuration type="kafka" enabled="true" priority="5" >
+        <property name="brokers">localhost:9095</property>
+        <property name="topics">TEST_TOPIC01</property>
+        <property name="procedure">test_topic01</property>
+      </configuration>
+      <configuration type="kafka" enabled="true" priority="5" >
+        <property name="brokers">localhost:9095</property>
+        <property name="topics">TEST_TOPIC02</property>
+        <property name="procedure">test_topic02</property>
+      </configuration>
+      <configuration type="kafka" enabled="true" priority="5" >
+        <property name="brokers">localhost:9095</property>
+        <property name="topics">TEST_TOPIC03</property>
+        <property name="procedure">test_topic03</property>
+      </configuration>
+      <configuration type="kafka" enabled="true" priority="5" >
+        <property name="brokers">localhost:9095</property>
+        <property name="topics">TEST_TOPIC04</property>
+        <property name="procedure">test_topic04</property>
+      </configuration>
+      <configuration type="kafka" enabled="true" priority="5" >
+        <property name="brokers">localhost:9095</property>
+        <property name="topics">TEST_TOPIC05</property>
+        <property name="procedure">test_topic05</property>
+      </configuration>
+    </import>
+</deployment>

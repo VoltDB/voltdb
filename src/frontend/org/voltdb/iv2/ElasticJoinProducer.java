@@ -285,7 +285,6 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
             runForBlockingDataTransfer(siteConnection);
             return;
         }
-
         m_taskQueue.offer(this);
     }
 

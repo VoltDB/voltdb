@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,22 +17,27 @@
 
 package org.voltdb;
 
+import org.voltdb.client.Priority;
+
 final class InternalAdapterTaskAttributes implements InvocationClientHandler, InternalConnectionContext {
 
     final boolean m_isAdmin;
     final long m_connectionId;
     final String m_name;
     final InternalConnectionContext m_proxy;
+    final int m_priority;
 
     public InternalAdapterTaskAttributes(String adapterName, boolean isAdmin, long connectionId) {
         m_isAdmin = isAdmin;
         m_connectionId = connectionId;
         m_name = adapterName;
         m_proxy = null;
+        m_priority = Priority.SYSTEM_PRIORITY;
     }
 
     public InternalAdapterTaskAttributes(InternalConnectionContext ctx, long connectionId) {
         m_name = ctx.getName();
+        m_priority = ctx.getPriority();
         m_proxy = ctx;
         m_connectionId = connectionId;
         m_isAdmin = false;
@@ -51,6 +56,11 @@ final class InternalAdapterTaskAttributes implements InvocationClientHandler, In
     @Override
     final public String getName() {
         return m_name;
+    }
+
+    @Override
+    public int getPriority() {
+        return m_priority;
     }
 
     final public InvocationClientHandler asHandler() {
@@ -73,6 +83,7 @@ final class InternalAdapterTaskAttributes implements InvocationClientHandler, In
                 + (int) (m_connectionId ^ (m_connectionId >>> 32));
         result = prime * result + (m_isAdmin ? 1231 : 1237);
         result = prime * result + ((m_name == null) ? 0 : m_name.hashCode());
+        result = prime * result + m_priority;
         return result;
     }
 
@@ -94,12 +105,15 @@ final class InternalAdapterTaskAttributes implements InvocationClientHandler, In
                 return false;
         } else if (!m_name.equals(other.m_name))
             return false;
+        if (m_priority != other.m_priority)
+            return false;
         return true;
     }
 
     @Override
     public String toString() {
-        return "InternalAdapterTaskAttributes [isAdmin=" + m_isAdmin
-                + ", connectionId=" + m_connectionId + ", name=" + m_name + "]";
+        return String.format(
+                "InternalAdapterTaskAttributes [isAdmin=%b, connectionId=%d, name=%s, priority=%d]",
+                m_isAdmin, m_connectionId, m_name, m_priority);
     }
 }

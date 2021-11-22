@@ -309,6 +309,9 @@ public class CSVLoader implements BulkLoaderErrorHandler {
         @Option(desc = "Enable Kerberos and use provided JAAS login configuration entry key.")
         String kerberos = "";
 
+        @Option(desc = "Priority for VoltDB client requests (0=none/default)")
+        int priority = 0;
+
         /**
          * Batch size for processing batched operations.
          */
@@ -471,6 +474,9 @@ public class CSVLoader implements BulkLoaderErrorHandler {
             c_config.enableKerberosAuthentication(config.kerberos);
         }
         c_config.setProcedureCallTimeout(0); // 0 => infinite
+        if (config.priority > 0) {
+            c_config.setRequestPriority(config.priority);
+        }
         Client csvClient = null;
         try {
             csvClient = CSVLoader.getClient(c_config, config.servers, config.port);
@@ -500,7 +506,7 @@ public class CSVLoader implements BulkLoaderErrorHandler {
                 listener.setLoader(dataLoader);
             }
 
-            CSVFileReader.initializeReader(cfg, csvClient, listReader);
+            CSVFileReader.initializeReader(cfg, listReader);
 
             CSVFileReader csvReader = new CSVFileReader(dataLoader, errHandler);
 
@@ -600,11 +606,11 @@ public class CSVLoader implements BulkLoaderErrorHandler {
      * @param config
      * @param servers
      * @param port
-     * @return
+     * @return client
      * @throws IOException
      */
-    public static Client getClient(ClientConfig config, String servers,
-                                   int port) throws IOException, InterruptedException {
+    private static Client getClient(ClientConfig config, String servers,
+                                    int port) throws IOException, InterruptedException {
         config.setTopologyChangeAware(true);
         Client client = ClientFactory.createClient(config);
         try {

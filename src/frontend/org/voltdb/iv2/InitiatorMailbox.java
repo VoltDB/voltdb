@@ -327,10 +327,15 @@ public class InitiatorMailbox implements Mailbox
                         deliverInternal(message);
                     }
                 }
-            };
-            if (hostLog.isDebugEnabled()) {
-                task.taskInfo = message.getMessageInfo() + " Source:" + CoreUtils.hsIdToString(message.m_sourceHSId);
-            }
+                private SiteTaskerRunnable init(VoltMessage message) {
+                    if (message instanceof Iv2InitiateTaskMessage && ((Iv2InitiateTaskMessage) message).getStoredProcedureInvocation() != null) {
+                        setPriority(((Iv2InitiateTaskMessage) message).getStoredProcedureInvocation().getRequestPriority());
+                    }
+                    return this;
+                }
+            }.init(message);
+
+            Iv2Trace.logSiteTaskerQueueOffer(task, message, m_hsId, hostLog.isDebugEnabled());
             m_scheduler.getQueue().offer(task);
         } else {
             synchronized (this) {

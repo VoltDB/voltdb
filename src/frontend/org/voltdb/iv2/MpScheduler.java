@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -39,6 +39,7 @@ import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltZK;
+import org.voltdb.client.Priority;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.exceptions.TransactionRestartException;
@@ -336,6 +337,16 @@ public class MpScheduler extends Scheduler
 
         // Don't have an SP HANDLE at the MPI, so fill in the unused value
         Iv2Trace.logIv2InitiateTaskMessage(message, m_mailbox.getHSId(), mpTxnId, Long.MIN_VALUE);
+
+        /*
+         * Reset invocation priority to system (highest) priority: this initiate message has been
+         * taken from the queue and will be assigned transaction numbers. The original priority
+         * should be forgotten when this message is copied to downstream destinations: repair log,
+         * command log, replicas...
+         */
+        if (message.getStoredProcedureInvocation() != null) {
+            message.getStoredProcedureInvocation().setRequestPriority(Priority.SYSTEM_PRIORITY);
+        }
 
         // Handle every-site system procedures (at the MPI)
         if (message.isEveryPartition()) {

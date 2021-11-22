@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -94,6 +94,9 @@ public abstract class BaseKafkaLoaderCLIArguments extends CLIConfig {
 
     @Option(desc = "Batch size for writing to VoltDB.")
     public int batch = 200;
+
+    @Option(desc = "Priority for writing to VoltDB.")
+    public int priority = 0;
 
     @AdditionalArgs(desc = "Insert the data into this table.")
     public String table = "";

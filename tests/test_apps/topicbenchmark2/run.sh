@@ -151,6 +151,45 @@ function server_common() {
     VOLTDB_OPTS="${VOLTDB_OPTS}" ${VOLTDB} start -H $HOST -l ${LICENSE}
 }
 
+# start voltdb impersonating kafka for kafka_imports test case
+# see tests/test_apps/priority/README_kafka_imports.md
+function server_kafka_imports() {
+    srccompile-ifneeded
+    rm -rf node2/*
+    voltdb init --force -D node2 -C deployment_kafka_imports.xml
+    sleep 3
+    voltdb start --host=localhost:3023 -D node2 \
+              --admin=21209 --client=21214 --http=8087 --internal=3023 --zookeeper=7183  --topicsport=9095 &
+}
+
+# init kafka_imports test case
+function init_kafka_imports() {
+  srccompile-ifneeded
+  sqlcmd --port=21214 < topicTable.sql
+}
+
+# run kafka_imports test case - multiple producer-only clients
+function run_kafka_imports() {
+    srccompile-ifneeded
+
+    run_kafka_imports_common TEST_TOPIC
+    run_kafka_imports_common TEST_TOPIC01
+    run_kafka_imports_common TEST_TOPIC02
+    run_kafka_imports_common TEST_TOPIC03
+    run_kafka_imports_common TEST_TOPIC04
+    run_kafka_imports_common TEST_TOPIC05
+}
+
+function run_kafka_imports_common() {
+    java -classpath topicbenchmark2-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file:$LOG4J \
+        topicbenchmark2.TopicBenchmark2 \
+        --servers=localhost:21214 \
+        --topic=$1 \
+        --count=50000000 \
+        --producers=1 \
+        --groups=0 &
+}
+
 # load schema and procedures
 function init() {
     srccompile-ifneeded

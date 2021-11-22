@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -90,23 +90,21 @@ public abstract class BaseInitiator<S extends Scheduler> implements Initiator
         }
         m_scheduler.setMailbox(m_initiatorMailbox);
         m_repairLog.setHSId(m_initiatorMailbox.getHSId());
-        StarvationTracker st = new StarvationTracker(getInitiatorHSId());
+        long hsId = getInitiatorHSId();
+        StarvationTracker st = new StarvationTracker(hsId);
         m_scheduler.setStarvationTracker(st);
         m_scheduler.setLock(m_initiatorMailbox);
-        agent.registerStatsSource(StatsSelector.STARVATION,
-                                  getInitiatorHSId(),
-                                  st);
-        QueueDepthTracker qdt = m_scheduler.setupQueueDepthTracker(getInitiatorHSId());
-        agent.registerStatsSource(StatsSelector.QUEUE,
-                                  getInitiatorHSId(),
-                                  qdt);
+        agent.registerStatsSource(StatsSelector.STARVATION,hsId, st);
+        QueueDepthTracker qdt = m_scheduler.setupQueueDepthTracker(hsId);
+        agent.registerStatsSource(StatsSelector.QUEUE, hsId, qdt.newQueueStats());
+        agent.registerStatsSource(StatsSelector.QUEUEPRIORITY, hsId, qdt.newQueuePriorityStats());
 
         String partitionString = " ";
         if (m_partitionId != -1) {
             partitionString = " for partition " + m_partitionId + " ";
         }
         m_whoami = whoamiPrefix +  " " +
-            CoreUtils.hsIdToString(getInitiatorHSId()) + partitionString;
+            CoreUtils.hsIdToString(hsId) + partitionString;
         m_isEnterpriseLicense = MiscUtils.isPro();
         m_scheduler.m_isEnterpriseLicense = m_isEnterpriseLicense;
     }
@@ -123,12 +121,6 @@ public abstract class BaseInitiator<S extends Scheduler> implements Initiator
                           boolean isLowestSiteId)
         throws KeeperException, ExecutionException, InterruptedException
     {
-            int snapshotPriority = 6;
-            if (catalogContext.cluster.getDeployment().get("deployment") != null) {
-                snapshotPriority = catalogContext.cluster.getDeployment().get("deployment").
-                    getSystemsettings().get("systemsettings").getSnapshotpriority();
-            }
-
             // demote rejoin to create for initiators that aren't rejoinable.
             if (startAction.doesJoin() && !isRejoinable()) {
                 startAction = StartAction.CREATE;
@@ -146,7 +138,6 @@ public abstract class BaseInitiator<S extends Scheduler> implements Initiator
                                        m_partitionId,
                                        numberOfPartitions,
                                        startAction,
-                                       snapshotPriority,
                                        m_initiatorMailbox,
                                        agent,
                                        memStats,

@@ -76,6 +76,7 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
 
     static final String INSERT_PREFIX = "Insert_";
     static final String INSERT_PREFIX_P = "Insert_P";
+    static final String UPSERT_PREFIX_P = "Upsert_P";
     static final String SELECT_ALL_PREFIX = "SelectAll_";
     static final String REPLICATED_TAG = "rep_";
     static final String STREAM_TAG = "stream_";
@@ -95,6 +96,9 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
                     + "create procedure " + INSERT_PREFIX_P + "{0}{1} "
                     + "partition on table {0}{1} column key "
                     + "as insert into {0}{1} (key, value) values (?, ?);"
+                    + "create procedure " + UPSERT_PREFIX_P + "{0}{1} "
+                    + "partition on table {0}{1} column key "
+                    + "as upsert into {0}{1} (key, value) values (?, ?);"
                     + "create procedure " + SELECT_ALL_PREFIX
                     + "{0}{1} as select key, value from {0}{1} order by key;"
                     + "dr table {0}{1};");
@@ -262,7 +266,7 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
                                                int topicsCount,
                                                String[] streamTargets,
                                                ClientConfig clientConfig) throws Exception {
-        configureClustersAndClients(configs, new ClusterSchema().paritionedTables(partitionedTableCount)
+        configureClustersAndClients(configs, new ClusterSchema().partitionedTables(partitionedTableCount)
                 .replicatedTables(replicatedTableCount).topics(topicsCount).streamTargets(streamTargets),
                 clientConfig);
     }
@@ -677,6 +681,24 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
     }
 
     /**
+     *
+     * @param tableNumber 0 based table number
+     * @return the name of the corresponding partitioned procedure
+     */
+    protected String getPartitionedProcedureName(int tableNumber) {
+        return getDbResourceName(INSERT_PREFIX_P, tableNumber, TableType.PARTITIONED);
+    }
+
+    /**
+     *
+     * @param tableNumber 0 based table number
+     * @return the name of the corresponding upsert partitioned procedure
+     */
+   protected String getPartitionedUpsertProcedureName(int tableNumber) {
+       return getDbResourceName(UPSERT_PREFIX_P, tableNumber, TableType.PARTITIONED);
+   }
+
+    /**
      * Generate a truncate table sql statement and append it to {@code sqlStatement}
      *
      * @param sqlStatement {@link StringBuilder} to which the statement will be appended
@@ -879,7 +901,7 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
         int m_topicsCount;
         String[] m_streamTargets = ArrayUtils.EMPTY_STRING_ARRAY;
 
-        public ClusterSchema paritionedTables(int count) {
+        public ClusterSchema partitionedTables(int count) {
             m_partitionedTableCount = count;
             return this;
         }

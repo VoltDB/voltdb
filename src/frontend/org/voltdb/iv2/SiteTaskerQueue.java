@@ -17,7 +17,7 @@
 
 package org.voltdb.iv2;
 
-import java.util.concurrent.LinkedTransferQueue;
+import java.util.concurrent.BlockingQueue;
 
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.QueueDepthTracker;
@@ -26,7 +26,7 @@ import org.voltdb.StarvationTracker;
 /** SiteTaskerScheduler orders SiteTaskers for execution. */
 public class SiteTaskerQueue
 {
-    private final LinkedTransferQueue<SiteTasker> m_tasks = new LinkedTransferQueue<SiteTasker>();
+    private final BlockingQueue<SiteTasker> m_tasks = PriorityPolicy.getSpTaskQueue();
     private StarvationTracker m_starvationTracker;
     private QueueDepthTracker m_queueDepthTracker;
     private int m_partitionId;
@@ -46,7 +46,7 @@ public class SiteTaskerQueue
         // prevent another thread from polling a task and decrementing
         // the queue depth before it is incremented
         // i.e. avoid queueDepth < 0
-        m_queueDepthTracker.offerUpdate();
+        m_queueDepthTracker.offerUpdate(task.getPriority());
         return m_tasks.offer(task);
     }
 
@@ -58,13 +58,13 @@ public class SiteTaskerQueue
         if (task == null) {
             m_starvationTracker.beginStarvation();
         } else {
-            m_queueDepthTracker.pollUpdate(task.getQueueOfferTime());
+            m_queueDepthTracker.pollUpdate(task.getQueueOfferTime(), task.getPriority());
             return task;
         }
         try {
             task = CoreUtils.queueSpinTake(m_tasks);
             // task is never null
-            m_queueDepthTracker.pollUpdate(task.getQueueOfferTime());
+            m_queueDepthTracker.pollUpdate(task.getQueueOfferTime(), task.getPriority());
             return task;
         } finally {
             m_starvationTracker.endStarvation();
@@ -76,7 +76,7 @@ public class SiteTaskerQueue
     {
         SiteTasker task = m_tasks.poll();
         if (task != null) {
-            m_queueDepthTracker.pollUpdate(task.getQueueOfferTime());
+            m_queueDepthTracker.pollUpdate(task.getQueueOfferTime(), task.getPriority());
         }
         return task;
     }

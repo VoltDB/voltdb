@@ -56,6 +56,7 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
     private final static VoltLogger s_logger = new VoltLogger("ImporterTypeManager");
     public static final int MEDIUM_STACK_SIZE = 1024 * 512;
 
+    private final int m_priority;
     private final AbstractImporterFactory m_factory;
     private ListeningExecutorService m_executorService;
     private ImmutableMap<URI, ImporterConfig> m_configs = ImmutableMap.of();
@@ -67,10 +68,12 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
     private final String m_distributerDesignation;
 
     public ImporterLifeCycleManager(
+            int priority,
             AbstractImporterFactory factory,
             final ChannelDistributer distributer,
             String clusterTag)
     {
+        m_priority = priority;
         m_factory = factory;
         m_distributer = distributer;
         m_distributerDesignation = m_factory.getTypeName() + "_" + clusterTag;
@@ -134,7 +137,7 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
         if (m_factory.isImporterRunEveryWhere()) {
             ImmutableMap.Builder<URI, AbstractImporter> builder = new ImmutableMap.Builder<>();
             for (final ImporterConfig config : m_configs.values()) {
-                AbstractImporter importer = m_factory.createImporter(config);
+                AbstractImporter importer = m_factory.createImporter(m_priority, config);
                 builder.put(importer.getResourceID(), importer);
             }
             m_importers.set(builder.build());
@@ -196,7 +199,7 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
                 if (importersMap.containsKey(added)) {
                     continue;
                 }
-                AbstractImporter importer = m_factory.createImporter(m_configs.get(added));
+                AbstractImporter importer = m_factory.createImporter(m_priority, m_configs.get(added));
                 newImporters.add(importer);
                 importersMap.put(added, importer);
             } else {

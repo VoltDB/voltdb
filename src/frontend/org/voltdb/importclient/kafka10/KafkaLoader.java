@@ -243,6 +243,9 @@ public class KafkaLoader implements ImporterLifecycle {
             clientConfig.enableSSL();
         }
         clientConfig.setProcedureCallTimeout(0);
+        if (m_cliOptions.priority > 0) {
+            clientConfig.setRequestPriority(m_cliOptions.priority);
+        }
         m_client = getVoltClient(clientConfig, m_cliOptions.getVoltHosts());
 
         if (m_cliOptions.useSuppliedProcedure) {

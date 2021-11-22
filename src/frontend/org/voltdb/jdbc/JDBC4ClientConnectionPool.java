@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -70,7 +70,7 @@ public class JDBC4ClientConnectionPool {
      */
     public static JDBC4ClientConnection get(String[] servers, String user,
             String password, boolean isHeavyWeight, int maxOutstandingTxns, boolean reconnectOnConnectionLoss) throws Exception {
-        return get(servers, user, password, isHeavyWeight, maxOutstandingTxns, reconnectOnConnectionLoss, null, null, false);
+        return get(servers, user, password, isHeavyWeight, maxOutstandingTxns, reconnectOnConnectionLoss, null, null, false, -1);
     }
 
     /**
@@ -113,7 +113,7 @@ public class JDBC4ClientConnectionPool {
                                             int maxOutstandingTxns, boolean reconnectOnConnectionLoss,
                                             SSLConfiguration.SslConfig sslConfig, String kerberosConfig) throws Exception {
         return get(servers, user, password, isHeavyWeight, maxOutstandingTxns, reconnectOnConnectionLoss,
-                   sslConfig, kerberosConfig, false);
+                   sslConfig, kerberosConfig, false, -1);
     }
 
     /**
@@ -150,6 +150,9 @@ public class JDBC4ClientConnectionPool {
      *            Uses specified JAAS file entry id for kerberos authentication if set.
      * @param topologyChangeAware
      *            make client aware of changes in topology.
+     * @param priority
+     *            request priority if > 0, or any value <= 0 for not specified
+     *
      * @return the client connection object the caller should use to post requests.
      * @see #get(String[] servers, String user, String password, boolean isHeavyWeight, int
      *      maxOutstandingTxns, boolean reconnectOnConnectionLoss)
@@ -157,7 +160,7 @@ public class JDBC4ClientConnectionPool {
     public static JDBC4ClientConnection get(String[] servers, String user, String password, boolean isHeavyWeight,
                                             int maxOutstandingTxns, boolean reconnectOnConnectionLoss,
                                             SSLConfiguration.SslConfig sslConfig, String kerberosConfig,
-                                            boolean topologyChangeAware) throws Exception {
+                                            boolean topologyChangeAware, int priority) throws Exception {
         String clientConnectionKeyBase = getClientConnectionKeyBase(servers, user, password,
                 isHeavyWeight, maxOutstandingTxns, reconnectOnConnectionLoss);
         String clientConnectionKey = clientConnectionKeyBase;
@@ -167,7 +170,7 @@ public class JDBC4ClientConnectionPool {
                 ClientConnections.put(clientConnectionKey, new JDBC4ClientConnection(
                         clientConnectionKeyBase, clientConnectionKey, servers, user,
                         password, isHeavyWeight, maxOutstandingTxns, reconnectOnConnectionLoss,
-                        sslConfig, kerberosConfig, topologyChangeAware));
+                        sslConfig, kerberosConfig, topologyChangeAware, priority));
             return ClientConnections.get(clientConnectionKey).use();
         }
     }

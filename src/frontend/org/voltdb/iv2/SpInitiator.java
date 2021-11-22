@@ -238,7 +238,7 @@ public class SpInitiator extends BaseInitiator<SpScheduler> implements Promotabl
             mpPDRG = null;
         }
 
-        m_scheduler.getQueue().offer(new SiteTasker.SiteTaskerRunnable() {
+        SiteTasker.SiteTaskerRunnable task = new SiteTasker.SiteTaskerRunnable() {
             @Override
             void run()
             {
@@ -248,7 +248,10 @@ public class SpInitiator extends BaseInitiator<SpScheduler> implements Promotabl
                 taskInfo = "Set DRGateway";
                 return this;
             }
-        }.init());
+        }.init();
+
+        Iv2Trace.logSiteTaskerQueueOffer(task);
+        m_scheduler.getQueue().offer(task);
     }
 
     @Override

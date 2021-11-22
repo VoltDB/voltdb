@@ -48,22 +48,26 @@ public class ProcedureInvocation {
     // Not partition-specific
     public static final int NO_PARTITION = -1;
 
-    // This internally indicates that no priority field will be marshalled
-    private static final int NO_PRIORITY = -1;
+    // No priority field will be marshalled
+    public static final int NO_PRIORITY = -1;
 
+    // No optional arguments
     public ProcedureInvocation(long handle, String procName, Object... parameters) {
         this(handle, BatchTimeoutOverrideType.NO_TIMEOUT, NO_PARTITION, NO_PRIORITY, procName, parameters);
     }
 
+    // With batch timeout
     public ProcedureInvocation(long handle, int batchTimeout, String procName, Object... parameters) {
         this(handle, batchTimeout, NO_PARTITION, NO_PRIORITY, procName, parameters);
     }
 
+    // With batch timeout and partition
     public ProcedureInvocation(long handle, int batchTimeout, int partitionDestination, String procName,
             Object... parameters) {
         this(handle, batchTimeout, partitionDestination, NO_PRIORITY, procName, parameters);
     }
 
+    // With batch timeout, partition, request priority
     public ProcedureInvocation(long handle, int batchTimeout, int partitionDestination, int requestPrio,
                                 String procName, Object... parameters) {
         if (batchTimeout < 0 && batchTimeout != BatchTimeoutOverrideType.NO_TIMEOUT) {

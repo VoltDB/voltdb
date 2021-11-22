@@ -427,6 +427,7 @@ public final class VoltTable extends VoltTableRow implements JSONString {
      * get a not fully constructed and validated VoltTable.
      * DO NOT use it for production
      * @param buf The buffer containing VoltTable buffer.
+     * @return VoltTable instance
      */
     public static VoltTable getInstanceForTest(ByteBuffer buf) {
         return new VoltTable(buf);

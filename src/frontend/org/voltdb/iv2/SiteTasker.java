@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,11 +20,18 @@ package org.voltdb.iv2;
 import java.io.IOException;
 
 import org.voltdb.SiteProcedureConnection;
+import org.voltdb.client.Priority;
 import org.voltdb.rejoin.TaskLog;
+import org.voltdb.utils.Prioritized;
 
-public abstract class SiteTasker {
+public abstract class SiteTasker implements Comparable<SiteTasker>, Prioritized {
 
     private long queueOfferTime = -1L;
+    /*
+     * By default, the priority is the highest in the system and preserves
+     * the ordering of all tasks created internally.
+     */
+    private int priority = Priority.SYSTEM_PRIORITY;
 
     public void setQueueOfferTime() {
         queueOfferTime = System.nanoTime();
@@ -32,6 +39,21 @@ public abstract class SiteTasker {
 
     public long getQueueOfferTime() {
         return queueOfferTime;
+    }
+
+    @Override
+    public void setPriority(int prio) {
+        priority = prio;
+    }
+
+    @Override
+    public int getPriority() {
+        return priority;
+    }
+
+    @Override
+    public int compareTo(SiteTasker other) {
+        return Integer.compare(this.priority, other.priority);
     }
 
     public static abstract class SiteTaskerRunnable extends SiteTasker {

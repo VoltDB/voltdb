@@ -110,6 +110,9 @@ public final class ClientImpl implements Client {
     private boolean m_nonblocking = false;
     private long m_asyncBlockingTimeout = 0;
 
+    // Priority for all requests (if set)
+    private int m_requestPriority = ProcedureInvocation.NO_PRIORITY;
+
     // Tracks historical connections for when we have nothing
     // to ask for topo info.
     private final Set<HostAndPort> m_connectHistory;
@@ -177,6 +180,11 @@ public final class ClientImpl implements Client {
             m_distributer.addClientStatusListener(m_reconnectStatusListener);
         } else {
             m_reconnectStatusListener = null;
+        }
+
+        if (config.m_requestPriority > 0) {
+            m_requestPriority = config.m_requestPriority; // already validated
+            m_distributer.useRequestPriority();
         }
 
         if (config.m_listener != null) {
@@ -286,8 +294,12 @@ public final class ClientImpl implements Client {
                                                               Object... parameters)
         throws IOException, NoConnectionsException, ProcCallException {
         long handle = m_handle.getAndIncrement();
-        ProcedureInvocation invocation = new ProcedureInvocation(handle, batchTimeout,
-                                                                 -1, procName, parameters);
+        ProcedureInvocation invocation = new ProcedureInvocation(handle,
+                                                                 batchTimeout,
+                                                                 ProcedureInvocation.NO_PARTITION,
+                                                                 m_requestPriority,
+                                                                 procName,
+                                                                 parameters);
         long nanos = unit.toNanos(clientTimeout);
         return internalSyncCallProcedure(nanos, invocation);
     }
@@ -307,7 +319,7 @@ public final class ClientImpl implements Client {
         //Time unit doesn't matter in this case since the timeout isn't being specified
         return callProcedureWithClientTimeout(callback,
                                               BatchTimeoutOverrideType.NO_TIMEOUT,
-                                              -1,
+                                              ProcedureInvocation.NO_PARTITION,
                                               procName,
                                               Distributer.USE_DEFAULT_CLIENT_TIMEOUT,
                                               TimeUnit.NANOSECONDS,
@@ -331,7 +343,7 @@ public final class ClientImpl implements Client {
         //Time unit doesn't matter in this case since the timeout isn't being specified
         return callProcedureWithClientTimeout(callback,
                                               batchTimeout,
-                                              -1,
+                                              ProcedureInvocation.NO_PARTITION,
                                               procName,
                                               Distributer.USE_DEFAULT_CLIENT_TIMEOUT,
                                               TimeUnit.NANOSECONDS,
@@ -358,7 +370,7 @@ public final class ClientImpl implements Client {
                                                   Object... parameters) throws IOException {
         return callProcedureWithClientTimeout(callback,
                                               batchTimeout,
-                                              -1,
+                                              ProcedureInvocation.NO_PARTITION,
                                               procName,
                                               clientTimeout,
                                               clientTimeoutUnit,
@@ -370,7 +382,7 @@ public final class ClientImpl implements Client {
      *
      * @param callback TransactionCallback that will be invoked with procedure results.
      * @param batchTimeout procedure invocation batch timeout.
-     * @param partitionDestination or -1
+     * @param partitionDestination or NO_PARTITION
      * @param procName class name (not qualified by package) of the procedure to execute.
      * @param clientTimeout timeout for the procedure
      * @param unit TimeUnit of procedure timeout
@@ -392,9 +404,12 @@ public final class ClientImpl implements Client {
         }
 
         long handle = m_handle.getAndIncrement();
-        ProcedureInvocation invocation = new ProcedureInvocation(handle, batchTimeout,
+        ProcedureInvocation invocation = new ProcedureInvocation(handle,
+                                                                 batchTimeout,
                                                                  partitionDestination,
-                                                                 procName, parameters);
+                                                                 m_requestPriority,
+                                                                 procName,
+                                                                 parameters);
         if (m_isShutdown) {
             return false;
         }

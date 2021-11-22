@@ -45,6 +45,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
@@ -295,6 +296,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
                     }
                     client.callProcedure(cb, tableName + ".insert", params);
                 }
+                checkAllResponses(callbacks);
             }
         }
         catch (Exception ex)
@@ -303,6 +305,19 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
             fail("loadTable exception: " + ex.getMessage());
         }
         return results;
+    }
+
+    static void checkAllResponses(ArrayList<SyncCallback> callbacks) {
+        // Preserve argument
+        ArrayList<SyncCallback> checkList = new ArrayList<>(callbacks);
+        while (!checkList.isEmpty()) {
+            ListIterator<SyncCallback> lit = checkList.listIterator();
+            while (lit.hasNext()) {
+                if (lit.next().checkForResponse()) {
+                    lit.remove();
+                }
+            }
+        }
     }
 
     private void loadLargeReplicatedTable(Client client, String tableName,

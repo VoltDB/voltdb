@@ -239,7 +239,8 @@
         </xs:element>
         <xs:element name="snapshot" minOccurs="0" maxOccurs="1">
             <xs:complexType>
-                <xs:attribute name="priority" type="snapshotPriorityType" default="6"/>
+                <!--  this 'priority' is in fact a delay factor limiting the frequency of the snapshot tasks -->
+                <xs:attribute name="priority" type="snapshotDelayFactorType" default="6"/>
             </xs:complexType>
         </xs:element>
         <xs:element name="elastic" minOccurs="0" maxOccurs="1">
@@ -260,6 +261,7 @@
         </xs:element>
         <xs:element name="resourcemonitor" minOccurs="0" maxOccurs="1" type="resourceMonitorType"/>
         <xs:element name="flushinterval" minOccurs="0" maxOccurs="1" type="flushIntervalType"/>
+        <xs:element name="priorities" minOccurs="0" maxOccurs="1" type="priorityPolicyType"/>
     </xs:all>
   </xs:complexType>
 
@@ -301,9 +303,11 @@
   </xs:simpleType>
 
   <!-- restriction on frequency of snapshot work.
-       0-10 where 0 means no priority control and 1
-       means high priority and 10 means lowest priority -->
-  <xs:simpleType name="snapshotPriorityType">
+    0 means no delay of snapshot tasks, nonzero means delaying
+    the snapshot tasks by an amount proportional to the value
+    (values up to 30 were used at customer sites)
+  -->
+  <xs:simpleType name="snapshotDelayFactorType">
     <xs:restriction base="xs:int">
       <xs:minInclusive value="0"/>
     </xs:restriction>
@@ -433,6 +437,7 @@
     <xs:attribute name="enabled" type="xs:boolean" default="true"/>
     <xs:attribute name="format" type="xs:string" default="csv"/>
     <xs:attribute name="version" type="xs:string" default="10"/>
+    <xs:attribute name="priority" type="PriorityType" default="4"/>
   </xs:complexType>
 
   <xs:complexType name="PropertyType">
@@ -617,7 +622,51 @@
     <xs:attribute name="retention" type="xs:string" default="" />
     <xs:attribute name="opaque" type="xs:boolean" default="false" />
     <xs:attribute name="allow" type="xs:string" default="" />
+    <xs:attribute name="priority" type="PriorityType" default="4" />
   </xs:complexType>
   
 
+  <!--  Priority, 1 = highest, 8 = lowest -->
+  <!--  Must match definitions in client/Priority.java -->
+  <xs:simpleType name="PriorityType">
+    <xs:restriction base="xs:int">
+      <xs:minInclusive value="1"/>
+      <xs:maxInclusive value="8"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="PriorityMaxWaitType">
+    <xs:restriction base="xs:int">
+      <!--  a value of 0 disables maxwait so the queue is pure priority -->
+      <xs:minInclusive value="0"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="PriorityBatchSizeType">
+    <xs:restriction base="xs:int">
+      <!--  a value of 0 disables the batching in the priority queue -->
+      <xs:minInclusive value="0"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- These parameters should be be set before starting the system and cannot be changed
+        while the system is running (voltadmin update will fail) 
+   -->
+  <xs:complexType name="priorityPolicyType">
+    <xs:all>
+      <xs:element name="dr" minOccurs="0" maxOccurs="1">
+        <xs:complexType>
+          <xs:attribute name="priority" type="PriorityType" default="5"/>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="snapshot" minOccurs="0" maxOccurs="1">
+        <xs:complexType>
+          <xs:attribute name="priority" type="PriorityType" default="6"/>
+        </xs:complexType>
+      </xs:element>
+    </xs:all>
+    <xs:attribute name="enabled" type="xs:boolean" default="false" />
+    <xs:attribute name="maxwait" type="PriorityMaxWaitType" default="1000" />
+    <xs:attribute name="batchsize" type="PriorityBatchSizeType" default="25" />
+  </xs:complexType>
 </xs:schema>

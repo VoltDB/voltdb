@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -29,13 +29,15 @@ import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.BatchTimeoutOverrideType;
+import org.voltdb.client.Priority;
 import org.voltdb.client.ProcedureInvocationExtensions;
 import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.common.Constants;
+import org.voltdb.iv2.PriorityPolicy;
 import org.voltdb.utils.SerializationHelper;
 
 /**
- * Represents a serializeable bundle of procedure name and parameters. This
+ * Represents a serializable bundle of procedure name and parameters. This
  * is the object that is sent by the client library to call a stored procedure.
  *
  * Note, the client (java) serializes a ProcedureInvocation, which is deserialized
@@ -56,7 +58,8 @@ public class StoredProcedureInvocation implements JSONString {
     private String procName = null;
     private byte m_procNameBytes[] = null;
 
-    public static final long UNITIALIZED_ID = -1L;
+    // TODO - this is nowhere used
+    public static final long UNINITIALIZED_ID = -1L;
 
     /*
      * This ByteBuffer is accessed from multiple threads concurrently.
@@ -74,6 +77,20 @@ public class StoredProcedureInvocation implements JSONString {
     private boolean m_allPartition = false;
     private int m_partitionDestination = -1;
     private boolean m_batchCall = false;
+
+    /*
+     * StoredProcedureInvocations (SPI) are created with the SYSTEM_PRIORITY by default,
+     * which is the highest in the system and is not supposed to be requested by VoltDB clients.
+     * This preserves the default behavior for those SPI instances that are created internally
+     * by the system. The only cases where the priority can be set to a different value are:
+     *
+     * - a serialized invocation arriving from the client and carrying an explicit priority
+     * - a serialized invocation arriving from the client and NOT carrying an explicit priority
+     *   (in which case we assign a default client priority).
+     *
+     * SAee initVersion2FromBuffer for SPI deserialization.
+     */
+    private int m_requestPriority = Priority.SYSTEM_PRIORITY;
 
     public StoredProcedureInvocation getShallowCopy()
     {
@@ -234,6 +251,21 @@ public class StoredProcedureInvocation implements JSONString {
         return m_batchCall;
     }
 
+    public int getRequestPriority() {
+        return m_requestPriority;
+    }
+
+    public void setRequestPriority(int priority) {
+        // Clip values to acceptable range - TODO: consider rate-limited logging
+        if (priority < Priority.SYSTEM_PRIORITY) {
+            m_requestPriority = Priority.LOWEST_PRIORITY;
+        } else if (priority > Priority.LOWEST_PRIORITY) {
+            m_requestPriority = Priority.LOWEST_PRIORITY;
+        } else {
+            m_requestPriority = priority;
+        }
+    }
+
     /** Read into an serialized parameter buffer to extract a single parameter */
     Object getParameterAtIndex(int partitionIndex) {
         try {
@@ -277,13 +309,17 @@ public class StoredProcedureInvocation implements JSONString {
             batchExtensionSize += 2;
         }
 
+        // The request priority, always present
+        // 3 is one byte for ext type, one for size, one for byte value
+        batchExtensionSize += 3;
+
         // compute the size
         int size =
                 1 + // type
                 4 + getProcNameBytes().length + // procname
                 8 + // client handle
                 1 + // extension count
-                        batchExtensionSize;
+                batchExtensionSize;
         return size;
     }
 
@@ -383,8 +419,9 @@ public class StoredProcedureInvocation implements JSONString {
 
         buf.putLong(clientHandle);
 
-        // there are two possible extensions, count which apply
-        byte extensionCount = 0;
+        // there are several possible extensions, count which apply
+        // note that priority is always present
+        byte extensionCount = 1;
         if (m_batchTimeout != BatchTimeoutOverrideType.NO_TIMEOUT) {
             ++extensionCount;
         }
@@ -408,10 +445,10 @@ public class StoredProcedureInvocation implements JSONString {
         } else if (m_allPartition) {
             ProcedureInvocationExtensions.writeAllPartitionWithTypeByte(buf);
         }
-
         if (m_batchCall) {
             ProcedureInvocationExtensions.writeBatchCallWithTypeByte(buf);
         }
+        ProcedureInvocationExtensions.writeRequestPriorityWithTypeByte(buf, m_requestPriority);
 
         serializeParams(buf);
 
@@ -510,6 +547,8 @@ public class StoredProcedureInvocation implements JSONString {
         }
         setProcName(procNameBytes);
         clientHandle = buf.getLong();
+
+        // Note: do not set a priority on older requests, leave at system level
         // do not deserialize parameters in ClientInterface context
         initParameters(buf);
     }
@@ -528,6 +567,7 @@ public class StoredProcedureInvocation implements JSONString {
             }
         }
 
+        // Note: do not set a priority on older requests, leave at system level
         // the rest of the format is the same as the original
         initOriginalFromBuffer(buf);
     }
@@ -558,27 +598,54 @@ public class StoredProcedureInvocation implements JSONString {
             throw new IOException("SPI extension count was > 30: possible corrupt network data.");
         }
 
-        for (int i = 0; i < extensionCount; ++i) {
-            final byte type = ProcedureInvocationExtensions.readNextType(buf);
-            switch (type) {
-            case ProcedureInvocationExtensions.BATCH_TIMEOUT:
-                m_batchTimeout = ProcedureInvocationExtensions.readBatchTimeout(buf);
-                break;
-            case ProcedureInvocationExtensions.ALL_PARTITION:
-                // note this always returns true as it's just a flag
-                m_allPartition = ProcedureInvocationExtensions.readAllPartition(buf);
-                break;
-            case ProcedureInvocationExtensions.PARTITION_DESTINATION:
-                m_partitionDestination = ProcedureInvocationExtensions.readPartitionDestination(buf);
-                m_allPartition = true;
-                break;
-            case ProcedureInvocationExtensions.BATCH_CALL:
-                m_batchCall = ProcedureInvocationExtensions.readBatchCall(buf);
-                break;
-            default:
-                ProcedureInvocationExtensions.skipUnknownExtension(buf);
-                break;
+        boolean hadPriority = false;
+        try {
+            for (int i = 0; i < extensionCount; ++i) {
+                final byte type = ProcedureInvocationExtensions.readNextType(buf);
+                switch (type) {
+                case ProcedureInvocationExtensions.BATCH_TIMEOUT:
+                    m_batchTimeout = ProcedureInvocationExtensions.readBatchTimeout(buf);
+                    break;
+                case ProcedureInvocationExtensions.ALL_PARTITION:
+                    // note this always returns true as it's just a flag
+                    m_allPartition = ProcedureInvocationExtensions.readAllPartition(buf);
+                    break;
+                case ProcedureInvocationExtensions.PARTITION_DESTINATION:
+                    m_partitionDestination = ProcedureInvocationExtensions.readPartitionDestination(buf);
+                    m_allPartition = true;
+                    break;
+                case ProcedureInvocationExtensions.BATCH_CALL:
+                    m_batchCall = ProcedureInvocationExtensions.readBatchCall(buf);
+                    break;
+                case ProcedureInvocationExtensions.REQUEST_PRIORITY:
+                    int priority = ProcedureInvocationExtensions.readRequestPriority(buf);
+                    if (priority == Priority.SYSTEM_PRIORITY) {
+                        // Preserve system priority: note that rogue clients can
+                        // take advantage of this but we have no way to discriminate.
+                        setRequestPriority(priority);
+                    }
+                    else {
+                        // Clip the incoming request to the values supported by the server configuration
+                        setRequestPriority(PriorityPolicy.clipPriority(priority));
+                    }
+                    hadPriority = true;
+                    break;
+                default:
+                    ProcedureInvocationExtensions.skipUnknownExtension(buf);
+                    break;
+                }
             }
+        } catch (Exception e) {
+            if (e instanceof IOException) {
+                throw e;
+            } else {
+                throw new IOException(String.format("Failed to deserialize SPI extensions: ", e.getMessage()));
+            }
+        }
+
+        // Old clients that sent invocations without priority get assigned a default
+        if (!hadPriority) {
+            setRequestPriority(PriorityPolicy.getDefaultPriority());
         }
 
         // do not deserialize parameters in ClientInterface context

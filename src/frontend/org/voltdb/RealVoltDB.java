@@ -2709,7 +2709,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     hostLog.info("Max temptable size set to " + sysType.getTemptables().getMaxsize() + " mb");
                 }
                 if (sysType.getSnapshot() != null) {
-                    hostLog.info("Snapshot priority set to " + sysType.getSnapshot().getPriority() + " [0 - 10]");
+                    hostLog.info("Snapshot priority set to " + sysType.getSnapshot().getPriority() + " (if > 0, delays snapshot tasks)");
                 }
                 if (sysType.getQuery() != null) {
                     if (sysType.getQuery().getTimeout() > 0) {
@@ -3430,7 +3430,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         hostLog.info("Elastic duration set to " + sysSettings.getElasticduration() + " milliseconds");
         hostLog.info("Elastic throughput set to " + sysSettings.getElasticthroughput() + " mb/s");
         hostLog.info("Max temptable size set to " + sysSettings.getTemptablemaxsize() + " mb");
-        hostLog.info("Snapshot priority set to " + sysSettings.getSnapshotpriority() + " [0 - 10]");
+        hostLog.info("Snapshot priority set to " + sysSettings.getSnapshotpriority() + " (if > 0, delays snapshot tasks)");
 
         if (sysSettings.getQuerytimeout() > 0) {
             hostLog.info("Query timeout set to " + sysSettings.getQuerytimeout() + " milliseconds");

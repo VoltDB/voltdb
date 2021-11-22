@@ -23,3 +23,47 @@ CREATE STREAM TEST_TOPIC01 PARTITION ON COLUMN rowid EXPORT TO TOPIC TEST_TOPIC0
 );
 
 CREATE PROCEDURE test_topic01  PARTITION ON TABLE TEST_TOPIC01 COLUMN rowid AS INSERT INTO TEST_TOPIC01 (rowid, type_varchar32k) VALUES (?, ?);
+
+DROP PROCEDURE test_topic02 if exists;
+DROP STREAM TEST_TOPIC02 if exists;
+
+CREATE STREAM TEST_TOPIC02 PARTITION ON COLUMN rowid EXPORT TO TOPIC TEST_TOPIC02 WITH KEY (rowid) (
+  rowid                     BIGINT        NOT NULL
+, type_timestamp            TIMESTAMP     DEFAULT NOW
+, type_varchar32k           VARCHAR(32768)
+);
+
+CREATE PROCEDURE test_topic02  PARTITION ON TABLE TEST_TOPIC02 COLUMN rowid AS INSERT INTO TEST_TOPIC02 (rowid, type_varchar32k) VALUES (?, ?);
+
+DROP PROCEDURE test_topic03 if exists;
+DROP STREAM TEST_TOPIC03 if exists;
+
+CREATE STREAM TEST_TOPIC03 PARTITION ON COLUMN rowid EXPORT TO TOPIC TEST_TOPIC03 WITH KEY (rowid) (
+  rowid                     BIGINT        NOT NULL
+, type_timestamp            TIMESTAMP     DEFAULT NOW
+, type_varchar32k           VARCHAR(32768)
+);
+
+CREATE PROCEDURE test_topic03  PARTITION ON TABLE TEST_TOPIC03 COLUMN rowid AS INSERT INTO TEST_TOPIC03 (rowid, type_varchar32k) VALUES (?, ?);
+
+DROP PROCEDURE test_topic04 if exists;
+DROP STREAM TEST_TOPIC04 if exists;
+
+CREATE STREAM TEST_TOPIC04 PARTITION ON COLUMN rowid EXPORT TO TOPIC TEST_TOPIC04 WITH KEY (rowid) (
+  rowid                     BIGINT        NOT NULL
+, type_timestamp            TIMESTAMP     DEFAULT NOW
+, type_varchar32k           VARCHAR(32768)
+);
+
+CREATE PROCEDURE test_topic04  PARTITION ON TABLE TEST_TOPIC04 COLUMN rowid AS INSERT INTO TEST_TOPIC04 (rowid, type_varchar32k) VALUES (?, ?);
+
+DROP PROCEDURE test_topic05 if exists;
+DROP STREAM TEST_TOPIC05 if exists;
+
+CREATE STREAM TEST_TOPIC05 PARTITION ON COLUMN rowid EXPORT TO TOPIC TEST_TOPIC05 WITH KEY (rowid) (
+  rowid                     BIGINT        NOT NULL
+, type_timestamp            TIMESTAMP     DEFAULT NOW
+, type_varchar32k           VARCHAR(32768)
+);
+
+CREATE PROCEDURE test_topic05  PARTITION ON TABLE TEST_TOPIC05 COLUMN rowid AS INSERT INTO TEST_TOPIC05 (rowid, type_varchar32k) VALUES (?, ?);

@@ -132,6 +132,8 @@ public class InitiateTaskMessage extends TransactionInfoBaseMessage {
 
         sb.append("\n  PROCEDURE: ");
         sb.append(m_invocation.getProcName());
+        sb.append("\n  PRIORITY: ");
+        sb.append(m_invocation.getRequestPriority());
         sb.append("\n  PARAMS: ");
         sb.append(m_invocation.getParams().toString());
 

@@ -23,23 +23,45 @@
 
 package txnIdSelfCheck;
 
-import org.voltcore.logging.VoltLogger;
-import org.voltdb.CLIConfig;
-import org.voltdb.ClientResponseImpl;
-import org.voltdb.VoltTable;
-import org.voltdb.client.*;
-import org.voltdb.utils.MiscUtils;
-
 import java.io.FileWriter;
 import java.io.IOException;
 import java.lang.Thread.UncaughtExceptionHandler;
 import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
-import java.util.concurrent.*;
+import java.util.Random;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+
+import org.voltcore.logging.VoltLogger;
+import org.voltdb.CLIConfig;
+import org.voltdb.ClientResponseImpl;
+import org.voltdb.VoltTable;
+import org.voltdb.client.Client;
+import org.voltdb.client.Client2;
+import org.voltdb.client.Client2Config;
+import org.voltdb.client.ClientConfig;
+import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientImpl;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ClientStatusListenerExt;
+import org.voltdb.client.ProcCallException;
+import org.voltdb.client.ProcedureCallback;
+import org.voltdb.utils.MiscUtils;
 
 public class Benchmark {
 
@@ -52,8 +74,10 @@ public class Benchmark {
 
     // validated command line configuration
     final Config config;
-    // create a client for each server node
+    // clients for each Client version
     Client client;
+    Client2 client2;
+    static final int REQUEST_LIMIT = 300_000;
     // Timer for periodic stats printing
     Timer timer;
     // Benchmark start time
@@ -109,6 +133,12 @@ public class Benchmark {
         @Option(desc = "Id of the first thread (useful for running multiple clients).")
         int threadoffset = 0;
 
+        @Option(desc = "Use client V2 (default false")
+        boolean useclientv2 = false;
+
+        @Option(desc = "Use priorities, only evaluated if client V2 (default false")
+        boolean usepriorities = false;
+
         @Option(desc = "Minimum value size in bytes.")
         int minvaluesize = 1024;
 
@@ -158,7 +188,7 @@ public class Benchmark {
         float upserthitratio = (float)0.20;
 
         @Option(desc = "Allow disabling different threads for testing specific functionality. ")
-        String disabledthreads = "none";
+        String disabledthreads = "Cappedlt";
         //threads: "clients,partBiglt,replBiglt,partTrunclt,replTrunclt,partCappedlt,replCappedlt,partLoadlt,replLoadlt,readThread,adHocMayhemThread,idpt,updateclasses,partNDlt,replNDlt"
         // Biglt,Trunclt,Cappedlt,Loadlt are also recognized and apply to BOTH part and repl threads
         ArrayList<String> disabledThreads = null;
@@ -347,6 +377,18 @@ public class Benchmark {
         }
     }
 
+    // Client2 support
+    Client2 getClient2() {
+        Client2Config clientConfig = new Client2Config()
+                .clientRequestLimit(REQUEST_LIMIT)
+                .outstandingTransactionLimit(REQUEST_LIMIT / 10);
+        if (config.sslfile.trim().length() > 0) {
+            clientConfig.trustStoreFromPropertyFile(config.sslfile);
+            clientConfig.enableSSL();
+        }
+        return ClientFactory.createClient(clientConfig);
+    }
+
     /**
      * Constructor for benchmark instance.
      * Configures VoltDB client and prints configuration.
@@ -375,6 +417,9 @@ public class Benchmark {
             clientConfig.setTopologyChangeAware(true);
         }
         client = ClientFactory.createClient(clientConfig);
+        if (config.useclientv2) {
+            client2 = getClient2();
+        }
     }
 
     /**
@@ -616,6 +661,9 @@ public class Benchmark {
 
         // connect to one or more servers, loop until success
         connect();
+        if (client2 != null) {
+            client2.connectSync(config.servers, 60, 1, TimeUnit.SECONDS);
+        }
 
         // get partition count
         int pcount = 0;
@@ -656,8 +704,8 @@ public class Benchmark {
         clientThreads = new ArrayList<ClientThread>();
         if (!config.disabledThreads.contains("clients")) {
             for (byte cid = (byte) config.threadoffset; cid < config.threadoffset + config.threads; cid++) {
-                ClientThread clientThread = new ClientThread(cid, txnCount, client, processor, permits,
-                        config.allowinprocadhoc, config.mpratio);
+                ClientThread clientThread = new ClientThread(cid, txnCount, client, client2, processor, permits,
+                        config.allowinprocadhoc, config.usepriorities, config.mpratio);
                 //clientThread.start(); # started after preload is complete
                 clientThreads.add(clientThread);
             }
@@ -819,6 +867,7 @@ public class Benchmark {
             log.info("Hashmismatch will fire in " + String.valueOf(config.duration/2) + " seconds");
             Thread hashmismatchthread = new Thread() {
 
+                @Override
                 public void run() {
                     try {
                         // run once halfway through .

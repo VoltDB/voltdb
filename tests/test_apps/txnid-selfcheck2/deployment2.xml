@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<deployment>
+    <cluster hostcount="1" sitesperhost="4" kfactor="0" schema="ddl" />
+    <httpd enabled="true">
+        <jsonapi enabled="true" />
+    </httpd>
+    <systemsettings>
+      <priorities enabled="true" />
+    </systemsettings>
+    <export>
+        <configuration enabled="true" type="file" target="partstream">
+            <property name="type">csv</property>
+            <property name="nonce">PartStream</property>
+            <property name="skipinternals">true</property>
+        </configuration>
+        <configuration enabled="true" type="file" target="replstream">
+            <property name="type">csv</property>
+            <property name="nonce">ReplStream</property>
+            <property name="skipinternals">true</property>
+        </configuration>
+        <configuration enabled="true" type="file" target="ABC1">
+            <property name="type">csv</property>
+            <property name="nonce">TTLMigrate1</property>
+            <property name="skipinternals">true</property>
+        </configuration>
+        <configuration enabled="true" type="file" target="ABC2">
+            <property name="type">csv</property>
+            <property name="nonce">TTLMigrate3</property>
+            <property name="skipinternals">true</property>
+        </configuration>
+        <configuration enabled="true" type="file" target="ABC3">
+            <property name="type">csv</property>
+            <property name="nonce">PARTITIONED_EXPORT</property>
+            <property name="skipinternals">true</property>
+        </configuration>
+    </export>
+</deployment>

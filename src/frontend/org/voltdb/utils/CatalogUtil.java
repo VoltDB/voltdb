@@ -112,6 +112,7 @@ import org.voltdb.catalog.Group;
 import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.PlanFragment;
+import org.voltdb.catalog.Priorities;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Property;
 import org.voltdb.catalog.SnapshotSchedule;
@@ -140,6 +141,7 @@ import org.voltdb.compiler.deploymentfile.ImportConfigurationType;
 import org.voltdb.compiler.deploymentfile.ImportType;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
 import org.voltdb.compiler.deploymentfile.PathsType;
+import org.voltdb.compiler.deploymentfile.PriorityPolicyType;
 import org.voltdb.compiler.deploymentfile.PropertyType;
 import org.voltdb.compiler.deploymentfile.ResourceMonitorType;
 import org.voltdb.compiler.deploymentfile.SchemaType;
@@ -163,6 +165,7 @@ import org.voltdb.importer.ImportDataProcessor;
 import org.voltdb.importer.formatter.AbstractFormatterFactory;
 import org.voltdb.importer.formatter.FormatterBuilder;
 import org.voltdb.iv2.DeterminismHash;
+import org.voltdb.iv2.PriorityPolicy;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
@@ -1450,6 +1453,20 @@ public abstract class CatalogUtil {
         syssettings.setElasticduration(deployment.getSystemsettings().getElastic().getDuration());
         syssettings.setElasticthroughput(deployment.getSystemsettings().getElastic().getThroughput());
         syssettings.setQuerytimeout(deployment.getSystemsettings().getQuery().getTimeout());
+
+        // Set the priorities
+        Priorities priorities = syssettings.getPriorities().get("priorities");
+        if (priorities == null) {
+            priorities = syssettings.getPriorities().add("priorities");
+        }
+        PriorityPolicyType pp = PriorityPolicy.getPolicyFromDeployment(deployment);
+        if (pp.isEnabled()) {
+            priorities.setEnabled(true);
+            priorities.setMaxwait(pp.getMaxwait());
+            priorities.setBatchsize(pp.getBatchsize());
+            priorities.setDrpriority(pp.getDr().getPriority());
+            priorities.setSnapshotpriority(pp.getSnapshot().getPriority());
+        }
     }
 
     private static void setThreadPools(DeploymentType deployment, Deployment catDeployment) {
@@ -1585,10 +1602,12 @@ public abstract class CatalogUtil {
     }
 
     public static class ImportConfiguration {
+        private final int m_priority;
         private final Properties m_moduleProps;
         private final FormatterBuilder m_formatterBuilder;
 
-        public ImportConfiguration(String formatName, Properties moduleProps, Properties formatterProps) {
+        public ImportConfiguration(String formatName, int priority, Properties moduleProps, Properties formatterProps) {
+            m_priority = priority;
             m_moduleProps = moduleProps;
             m_formatterBuilder = new FormatterBuilder(formatName, formatterProps);
 
@@ -1617,6 +1636,10 @@ public abstract class CatalogUtil {
                     }
                 }
             }
+        }
+
+        public int getPriority() {
+            return m_priority;
         }
 
         public Properties getmoduleProperties() {
@@ -1649,7 +1672,7 @@ public abstract class CatalogUtil {
 
         @Override
         public int hashCode() {
-            return Objects.hash(m_moduleProps, m_formatterBuilder);
+            return Objects.hash(m_priority, m_moduleProps, m_formatterBuilder);
         }
 
         @Override
@@ -1661,6 +1684,9 @@ public abstract class CatalogUtil {
                 return false;
             }
             ImportConfiguration other = (ImportConfiguration) o;
+            if (this.m_priority != other.m_priority) {
+                return false;
+            }
             return m_moduleProps.equals(other.m_moduleProps);
         }
 
@@ -1862,7 +1888,7 @@ public abstract class CatalogUtil {
             }
         }
 
-        return new ImportConfiguration(formatName, moduleProps, formatterProps);
+        return new ImportConfiguration(formatName, importConfiguration.getPriority(), moduleProps, formatterProps);
     }
 
     /**
@@ -1980,9 +2006,7 @@ public abstract class CatalogUtil {
         if (importType == null) {
             return;
         }
-        List<String> streamList = new ArrayList<>();
         List<ImportConfigurationType> kafkaConfigs = new ArrayList<>();
-
         for (ImportConfigurationType importConfiguration : importType.getConfiguration()) {
 
             boolean connectorEnabled = importConfiguration.isEnabled();
@@ -1993,11 +2017,6 @@ public abstract class CatalogUtil {
             if (importConfiguration.getType().equals(ServerImportEnum.KAFKA)) {
                 kafkaConfigs.add(importConfiguration);
             }
-
-            if (!streamList.contains(importConfiguration.getModule())) {
-                streamList.add(importConfiguration.getModule());
-            }
-
             buildImportProcessorConfiguration(importConfiguration, true);
         }
         validateKafkaConfig(kafkaConfigs);
@@ -2098,6 +2117,7 @@ public abstract class CatalogUtil {
             String procName = topic.getProcedure();
             if (!StringUtils.isBlank(procName)) {
                 cataTopic.setProcedurename(procName);
+                cataTopic.setPriority(topic.getPriority());
             }
             if (topic.isOpaque()) {
                 /*

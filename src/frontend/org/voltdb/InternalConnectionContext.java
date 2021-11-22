@@ -24,4 +24,5 @@ package org.voltdb;
 public interface InternalConnectionContext
 {
     public String getName();
+    public int getPriority( );
 }

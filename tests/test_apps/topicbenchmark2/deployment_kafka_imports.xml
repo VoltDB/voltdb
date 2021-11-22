@@ -1,0 +1,44 @@
+<?xml version="1.0"?>
+<deployment>
+   <!--  Deployment for testing ENG-21666 scenario:
+        this voltdb instance impersonates a kafka system that
+        another voltdb instance is importing from.
+   -->
+   <cluster hostcount="1"  sitesperhost="24" />
+   <systemsettings>
+      <flushinterval minimum="10">
+          <export interval="100" />
+      </flushinterval>
+   </systemsettings>
+    <threadpools>
+      <!-- make this 2 * number of cores (32 cores on volt16)
+      as some subscribers can block on I/O while others are transcoding poll results -->
+      <pool name="topicbenchmark" size="64" />
+    </threadpools>
+    <topics enabled="true" threadpool="topicbenchmark">
+     <broker>
+       <property name="port">9095</property>
+       <!--  should be 3/4 number of cores (32 cores on volt16)  -->
+       <property name="network.thread.count">24</property>
+     </broker>
+     <!-- note the very short retention times -->
+     <topic name="TEST_TOPIC" procedure="test_topic" retention="5 mn">
+       <property name="producer.parameters.includeKey">true</property>
+     </topic>
+     <topic name="TEST_TOPIC01" procedure="test_topic01" retention="5 mn">
+       <property name="producer.parameters.includeKey">true</property>
+     </topic>
+     <topic name="TEST_TOPIC02" procedure="test_topic02" retention="5 mn">
+       <property name="producer.parameters.includeKey">true</property>
+     </topic>
+     <topic name="TEST_TOPIC03" procedure="test_topic03" retention="5 mn">
+       <property name="producer.parameters.includeKey">true</property>
+     </topic>
+     <topic name="TEST_TOPIC04" procedure="test_topic04" retention="5 mn">
+       <property name="producer.parameters.includeKey">true</property>
+     </topic>
+     <topic name="TEST_TOPIC05" procedure="test_topic05" retention="5 mn">
+       <property name="producer.parameters.includeKey">true</property>
+     </topic>
+   </topics>
+</deployment>

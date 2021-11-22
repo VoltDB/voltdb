@@ -54,6 +54,7 @@ import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Deployment;
 import org.voltdb.catalog.GroupRef;
+import org.voltdb.catalog.Priorities;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.User;
@@ -605,9 +606,12 @@ public class SystemInformation extends VoltSystemProcedure
         // Add system setting information also
         // the attribute names follows the above naming rule
         Systemsettings sysSettings = deploy.getSystemsettings().get("systemsettings");
+        Priorities priorities = sysSettings.getPriorities().get("priorities");
+
         results.addRow("elasticduration", Integer.toString(sysSettings.getElasticduration()));
         results.addRow("elasticthroughput", Integer.toString(sysSettings.getElasticthroughput()));
-        results.addRow("snapshotpriority", Integer.toString(sysSettings.getSnapshotpriority()));
+        results.addRow("snapshotpriority", priorities.getEnabled() ?
+                Integer.toString(priorities.getSnapshotpriority()) : Integer.toString(sysSettings.getSnapshotpriority()));
         results.addRow("temptablesmaxsize", Integer.toString(sysSettings.getTemptablemaxsize()));
         results.addRow("querytimeout", Integer.toString(sysSettings.getQuerytimeout()));
 
@@ -616,6 +620,10 @@ public class SystemInformation extends VoltSystemProcedure
             results.addRow("drrole", cluster.getDrrole());
         }
 
+        // Add priorities information
+        results.addRow("prioritiesenabled", Boolean.toString(priorities.getEnabled()));
+        results.addRow("drpriority", priorities.getEnabled() ?
+                Integer.toString(priorities.getDrpriority()) : "null");
         return results;
     }
 

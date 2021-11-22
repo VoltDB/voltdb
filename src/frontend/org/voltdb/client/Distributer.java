@@ -109,6 +109,9 @@ class Distributer {
     private final long m_connectionResponseTimeoutNanos;
     private final Subject m_subject; // JAAS authentication subject
 
+    // Possible priority for system-originated requests
+    private int m_sysRequestPrio = ProcedureInvocation.NO_PRIORITY;
+
     // Status listeners (from application and ClientImpl)
     private final ArrayList<ClientStatusListenerExt> m_listeners = new ArrayList<>();
 
@@ -651,7 +654,7 @@ class Distributer {
          * Sends a ping on the underlying connection, bypassing rate limits, etc.
          */
         void sendPing() {
-            ProcedureInvocation invocation = new ProcedureInvocation(PING_HANDLE, "@Ping");
+            ProcedureInvocation invocation = makeProcedureInvocation(PING_HANDLE, "@Ping");
             ByteBuffer buf = ByteBuffer.allocate(4 + invocation.getSerializedSize());
             buf.putInt(buf.capacity() - 4);
             try {
@@ -1201,7 +1204,7 @@ class Distributer {
 
             //Subscribe to topology updates before retrieving the current topo
             //so there isn't potential for lost updates
-            ProcedureInvocation spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@Subscribe", "TOPOLOGY");
+            ProcedureInvocation spi = makeProcedureInvocation(m_sysHandle.getAndDecrement(), "@Subscribe", "TOPOLOGY");
             cxn.createWork(System.nanoTime(),
                            spi.getHandle(),
                            spi.getProcName(),
@@ -1210,7 +1213,7 @@ class Distributer {
                            true,
                            USE_DEFAULT_CLIENT_TIMEOUT);
 
-            spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@Statistics", "TOPO", 0);
+            spi = makeProcedureInvocation(m_sysHandle.getAndDecrement(), "@Statistics", "TOPO", 0);
             //The handle is specific to topology updates and has special-cased handling
             cxn.createWork(System.nanoTime(),
                            spi.getHandle(),
@@ -1223,7 +1226,7 @@ class Distributer {
             //Don't need to retrieve procedure updates every time we do a new subscription
             //since catalog changes aren't correlated with node failure the same way topo is
             if (!m_fetchedCatalog) {
-                spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@SystemCatalog", "PROCEDURES");
+                spi = makeProcedureInvocation(m_sysHandle.getAndDecrement(), "@SystemCatalog", "PROCEDURES");
                 //The handle is specific to procedure updates and has special-cased handling
                 cxn.createWork(System.nanoTime(),
                                spi.getHandle(),
@@ -1816,7 +1819,7 @@ class Distributer {
         }
 
         try {
-            ProcedureInvocation invocation = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@GetPartitionKeys", "INTEGER");
+            ProcedureInvocation invocation = makeProcedureInvocation(m_sysHandle.getAndDecrement(), "@GetPartitionKeys", "INTEGER");
             CountDownLatch latch = null;
 
             if (!topologyUpdate) {
@@ -1835,6 +1838,20 @@ class Distributer {
             m_partitionUpdateStatus.set(new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE, new VoltTable[0],
                     "Fails to fetch partition keys from server:" + e.getMessage()));
         }
+    }
+
+    /**
+     * Build procedure invocation for internally-generated procedure calls.
+     * This all go at "almost the highest" priority; only the highest prio
+     * user requests will bypass them.
+     */
+    private ProcedureInvocation makeProcedureInvocation(long handle, String procName, Object... parameters) {
+        return new ProcedureInvocation(handle, BatchTimeoutOverrideType.NO_TIMEOUT, ProcedureInvocation.NO_PARTITION,
+                                       m_sysRequestPrio, procName, parameters);
+    }
+
+    void useRequestPriority() {
+        m_sysRequestPrio = Priority.HIGHEST_PRIORITY + 1;
     }
 
     /**
@@ -1894,7 +1911,7 @@ class Distributer {
      */
     void setCreateConnectionsUponTopologyChangeComplete() throws NoConnectionsException {
         m_createConnectionUponTopoChangeInProgress.set(false); // TODO: WHY?
-        ProcedureInvocation spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@Statistics", "TOPO", 0);
+        ProcedureInvocation spi = makeProcedureInvocation(m_sysHandle.getAndDecrement(), "@Statistics", "TOPO", 0);
         queue(spi, new TopoUpdateCallback(), true, System.nanoTime(), USE_DEFAULT_CLIENT_TIMEOUT);
     }
 

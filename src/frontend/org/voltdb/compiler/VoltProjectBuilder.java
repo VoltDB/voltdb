@@ -67,6 +67,7 @@ import org.voltdb.compiler.deploymentfile.KeyOrTrustStoreType;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.PathsType.Voltdbroot;
+import org.voltdb.compiler.deploymentfile.PriorityPolicyType;
 import org.voltdb.compiler.deploymentfile.PropertyType;
 import org.voltdb.compiler.deploymentfile.ResourceMonitorType;
 import org.voltdb.compiler.deploymentfile.ResourceMonitorType.Memorylimit;
@@ -330,6 +331,7 @@ public class VoltProjectBuilder {
     private Map<FeatureNameType, String> m_featureDiskLimits;
     private Map<FeatureNameType, String> m_snmpFeatureDiskLimits;
     private FlushIntervalType m_flushIntervals = null;
+    private PriorityPolicyType m_priorityPolicy = null;
 
     private boolean m_useDDLSchema = false;
 
@@ -803,6 +805,14 @@ public class VoltProjectBuilder {
         FlushIntervalType.Export exportFlush = new FlushIntervalType.Export();
         exportFlush.setInterval(exportFlushInterval);
         m_flushIntervals.setExport(exportFlush);
+    }
+
+    // Return a priority policy that can be modified in place prior to compiling the project
+    public PriorityPolicyType getPriorityPolicy() {
+        if (m_priorityPolicy == null) {
+            m_priorityPolicy = new PriorityPolicyType();
+        }
+        return m_priorityPolicy;
     }
 
     public void addImport(boolean enabled, String importType, String importFormat, String importBundle, Properties config) {
@@ -1491,8 +1501,9 @@ public class VoltProjectBuilder {
             systemSettingType.setProcedure(procedure);
         }
 
-        // <flushIntervals>
+        // Flush intervals and transaction policy
         systemSettingType.setFlushinterval(m_flushIntervals);
+        systemSettingType.setPriorities(m_priorityPolicy);
 
         if (m_rssLimit != null || m_snmpRssLimit != null) {
             ResourceMonitorType monitorType = initializeResourceMonitorType(systemSettingType, factory);

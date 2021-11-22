@@ -23,20 +23,24 @@
 
 package txnIdSelfCheck;
 
-import org.voltdb.ClientResponseImpl;
-import org.voltdb.VoltProcedure.VoltAbortException;
-import org.voltdb.VoltTable;
-import org.voltdb.client.Client;
-import org.voltdb.client.ClientResponse;
-import org.voltdb.client.NoConnectionsException;
-import org.voltdb.client.ProcCallException;
-import txnIdSelfCheck.procedures.UpdateBaseProc;
-
 import java.io.InterruptedIOException;
 import java.util.Random;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+
+import org.voltdb.ClientResponseImpl;
+import org.voltdb.VoltProcedure.VoltAbortException;
+import org.voltdb.VoltTable;
+import org.voltdb.client.Client;
+import org.voltdb.client.Client2;
+import org.voltdb.client.Client2CallOptions;
+import org.voltdb.client.Client2Config;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NoConnectionsException;
+import org.voltdb.client.ProcCallException;
+
+import txnIdSelfCheck.procedures.UpdateBaseProc;
 
 public class ClientThread extends BenchmarkThread {
 
@@ -60,6 +64,8 @@ public class ClientThread extends BenchmarkThread {
     }
 
     final Client m_client;
+    final Client2 m_client2;
+    final Client2CallOptions m_client2_options;
     final byte m_cid;
     long m_nextRid;
     final Type m_type;
@@ -70,18 +76,31 @@ public class ClientThread extends BenchmarkThread {
     final Random m_random = new Random();
     final Semaphore m_permits;
 
-    ClientThread(byte cid, AtomicLong txnsRun, Client client, TxnId2PayloadProcessor processor, Semaphore permits,
-            boolean allowInProcAdhoc, float mpRatio)
+    ClientThread(byte cid, AtomicLong txnsRun, Client client, Client2 client2, TxnId2PayloadProcessor processor, Semaphore permits,
+            boolean allowInProcAdhoc, boolean usepriorities, float mpRatio)
         throws Exception
     {
         setName("ClientThread(CID=" + String.valueOf(cid) + ")");
         m_type = Type.typeFromId(mpRatio, allowInProcAdhoc);
         m_cid = cid;
         m_client = client;
+        m_client2 = client2;
         m_processor = processor;
         m_txnsRun = txnsRun;
         m_permits = permits;
-        log.info("ClientThread(CID=" + String.valueOf(cid) + ") " + m_type.toString());
+
+        String logMsg = String.format("ClientThread(CID=%s) %s, %s client", String.valueOf(cid), m_type.toString(),
+                m_client2 == null ? "V1" : "V2");
+        if (m_client2 != null && usepriorities) {
+            // Assign random priority, avoiding invalid 0
+            int priority = m_random.nextInt(Client2Config.LOWEST_PRIORITY - 1) + 1;
+            m_client2_options = new Client2CallOptions().requestPriority(priority);
+            log.info(String.format("%s, priority %d", logMsg, priority));
+        }
+        else {
+            m_client2_options = null;
+            log.info(logMsg);
+        }
 
         String sql1 = String.format("select * from partitioned where cid = %d order by rid desc limit 1", cid);
         String sql2 = String.format("select * from replicated  where cid = %d order by rid desc limit 1", cid);
@@ -89,11 +108,18 @@ public class ClientThread extends BenchmarkThread {
         VoltTable t2;
         while (true) {
             try {
-                  t1 = client.callProcedure("@AdHoc", sql1).getResults()[0];
-                  t2 = client.callProcedure("@AdHoc", sql2).getResults()[0];
-                  // init the dimension table to have one record for each cid.
-                  client.callProcedure("PopulateDimension", cid);
-                  break;
+                // init the dimension table to have one record for each cid.
+                if (m_client2 == null) {
+                    t1 = m_client.callProcedure("@AdHoc", sql1).getResults()[0];
+                    t2 = m_client.callProcedure("@AdHoc", sql2).getResults()[0];
+                    m_client.callProcedure("PopulateDimension", cid);
+                }
+                else {
+                    t1 = m_client2.callProcedureSync(m_client2_options, "@AdHoc", sql1).getResults()[0];
+                    t2 = m_client2.callProcedureSync(m_client2_options, "@AdHoc", sql2).getResults()[0];
+                    m_client2.callProcedureSync(m_client2_options, "PopulateDimension", cid);
+                }
+                break;
             }
             catch (Exception e) {
                 log.warn("ClientThread threw exception '" + e.getClass().getSimpleName() + " " + e.getMessage() + "' in initialization, will retry");
@@ -155,11 +181,22 @@ public class ClientThread extends BenchmarkThread {
 
             ClientResponse response;
             try {
-                response = m_client.callProcedure(procName,
+                if (m_client2 == null) {
+                response = m_client.callProcedure(
+                        procName,
                         m_cid,
                         m_nextRid,
                         payload,
                         shouldRollback);
+                }
+                else {
+                    response = m_client2.callProcedureSync(m_client2_options,
+                            procName,
+                            m_cid,
+                            m_nextRid,
+                            payload,
+                            shouldRollback);
+                }
             } catch (Exception e) {
                 if (shouldRollback == 0) {
                     log.warn("ClientThread threw '" + e.getClass().getSimpleName() + ": " + e.getMessage() + "' after " + m_txnsRun.get() +
@@ -220,14 +257,17 @@ public class ClientThread extends BenchmarkThread {
             log.warn(cri.toJSONString());
 
             // take a breather to avoid slamming the log (stay paused if no connections)
+            int connectedHosts = 0;
             do {
                 try { Thread.sleep(3000); } catch (Exception e2) {} // sleep for 3s
                 // bail on wakeup if we're supposed to bail
                 if (!m_shouldContinue.get()) {
                     return;
                 }
+                connectedHosts = m_client2 == null?
+                        m_client.getConnectedHostList().size() : m_client2.connectedHosts().size();
             }
-            while (m_client.getConnectedHostList().size() == 0);
+            while (connectedHosts== 0);
 
         }
         // this implies bad data and is fatal
@@ -246,14 +286,17 @@ public class ClientThread extends BenchmarkThread {
             catch (NoConnectionsException e) {
                 log.error("ClientThread got NoConnectionsException on proc call. Will sleep.");
                 // take a breather to avoid slamming the log (stay paused if no connections)
+                int connectedHosts = 0;
                 do {
                     try { Thread.sleep(3000); } catch (Exception e2) {} // sleep for 3s
                     // bail on wakeup if we're supposed to bail
                     if (!m_shouldContinue.get()) {
                         return;
                     }
+                    connectedHosts = m_client2 == null?
+                            m_client.getConnectedHostList().size() : m_client2.connectedHosts().size();
                 }
-                while (m_client.getConnectedHostList().size() == 0);
+                while (connectedHosts== 0);
             }
             catch (ProcCallException e) {
                 ClientResponseImpl cri = (ClientResponseImpl) e.getClientResponse();
