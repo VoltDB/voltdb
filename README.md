@@ -78,7 +78,7 @@ Next Steps
 You can find application examples in the “examples” directory inside this VoltDB kit.
 
 The Voter app (“examples/voter”) is a great example to start with. See the README to learn what it does and how to get it running, or watch this 5 minute video demonstration of the Voter app:
-https://voltdb.com/resources/video/voltdb-how-tour-voter-example
+https://www.youtube.com/watch?v=hRdK5qlzxaM
 
 The App Gallery has more information on additional examples, some in the kit and some on GitHub.
 
