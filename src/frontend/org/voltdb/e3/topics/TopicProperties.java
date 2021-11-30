@@ -78,7 +78,6 @@ public class TopicProperties extends TypedPropertiesBase<TopicProperties.Key<?>>
     public EncodeFormat getProducerValueFormat() {
         return firstValidFormat(
                 Key.PRODUCER_FORMAT_VALUE,
-                Key.TOPIC_FORMAT_VALUE,
                 Key.TOPIC_FORMAT);
     }
 
@@ -99,7 +98,6 @@ public class TopicProperties extends TypedPropertiesBase<TopicProperties.Key<?>>
         return firstValidFormat(
                 Key.CONSUMER_FORMAT_VALUE,
                 Key.CONSUMER_FORMAT,
-                Key.TOPIC_FORMAT_VALUE,
                 Key.TOPIC_FORMAT);
     }
 
@@ -133,9 +131,9 @@ public class TopicProperties extends TypedPropertiesBase<TopicProperties.Key<?>>
         // Properties for specifying record encoding.
         // Note producer.format.value is not supported so related properties are not implemented
 
-        // Formats which apply to both producer and consumer
+        // Historical: topic format is an XML attribute but is converted to a property to
+        // preserve the format selection logic, which was designed to be based on properties.
         public static final Key<EncodeFormat> TOPIC_FORMAT = new FormatKey("topic.format");
-        public static final Key<EncodeFormat> TOPIC_FORMAT_VALUE = new FormatKey("topic.format.value");
 
         // Formats which just apply to producer records
         public static final Key<EncodeFormat> PRODUCER_FORMAT_VALUE = new FormatKey("producer.format.value");
