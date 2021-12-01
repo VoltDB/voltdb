@@ -42,30 +42,8 @@ function alertNodeClicked(obj) {
   $(".popup_close").trigger("click");
 }
 
-function set_kubernetes(server, port) {
-  uri = "http://" + server + ":" + port + "/api/1.0/?Procedure=@SystemInformation";
-  var con = "false";
-  $.get(uri,
-    function (data, textStatus, jqXHR) {  // success callback
-      if (textStatus == "success") {
-        data = data["results"][0]["data"];
-        $.each(data, function (id, val) {
-          if (val[1] == "KUBERNETES") {
-            con = val[2];
-          }
-        });
-      }
-      if (con == "true") {
-        voltDbRenderer.kubernetes_con = true;
-      } else {
-        voltDbRenderer.kubernetes_con = false;
-      };
-    });
-}
-
 (function (window) {
   var iVoltDbRenderer = function () {
-    this.kubernetes_con = false;
     this.hostNames = [];
     this.currentHost = "";
     this.usersList = [];
@@ -252,7 +230,6 @@ function set_kubernetes(server, port) {
                   $("#PasswordChangeMsg").hide();
                   $("#dbNotReadyMsg").hide();
                   //Save user details to cookie.
-                  set_kubernetes($(location).attr("hostname"), $(location).attr("port"));
                   loadAdminPage();
                   saveSessionCookie("username", usernameVal);
                   saveSessionCookie("password", passwordVal);
@@ -1204,6 +1181,13 @@ function set_kubernetes(server, port) {
           }
           if ($.inArray(singleData[2], voltDbRenderer.hostNames) == -1)
             voltDbRenderer.hostNames.push(singleData[2]);
+        }
+
+        if (singleData[1] == "KUBERNETES") {
+          if (singleData[2] == "true") {
+            console.log("Detected Kubernetes.");
+            set_kubernetes_admin();
+          }
         }
 
         //assign entry in data object to 'currentServerOverview' if object being iterated is not a current host object
@@ -3561,7 +3545,7 @@ function set_kubernetes(server, port) {
               '" data-HostName="' +
               val.serverName +
               '" class="' +
-              className +
+              className + ' k8s_hidden' +
               '"'
             );
             if (conn) {

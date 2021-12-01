@@ -463,7 +463,6 @@ $(document).ready(function () {
   voltDbRenderer.HandleLogin(serverName, portid, function () {
     getListOfRoles();
     voltDbRenderer.checkRolesUpdate();
-    set_kubernetes($(location).attr("hostname"), $(location).attr("port"));
     loadPage(serverName, portid);
   });
 
