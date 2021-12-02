@@ -61,6 +61,9 @@ public interface ClientResponse {
 
     /**
      * Status code indicating that the request didn't receive a response before the per-client timeout.
+     * <p>
+     * This code is not used with the {@link Client2} interface, which uses distinct {@link #CLIENT_REQUEST_TIMEOUT}
+     * and {@link #CLIENT_RESPONSE_TIMEOUT} codes.
      */
     public static final byte CONNECTION_TIMEOUT = -6;
 
@@ -111,12 +114,16 @@ public interface ClientResponse {
      * Status code indicating that the transaction failed in the client before it
      * was sent to the VoltDB server. This status code is used for client errors
      * other than timeouts.
+     * <p>
+     * Currently used only with the {@link Client2} interface.
      */
     public static final byte CLIENT_ERROR_TXN_NOT_SENT = -14;
 
     /**
      * Status code indicating that the request was timed out in the client
      * before it could be sent to the VoltDB server.
+     * <p>
+     * Currently used only with the {@link Client2} interface.
      */
     public static final byte CLIENT_REQUEST_TIMEOUT = -15;
 
@@ -124,6 +131,8 @@ public interface ClientResponse {
      * Status code indicating that the request was timed out in the client
      * while waiting for a response from the VoltDB server. No conclusion can
      * be drawn about whether the transaction has been executed.
+     * <p>
+     * Currently used only with the {@link Client2} interface.
      */
     public static final byte CLIENT_RESPONSE_TIMEOUT = -16;
 

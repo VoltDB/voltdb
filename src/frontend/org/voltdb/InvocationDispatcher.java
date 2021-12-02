@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -539,9 +539,8 @@ public final class InvocationDispatcher {
                 // getPartitionsForProcedure and the directed procedure handling can modify the parameters
                 task = MiscUtils.roundTripForCL(task);
             } catch (IOException e) {
-                return new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE, new VoltTable[0],
-                        "Unable to execute " + task.getProcName() + " with parameters " + task.getParams());
-                // no client handle?
+                String err = "Unable to execute " + task.getProcName() + " with parameters " + task.getParams();
+                return gracefulFailureResponse(err, task.clientHandle);
             }
 
             CreateTransactionResult result = createTransaction(handler.connectionId(), task, catProc.getReadonly(),
@@ -761,20 +760,22 @@ public final class InvocationDispatcher {
     }
 
     final static ClientResponseImpl dispatchStatistics(OpsSelector selector, StoredProcedureInvocation task, Connection ccxn) {
+        ClientResponseImpl errorResp = null;
         try {
             OpsAgent agent = VoltDB.instance().getOpsAgent(selector);
             if (agent != null) {
                 agent.performOpsAction(ccxn, task.clientHandle, selector, task.getParams());
             }
             else {
-                return errorResponse(ccxn, task.clientHandle, ClientResponse.GRACEFUL_FAILURE,
-                        "Unknown OPS selector", null, true);
+                String msg = String.format("Unknown OPS selector %s", selector);
+                errorResp = gracefulFailureResponse(msg, task.clientHandle);
             }
-
-            return null;
         } catch (Exception e) {
-            return errorResponse( ccxn, task.clientHandle, ClientResponse.UNEXPECTED_FAILURE, null, e, true);
+            String reason = Throwables.getStackTraceAsString(e);
+            hostLog.warn(reason);
+            errorResp = unexpectedFailureResponse(reason, task.clientHandle);
         }
+        return errorResp;
     }
 
     private ClientResponseImpl dispatchStopNode(StoredProcedureInvocation task) {
@@ -1556,17 +1557,6 @@ public final class InvocationDispatcher {
     /*
      * Utility methods for sending common client responses
      */
-    private final static ClientResponseImpl errorResponse(Connection c, long handle, byte status, String reason, Exception e, boolean log) {
-        String realReason = reason;
-        if (e != null) {
-            realReason = Throwables.getStackTraceAsString(e);
-        }
-        if (log) {
-            hostLog.warn(realReason);
-        }
-        return new ClientResponseImpl(status, new VoltTable[0], realReason, handle);
-    }
-
     private final static ClientResponseImpl unexpectedFailureResponse(String msg, long handle) {
         return new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE, new VoltTable[0], msg, handle);
     }
