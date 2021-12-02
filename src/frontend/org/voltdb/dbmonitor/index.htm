@@ -1478,7 +1478,7 @@
                         id="securityEdit"
                         class="edit"
                         title="Edit"
-                        >&nbsp;</a
+                        ></a
                       >
                       </div>
                     </td>
@@ -1599,7 +1599,7 @@
                         id="autoSnapshotEdit"
                         class="edit"
                         title="Edit"
-                        >&nbsp;</a
+                        ></a
                       >
                       </div>
                     </td>
@@ -1747,7 +1747,7 @@
                         class="plusAdd"
                         style="display: none"
                         title="Add Configuration"
-                        >&nbsp;</a
+                        ></a
                       >
                       <div
                         id="loadingConfiguration"
@@ -1809,7 +1809,7 @@
                         class="plusAdd"
                         style="display: block"
                         title="Add Import Configuration"
-                        >&nbsp;</a
+                        ></a
                       >
                       <div
                         id="loadingImportConfig"
@@ -1882,7 +1882,7 @@
                         id="snmpEdit"
                         class="edit"
                         title="Edit"
-                        >&nbsp;</a
+                        ></a
                       >
                       </div>
                     </td>
@@ -3268,6 +3268,28 @@
       </div>
     </div>
     <!--Connection popup-->
+    <!--Role Change popup-->
+    <div style="display: none">
+      <a href="#roleChangePopup" id="rolePopup">Security Changed</a>
+    </div>
+    <div id="roleChangePopup" style="display: none">
+      <div id="rolePop">
+        <div class="overlay-title">
+          <img src="images/Information.png" class="imgError" />Warning
+        </div>
+        <div class="clear"></div>
+        <div class="overlay-contentError errorMsg">
+          <p>
+            Your security settings has been changed.
+          </p>
+          <br />
+          <div class="overlay-btns" style="padding: 0">
+            <a class="btn" id="btnPopOk">Ok</a>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!--Role Change popup-->
     <!--Server Shutdown Information-->
     <div style="display: none">
       <a href="#shutdownInfoPopup" id="serverShutdownPopup">Cluster Shutdown</a>

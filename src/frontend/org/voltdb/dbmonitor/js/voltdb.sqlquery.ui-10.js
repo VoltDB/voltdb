@@ -80,11 +80,11 @@ $(document).ready(function () {
     var mouseup = new CustomEvent("mouseup", { bubbles: true });
     var gutter = document.querySelector(".gutter-horizontal");
 
-    mousemove.clientX = gutter === null? '' : gutter.getBoundingClientRect().left;
+    mousemove.clientX = gutter === null ? '' : gutter.getBoundingClientRect().left;
 
-    gutter === null? '' : gutter.dispatchEvent(mousedown);
-    gutter === null? '' : gutter.dispatchEvent(mousemove);
-    gutter === null? '' : gutter.dispatchEvent(mouseup);
+    gutter === null ? '' : gutter.dispatchEvent(mousedown);
+    gutter === null ? '' : gutter.dispatchEvent(mousemove);
+    gutter === null ? '' : gutter.dispatchEvent(mouseup);
   };
 
   $("#bntTimeoutSetting").popup({
@@ -1048,20 +1048,18 @@ $(document).ready(function () {
 
       $("#runBTn-" + tab_id).off("click");
 
-      $("#runBTn-" + tab_id).on("click", function () {        
+      $("#runBTn-" + tab_id).on("click", function () {
         var queryTab = $(
           $("#worktabs div.ui-tabs-panel")[$tabs.tabs("option", "active")]
         );
-        if(queryTab.text().split(' ')[0] === 'exec'){
-          VoltDbUI.refreshSqlAndSchemaTab();
-        }
+        var query = queryTab.text().split(' ');
         if (queryTab.length == 1) {
           var queryUI = new QueryUI(
             $($("#worktabs div.ui-tabs-panel")[$tabs.tabs("option", "active")])
           );
-          setTimeout(()=>{
-            queryUI.execute();
-          },100)
+          queryUI.execute(query);
+          setTimeout(function(){
+          }, 5000);
         }
       });
 

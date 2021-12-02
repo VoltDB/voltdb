@@ -2154,6 +2154,16 @@ label.error {
     display: block;
     line-height: 15px;
     font-size: 11px;
+    padding: 5px 5px 0 0;
+    margin: 0 0 6px 0;
+    height: auto;
+}
+.roleerror {
+    color: #c70000;
+    width: auto;
+    display: block;
+    line-height: 15px;
+    font-size: 11px;
     padding: 10px 5px 0 0;
     margin: 0 0 6px 0;
     height: auto;
@@ -2305,6 +2315,9 @@ ul.adminClusterList li a.shutdown {
     background: #D0D2D2;
     padding: 8px;
     font-weight: bold;
+}
+.btnDown:focus {
+    color : #000 !important;
 }
 .adminServer {
     float: left;
@@ -2485,7 +2498,7 @@ ul.adminClusterList li a.shutdown {
 }
 .adminTbl1 td .edit,
 .adminTbl1 td .editDisabled {
-    top: 9px;
+    top: 5px;
 }
 .hasSubLabel {} .helpDrop {
     float: right;
@@ -3045,7 +3058,7 @@ a.restoreBtn {
     height: 17px;
     display: inline-block;
     position: relative;
-    top: 8px;
+    top: 4px;
 }
 a.drTblBtn {
     background: #4E8DB5;
@@ -4847,4 +4860,31 @@ table.dataTable {top:0;}
 }
 #admin.kubernetes .k8s_hidden {
     display: none !important;
+}
+
+.errMsgBox {
+    width: auto;
+    height: 40px;
+    background: #EAEAEA;
+    border-left:5px;
+    border-style: solid;
+    border-color: #aa1f2f;
+    display: flex;
+    align-items: center;
+}
+
+.errMsg {
+    font-size: 12px;
+    line-height: 19px;
+    padding: 0px 10px;
+    text-align: center;
+}
+
+.roleBox {
+    border: 1px solid #ccc; 
+    border-radius: 3px;
+    padding: 4px 0px 4px 4px;
+    max-height: 125px;
+    overflow: hidden;
+    overflow-y: scroll;
 }
