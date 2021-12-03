@@ -619,13 +619,13 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         int32_t fetchTopicsGroups(int32_t maxResultSize, const NValue& startGroupId);
 
         /**
-         * Store topic parition offsets for a topics group
+         * Store topic partition offsets for a topics group
          */
         int32_t commitTopicsGroupOffsets(int64_t spUniqueId, int64_t undoToken, int16_t requestVersion,
                 const NValue& groupId, SerializeInputBE& in);
 
         /**
-         * Fetch topic parition offsets for a topics group
+         * Fetch topic partition offsets for a topics group
          */
         int32_t fetchTopicsGroupOffsets(int16_t requestVersion, const NValue& groupId, SerializeInputBE& in);
 

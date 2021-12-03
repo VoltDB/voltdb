@@ -59,10 +59,10 @@ public class MPJoinQueryFallBackRule extends RelOptRule {
         // The query is SP, and the distributions of any partitioned tables had been set.
         final RelDistribution outerDist = RelDistributionUtils.getDistribution(outer),
                 innerDist = RelDistributionUtils.getDistribution(inner);
-        final boolean isOuterParitioned = outerDist.getType() == RelDistribution.Type.HASH_DISTRIBUTED;
-        final boolean isInnerParitioned = innerDist.getType() == RelDistribution.Type.HASH_DISTRIBUTED;
+        final boolean isOuterPartitioned = outerDist.getType() == RelDistribution.Type.HASH_DISTRIBUTED;
+        final boolean isInnerPartitioned = innerDist.getType() == RelDistribution.Type.HASH_DISTRIBUTED;
         final RelDistribution intermediate =
-                isOuterParitioned || isInnerParitioned ? RelDistributions.hash(joinState.getPartCols()) : innerDist;
+                isOuterPartitioned || isInnerPartitioned ? RelDistributions.hash(joinState.getPartCols()) : innerDist;
         final RelDistribution newDist;
         List<RelNode> newInputs;
         // If we have a LEFT / RIGHT / FULL join and its outer node is replicated while the other one is
@@ -71,13 +71,13 @@ public class MPJoinQueryFallBackRule extends RelOptRule {
         // That means that we need to insert an Exchange node above the partitioned child and
         // make the join distribution itself to be a SINGLETON
         if ((JoinRelType.LEFT == join.getJoinType() || JoinRelType.FULL == join.getJoinType())
-                && !isOuterParitioned && isInnerParitioned) {
+                && !isOuterPartitioned && isInnerPartitioned) {
             newDist = RelDistributions.SINGLETON.with(innerDist.getPartitionEqualValue(), false);
             VoltLogicalExchange innerExchange = new VoltLogicalExchange(inner.getCluster(),
                     inner.getTraitSet(), inner, innerDist);
             newInputs = Lists.newArrayList(outer, innerExchange);
         } else if((JoinRelType.RIGHT == join.getJoinType() || JoinRelType.FULL == join.getJoinType())
-                && isOuterParitioned && !isInnerParitioned) {
+                && isOuterPartitioned && !isInnerPartitioned) {
             newDist = RelDistributions.SINGLETON.with(outerDist.getPartitionEqualValue(), false);
             VoltLogicalExchange outerExchange = new VoltLogicalExchange(outer.getCluster(),
                     outer.getTraitSet(), outer, outerDist);

@@ -414,7 +414,7 @@ public class MpScheduler extends Scheduler
             // if cannot figure out the involved partitions, run it as an MP txn
         }
 
-        int[] nPartitionIds = message.getNParitionIds();
+        int[] nPartitionIds = message.getNPartitionIds();
         if (nPartitionIds != null) {
             HashMap<Integer, Long> involvedPartitionMasters = new HashMap<>();
             for (int partitionId : nPartitionIds) {

@@ -230,7 +230,7 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         return m_connectionId;
     }
 
-    public int[] getNParitionIds() {
+    public int[] getNPartitionIds() {
         return m_nPartitions;
     }
 

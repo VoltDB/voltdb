@@ -141,7 +141,7 @@
     };
 
     this.GetPartitionDetailData = function (partitionDetails) {
-      dataParitionDetails = partitionDetails;
+      dataPartitionDetails = partitionDetails;
     };
 
     var dataImporterDetails = [];
@@ -329,8 +329,8 @@
       var count = 0;
       var dataPartition = [];
 
-      if (dataParitionDetails != undefined) {
-        $.each(dataParitionDetails, function (key, value) {
+      if (dataPartitionDetails != undefined) {
+        $.each(dataPartitionDetails, function (key, value) {
           $.each(value, function (datatype, datatypeValue) {
             if (typeof datatypeValue === "object") {
               $.each(datatypeValue, function (partitionKey, partitionValue) {
@@ -369,8 +369,8 @@
     function getEmptyDataForPartitionForMinutes() {
       var count = 0;
       var dataPartition = [];
-      if (dataParitionDetails != undefined) {
-        $.each(dataParitionDetails, function (key, value) {
+      if (dataPartitionDetails != undefined) {
+        $.each(dataPartitionDetails, function (key, value) {
           $.each(value, function (datatype, datatypeValue) {
             if (typeof datatypeValue === "object") {
               $.each(datatypeValue, function (partitionKey, partitionValue) {
@@ -409,8 +409,8 @@
     function getEmptyDataForPartitionForDay() {
       var count = 0;
       var dataPartition = [];
-      if (dataParitionDetails != undefined) {
-        $.each(dataParitionDetails, function (key, value) {
+      if (dataPartitionDetails != undefined) {
+        $.each(dataPartitionDetails, function (key, value) {
           $.each(value, function (datatype, datatypeValue) {
             if (typeof datatypeValue === "object") {
               $.each(datatypeValue, function (partitionKey, partitionValue) {
@@ -614,7 +614,7 @@
 
     var dataPartitionIdleTime = [];
 
-    var dataParitionDetails = [];
+    var dataPartitionDetails = [];
 
     var dataTableAnalysis = [
       {

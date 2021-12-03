@@ -27,7 +27,7 @@ create view v4 as select a * 2 + a1 a2pa1, b - a b_minus_a, sum(a1) sum_a1, min(
 -- LIKE
 create view v4_1 as select b1, count(*) counts from t1 where c in ('foo', 'bar', 'pattern') group by b1;
 
--- Testing on T2 with paritioning
+-- Testing on T2 with partitioning
 create view vt2 as select distinct c0 distinct_c, sum(b0) sum_b, count(*) counts from t2 group by c0;
 create view vt2_1 as select b0 b, sum(c0) sum_c, count(*) counts from t2 group by b0;
 

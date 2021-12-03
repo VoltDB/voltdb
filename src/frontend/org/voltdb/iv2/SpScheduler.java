@@ -1182,7 +1182,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                         uac.isReadOnly(),
                         uac.isSinglePartition(),
                         uac.isEveryPartition(),
-                        uac.getNParitionIds(),
+                        uac.getNPartitionIds(),
                         invocation,
                         uac.getClientInterfaceHandle(),
                         uac.getConnectionId(),
