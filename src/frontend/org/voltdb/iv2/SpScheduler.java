@@ -523,9 +523,34 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
          * taken from the queue and will be assigned transaction numbers. The original priority
          * should be forgotten when this message is copied to downstream destinations: repair log,
          * command log, replicas...
+         *
+         * Also check for a timed-out request, and unconditionally remove the timeout indicators
+         * from the procedure invocation. We must make the check before we reset the priority,
+         * since SYSTEM_PRIORITY tasks are considered to never time out.
+         *
+         * There is an abundance of caution here:
+         * - Only external clients set the request-timeout indicator
+         * - We don't check timeouts for replicas or replay
+         * - No timeout is ever reported if priority is SYSTEM_PRIORITY
+         * - We immediately clear the request-timeout indicator here
+         * - Any replica requests or repair logs we create will have
+         *   SYSTEM_PRIORITY and not have request-timeout indication
          */
-        if (msg.getStoredProcedureInvocation() != null) {
-            msg.getStoredProcedureInvocation().setRequestPriority(Priority.SYSTEM_PRIORITY);
+        boolean hasTimedOut = false;
+        StoredProcedureInvocation spi = msg.getStoredProcedureInvocation();
+        if (spi != null) {
+            if (spi.hasRequestTimeout()) {
+                if (m_isLeader && !message.isForReplay()) {
+                    hasTimedOut = spi.requestHasTimedOut();
+                }
+                spi.clearRequestTimeout();
+            }
+            spi.setRequestPriority(Priority.SYSTEM_PRIORITY);
+        }
+
+        if (hasTimedOut) {
+            sendTimeoutResponse(msg, spi);
+            return;
         }
 
         if (m_isLeader || message.isReadOnly()) {
@@ -575,7 +600,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             // Need to copy this or the other local sites handling
             // the same initiate task message will overwrite each
             // other's memory -- the message isn't copied on delivery
-            // to other local mailboxes.
+            // to other local mailboxes. This copy refers to the original
+            // SPI but we have reset the priority and request timeout.
             msg = new Iv2InitiateTaskMessage(
                     message.getInitiatorHSId(),
                     message.getCoordinatorHSId(),
@@ -585,7 +611,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     message.isReadOnly(),
                     message.isSinglePartition(),
                     message.isEveryPartition(),
-                    null,
+                    null, // nPartitions
                     message.getStoredProcedureInvocation(),
                     message.getClientInterfaceHandle(),
                     message.getConnectionId(),
@@ -607,7 +633,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
             // The leader will be responsible to replicate messages to replicas.
             // Don't replicate reads, no matter FAST or SAFE.
-            if (m_isLeader && (!msg.isReadOnly()) && IS_KSAFE_CLUSTER ) {
+            if (m_isLeader && !msg.isReadOnly() && IS_KSAFE_CLUSTER) {
                 for (long hsId : m_sendToHSIds) {
                     Iv2InitiateTaskMessage finalMsg = msg;
                     final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.SPI);
@@ -651,7 +677,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 safeAddToDuplicateCounterMap(new DuplicateCounterKey(msg.getTxnId(), newSpHandle), counter);
             }
         }
-        else {
+        else { // !(m_isLeader || message.isReadOnly())
             setMaxSeenTxnId(msg.getSpHandle());
             newSpHandle = msg.getSpHandle();
             logRepair(msg);
@@ -708,6 +734,20 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         if (m_cl.canOfferTask()) {
             m_pendingTasks.offer(task.setDurabilityBackpressureFuture(durabilityBackpressureFuture));
         }
+    }
+
+    /*
+     * Responds to a client request that has been found to have timed out while it
+     * was loitering in the site queue. Execution has not been started.
+     */
+    private void sendTimeoutResponse(Iv2InitiateTaskMessage task, StoredProcedureInvocation spi) {
+        ClientResponseImpl clientResp = new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                                                               new VoltTable[0],
+                                                               "Request timed out at server before execution",
+                                                               spi.getClientHandle());
+        InitiateResponseMessage response = new InitiateResponseMessage(task);
+        response.setResults(clientResp);
+        m_mailbox.send(response.getInitiatorHSId(), response);
     }
 
     @Override

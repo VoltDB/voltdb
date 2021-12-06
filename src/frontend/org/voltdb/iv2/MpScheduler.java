@@ -34,7 +34,9 @@ import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.CatalogContext;
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.CommandLog;
+import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
@@ -304,11 +306,46 @@ public class MpScheduler extends Scheduler
     public void handleIv2InitiateTaskMessage(Iv2InitiateTaskMessage message)
     {
         final String procedureName = message.getStoredProcedureName();
+
+        /*
+         * Reset invocation priority to system (highest) priority: this initiate message has been
+         * taken from the queue and will be assigned transaction numbers. The original priority
+         * should be forgotten when this message is copied to downstream destinations: repair log,
+         * command log, replicas...
+         *
+         * Also check for a timed-out request, and unconditionally remove the timeout indicators
+         * from the procedure invocation. We must make the check before we reset the priority,
+         * since SYSTEM_PRIORITY tasks are considered to never time out.
+         *
+         * There is an abundance of caution here:
+         * - Only external clients set the request-timeout indicator
+         * - We don't check timeouts for replay requests
+         * - No timeout is ever reported if priority is SYSTEM_PRIORITY
+         * - We immediately clear the request-timeout indicator here
+         * - Any every-site duplicate requests or repair logs we create will
+         *   have SYSTEM_PRIORITY and not have request-timeout indication
+         */
+        boolean hasTimedOut = false;
+        StoredProcedureInvocation spi = message.getStoredProcedureInvocation();
+        if (spi != null) {
+            if (spi.hasRequestTimeout()) {
+                if (!message.isForReplay()) {
+                    hasTimedOut = spi.requestHasTimedOut();
+                }
+                spi.clearRequestTimeout();
+            }
+            spi.setRequestPriority(Priority.SYSTEM_PRIORITY);
+        }
+
+        if (hasTimedOut) {
+            sendTimeoutResponse(message, spi);
+            return;
+        }
+
         /*
          * If this is CL replay, use the txnid from the CL and use it to update the current txnid
+         * Timestamp is actually a pre-IV2ish style time based transaction id
          */
-        long mpTxnId;
-        //Timestamp is actually a pre-IV2ish style time based transaction id
         long timestamp = Long.MIN_VALUE;
 
         // Update UID if it's for replay
@@ -320,7 +357,7 @@ public class MpScheduler extends Scheduler
         }
 
         TxnEgo ego = advanceTxnEgo();
-        mpTxnId = ego.getTxnId();
+        long mpTxnId = ego.getTxnId();
 
         final String threadName = Thread.currentThread().getName(); // Thread name has to be materialized here
         final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.MPI);
@@ -338,16 +375,6 @@ public class MpScheduler extends Scheduler
         // Don't have an SP HANDLE at the MPI, so fill in the unused value
         Iv2Trace.logIv2InitiateTaskMessage(message, m_mailbox.getHSId(), mpTxnId, Long.MIN_VALUE);
 
-        /*
-         * Reset invocation priority to system (highest) priority: this initiate message has been
-         * taken from the queue and will be assigned transaction numbers. The original priority
-         * should be forgotten when this message is copied to downstream destinations: repair log,
-         * command log, replicas...
-         */
-        if (message.getStoredProcedureInvocation() != null) {
-            message.getStoredProcedureInvocation().setRequestPriority(Priority.SYSTEM_PRIORITY);
-        }
-
         // Handle every-site system procedures (at the MPI)
         if (message.isEveryPartition()) {
             assert(SystemProcedureCatalog.listing.get(procedureName) != null &&
@@ -363,7 +390,7 @@ public class MpScheduler extends Scheduler
                     message.isReadOnly(),
                     true, // isSinglePartition
                     true, // isEveryPartition
-                    null,
+                    null, // nPartitions
                     message.getStoredProcedureInvocation(),
                     message.getClientInterfaceHandle(),
                     message.getConnectionId(),
@@ -381,6 +408,7 @@ public class MpScheduler extends Scheduler
             m_pendingTasks.offer(eptask);
             return;
         }
+
         // Create a copy so we can overwrite the txnID so the InitiateResponse will be
         // correctly tracked.
         Iv2InitiateTaskMessage mp =
@@ -392,12 +420,13 @@ public class MpScheduler extends Scheduler
                     timestamp,
                     message.isReadOnly(),
                     message.isSinglePartition(),
-                    false,
-                    null,
+                    false, // isEveryPartition
+                    null,  // nPartitions
                     message.getStoredProcedureInvocation(),
                     message.getClientInterfaceHandle(),
                     message.getConnectionId(),
                     message.isForReplay());
+
         // Multi-partition initiation (at the MPI)
         MpProcedureTask task = null;
         if (isNpTxn(message) && NP_PROCEDURE_CLASS.hasProClass()) {
@@ -435,6 +464,20 @@ public class MpScheduler extends Scheduler
 
         m_outstandingTxns.put(task.m_txnState.txnId, task.m_txnState);
         m_pendingTasks.offer(task);
+    }
+
+    /*
+     * Responds to a client request that has been found to have timed out while it
+     * was loitering in the site queue. Execution has not been started.
+     */
+    private void sendTimeoutResponse(Iv2InitiateTaskMessage task, StoredProcedureInvocation spi) {
+        ClientResponseImpl clientResp = new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                                                               new VoltTable[0],
+                                                               "Request timed out at server before execution",
+                                                               spi.getClientHandle());
+        InitiateResponseMessage response = new InitiateResponseMessage(task);
+        response.setResults(clientResp);
+        m_mailbox.send(response.getInitiatorHSId(), response);
     }
 
     /**

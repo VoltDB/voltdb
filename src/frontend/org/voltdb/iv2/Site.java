@@ -902,7 +902,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
 
     @Override
-    public void run()
+    final public void run()
     {
         if (m_partitionId == MpInitiator.MP_INIT_PID) {
             Thread.currentThread().setName("MP Site - " + CoreUtils.hsIdToString(m_siteId));

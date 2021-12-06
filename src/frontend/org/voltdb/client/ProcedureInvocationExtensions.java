@@ -50,6 +50,7 @@ public abstract class ProcedureInvocationExtensions {
     public static final byte PARTITION_DESTINATION = 3; // Which partition this procedure is targeting
     public static final byte BATCH_CALL = 4; // If this is a batch call to a procedure
     public static final byte REQUEST_PRIORITY = 5; // client-assigned priority for this request
+    public static final byte REQUEST_TIMEOUT = 6; // remaining time from client-specified request timeout
 
     private static final int INTEGER_SIZE = Integer.BYTES;
 
@@ -65,8 +66,8 @@ public abstract class ProcedureInvocationExtensions {
 
     public static int readBatchTimeout(ByteBuffer buf) {
         int timeout = readInt(buf, "Batch timeout");
-        if ((timeout < 0) && (timeout != BatchTimeoutOverrideType.NO_TIMEOUT)) {
-            throw new IllegalStateException("Invalid timeout value deserialized: " + timeout);
+        if (timeout < 0 && timeout != ProcedureInvocation.NO_TIMEOUT) {
+            throw new IllegalStateException("Invalid batch timeout value deserialized: " + timeout);
         }
         return timeout;
     }
@@ -124,6 +125,20 @@ public abstract class ProcedureInvocationExtensions {
             throw new IllegalStateException("Priority extension serialization length expected to be 1: " + len);
         }
         return buf.get();
+    }
+
+    public static void writeRequestTimeoutWithTypeByte(ByteBuffer buf, int tmo) {
+        buf.put(REQUEST_TIMEOUT);
+        writeLength(buf, INTEGER_SIZE);
+        buf.putInt(tmo);
+    }
+
+    public static int readRequestTimeout(ByteBuffer buf) {
+        int timeout = readInt(buf, "Request timeout");
+        if (timeout < 0 && timeout != ProcedureInvocation.NO_TIMEOUT) {
+            throw new IllegalStateException("Invalid request timeout value deserialized: " + timeout);
+        }
+        return timeout;
     }
 
     public static void skipUnknownExtension(ByteBuffer buf) {

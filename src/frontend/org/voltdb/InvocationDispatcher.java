@@ -924,6 +924,7 @@ public final class InvocationDispatcher {
             spi.setAllPartition(task.getAllPartition());
             spi.setPartitionDestination(task.getPartitionDestination());
             spi.setRequestPriority(task.getRequestPriority());
+            spi.copyRequestTimeout(task);
             return spi;
         }
         catch (Exception ex) {

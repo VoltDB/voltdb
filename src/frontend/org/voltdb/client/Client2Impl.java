@@ -720,7 +720,7 @@ public class Client2Impl implements Client2 {
      */
     @Override
     public CompletableFuture<ClientResponse> callProcedureAsync(String procName, Object... parameters) {
-        return doProcCall(procedureCallTimeout, BatchTimeoutOverrideType.NO_TIMEOUT,
+        return doProcCall(procedureCallTimeout, ProcedureInvocation.NO_TIMEOUT,
                           ProcedureInvocation.NO_PARTITION, defaultRequestPriority,
                           procName, parameters);
     }
@@ -737,7 +737,7 @@ public class Client2Impl implements Client2 {
     @Override
     public CompletableFuture<ClientResponse> callProcedureAsync(Client2CallOptions options, String procName, Object... parameters) {
         long clientTmo = procedureCallTimeout;
-        long queryTmo = BatchTimeoutOverrideType.NO_TIMEOUT;
+        long queryTmo = ProcedureInvocation.NO_TIMEOUT;
         int reqPrio = defaultRequestPriority;
         if (options != null) {
             if (options.clientTimeout != null) clientTmo = options.clientTimeout;
@@ -759,7 +759,7 @@ public class Client2Impl implements Client2 {
     @Override
     public CompletableFuture<ClientResponseWithPartitionKey[]> callAllPartitionProcedureAsync(Client2CallOptions options, String procName, Object... parameters) {
         long clientTmo = procedureCallTimeout;
-        long queryTmo = BatchTimeoutOverrideType.NO_TIMEOUT;
+        long queryTmo = ProcedureInvocation.NO_TIMEOUT;
         int reqPrio = defaultRequestPriority;
         if (options != null) {
             if (options.clientTimeout != null) clientTmo = options.clientTimeout;
@@ -1373,7 +1373,6 @@ public class Client2Impl implements Client2 {
                 if (rateLimiter != null) {
                     rateLimiter.limitSendRate();
                 }
-                ByteBuffer buf = serializeInvocation(req.invocation);
                 long timeLeft = remainingTime(req.startTime, req.timeout);
                 req.holdsPermit = sendPermits.tryAcquire();
                 while (!req.holdsPermit) {
@@ -1383,6 +1382,10 @@ public class Client2Impl implements Client2 {
                 if (awaitClearToSend(cxn, req.startTime, req.timeout)) {
                     timeLeft = remainingTime(req.startTime, req.timeout);
                 }
+                long timeLeftMicros = TimeUnit.NANOSECONDS.toMicros(timeLeft) + 1; // round up, sort of
+                req.invocation.setRequestTimeout(timeLeftMicros > Integer.MAX_VALUE ? ProcedureInvocation.NO_TIMEOUT
+                                                                                    : (int)timeLeftMicros);
+                ByteBuffer buf = serializeInvocation(req.invocation);
                 activeHandles.add(req.invocation.getHandle());
                 if (req.timeout < ONE_SECOND_NANOS) {
                     setShortTimeoutTask(req, timeLeft);
@@ -1934,7 +1937,7 @@ public class Client2Impl implements Client2 {
         CompletableFuture<ClientResponse> future = new CompletableFuture<>();
         future.whenComplete((resp, th) -> completion.accept(resp, unwrapThrowable(th)));
         long handle = sysHandleGenerator.decrementAndGet();
-        ProcedureInvocation pi = new ProcedureInvocation(handle, BatchTimeoutOverrideType.NO_TIMEOUT,
+        ProcedureInvocation pi = new ProcedureInvocation(handle, ProcedureInvocation.NO_TIMEOUT,
                                                          ProcedureInvocation.NO_PARTITION,
                                                          systemRequestPriority, procName, procParams);
         ByteBuffer buf = serializeInvocation(pi);
