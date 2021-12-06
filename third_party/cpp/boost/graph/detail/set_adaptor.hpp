@@ -108,7 +108,7 @@ bool set_subset(const std::set< K, C, A >& x, const std::set< K, C, A >& y)
 // Shit, can't implement this without knowing the size of the
 // universe.
 template < class K, class C, class A >
-void set_compliment(const std::set< K, C, A >& /*x*/, std::set< K, C, A >& z)
+void set_complement(const std::set< K, C, A >& /*x*/, std::set< K, C, A >& z)
 {
     z.clear();
 }

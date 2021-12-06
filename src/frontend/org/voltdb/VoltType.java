@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -77,7 +77,7 @@ public enum VoltType {
     NUMERIC   ((byte)2, new Class[] {}, null),
 
     /**
-     * 1-byte signed 2s-compliment byte.
+     * 1-byte signed 2s-complement byte.
      * Lowest value means NULL in the database.
      */
     TINYINT   ((byte)3, "tinyint", 1,
@@ -95,7 +95,7 @@ public enum VoltType {
     },
 
     /**
-     * 2-byte signed 2s-compliment short.
+     * 2-byte signed 2s-complement short.
      * Lowest value means NULL in the database.
      */
     SMALLINT  ((byte)4, "smallint", 2,
@@ -113,7 +113,7 @@ public enum VoltType {
     },
 
     /**
-     * 4-byte signed 2s-compliment integer.
+     * 4-byte signed 2s-complement integer.
      * Lowest value means NULL in the database.
      */
     INTEGER   ((byte)5, "integer", 4,
@@ -131,7 +131,7 @@ public enum VoltType {
     },
 
     /**
-     * 8-byte signed 2s-compliment long.
+     * 8-byte signed 2s-complement long.
      * Lowest value means NULL in the database.
      */
     BIGINT    ((byte)6, "bigint", 8,

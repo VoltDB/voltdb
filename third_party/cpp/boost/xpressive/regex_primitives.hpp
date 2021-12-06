@@ -751,7 +751,7 @@ keep(Expr const &expr)
 /// before(expr) succeeds if the expr sub-expression would match at the current
 /// position in the sequence, but expr is not included in the match. For instance,
 /// before("foo") succeeds if we are before a "foo". Look-ahead assertions can be
-/// negated with the bit-compliment operator.
+/// negated with the bit-complement operator.
 ///
 /// \attention before(expr) is equivalent to the perl (?=...) extension.
 /// ~before(expr) is a negative look-ahead assertion, equivalent to the

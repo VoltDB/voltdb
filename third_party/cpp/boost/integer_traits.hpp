@@ -217,7 +217,7 @@ class integer_traits< ::boost::ulong_long_type>
 #elif defined(BOOST_HAS_LONG_LONG)
 //
 // we have long long but no constants, this happens for example with gcc in -ansi mode,
-// we'll just have to work out the values for ourselves (assumes 2's compliment representation):
+// we'll just have to work out the values for ourselves (assumes 2's complement representation):
 //
 template<>
 class integer_traits< ::boost::long_long_type>
