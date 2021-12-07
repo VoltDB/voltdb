@@ -4,11 +4,15 @@
         <!ENTITY calcite_logger SYSTEM "calcite-logger.xml">
         ]>
 <log4j:configuration xmlns:log4j="http://jakarta.apache.org/log4j/">
-    <!-- console is a special appender for the logger CONSOLE
-      that allows selectively logging INFO level messages to the console.
-      Appender console and appender consolefiltered must have non-intersecting
-      level filters or messages will appear on the console once for each
-      overlapping appender. -->
+
+  <!-- Logging configuration for VoltDB server.
+       Prefer utility-log4j.xml for utility programs. -->
+
+    <!-- console is a special appender for the logger CONSOLE that
+         allows selectively logging INFO level messages to the console.
+         Appenders console and consolefiltered must have non-intersecting
+         level filters or messages will appear on the console once for each
+         overlapping appender. -->
     <appender name="console" class="org.apache.log4j.ConsoleAppender">
         <layout class="org.apache.log4j.PatternLayout">
             <param name="ConversionPattern"
@@ -19,7 +23,8 @@
             <param name="levelMax" value="INFO"/>
         </filter>
     </appender>
-    <!-- console appender displays log messages with priority > INFO. -->
+
+    <!-- consolefiltered appender displays log messages with priority greater than INFO. -->
     <appender name="consolefiltered" class="org.apache.log4j.ConsoleAppender">
         <layout class="org.apache.log4j.PatternLayout">
             <param name="ConversionPattern"
@@ -30,11 +35,17 @@
             <param name="levelMax" value="FATAL"/>
         </filter>
     </appender>
-    <!-- file appender captures all loggers messages. -->
+
+    <!-- file appender captures all loggers messages. Note that the for
+         VoltDB itself, the relative "file" parameter is overridden to create
+         create log/volt.log under voltdbroot and with a fixed name.
+         For other cases a relative path will have the undesirable effect
+         of creating the path under the current working directory. Prefer
+         to use utility-log4j.xml in such cases. -->
     <appender name="file" class="org.apache.log4j.DailyMaxRollingFileAppender">
         <param name="file" value="log/volt.log"/>
         <param name="MaxBackupIndex" value="30"/>
-	<param name="DatePattern" value="'.'yyyy-MM-dd" />
+        <param name="DatePattern" value="'.'yyyy-MM-dd" />
         <layout class="org.apache.log4j.PatternLayout">
             <param name="ConversionPattern" value="%d   %-5p [%t] %c: %m%n"/>
         </layout>

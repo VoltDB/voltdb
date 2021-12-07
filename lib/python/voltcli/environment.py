@@ -245,7 +245,9 @@ def initialize(standalone_arg, command_name_arg, command_dir_arg, version_arg):
 
     pro_version = utility.is_pro_version(voltdb_jar)
     utility.debug('VoltDB Pro Version: %s' % pro_version)
-    # LOG4J configuration
+
+    # LOG4J configuration (for VoltDB itself, so we do not
+    # consider the utility_log4j.xml file here)
     if 'LOG4J_CONFIG_PATH' not in os.environ:
         for chk_dir in ('$VOLTDB_LIB/../src/frontend', '$VOLTDB_VOLTDB'):
             path = os.path.join(os.path.realpath(os.path.expandvars(chk_dir)), 'log4j.xml')
