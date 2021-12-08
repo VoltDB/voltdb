@@ -54,6 +54,7 @@ def _addUnique(result, uniq, path):
                           'Specifies a list of .jar files or paths with wildcards, comma separated, containing classes used to declare stored procedures. The classes are loaded automatically from a saved copy when the database starts.'),
         VOLT.PathOption('-l', '--license', 'license', 'Specifies the path for the VoltDB license file')
     ),
+    log4j_default = 'log4j.xml',
     description = 'Initializes a new, empty database.'
 )
 

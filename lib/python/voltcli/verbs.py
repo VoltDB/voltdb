@@ -37,6 +37,7 @@ class BaseVerb(object):
         self.dirty_opts = False
         self.dirty_args = False
         self.command_arguments = utility.flatten_to_list(kwargs.get('command_arguments', None))
+        self.log4j_default = utility.flatten_to_list(kwargs.get('log4j_default', None))
         utility.debug(str(self))
 
     def execute(self, runner):

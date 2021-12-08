@@ -46,7 +46,8 @@ output_help = ('file name to store collect data in compressed format. \'-\' mean
     ),
     arguments = (
         VOLT.PathArgument('voltdbroot', 'the voltdbroot path. (Deprecated. Please use --dir).', absolute = True, optional=True, default=None)
-    )
+    ),
+    log4j_default = ('utility-log4j.xml', 'log4j.xml')
 )
 
 def collect(runner):

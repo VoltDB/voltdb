@@ -40,7 +40,8 @@ output_help = ('Specifies the path and file name for the output file. \'-\' oper
     ),
     arguments = (
         VOLT.StringArgument('resource', get_resource_help, default=None),
-    )
+    ),
+    log4j_default = ('utility-log4j.xml', 'log4j.xml')
 )
 
 def get(runner):

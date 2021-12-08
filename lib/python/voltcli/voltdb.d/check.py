@@ -44,7 +44,8 @@ def displayResults():
         print("\nCheck completed successfully.")
 
 @VOLT.Command(
-    description = 'Check system properties.'
+    description = 'Check system properties.',
+    log4j_default = None
 )
 
 def check(runner):

@@ -34,7 +34,8 @@ server_list_help = ('{hostname-or-ip[,...]}, '
         VOLT.BooleanOption('-A', '--add', 'enableadd', 'allows the server to elastically expand the cluster if the cluster is already complete', default = False),
         VOLT.IntegerOption('-m', '--missing', 'missing', 'specifies how many nodes are missing at K-safe cluster startup'),
         VOLT.PathOption('-l', '--license', 'license', 'specify a license file to replace the existing staged copy of the license')
-   ),
+    ),
+    log4j_default = 'log4j.xml',
     description = 'Starts a database, which has been initialized.'
 )
 

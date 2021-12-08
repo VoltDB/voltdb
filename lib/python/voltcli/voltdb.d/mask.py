@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2020 VoltDB Inc.
+# Copyright (C) 2008-2021 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -31,7 +31,10 @@ CatalogPasswordScrambler = 'org.voltdb.utils.CatalogPasswordScrambler'
             'Source and optionally a destination masked deployment file(s)',
             min_count=1, max_count=2
             )
-    )
+    ),
+
+    # Console-only logging
+    log4j_default = ('utility-log4j.xml', 'log4j.xml')
 )
 
 # Command implementation

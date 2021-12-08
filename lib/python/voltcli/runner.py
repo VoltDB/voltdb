@@ -82,6 +82,7 @@ class JavaRunner(object):
         self.config = config
         self.kwargs = kwargs
         self.classpath = None
+        self.log4j_default = None
 
     def initialize(self):
         if self.classpath is None:
@@ -96,6 +97,10 @@ class JavaRunner(object):
                 self.classpath = ':'.join((verb_classpath, self.classpath))
             if 'classpath' in self.kwargs:
                 self.classpath = ':'.join((self.kwargs['classpath'], self.classpath))
+        if self.log4j_default is None:
+            verb_log4j = getattr(self.verb, 'log4j_default', None)
+            if verb_log4j:
+                self.log4j_default = verb_log4j
 
     def execute(self, java_class, java_opts_override, *args, **kwargs):
         """
@@ -115,7 +120,7 @@ class JavaRunner(object):
         java_args = [environment.java]
         java_opts = utility.merge_java_options(environment.java_opts, java_opts_override)
         java_args.extend(java_opts)
-        java_args.append('-Dlog4j.configuration=file://%s' % os.environ['LOG4J_CONFIG_PATH'])
+        java_args.append('-Dlog4j.configuration=file://%s' % self.find_log4j_config())
         java_args.append('-Djava.library.path=default')
         java_args.extend(('-classpath', classpath))
         java_args.append(java_class)
@@ -132,6 +137,24 @@ class JavaRunner(object):
         else:
             # Run as a sub-process. Returns when the sub-process exits.
             return utility.run_cmd(*java_args)
+
+    def find_log4j_config(self):
+        if 'LOG4J_CONFIG_PATH' in os.environ:
+            path = os.environ['LOG4J_CONFIG_PATH']
+            utility.debug('LOG4J_CONFIG_PATH=%s' % path)
+            if not os.path.exists(path): # warn only, since this was not previously checked
+                utility.warning('LOG4J_CONFIG_PATH refers to a nonexistent file: %s' % path)
+            return path
+        if not self.log4j_default:
+            utility.abort('log4j_default not defined for verb')
+        for fname in self.log4j_default:
+            for dir in ('$VOLTDB_LIB/../src/frontend', '$VOLTDB_VOLTDB'):
+                path = os.path.join(os.path.realpath(os.path.expandvars(dir)), fname)
+                if os.path.exists(path):
+                    os.environ['LOG4J_CONFIG_PATH'] = path # define this for back-compatibility
+                    utility.debug('LOG4J_CONFIG_PATH=%s' % path)
+                    return path
+        utility.abort('Could not find log4j configuration file and LOG4J_CONFIG_PATH variable not set.')
 
     def compile(self, outdir, *srcfiles):
         """
