@@ -1,8 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<!DOCTYPE log4j:configuration SYSTEM "log4j.dtd" [
-        <!ENTITY calcite_appender SYSTEM "calcite-appender.xml">
-        <!ENTITY calcite_logger SYSTEM "calcite-logger.xml">
-        ]>
+<!DOCTYPE log4j:configuration SYSTEM "log4j.dtd">
 <log4j:configuration xmlns:log4j="http://jakarta.apache.org/log4j/">
 
   <!-- Logging configuration for VoltDB server.
@@ -50,9 +47,6 @@
             <param name="ConversionPattern" value="%d   %-5p [%t] %c: %m%n"/>
         </layout>
     </appender>
-
-    <!--appender config for calcite-->
-    &calcite_appender;
 
     <logger name="kafka.consumer.SimpleConsumer" additivity="false">
         <level value="ERROR"/>
@@ -155,9 +149,6 @@
         <level value="INFO"/>
         <appender-ref ref="console"/>
     </logger>
-
-    <!--logger config for calcite-->
-    &calcite_logger;
 
     <root>
         <priority value="info" />

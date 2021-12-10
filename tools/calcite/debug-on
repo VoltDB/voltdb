@@ -2,6 +2,11 @@
 
 # Use this script to turn on debug output in Calcite
 
+# NOTE - needs attention, the base log4j no longer has calcite
+# hooks in it, due to a useability problem: see ENG-21779.
+# I suggest writing a complete replacement for the standard
+# log4j.xml file rather than attempting to use separate files.
+
 import os
 import shutil
 
