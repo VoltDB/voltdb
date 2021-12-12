@@ -1,0 +1,14 @@
+What's here
+===========
+
+This directory tree, tests/test_apps/voter, was cloned
+from examples/voter on 2021-12-10.
+
+The intent is to avoid burdening example code with features
+that internal voltdb testing would like to use. The examples
+should remain reasonably simple examples.
+
+Everything is executed via 'run.sh'.  You must set your
+working directory to this directory, tests/test_apps/voter.
+
+'./run.sh help' will list available test targets.
