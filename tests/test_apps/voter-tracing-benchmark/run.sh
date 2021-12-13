@@ -36,7 +36,7 @@ SERVERS="localhost"
 # remove binaries, logs, runtime artifacts, etc... but keep the jars
 function clean() {
     rm -rf voltdbroot log procedures/voter/*.class client/voter/*.class
-    rm -r  *.log resTracing*.txt
+    rm -rf *.log resTracing*.txt
 }
 
 # remove everything from "clean" as well as the jarfiles
