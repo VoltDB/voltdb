@@ -5,6 +5,10 @@ This application is based on the examples/voter.  Its current differences:
   result will be checked against the hash of the original result.  Differences
   will acause replication failure.
 
+TODO: consider unifying code with tests/test_apps/voter.
+      but beware, there are tests in the pro repo that depends
+      on the details of voter-selfcheck.
+
 Voter application
 ===========================
 
@@ -78,4 +82,3 @@ run.sh jdbc-benchmark: start the JDBC client, more than 1 client is permitted.
 run.sh catalog       : build the catalog
 
 run.sh clean         : remove compiled files
-

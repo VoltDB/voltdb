@@ -64,7 +64,7 @@ public class TracingBenchmark {
     static final String CONTESTANT_NAMES_CSV =
             "Edwina Burnam,Tabatha Gehling,Kelly Clauss,Jessie Alloway," +
             "Alana Bregman,Jessie Eichman,Allie Rogalski,Nita Coster," +
-            "Kurt Walser,Ericka Dieter,Loraine NygrenTania Mattioli";
+            "Kurt Walser,Ericka Dieter,Loraine Nygren,Tania Mattioli";
 
     static final String HORIZONTAL_RULE =
         "----------" + "----------" + "----------" + "----------" +
@@ -225,7 +225,7 @@ public class TracingBenchmark {
             for (int i = 0; i < TracingBenchmark.TXNS; i++) {
                 ClientResponse response = client.callProcedure("DistinctCount");
                 if (response.getStatus() != ClientResponse.SUCCESS) {
-                    System.out.println("Resonse unsuccessful");
+                    System.out.println("Response unsuccessful");
                     throw new RuntimeException(response.getStatusString());
                 }
             }

@@ -1,9 +1,18 @@
 #!/usr/bin/env bash
 
+# This is a semi-clone of examples/voter, with only
+# the TracingBenchmark client code. For other client
+# targets, use tests/test_apps/voter.
+#
+# TracingBenchmark doesn't seem to have a whole lot
+# to do with the actual voter logic.
+
+echo '-=-=-=-=- test/test_apps/voter-tracing-benchmark -=-=-=-=-'
+
 # find voltdb binaries
-if [ -e ../../bin/voltdb ]; then
-    # assume this is the examples folder for a kit
-    VOLTDB_BIN="$(dirname $(dirname $(pwd)))/bin"
+if [ -e ../../../bin/voltdb ]; then
+    # assume this is the tests/test_apps/voter-tracing-benchmark directory
+    VOLTDB_BIN="$(dirname $(dirname $(dirname $(pwd))))/bin"
 elif [ -n "$(which voltdb 2> /dev/null)" ]; then
     # assume we're using voltdb from the path
     VOLTDB_BIN=$(dirname "$(which voltdb)")
@@ -20,12 +29,14 @@ source $VOLTDB_BIN/voltenv
 # leader host for startup purposes only
 # (once running, all nodes are the same -- no leaders)
 STARTUPLEADERHOST="localhost"
+
 # list of cluster nodes separated by commas in host:[port] format
 SERVERS="localhost"
 
 # remove binaries, logs, runtime artifacts, etc... but keep the jars
 function clean() {
-    rm -rf voltdbroot log procedures/voter/*.class client/voter/*.class *.log
+    rm -rf voltdbroot log procedures/voter/*.class client/voter/*.class
+    rm -r  *.log resTracing*.txt
 }
 
 # remove everything from "clean" as well as the jarfiles
@@ -71,87 +82,12 @@ function init() {
     sqlcmd < ddl.sql
 }
 
-# run the client that drives the example
-function client() {
-    async-benchmark
-}
-
-# Asynchronous benchmark sample
-# Use this target for argument help
-function async-benchmark-help() {
-    jars-ifneeded
-    java -classpath voter-client.jar:$CLIENTCLASSPATH voter.AsyncBenchmark --help
-}
-
-# latencyreport: default is OFF
-# ratelimit: must be a reasonable value if lantencyreport is ON
-# Disable the comments to get latency report
-function async-benchmark() {
-    jars-ifneeded
-    java -classpath voter-client.jar:$CLIENTCLASSPATH voter.AsyncBenchmark \
-        --displayinterval=5 \
-        --warmup=5 \
-        --duration=120 \
-        --servers=$SERVERS \
-        --contestants=6 \
-        --maxvotes=2 \
-        --latencyreport=true \
-        --ratelimit=10000
-}
-
-# trivial client code for illustration purposes
-function simple-benchmark() {
-    jars-ifneeded
-    java -classpath voter-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
-        voter.SimpleBenchmark $SERVERS
-}
-
-# Multi-threaded synchronous benchmark sample
-# Use this target for argument help
-function sync-benchmark-help() {
-    jars-ifneeded
-    java -classpath voter-client.jar:$CLIENTCLASSPATH voter.SyncBenchmark --help
-}
-
-function sync-benchmark() {
-    jars-ifneeded
-    java -classpath voter-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
-        voter.SyncBenchmark \
-        --displayinterval=5 \
-        --warmup=5 \
-        --duration=120 \
-        --servers=$SERVERS \
-        --contestants=6 \
-        --maxvotes=2 \
-        --threads=40
-}
-
-# JDBC benchmark sample
-# Use this target for argument help
-function jdbc-benchmark-help() {
-    jars-ifneeded
-    java -classpath voter-client.jar:$CLIENTCLASSPATH voter.JDBCBenchmark --help
-}
-
-function jdbc-benchmark() {
-    jars-ifneeded
-    java -classpath voter-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
-        voter.JDBCBenchmark \
-        --displayinterval=5 \
-        --duration=120 \
-        --servers=$SERVERS \
-        --maxvotes=2 \
-        --contestants=6 \
-        --threads=40
-}
-
-function start-voltdb() {
-    voltdb init --force --dir=.
-    voltdb start --dir=.
-}
-
+# variations on client benchmark code
+# 1 - show results on console with detailed latency report
+# 2 - show result  on console with main statisical parameters of performance listed in table
+# 3 - plot the statistical data in figures
 function tracing-benchmark() {
-    sqlcmd < ddl.sql > /dev/null
+    sqlcmd < ddl.sql > /dev/null # always reset results on server
     java -classpath voter-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
             voter.TracingBenchmark \
             --servers=$SERVERS \
@@ -161,24 +97,30 @@ function tracing-benchmark() {
             --doInsert=true
 }
 
+# 1 - show results on console with detailed latency report
 function tracing-benchmark-showAll() {
+    jars-ifneeded
     tracing-benchmark 1
-    #voltadmin shutdown
+    voltadmin shutdown > /dev/null
 }
 
+function showAll() { # handy abbreviation
+    tracing-benchmark-showAll
+}
+
+# 3 - plot the statistical data in figures
 function tracing-benchmark-figurePlot() {
     jars-ifneeded
-    # SET THE NUMBER OF ITERATIONS HERE BY CHANGE THE VALUE OF VARIABLE N
+
+    # SET THE NUMBER OF ITERATIONS HERE BY CHANGING THE VALUE OF VARIABLE N
     NUM_ITER=50
 
     ###################
     # tracing tool off
     ###################
+
     FILENAME="resTracingOff.txt"
-    if [ -f ./$FILENAME ]; then
-        echo "file already exists; remove it"
-        rm $FILENAME
-    fi
+    rm -f $FILENAME
 
     for i in $(eval echo "{1..$NUM_ITER}")
     do
@@ -197,10 +139,7 @@ function tracing-benchmark-figurePlot() {
     sqlcmd --query="exec @Trace status" > /dev/null
 
     FILENAME="resTracingOn.txt"
-    if [ -f ./$FILENAME ]; then
-        echo "file already exists; remove it"
-        rm $FILENAME
-    fi
+    rm -f $FILENAME
 
     for i in $(eval echo "{1..$NUM_ITER}")
     do
@@ -213,6 +152,7 @@ function tracing-benchmark-figurePlot() {
     sqlcmd --query="exec @Trace disable SPI" > /dev/null
     #sqlcmd --query="exec @Trace disable EE" > /dev/null
     sqlcmd --query="exec @Trace status" > /dev/null
+
     # shutdown database
     voltadmin shutdown > /dev/null
 
@@ -222,9 +162,15 @@ function tracing-benchmark-figurePlot() {
     rm resTracing*.txt
 }
 
+function figurePlot() { # handy abbreviation
+    tracing-benchmark-figurePlot
+}
+
+# 2 - show result on console with main statisical parameters of performance listed in table
 function tracing-benchmark-showBenchmark() {
     jars-ifneeded
-    # SET THE NUMBER OF ITERATIONS HERE BY CHANGE THE VALUE OF VARIABLE N
+
+    # SET THE NUMBER OF ITERATIONS HERE BY CHANGING THE VALUE OF VARIABLE N
     NUM_ITER=10
 
     echo "-----------------------------------------"
@@ -267,19 +213,34 @@ function tracing-benchmark-showBenchmark() {
     voltadmin shutdown > /dev/null
 }
 
-function help() {
-    echo "Usage: ./run.sh {clean|cleanall|jars|server|init|client|async-benchmark|aysnc-benchmark-help|...}"
-    echo "       {...|sync-benchmark|sync-benchmark-help|jdbc-benchmark|jdbc-benchmark-help|simple-benchmark}"
+function showBenchmark() { # handy abbreviation
+    tracing-benchmark-showBenchmark
 }
 
+function help() {
+    echo "
+  Usage: ./run.sh TARGET
+
+  Targets:
+        server (starts a local server)
+        tracing-benchmark-showAll -or- showAll
+        tracing-benchmark-showBenchmark -or- showBenchmark
+        tracing-benchmark-figurePlot -or- figurePlot
+        test-volt-trace
+
+"
+}
+
+# Not really sure of the point here
 function test-volt-trace() {
+    jars-ifneeded
     sqlcmd < ddl.sql
     sqlcmd --query="exec @Trace status"
     sqlcmd --query="exec @Trace filter 800"
     sqlcmd --query="exec @Trace enable SPI"
     sqlcmd --query="exec @Trace enable CI"
     sqlcmd --query="exec @Trace status"
-    tracing-benchmark-showAll
+    tracing-benchmark 1 # showAll
     sqlcmd --query="exec @Trace dump"
     sqlcmd --query="exec @Trace filter 0"
     sqlcmd --query="exec @Trace status"
@@ -289,8 +250,13 @@ function test-volt-trace() {
 }
 
 # Run the targets pass on the command line
-# If no first arg, run server
-if [ $# -eq 0 ]; then server; exit; fi
+
+if [ $# -eq 0 ];
+then
+    help
+    exit 0
+fi
+
 for arg in "$@"
 do
     echo "${0}: Performing $arg..."

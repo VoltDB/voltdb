@@ -1,6 +1,6 @@
-/stats.csv
-/log/
-/d[12].xml
-/s[12]
-/src/
+d[12].xml
+s[12]
+client
+procedures
+runvoter.tmp
 ddl.sql

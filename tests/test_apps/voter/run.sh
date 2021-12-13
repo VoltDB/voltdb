@@ -7,7 +7,7 @@ echo '-=-=-=-=- test/test_apps/voter -=-=-=-=-'
 
 # find voltdb binaries
 if [ -e ../../../bin/voltdb ]; then
-    # assume this is the tests/test_apps/voter folder for a kit
+    # assume this is the tests/test_apps/voter directory
     VOLTDB_BIN="$(dirname $(dirname $(dirname $(pwd))))/bin"
 elif [ -n "$(which voltdb 2> /dev/null)" ]; then
     # assume we're using voltdb from the path
@@ -196,6 +196,18 @@ function jdbc-benchmark() {
         --threads=40
 }
 
+# AdHoc benchmark, previously in test_apps/voter-adhoc.
+function adhoc-benchmark() {
+    java -classpath voter-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
+        voter.AdHocBenchmark \
+        --displayinterval=5 \
+        --warmup=5 \
+        --duration=12 \
+        --servers=localhost:21212 \
+        --contestants=6 \
+        --maxvotes=2
+}
+
 function help() {
     echo "
 Usage: ./run.sh target...
@@ -206,7 +218,7 @@ General targets:
 
 Benchmark targets:
         async-benchmark | nonblocking-benchmark | sync-benchmark | jdbc-benchmark |
-        client2-async-benchmark | client2-sync-benchmark | simple-benchmark
+        client2-async-benchmark | client2-sync-benchmark | adhoc-benchmark | simple-benchmark
 
 Selected help:
          async-benchmark-help | sync-benchmark-help | jdbc-benchmark-help
@@ -215,7 +227,6 @@ Abbreviations:
         client   : async-benchmark
         nbclient : nonblocking-benchmark
         client2  : client2-async-benchmark
-
 "
 }
 
