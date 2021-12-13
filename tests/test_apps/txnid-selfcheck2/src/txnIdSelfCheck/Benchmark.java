@@ -210,6 +210,11 @@ public class Benchmark {
         @Option(desc = "Enable Hashmismatch generation")
         boolean enablehashmismatchgen = false;
 
+        @Option(desc = "username")
+        String username = "";
+
+        @Option(desc = "password")
+        String password = "";
 
         @Override
         public void validate() {
@@ -407,7 +412,7 @@ public class Benchmark {
         log.info(HORIZONTAL_RULE);
         log.info(config.getConfigDumpString());
 
-        ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
+        ClientConfig clientConfig = new ClientConfig(config.username, config.password, new StatusListener());
         if (config.sslfile.trim().length() > 0) {
             clientConfig.setTrustStoreConfigFromPropertyFile(config.sslfile);
             clientConfig.enableSSL();
