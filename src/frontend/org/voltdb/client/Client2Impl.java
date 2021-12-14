@@ -941,6 +941,7 @@ public class Client2Impl implements Client2 {
         // Absorb new connection into our data. Synchronization is
         // needed for the cluster identity check.
         IOException fail = null;
+        ClientConnection prevCxn = null;
         synchronized (connectionLock) {
             if (connectionList.size() == 0 || clusterTimestamp == 0) {
                 clusterTimestamp = timestamp;
@@ -954,9 +955,7 @@ public class Client2Impl implements Client2 {
                 fail = new IOException(msg);
             }
             if (fail == null) {
-                if (hostIdToConnection.put(hostId, cxn) != null) {
-                    logError("Warning: replaced connection for host id %d", hostId);
-                }
+                prevCxn = hostIdToConnection.put(hostId, cxn);
                 connectHistory.add(HostAndPort.fromParts(host, port));
                 connectionList.add(cxn); // remember: copy-on-write array
                 cxn.start();
@@ -968,6 +967,12 @@ public class Client2Impl implements Client2 {
 
         // Either way, it's complete. This is intentionally outside
         // the sync block, since application code may immediately run.
+        if (prevCxn != null) {
+            Connection c = prevCxn.getConnection();
+            logError("Warning: replaced connection for host id %d (%s port %d)",
+                     hostId, c.getHostnameOrIP(), c.getRemotePort());
+            c.unregister();
+        }
         if (fail == null) {
             notifyConnectionUp(cxn);
         }
