@@ -59,8 +59,6 @@ import org.voltdb.ParameterSet;
 import org.voltdb.VoltTable;
 import org.voltdb.utils.Encoder;
 
-import voter.procedures.Vote;
-
 public class HTTPBenchmark {
 
     // Initialize some common constants and variables
@@ -73,6 +71,11 @@ public class HTTPBenchmark {
     static final String HORIZONTAL_RULE =
             "----------" + "----------" + "----------" + "----------" +
             "----------" + "----------" + "----------" + "----------" + "\n";
+
+    // potential return codes (synced with Vote procedure)
+    static final long VOTE_SUCCESSFUL = 0;
+    static final long ERR_INVALID_CONTESTANT = 1;
+    static final long ERR_VOTER_OVER_VOTE_LIMIT = 2;
 
     // validated command line configuration
     final VoterConfig config;
@@ -407,14 +410,14 @@ public class HTTPBenchmark {
                     Response response = responseFromJSON(res);
                     assert (response.results[0].advanceRow());
                     long resultCode = response.results[0].getLong(0);
-                    if (resultCode == Vote.ERR_INVALID_CONTESTANT) {
+                    if (resultCode == ERR_INVALID_CONTESTANT) {
                         badContestantVotes.incrementAndGet();
                     }
-                    else if (resultCode == Vote.ERR_VOTER_OVER_VOTE_LIMIT) {
+                    else if (resultCode == ERR_VOTER_OVER_VOTE_LIMIT) {
                         badVoteCountVotes.incrementAndGet();
                     }
                     else {
-                        assert(resultCode == Vote.VOTE_SUCCESSFUL);
+                        assert(resultCode == VOTE_SUCCESSFUL);
                         acceptedVotes.incrementAndGet();
                     }
                 }

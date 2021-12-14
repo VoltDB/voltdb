@@ -28,7 +28,7 @@
 // number of allowed votes.
 //
 
-package voter.procedures;
+package voter;
 
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;

@@ -79,8 +79,8 @@ CREATE ROLE hockey WITH adhoc;
 -- make sure to load the Java code for the procedures, before creating them
 LOAD CLASSES voter.jar;
 
-CREATE PROCEDURE ALLOW dbuser FROM CLASS voter.procedures.Initialize;
-CREATE PROCEDURE ALLOW dbuser FROM CLASS voter.procedures.Results;
-CREATE PROCEDURE ALLOW dbuser PARTITION ON TABLE votes COLUMN phone_number FROM CLASS voter.procedures.Vote;
-CREATE PROCEDURE ALLOW dbuser FROM CLASS voter.procedures.ContestantWinningStates;
-CREATE PROCEDURE ALLOW dbuser FROM CLASS voter.procedures.GetStateHeatmap;
+CREATE PROCEDURE ALLOW dbuser FROM CLASS voter.Initialize;
+CREATE PROCEDURE ALLOW dbuser FROM CLASS voter.Results;
+CREATE PROCEDURE ALLOW dbuser PARTITION ON TABLE votes COLUMN phone_number FROM CLASS voter.Vote;
+CREATE PROCEDURE ALLOW dbuser FROM CLASS voter.ContestantWinningStates;
+CREATE PROCEDURE ALLOW dbuser FROM CLASS voter.GetStateHeatmap;
