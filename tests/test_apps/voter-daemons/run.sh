@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 
 ###
-# Uses the version of 'voter' from test_apps/voter
+# Uses the version of 'voter' source from test_apps/voter
+# (including the schema file, ddl.sql)
 ###
 
 # find voltdb binaries
@@ -33,21 +34,6 @@ function _run() {
     fi
 }
 
-function populate() {
-    # Prefer to use rsync so that modifications are not overridden.
-    if command -v rsync > /dev/null 2>&1; then
-        rsync -ur $VOTER_BASE/ddl.sql .
-        rsync -ur $VOTER_BASE/client .
-        rsync -ur $VOTER_BASE/procedures .
-        rsync -u  $VOTER_BASE/run.sh runvoter.tmp
-    else
-        cp -afv $VOTER_BASE/ddl.sql .
-        cp -afv $VOTER_BASE/client .
-        cp -afv $VOTER_BASE/procedures .
-        cp -afv $VOTER_BASE/run.sh runvoter.tmp
-    fi
-}
-
 function _info() {
     if [ "$DRYRUN" != "true" ]; then
         echo ">>> $@"
@@ -68,20 +54,27 @@ function _checkarg() {
 
 # remove build artifacts
 function clean() {
-    rm -rf voter-client.jar voter-procs.jar s[12] d[12].xml voltdb_crash*.txt
-    rm -f ~/.voltdb_server/*
+    rm -rf voter-client.jar voter-procs.jar obj s[12] d[12].xml
+    rm -f ~/.voltdb_server/* voltdb_crash*.txt
 }
 
-# remove build artifacts and copied source
-function clean-all() {
-    clean
-    rm -rf ddl.sql client procedures runvoter.tmp
+# compile the source code for procedures and the client into jarfiles
+# (local dir used for classes, so can't use jars target from base voter)
+function jars() {
+    mkdir -p obj/procs/voter obj/client/voter
+    # compile java source
+    javac -cp $APPCLASSPATH -d obj/procs $VOTER_BASE/procedures/voter/*.java
+    javac -cp $CLIENTCLASSPATH -d obj/client $VOTER_BASE/client/voter/*.java
+    # build procedure and client jars
+    jar cf voter-procs.jar -C obj/procs voter
+    jar cf voter-client.jar -C obj/client voter
+    # remove compiled .class files
+    rm -rf obj
 }
 
-# compile the source code for procedures and the client
+# older synonym
 function srccompile() {
-    populate
-    ./runvoter.tmp jars
+    jars
 }
 
 # Usage: deployment INSTANCE
@@ -144,7 +137,7 @@ function client() {
     if [ ! -e voter-procs.jar ] || [ ! -e voter-client.jar ]; then
         srccompile;
     fi
-    sqlcmd --port=$(_port $1 6) <ddl.sql
+    sqlcmd --port=$(_port $1 6) < $VOTER_BASE/ddl.sql
     _run java -classpath voter-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
         voter.AsyncBenchmark \
         --displayinterval=5 \
@@ -167,7 +160,7 @@ function help() {
   Usage: ./run.sh OPTION
 
   Options:
-      clean | clean-all | srccompile |
+      clean | jars |
       server N | client N | stop N |
       watch
 "
