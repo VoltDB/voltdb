@@ -36,11 +36,6 @@ CONFLUENT_HOME=${CONFLUENT_HOME:-/home/opt/confluent-6.0.1}
 # This tool has been tested with confluent-6.6.0 and some adjustments to the jar files below may be
 # necessary if working with a different Confluent distribution.
 CLIENTLIBS=$({ \
-    \ls -1 "$CONFLUENT_HOME"/share/java/schema-registry/jersey-common-*.jar; \
-    \ls -1 "$CONFLUENT_HOME"/share/java/kafka-serde-tools/kafka-avro-serializer-*.jar; \
-    \ls -1 "$CONFLUENT_HOME"/share/java/kafka-serde-tools/kafka-schema-serializer-*.jar; \
-    \ls -1 "$CONFLUENT_HOME"/share/java/kafka-serde-tools/kafka-schema-registry-client-*.jar; \
-    \ls -1 "$CONFLUENT_HOME"/share/java/confluent-security/schema-registry/javax.ws.rs-api-*.jar; \
     \ls -1 "$VOLTDB_LIB"/jackson-annotations-*.jar; \
     \ls -1 "$VOLTDB_LIB"/jackson-core-*.jar; \
     \ls -1 "$VOLTDB_LIB"/jackson-databind-*.jar; \
@@ -53,6 +48,9 @@ CLIENTLIBS=$({ \
     \ls -1 "$VOLTDB_VOLTDB"/voltdb-*.jar; \
 } 2> /dev/null | paste -sd ':' - )
 CLIENTCLASSPATH=$CLIENTLIBS:$CLIENTCLASSPATH
+CLIENTCLASSPATH=$CONFLUENT_HOME/share/java/schema-registry/*:$CLIENTCLASSPATH
+CLIENTCLASSPATH=$CONFLUENT_HOME/share/java/kafka-serde-tools/*:$CLIENTCLASSPATH
+CLIENTCLASSPATH=$CONFLUENT_HOME/share/java/confluent-security/schema-registry/*:$CLIENTCLASSPATH
 
 # remove build artifacts
 function clean() {
