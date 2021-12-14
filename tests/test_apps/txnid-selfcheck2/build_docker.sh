@@ -20,7 +20,6 @@ if [ ! -e voltdb/bin/sqlcmd ]; then
 fi
 cp $VOLTDB_HOME/voltdb/* voltdb/voltdb/
 cp $VOLTDB_HOME/voltdb/log4j.xml  voltdb/
-cp ./txnid2-docker-log4j.xml voltdb/
 
 ./run.sh jars
 branch=""
@@ -38,7 +37,9 @@ docker build -t voltdb/txnid2:${branch}--latest .
 docker push voltdb/txnid2:${branch}--latest
 
 if [ "master" == "$branch" ]; then
-    docker push voltdb/txnid2:latest
+    # this defaults to voltdb/txnid2:latest
+    docker tag voltdb/txnid2:${branch}--latest voltdb/txnid2:latest
+    docker push voltdb/txnid2
 fi
 
-#rm -r ./voltdb
+rm -r ./voltdb
