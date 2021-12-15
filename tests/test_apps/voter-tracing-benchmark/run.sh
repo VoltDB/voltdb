@@ -33,15 +33,10 @@ STARTUPLEADERHOST="localhost"
 # list of cluster nodes separated by commas in host:[port] format
 SERVERS="localhost"
 
-# remove binaries, logs, runtime artifacts, etc... but keep the jars
+# remove binaries, logs, runtime artifacts, etc...
 function clean() {
     rm -rf voltdbroot log procedures/voter/*.class client/voter/*.class
     rm -rf *.log resTracing*.txt
-}
-
-# remove everything from "clean" as well as the jarfiles
-function cleanall() {
-    clean
     rm -rf voter-procs.jar voter-client.jar
 }
 
@@ -222,6 +217,7 @@ function help() {
   Usage: ./run.sh TARGET
 
   Targets:
+        jars | init | clean
         server (starts a local server)
         tracing-benchmark-showAll -or- showAll
         tracing-benchmark-showBenchmark -or- showBenchmark
