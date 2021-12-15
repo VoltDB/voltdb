@@ -33,6 +33,8 @@ STARTUPLEADERHOST="localhost"
 # list of cluster nodes separated by commas in host:[port] format
 SERVERS="localhost"
 
+VOTER_BASE=../voter
+
 # remove binaries, logs, runtime artifacts, etc...
 function clean() {
     rm -rf voltdbroot log procedures/voter/*.class client/voter/*.class
@@ -41,9 +43,10 @@ function clean() {
 }
 
 # compile the source code for procedures and the client into jarfiles
+# we merge code from the base test_apps/voter with our specializations
 function jars() {
     # compile java source
-    javac -classpath $APPCLASSPATH procedures/voter/*.java
+    javac -classpath $APPCLASSPATH -d procedures $VOTER_BASE/procedures/voter/*.java procedures/voter/*.java
     javac -classpath $CLIENTCLASSPATH client/voter/*.java
     # build procedure and client jars
     jar cf voter-procs.jar -C procedures voter
