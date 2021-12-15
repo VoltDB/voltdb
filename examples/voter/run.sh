@@ -76,14 +76,11 @@ function client() {
     async-benchmark
 }
 
-# run the non-blocking version
-function nbclient() {
-    nonblocking-benchmark
-}
-
-# run the 'Client2' version
-function client2() {
-    client2-async-benchmark
+# trivial client code for illustration purposes
+function simple-benchmark() {
+    jars-ifneeded
+    java -classpath voter-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
+        voter.SimpleBenchmark $SERVERS
 }
 
 # Asynchronous benchmark sample
@@ -104,51 +101,6 @@ function async-benchmark() {
         --servers=$SERVERS \
         --contestants=6 \
         --maxvotes=2
-}
-
-# latencyreport: default is OFF
-# ratelimit: must be a reasonable value if latencyreport is ON
-function nonblocking-benchmark() {
-    jars-ifneeded
-    java -classpath voter-client.jar:$CLIENTCLASSPATH voter.NonblockingAsyncBenchmark \
-        --displayinterval=5 \
-        --warmup=5 \
-        --duration=120 \
-        --servers=$SERVERS \
-        --contestants=6 \
-        --maxvotes=2
-}
-
-# Client2 variants
-
-function client2-async-benchmark() {
-    jars-ifneeded
-    java -classpath voter-client.jar:$CLIENTCLASSPATH voter.Client2AsyncBenchmark \
-        --displayinterval=5 \
-        --warmup=5 \
-        --duration=120 \
-        --servers=$SERVERS \
-        --contestants=6 \
-        --maxvotes=2
-}
-
-function client2-sync-benchmark() {
-    jars-ifneeded
-    java -classpath voter-client.jar:$CLIENTCLASSPATH voter.Client2SyncBenchmark \
-        --displayinterval=5 \
-        --warmup=5 \
-        --duration=120 \
-        --servers=$SERVERS \
-        --contestants=6 \
-        --maxvotes=2 \
-        --threads=40
-}
-
-# trivial client code for illustration purposes
-function simple-benchmark() {
-    jars-ifneeded
-    java -classpath voter-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
-        voter.SimpleBenchmark $SERVERS
 }
 
 # Multi-threaded synchronous benchmark sample
@@ -191,13 +143,31 @@ function jdbc-benchmark() {
 }
 
 function help() {
-    echo "Usage: ./run.sh {clean|cleanall|jars|server|init|client|async-benchmark|aysnc-benchmark-help|...}"
-    echo "       {...|sync-benchmark|sync-benchmark-help|jdbc-benchmark|jdbc-benchmark-help|simple-benchmark}"
+    echo "
+  Usage: ./run.sh [TARGET...]
+
+  Targets:
+     help | clean | cleanall | jars | init |
+     server | client |
+     async-benchmark | async-benchmark-help |
+     sync-benchmark | sync-benchmark-help |
+     jdbc-benchmark | jdbc-benchmark-help |
+     simple-benchmark
+
+  The default target is 'server'.
+  The 'client' target is the same as 'async-benchmark'.
+
+"
 }
 
 # Run the targets pass on the command line
 # If no first arg, run server
-if [ $# -eq 0 ]; then server; exit; fi
+if [ $# -eq 0 ];
+then
+    server;
+    exit;
+fi
+
 for arg in "$@"
 do
     echo "${0}: Performing $arg..."
