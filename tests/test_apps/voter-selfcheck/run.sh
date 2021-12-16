@@ -34,26 +34,19 @@ LOG4J="$VOLTDB_VOLTDB/log4j.xml"
 LICENSE="$VOLTDB_VOLTDB/license.xml"
 HOST="localhost"
 
-VOTER_BASE=../voter
-
 # remove build artifacts
 function clean() {
-    rm -rf ${APPNAME}.jar obj voltdbroot log voltdb_crash*.txt
+    rm -rf obj debugoutput ${APPNAME}.jar voltdbroot log voltdb_crash*txt
 }
 
 # compile the source code for procedures and the client into jarfiles
-# we merge code from the base test_apps/voter with our specializations
 function jars() {
     mkdir -p obj
     # compile java source
     javac -classpath $CLASSPATH -d obj \
-        $VOTER_BASE/client/voter/*.java \
-        src/$APPNAME/HTTPBenchmark.java \
-        $VOTER_BASE/procedures/voter/*.java
-    if [ $? != 0 ]; then exit 1; fi
-    # replace the Vote procedure with our version
-    javac -classpath $CLASSPATH -d obj \
-        src/$APPNAME/Vote.java
+        src/${APPNAME}/*.java \
+        src/${APPNAME}/procedures/*.java
+    # stop if compilation fails
     if [ $? != 0 ]; then exit 1; fi
     # build the jar file
     jar cf ${APPNAME}.jar -C obj ${APPNAME}
@@ -75,18 +68,14 @@ function server() {
     # truncate the voltdb log
     [[ -d voltdbroot/log && -w voltdbroot/log ]] && > voltdbroot/log/volt.log
     # run the server
-    CMD1="${VOLTDB} init -f -C deployment$1.xml -j ${APPNAME}.jar -s ddl.sql" # -l ${LICENSE}
-    CMD2="${VOLTDB} start -H ${HOST}"
-    echo "
-Starting the VoltDB server.
-To perform this action manually, use the command lines:
-    $CMD1
-    $CMD2
-"
-    $CMD1
-    if [ $? != 0 ]; then exit 1; fi
-    $CMD2
-    if [ $? != 0 ]; then exit 1; fi
+    echo "Starting the VoltDB server."
+    echo "To perform this action manually, use the command lines: "
+    echo
+    echo "${VOLTDB} init -C deployment$1.xml -j ${APPNAME}.jar -s ddl.sql --force"
+    echo "${VOLTDB} start -l ${LICENSE} -H ${HOST}"
+    echo
+    ${VOLTDB} init -C deployment$1.xml -j ${APPNAME}.jar -s ddl.sql --force
+    ${VOLTDB} start -l ${LICENSE} -H ${HOST}
 }
 
 # run the voltdb server locally

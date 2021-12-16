@@ -5,22 +5,25 @@ This application is used for internal VoltDB testing.
 It is invoked by several scripts in the pro repo, under
 tests/apptests/voter.
 
-It mostly uses source code from test_apps/voter in the
-internal repo.
-
-The current differences:
+It has its own copy of source code, separate from that
+in test_apps/voter. Too many tests break if we try to
+combine them.  There are some source-code differences:
 
 - Rejected (too many) votes are counted and returned by the Vote procedure.
   This is useful for testing replication - since the hash of the replication
   result will be checked against the hash of the original result.  Differences
-  will cause replication failure. 
+  will cause replication failure.
+
+- The local ddl.sql specifically sets up the tables needed for that
+  version of Vote.
+
+- The return type of the Vote procedure is different; this one returns
+  VoltTable[] instead of long, so they're not interchangeable.
 
 - There is an HTTPBenchmark, possibly unused, that has not been integrated
-  into test_apps/voter yet.
+  into test_apps/voter yet. Note it seems to be tied to the specific
+  return type of VoltTable[].
 
 - The compiled code lives in a single voter.jar, unlike the usual case with
   separate voter-client.jar and voter-proc.jar files. This is assumed to be
   necessary for existing test scripts,
-  
-Building the voter.jar file uses source from test_apps/voter
-and then overlays the local HTTPBenchmark and Vote classes.
