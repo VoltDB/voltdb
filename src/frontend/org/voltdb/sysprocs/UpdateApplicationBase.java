@@ -163,6 +163,9 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                         retval.errorMsg = e.getMessage();
                         return retval;
                     } catch (Exception ex) {
+                        compilerLog.error("Unexpected " + ex.getClass().getName() +
+                                          " occurred applying DDL statements: " + ex.getMessage(),
+                                          ex);
                         retval.errorMsg = "Unexpected condition occurred applying DDL statements: " + ex.getMessage();
                         return retval;
                     }
