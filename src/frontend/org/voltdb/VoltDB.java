@@ -1241,10 +1241,6 @@ public class VoltDB {
         }
     }
 
-    public static RuntimeException crashLocalVoltDB(String errMsg) {
-        return crashLocalVoltDB(errMsg, false, null);
-    }
-
     /**
      * turn off client interface as fast as possible
      */
@@ -1280,25 +1276,45 @@ public class VoltDB {
         }
         snmp.crash(msg);
     }
+
     /**
-     * Exit the process with an error message, optionally with a stack trace.
+     * Exit the process with an error message, generating a file containing
+     * crash details, and optionally logs the crash message.
+     *
+     * See comments for exitAfterMessage and ignoreCrash for modifiers;
+     * but these are not applicable to the majority of cases in VoltDB.
+     * Subject to those flags not being set, a crash file is always created
+     * by crashLocalVoltDB().
+     *
+     * At the time of writing, there is only one case (outside this file)
+     * of calling the four-argument overload of this method.
+     *
+     * @paran errMsg message to print, log, and/or include in trap message
+     * @param stackTrace if true, stack traces logged as well as in crash file
+     * @param thrown optional cause of crash, details added to crash file
+     * @param logFatal if true, errMsg written to host log as well as crash file
+     * @return nothing, despite the method signature: this routine does not return
      */
-    public static RuntimeException crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable thrown) {
-        return crashLocalVoltDB(errMsg, stackTrace, thrown, true);
+    public static RuntimeException crashLocalVoltDB(String errMsg) {
+        return crashLocalVoltDB(errMsg, false/*no stack*/, null, true/*log fatal msg*/);
     }
-    /**
-     * Exit the process with an error message, optionally with a stack trace.
-     */
+
+    public static RuntimeException crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable thrown) {
+        return crashLocalVoltDB(errMsg, stackTrace, thrown, true/*log fatal msg*/);
+    }
+
     public static RuntimeException crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable thrown,
-            boolean logFatal) {
+                                                    boolean logFatal) {
 
         if (singleton != null) {
             singleton.s_voltdb.notifyOfShutdown();
         }
+
         if (exitAfterMessage) {
             System.err.println(errMsg);
             VoltDB.exit(-1);
         }
+
         try {
             OnDemandBinaryLogger.flush();
         } catch (Throwable ignored) {}
@@ -1317,13 +1333,16 @@ public class VoltDB {
         if (ignoreCrash) {
             throw new AssertionError("Faux crash of VoltDB successful.");
         }
+
         if (CoreUtils.isJunitTest()) {
             VoltLogger log = new VoltLogger("HOST");
             log.warn("Declining to drop a crash file during a junit test.");
         }
         // end test code
+
         // send a snmp trap crash notification
         sendCrashSNMPTrap(errMsg);
+
         // try/finally block does its best to ensure death, no matter what context this
         // is called in
         try {
@@ -1347,7 +1366,10 @@ public class VoltDB {
                 List<String> currentStacktrace = new ArrayList<>();
                 currentStacktrace.add("Stack trace from crashLocalVoltDB() method:");
 
-                // Create a special dump file to hold the stack trace
+                // Create a crash file to record crash details, including exception stack trace
+                // if 'thrown' was given to us as a cause, and stack traces for all threads.
+                // This is not affected by the 'stackTrace' flag input argument, which only
+                // controls what is written to the host log.
                 try {
                     TimestampType ts = new TimestampType(new java.util.Date());
                     CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
@@ -1377,6 +1399,15 @@ public class VoltDB {
                     err.printStackTrace();
                 }
 
+                // Attempt writing to host log.
+                // - Logs fatal error message if requested via logFatal argument
+                // - If stackTrace requested:
+                //   Logs exception cause and exception stack, if 'thrown' non-null
+                //   Else logs the current thread stack
+                // - If stackTrace not requested:
+                // - Logs only the exception cause if given
+                // If writing to host log is not possible, the same information
+                // will be written to standard error instead.
                 VoltLogger log = null;
                 try {
                     log = new VoltLogger("HOST");
@@ -1427,16 +1458,37 @@ public class VoltDB {
     }
 
     /*
-     * For tests that causes failures,
-     * allow them stop the crash and inspect.
+     * For testing only: if set, throws an assertion error
+     * instead of crashing. The local crash routine first
+     * notifies the VoltDB instance of shutdown, and flushes
+     * binary logging. The global crash routine does nothing.
+     * In both cases the 'crash record' variables are then
+     * set and the error is thrown.
      */
     public static boolean ignoreCrash = false;
 
-    public static boolean wasCrashCalled = false;
+    /*
+     * If true, then what happens depends on whether we're doing
+     * a local crash or a global crash.
+     * - Local: notify the VoltDB instance of shutdown, print
+     *   a message on stderr, and exit. The 'crash record' below
+     *   will not be set, nor will ignoreCrash be used.
+     * - Global: if ignoreCrash is set, the 'crash record' is set,
+     *   and an assertion error is thrown. Otherwise (normal case)
+     *   cluster crash is triggered, and then we execute the local
+     *   node crash routine as described in previous paragraph.
+     * This is really just intended for local CLI operations, in
+     * which case the global-crash scenario is not applicable.
+     */
+    public static boolean exitAfterMessage = false;
 
+    /*
+     * Crash record: true when crash call, and the (most recent)
+     * crash message text. Mostly of use for test code.
+     */
+    public static boolean wasCrashCalled = false;
     public static String crashMessage;
 
-    public static boolean exitAfterMessage = false;
     /**
      * Exit the process with an error message, optionally with a stack trace.
      * Also notify all connected peers that the node is going down.
