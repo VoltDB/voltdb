@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<deployment>
+  <cluster sitesperhost="8" kfactor="0" />
+  <avro registry="http://localhost:8081" namespace="" />
+  <topics enabled="true">
+     <broker>
+     </broker>
+     <!-- ingress-only topic for producer tests -->
+     <topic name="TEST_TOPIC" format="csv" procedure="procedure01">
+       <property name="producer.parameters.includeKey">false</property>
+     </topic>
+     <!-- egress-only topics to check results -->
+     <topic name="source01" format="csv" />
+     <topic name="source02" format="csv" />
+     <topic name="source03" format="csv" />
+  </topics>
+</deployment>
