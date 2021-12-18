@@ -37,7 +37,7 @@ public class TopicsConfiguration extends TypedPropertiesBase<TopicsConfiguration
 
     // TODO make this configurable, but the places which use this currently do not have an instance of this class
     // 10 MB is the default which kafka has
-    public static int MAX_BATCH_SIZE = 10 * 1024 * 1024;
+    public static final int MAX_BATCH_SIZE = 10 * 1024 * 1024;
 
     /**
      * Defines all TopicsConfiguration parameters, with their types and default values.
@@ -54,11 +54,6 @@ public class TopicsConfiguration extends TypedPropertiesBase<TopicsConfiguration
          * offsets.retention.check.interval.ms
          * offset.metadata.max.bytes
          */
-        public static final Entry<Integer> PORT = new Entry<Integer>("port", Integer.class, 9092, value -> {
-            if (value == null || value < 1 || value > 65536) {
-                throw new IllegalArgumentException("Port number must be between 1 and 65536");
-            }
-        });
         public static final Entry<Integer> NETWORK_THREAD_COUNT = new Entry<>("network.thread.count", Integer.class, 20);
         public static final Entry<String> CLUSTER_ID = new Entry<>("cluster.id", String.class);
         public static final Entry<Integer> GROUP_MAX_SESSION_TIMEOUT = new Entry<>("group.max.session.timeout.ms", Integer.class, 1_800_000);

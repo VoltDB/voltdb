@@ -11,9 +11,6 @@
       </flushinterval>
    </systemsettings>
    <topics enabled="true">
-     <broker>
-       <property name="port">9095</property>
-     </broker>
      <topic name="ALL_VALUES1" procedure="InsertTopic1" retention="1 hr" />
    </topics>
 </deployment>

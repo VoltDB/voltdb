@@ -156,8 +156,8 @@ public class TopicBenchmark2 {
         @Option(desc = "Comma separated list of servers to connect to (using default volt port).")
         String servers = "localhost";
 
-        @Option(desc="Topic port on servers (default 9095)")
-        int topicPort = 9095;
+        @Option(desc="Topic port on servers (default 9092)")
+        int topicPort = 9092;
 
         @Option(desc="Size of varchar in record, in characters, min = 10, max = 32*1024, (default 512)")
         int varcharsize = 512;

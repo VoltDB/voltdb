@@ -19,7 +19,6 @@
     </threadpools>
     <topics enabled="true" threadpool="topicbenchmark">
      <broker>
-       <property name="port">9095</property>
        <!--  should be 3/4 number of cores (32 cores on volt16)  -->
        <property name="network.thread.count">24</property>
      </broker>
