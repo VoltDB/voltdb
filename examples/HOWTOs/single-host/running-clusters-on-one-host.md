@@ -26,15 +26,15 @@ For example, you might create folders and initialize VoltDB instances like this:
     mkdir -p node2
     mkdir -p node3
 
-Then, initialize each instance using a single deployment.xml file:
+Then, initialize each instance using a single deployment.xml file, along with the file containing the VoltDB license:
 
-    voltdb init -C deployment.xml -D $WORKING_DIR/node1
-    voltdb init -C deployment.xml -D $WORKING_DIR/node2
-    voltdb init -C deployment.xml -D $WORKING_DIR/node3
+    voltdb init -C deployment.xml -D $WORKING_DIR/node1 -l license.xml
+    voltdb init -C deployment.xml -D $WORKING_DIR/node2 -l license.xml
+    voltdb init -C deployment.xml -D $WORKING_DIR/node3 -l license.xml
 
 Now you can start each instance to form a cluster. It is convenient to use the default ports for the first instance, that way clients can connect without having to specify a port. In this case, for a small cluster, we don't need to specify the --count parameter, we can just list all the hosts in the -H (--hosts) parameter. But since all of the nodes will be running on localhost, they must be distinguished by specifying their internal port numbers. We also use the -D parameter to specify the node1 directory that we created for it to run in, and we redirect the nohup stdout and stderr to node1/console.log.
 
-    nohup voltdb start -l license.xml \
+    nohup voltdb start \
           -H localhost:3021,localhost:3022,localhost:3023 \
           -D $WORKING_DIR/node1 \
           --internal=3021 \
@@ -47,7 +47,7 @@ Now you can start each instance to form a cluster. It is convenient to use the d
 
 The remaining nodes can be started with a similar command, where we have changed the directory and the port numbers. Because the default admin and client ports are adjacent values 21211 and 21212, we can increment by 10. In some older versions, the replication port specified defined a range of 3 adjacent ports, so we can increment the replication port by 10 also.
 
-    nohup voltdb start -l license.xml \
+    nohup voltdb start \
           -H localhost:3021,localhost:3022,localhost:3023 \
           -D $WORKING_DIR/node2 \
           --internal=3022 \
@@ -58,7 +58,7 @@ The remaining nodes can be started with a similar command, where we have changed
           --replication=5565 \
           >> $WORKING_DIR/node2/console.log 2>&1 &
 
-    nohup voltdb start -l license.xml \
+    nohup voltdb start \
           -H localhost:3021,localhost:3022,localhost:3023 \
           -D $WORKING_DIR/node3 \
           --internal=3023 \

@@ -33,13 +33,13 @@ mkdir -p node3
 
 # initialize each node
 echo "initializing voltdb nodes"
-voltdb init -C deployment.xml -D $WORKING_DIR/node1
-voltdb init -C deployment.xml -D $WORKING_DIR/node2
-voltdb init -C deployment.xml -D $WORKING_DIR/node3
+voltdb init -C deployment.xml -D $WORKING_DIR/node1 -l license.xml
+voltdb init -C deployment.xml -D $WORKING_DIR/node2 -l license.xml
+voltdb init -C deployment.xml -D $WORKING_DIR/node3 -l license.xml
 
 echo "starting voltdb nodes"
 # start the first node using default ports
-nohup voltdb start -l license.xml \
+nohup voltdb start \
       -H localhost:3021,localhost:3022,localhost:3023 \
       -D $WORKING_DIR/node1 \
       --internal=3021 \
@@ -51,7 +51,7 @@ nohup voltdb start -l license.xml \
       >> $WORKING_DIR/node1/console.log 2>&1 &
 
 # start the next nodes using incremented ports
-nohup voltdb start -l license.xml \
+nohup voltdb start  \
       -H localhost:3021,localhost:3022,localhost:3023 \
       -D $WORKING_DIR/node2 \
       --internal=3022 \
@@ -62,7 +62,7 @@ nohup voltdb start -l license.xml \
       --replication=5565 \
       >> $WORKING_DIR/node2/console.log 2>&1 &
 
-nohup voltdb start -l license.xml \
+nohup voltdb start \
       -H localhost:3021,localhost:3022,localhost:3023 \
       -D $WORKING_DIR/node3 \
       --internal=3023 \
