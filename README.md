@@ -3,7 +3,7 @@ What is VoltDB?
 
 Thank you for your interest in VoltDB!
 
-VoltDB is a horizontally-scalable, in-memory SQL RDBMS designed for applications that benefit from strong consistency, high throughput and low, predictable latency.
+VoltDB provides reliable data services for today's demanding applications. A distributed, horizontally-scalable, ACID-compliant database that provides streaming, storage, and real-time analytics for applications that benefit from strong consistency, high throughput and low, predictable latency.
 
 VoltDB and Open Source
 ====================
@@ -12,17 +12,17 @@ VoltDB offers the fully open source, AGPL3-licensed Community Edition of VoltDB 
 
 https://github.com/voltdb/voltdb/
 
-Binary downloads of this edition and 30-day trials of the commercial editions of VoltDB can be downloaded from the VoltDB website at the following URL:
+Trials of the enterprise edition of VoltDB are available from the VoltDB website at the following URL:
 
-https://www.voltdb.com/try-voltdb/
+https://www.voltdb.com/
 
 The Community Edition has full application compatibility and provides everything needed to run a real-time, in-memory SQL database with datacenter-local redundancy and snapshot-based disk persistence.
 
 The commercial editions add operational features to support industrial strength durability and availability, including per-transaction disk-based persistence, multi-datacenter replication, elastic online expansion, live online upgrade, etc..
 
-For more information, please see our "Editions" page:
+For more information, please visit the VoltDB website.
 
-https://www.voltdb.com/product/editions/
+https://voltdb.com/
 
 VoltDB Branches and Tags
 ====================
@@ -63,7 +63,7 @@ To stop the running VoltDB cluster, use the shutdown command. For commercial cus
 
     voltadmin shutdown [--save]
     
-Then you can simply use the start comment to restart the database:
+Then you can simply use the start command to restart the database:
 
     voltdb start [--dir ~/mydb] [--background]
     
@@ -75,39 +75,27 @@ Next Steps
 
 ### Examples
 
-You can find application examples in the “examples” directory inside this VoltDB kit.
+You can find application examples in the "examples" directory inside this VoltDB kit. The Voter app ("examples/voter") is a great example to start with. See the README to learn what it does and how to get it running.
 
-The Voter app (“examples/voter”) is a great example to start with. See the README to learn what it does and how to get it running, or watch this 5 minute video demonstration of the Voter app:
-https://voltdb.com/resources/video/voltdb-how-tour-voter-example
-
-The App Gallery has more information on additional examples, some in the kit and some on GitHub.
-
-- App Gallery: https://voltdb.com/community/applications
-- Supplemental Examples: https://github.com/VoltDB/?query=app-
+The "examples" directory provides additional examples and a README explaining how to run them.
 
 ### Tutorial
 
-The VoltDB Tutorial will walk you through building and running your first VoltDB application.
+The VoltDB Tutorial walks you through building and running your first VoltDB application.
 
 https://docs.voltdb.com/tutorial/
 
 ### Documentation
 
-The VoltDB User Guide and supporting documentation is comprehensive and easy to use. It’s a great place for broad understanding or to look up something specific.
+The _Using VoltDB_ guide and supporting documentation is comprehensive and easy to use. It's a great place for broad understanding or to look up something specific.
 
-https://docs.voltdb.com
-
-### Product Overview
-
-The VoltDB Product page contains info at a higher level. This page has in-depth descriptions of features that explain not just what, but why. It also covers use cases and competitive comparisons.
-
-https://voltdb.com/product
+https://docs.voltdb.com/
 
 ### Go Full Cloud
 
-For information on using VoltDB virtualized, containerized or in the Cloud, see the the VoltDB website.
+For information on using VoltDB in the Cloud, see the _VoltDB Kubernetes Administrator's Guide_.
 
-https://voltdb.com/run-voltdb-virtualized-containerized-or-cloud
+https://docs.voltdb.com/KubernetesAdmin/
 
 
 What's Included
@@ -124,7 +112,6 @@ If you have installed VoltDB from the distribution kit, you now have a directory
 - **lib** - Third party libraries
 - **tools** - XML schemas, monitoring plugins, and other tools
 - **voltdb** - the VoltDB binary software itself including:
-  - license.xml - An embedded trial license.
   - log4j files - Logging configuration.
   - voltdbclient-version.jar - Java/JVM client for connecting to VoltDB, including native VoltDB client and JDBC driver.
   - voltdb-version.jar - The full VoltDB binary, including platform-specific native libraries embedded within the jar. This is a superset of the client code and can be used as a native client driver or JDBC driver.
@@ -133,30 +120,16 @@ If you have installed VoltDB from the distribution kit, you now have a directory
 Commercial VoltDB Differences
 ====================
 
-VoltDB offers a pre-built binary distribution of VoltDB under a commercial license. It can be downloaded from the VoltDB website. This download includes a 30 day trial license.
+VoltDB offers sandboxes and a pre-built trial version of VoltDB for application developers who want to try out the product. See the VoltDB website for more information.
 
-https://voltdb.com/download
-
-When to use this open-source version:
-
-- When developing applications (as long as they don't need VoltDB Export).
-- When performance testing in non-redundant configurations.
-- When reading or modifying source code.
-
-When to use the commercial version:
-
-- When disk persistence is required.
-- When the VoltDB Export feature is required.
-- When high availability features like redundant clustering, live node rejoin, and multi-datacenter replication are required.
-
+https://voltdb.com/
 
 Getting Help & Providing Feedback
 ====================
 
-If you have any questions or comments about VoltDB, we encourage you to reach out to the VoltDB team and community.
+If you have any questions or comments about VoltDB, we encourage you to reach out to the VoltDB team and community through our public Slack channel.
 
-- **VoltDB Forums** - Create threads, post responses and search existing posts on our community forums at https://forum.voltdb.com.
-- **VoltDB Community Slack Channel** - Get an invite to chat with community members and the VoltDB team at http://chat.voltdb.com.
+http://chat.voltdb.com.
 
 
 Licensing

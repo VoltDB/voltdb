@@ -19,9 +19,6 @@ The following projects are included in the examples directory:
 ### adperformance
 This application simulates a high velocity stream of impression, click-through, and conversions events that are enriched and ingested by VoltDB. Several materialized views maintain real-time aggregations on this data to provide a minutely summary for each advertiser as well as drill-down reports grouped by campaign to show detail-level metrics, costs and rates with real-time accuracy.
 
-### bank-fraud
-Ingest generated consumer purchase transaction data and use summary data from materialized views to evaluate against rules to detect possible fraud. The web dashboard shows recent alerts and their related transactions.
-
 ### bank-offers
 Ingest simulated consumer purchase transaction data and find the best matching offer to present to the consumer at the point-of-sale.
 
