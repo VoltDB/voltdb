@@ -21,7 +21,7 @@ old jalopy.
 
 Environmental blips in scheduling, networking, CPU accesss are like potholes
 to VoltDB.  If a VoltDB site thread can't run for 50ms - then your application 
-can experience long-tale latency problems.  If the heartbeating between cluster
+can experience long-tail latency problems.  If the heartbeating between cluster
 nodes is delayed for long enough, then some nodes may get ejected from
 the cluster.
 
