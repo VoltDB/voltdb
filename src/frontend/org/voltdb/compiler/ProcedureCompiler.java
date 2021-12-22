@@ -735,7 +735,7 @@ public abstract class ProcedureCompiler {
             }
             else {
                 String warnMsg = "Procedure " + shortName +
-                        " contains a mutable array parameter but the databse is configure not to copy parameter before execution." +
+                        " contains a mutable array parameter but the database is configured not to copy parameters before execution." +
                         " This can result in unpredictable behavior, crashes or data corruption if stored procedure modifies the content of the parameters." +
                         " Set the copyparameters configuration option to true to avoid this danger if the stored procedures might modify parameter content.";
                 compiler.addWarn(warnMsg);
