@@ -458,7 +458,7 @@ public class TestVoltProcedure extends TestCase {
         assertEquals( 0, statsRow.length);
         for (int ii = 1; ii < 200; ii++) {
             runner.setupTransaction(null);
-            runner.call(params.toArray(), true);
+            runner.call(params.toArray(), true, false);
             statsRow = agent.m_source.getStatsRows(false, 0L);
             assertEquals(statsRow[0][7], new Long(ii));
         }
@@ -475,7 +475,7 @@ public class TestVoltProcedure extends TestCase {
                 gcip, site,
                 VoltDB.instance().getCatalogContext().database.getProcedures().get(GetClusterIdProcedure.class.getName()));
         runner.setupTransaction(null);
-        ClientResponse r = runner.call(new Object[] { null }, true);
+        ClientResponse r = runner.call(new Object[] { null }, true, false);
         assertEquals(expectedClusterId, gcip.clusterId);
         assertEquals(ClientResponse.SUCCESS, r.getStatus());
     }
@@ -498,7 +498,7 @@ public class TestVoltProcedure extends TestCase {
                 VoltDB.instance().getCatalogContext().database.getProcedures().get(LongProcedure.class.getName()));
 
         runner.setupTransaction(null);
-        return runner.call(args, true);
+        return runner.call(args, true, false);
     }
 
     private class MockStatsAgent extends StatsAgent {

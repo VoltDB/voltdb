@@ -248,6 +248,10 @@ public class CatalogContext {
         return m_dbSettings.getCluster();
     }
 
+    public CatalogMap<Table> getTables() {
+        return tables;
+    }
+
     public NodeSettings getNodeSettings() {
         return m_dbSettings.getNodeSetting();
     }

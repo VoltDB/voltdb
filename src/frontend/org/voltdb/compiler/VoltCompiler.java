@@ -761,12 +761,14 @@ public class VoltCompiler {
         // try to get a catalog context
         CatalogContext catalogContext = voltdb != null ? voltdb.getCatalogContext() : null;
         ClusterSettings clusterSettings = catalogContext != null ? catalogContext.getClusterSettings() : null;
-        int tableCount = catalogContext != null ? catalogContext.tables.size() : 0;
-        Deployment deployment = catalogContext != null ? catalogContext.cluster.getDeployment().get("deployment") : null;
+        CatalogMap<Table> tables = catalogContext != null ? catalogContext.getTables() : null;
+        int tableCount = tables != null ? tables.size() : 0;
+        Cluster cluster = catalogContext != null ? catalogContext.getCluster() : null;
+        Deployment deployment = cluster != null ?  cluster.getDeployment().get("deployment") : null;
         int hostcount = clusterSettings != null ? clusterSettings.hostcount() : 1;
         int kfactor = deployment != null ? deployment.getKfactor() : 0;
         int sitesPerHost = 8;
-        if  (voltdb != null && voltdb.getCatalogContext() != null) {
+        if  (catalogContext != null && catalogContext.getNodeSettings()!= null) {
             sitesPerHost =  voltdb.getCatalogContext().getNodeSettings().getLocalSitesCount();
         }
         boolean isPro = MiscUtils.isPro();

@@ -22,6 +22,7 @@ import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Array;
 import java.lang.reflect.InvocationTargetException;
 import java.math.BigDecimal;
+import java.util.Arrays;
 import java.util.Date;
 import java.nio.ByteBuffer;
 
@@ -194,20 +195,96 @@ public class ParameterConverter {
     private static Object tryToMakeCompatibleArray(
             final Class<?> expectedComponentClz,
             final Class<?> inputComponentClz,
-            Object param)
+            Object param,
+            boolean keepParamsImmutable)
     throws VoltTypeException
     {
         int inputLength = Array.getLength(param);
 
-        if (inputComponentClz == expectedComponentClz) {
-            return param;
-        }
         // if it's an empty array, let it through
         // this is a bit ugly as it might hide passing
         //  arrays of the wrong type, but it "does the right thing"
         //  more often that not I guess...
-        else if (inputLength == 0) {
+        if (inputLength == 0) {
             return Array.newInstance(expectedComponentClz, 0);
+        }
+        else if (inputComponentClz == expectedComponentClz) {
+            if( !keepParamsImmutable ) {
+                return param;
+            }
+
+            // if both input and output types in the array stay same,
+            // no additional transformation happens. Hence we need to copy
+            // arrays since they, potentially, can be modified within the store procedure code.
+
+            VoltType type;
+            try {
+                type = VoltType.typeFromClass(inputComponentClz);
+            } catch (VoltTypeException e) {
+                // BZ looks like a hack. Do we allow objects of different type in an array?
+                Object obj = ParameterSet.getAKosherArray((Object[]) param);
+                type = VoltType.typeFromClass(obj.getClass().getComponentType());
+            }
+
+            switch (type) {
+                case TINYINT:
+                    if (param instanceof Byte[]) {
+                        return Arrays.copyOf((Byte[]) param, inputLength);
+                    } else {
+                        return Arrays.copyOf((byte[]) param, inputLength);
+                    }
+                case SMALLINT:
+                    if (param instanceof Short[]) {
+                        return Arrays.copyOf((Short[]) param, inputLength);
+                    } else {
+                        return Arrays.copyOf((short[]) param, inputLength);
+                    }
+                case INTEGER:
+                    if (param instanceof Integer[]) {
+                        return Arrays.copyOf((Integer[]) param, inputLength);
+                    } else {
+                        return Arrays.copyOf((int[]) param, inputLength);
+                    }
+                case BIGINT:
+                    if (param instanceof Long[]) {
+                        return Arrays.copyOf((Long[]) param, inputLength);
+                    } else {
+                        return Arrays.copyOf((long[]) param, inputLength);
+                    }
+                case FLOAT:
+                    if (param instanceof Double[]) {
+                        return Arrays.copyOf((Double[]) param, inputLength);
+                    } else {
+                        return Arrays.copyOf((double[]) param, inputLength);
+                    }
+                case STRING:
+                    return param;
+                case DECIMAL:
+                    return Arrays.copyOf((BigDecimal[])param, inputLength);
+                case VOLTTABLE:
+                    return Arrays.copyOf((VoltTable[])param, inputLength);
+                case VARBINARY:
+                    if (param instanceof Byte[][]) {
+                        Byte[][] obj = new Byte[inputLength][];
+                        for (int ii = 0; ii < inputLength; ii++) {
+                            obj[ii] = Arrays.copyOf(((Byte[][]) param)[ii], ((Byte[][]) param)[ii].length);
+                        }
+                        return obj;
+                    }
+                    else {
+                        byte[][] obj = new byte[inputLength][];
+                        for (int ii = 0; ii < inputLength; ii++) {
+                            obj[ii] = Arrays.copyOf(((byte[][]) param)[ii], ((byte[][]) param)[ii].length);
+                        }
+                        return obj;
+                    }
+                case GEOGRAPHY_POINT:
+                    return Arrays.copyOf((GeographyPointValue[])param, inputLength);
+                case GEOGRAPHY:
+                    return Arrays.copyOf((GeographyValue[])param, inputLength);
+                default:
+                    return param;
+            }
         }
         // hack to make strings work with input as bytes
         else if (isByteArrayClass(inputComponentClz)
@@ -254,6 +331,15 @@ public class ParameterConverter {
     }
 
     /**
+     * Wraps tryToMakeCompatible
+     */
+    public static Object tryToMakeCompatible(final Class<?> expectedClz, final Object param)
+            throws VoltTypeException
+    {
+        return tryToMakeCompatible(expectedClz, param, false);
+    }
+
+    /**
      * Convert the given value to the type given, if possible.
      *
      * This function is in the performance path, so some effort has been made to order
@@ -264,7 +350,7 @@ public class ParameterConverter {
      *
      * @throws Exception with a message describing why the types are incompatible.
      */
-    public static Object tryToMakeCompatible(final Class<?> expectedClz, final Object param)
+    public static Object tryToMakeCompatible(final Class<?> expectedClz, final Object param, boolean keepParamsImmutable)
     throws VoltTypeException
     {
         /* uncomment for debugging
@@ -356,8 +442,9 @@ public class ParameterConverter {
             }
         }
         else if (inputClz == byte[].class) {
-            if (expectedClz == byte[].class) return param;
-            if (expectedClz == Byte[].class) return ArrayUtils.toObject((byte[]) param);
+            if (expectedClz == Byte[].class) {
+                return ArrayUtils.toObject((byte[]) param);
+            }
             // allow byte arrays to be passed into string parameters
             if (expectedClz == String.class) {
                 String value = new String((byte[]) param, Constants.UTF8ENCODING);
@@ -434,7 +521,7 @@ public class ParameterConverter {
 
         // handle arrays in a factored-out method
         if (expectedClz.isArray()) {
-            return tryToMakeCompatibleArray(expectedClz.getComponentType(), inputClz.getComponentType(), param);
+            return tryToMakeCompatibleArray(expectedClz.getComponentType(), inputClz.getComponentType(), param, keepParamsImmutable);
         }
 
         // The following block switches on the type of the parameter desired.

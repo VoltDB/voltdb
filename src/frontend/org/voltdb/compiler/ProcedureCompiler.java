@@ -47,6 +47,7 @@ import org.voltdb.catalog.StmtParameter;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
+import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compilereport.ProcedureAnnotation;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ParameterValueExpression;
@@ -210,10 +211,10 @@ public abstract class ProcedureCompiler {
             throw compiler.new VoltCompilerException(msg);
         }
         // check the return type of the run method
-        if ((procMethod.getReturnType() != VoltTable[].class) &&
-           (procMethod.getReturnType() != VoltTable.class) &&
-           (procMethod.getReturnType() != long.class) &&
-           (procMethod.getReturnType() != Long.class)) {
+        if (!procMethod.getReturnType().getCanonicalName().equals(VoltTable[].class.getCanonicalName()) &&
+            !procMethod.getReturnType().getCanonicalName().equals(VoltTable.class.getCanonicalName())   &&
+            !procMethod.getReturnType().getCanonicalName().equals(long.class.getCanonicalName())        &&
+            !procMethod.getReturnType().getCanonicalName().equals(Long.class.getCanonicalName())           ) {
 
             String msg = "Procedure: " + shortName + " has run(...) method that doesn't return long, Long, VoltTable or VoltTable[].";
             throw compiler.new VoltCompilerException(msg);
@@ -536,7 +537,9 @@ public abstract class ProcedureCompiler {
 
         compileSQLStmtUpdatingProcedureInfomation(compiler, hsql, estimates, db, procedure,
                 info.isSinglePartition(), fields);
-
+        if( VoltDB.instance().getKFactor() > 0 && info.isSinglePartition() ) {
+            checkForMutableParamsWarning(compiler,shortName,procMethod);
+        }
         // set procedure parameter types
         Class<?>[] paramTypes = setParameterTypes(compiler, procedure, shortName, procMethod);
 
@@ -712,6 +715,34 @@ public abstract class ProcedureCompiler {
             }
         }
     }
+
+    public static void checkForMutableParamsWarning(VoltCompiler compiler, String shortName, Method procMethod) {
+        Class<?>[] paramTypes = procMethod.getParameterTypes();
+        boolean hasArr = false;
+        for(Class<?> param : paramTypes){
+            if( param.isArray() ) {
+                hasArr = true;
+                break;
+            }
+        }
+        if( hasArr ) {
+            SystemSettingsType.Procedure procedureSetting = VoltDB.instance().getCatalogContext().getDeployment().getSystemsettings().getProcedure();
+            if ( procedureSetting == null || procedureSetting.isCopyparameters() ) {
+                String infoMsg = "Procedure "+ shortName + " contains a mutable array parameter." +
+                        " VoltDb can be optimized by disabling copyparameters configuration option." +
+                        " In that case, all parameters including arrays must remain immutable within the scope of Stored Procedures.";
+                compiler.addWarn(infoMsg);
+            }
+            else {
+                String warnMsg = "Procedure " + shortName +
+                        " contains a mutable array parameter but the databse is configure not to copy parameter before execution." +
+                        " This can result in unpredictable behavior, crashes or data corruption if stored procedure modifies the content of the parameters." +
+                        " Set the copyparameters configuration option to true to avoid this danger if the stored procedures might modify parameter content.";
+                compiler.addWarn(warnMsg);
+            }
+        }
+    }
+
 
     static void compileDDLProcedure(VoltCompiler compiler,
                                     HSQLInterface hsql,

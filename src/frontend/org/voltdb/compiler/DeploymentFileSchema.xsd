@@ -257,6 +257,7 @@
         <xs:element name="procedure" minOccurs="0" maxOccurs="1">
             <xs:complexType>
                 <xs:attribute name="loginfo" type="latencyType" default="10000"/>
+                <xs:attribute name="copyparameters" type="xs:boolean" default="true"/>
             </xs:complexType>
         </xs:element>
         <xs:element name="resourcemonitor" minOccurs="0" maxOccurs="1" type="resourceMonitorType"/>

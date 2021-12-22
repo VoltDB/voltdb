@@ -659,6 +659,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                             msg.isForReplay(),
                             true);
                 replmsg.setShouldReturnResultTables(false);
+                replmsg.getStoredProcedureInvocation().setKeepParamsImmutable(true);
+
                 // Update the handle in the copy since the constructor doesn't set it
                 replmsg.setSpHandle(newSpHandle);
                 // K-safety cluster doesn't always mean partition has replicas,

@@ -26,6 +26,9 @@ package org.voltdb.compiler;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.mock;
 
 import java.io.File;
 import java.io.IOException;
@@ -44,10 +47,21 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.hsqldb_voltpatches.HsqlException;
 import org.mockito.Mockito;
+
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.CatalogContext;
+import org.powermock.api.mockito.PowerMockito;
+import org.powermock.core.classloader.annotations.PrepareForTest;
+import org.powermock.core.classloader.annotations.PowerMockIgnore;
+import org.powermock.modules.junit4.PowerMockRunner;
+import org.junit.runner.RunWith;
+import org.junit.Before;
+import org.junit.After;
+import org.voltdb.VoltDB;
 import org.voltdb.ProcedurePartitionData;
 import org.voltdb.TableType;
 import org.voltdb.VoltDB.Configuration;
+import org.voltdb.VoltDBInterface;
 import org.voltdb.VoltType;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
@@ -65,7 +79,9 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler.Feedback;
+import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
+import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.exceptions.PlanningErrorException;
 import org.voltdb.types.GeographyValue;
 import org.voltdb.types.IndexType;
@@ -75,17 +91,24 @@ import org.voltdb.utils.MiscUtils;
 
 import junit.framework.TestCase;
 
+@PowerMockIgnore({"org.voltdb.compiler.procedures.*",
+                  "org.voltdb.VoltProcedure",
+                  "org.voltdb_testprocs.regressionsuites.fixedsql.*"})
+@RunWith(PowerMockRunner.class)
+@PrepareForTest(VoltDB.class)
 public class TestVoltCompiler extends TestCase {
     private String nothing_jar;
     private String testout_jar;
 
     @Override
+    @Before
     public void setUp() {
         nothing_jar = BuildDirectoryUtils.getBuildDirectoryPath() + File.pathSeparator + "nothing.jar";
         testout_jar = BuildDirectoryUtils.getBuildDirectoryPath() + File.pathSeparator + "testout.jar";
     }
 
     @Override
+    @After
     public void tearDown() {
         File njar = new File(nothing_jar);
         njar.delete();
@@ -303,6 +326,60 @@ public class TestVoltCompiler extends TestCase {
             }
         }
         return false;
+    }
+
+    public void testCopyParametersMessage(){
+
+        VoltDBInterface voltdb = VoltDB.instance();
+
+        org.voltdb.compiler.deploymentfile.ObjectFactory factory =
+                    new org.voltdb.compiler.deploymentfile.ObjectFactory();
+        DeploymentType deployment = factory.createDeploymentType();
+        SystemSettingsType systemSettings =  factory.createSystemSettingsType();
+        SystemSettingsType.Procedure procedureType = factory.createSystemSettingsTypeProcedure();
+        procedureType.setCopyparameters(true);
+        systemSettings.setProcedure(procedureType);
+        deployment.setSystemsettings(systemSettings);
+
+        CatalogContext catalog = mock(CatalogContext.class);
+        when(catalog.getDeployment()).thenReturn(deployment);
+        VoltDBInterface mockedVolt = spy(voltdb);
+        when(mockedVolt.getCatalogContext()).thenReturn(catalog);
+        when(mockedVolt.getKFactor()).thenReturn(1);
+
+        PowerMockito.mockStatic(VoltDB.class);
+        when(VoltDB.instance()).thenReturn(mockedVolt);
+
+        String ddl = "CREATE TABLE FOO ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) ); " +
+                "PARTITION TABLE FOO ON COLUMN PKEY; " +
+                "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.ProcedureWithArrayParams; " +
+                "PARTITION PROCEDURE ProcedureWithArrayParams ON TABLE FOO COLUMN PKEY; ";
+        String expectedError =
+                "Procedure ProcedureWithArrayParams contains a mutable array parameter. " +
+                        "VoltDb can be optimized by disabling copyparameters configuration option. " +
+                        "In that case, all parameters including arrays must remain immutable within " +
+                        "the scope of Stored Procedures.";
+
+        VoltCompiler compiler = new VoltCompiler(false);
+        boolean success = compileDDL(ddl, compiler);
+        assertTrue(success);
+        boolean status = isFeedbackPresent(expectedError,compiler.m_warnings);
+        assertTrue(status);
+
+        expectedError =
+                "Procedure ProcedureWithArrayParams contains a mutable array parameter " +
+                        "but the databse is configure not to copy parameter before execution. " +
+                        "This can result in unpredictable behavior, crashes or data corruption " +
+                        "if stored procedure modifies the content of the parameters. " +
+                        "Set the copyparameters configuration option to true to avoid this danger " +
+                        "if the stored procedures might modify parameter content.";
+
+        procedureType.setCopyparameters(false);
+        compiler = new VoltCompiler(false);
+        success = compileDDL(ddl, compiler);
+        assertTrue(success);
+        status = isFeedbackPresent(expectedError,compiler.m_warnings);
+        assertTrue(status);
     }
 
     public void testMismatchedPartitionParams() {

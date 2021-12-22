@@ -278,14 +278,18 @@ public class ProcedureRunner {
     }
 
     /**
-     * Wraps coreCall with statistics code.
+     * Wraps coreCall
      */
-    public ClientResponseImpl call(Object[] paramListIn, boolean returnResults) {
-        return call(true, paramListIn, returnResults);
+    public ClientResponseImpl call(Object[] paramListIn, boolean returnResults,
+                                   boolean keepParamsImmutable) {
+        return call(true, paramListIn, returnResults, keepParamsImmutable);
     }
 
+    /**
+     * Wraps coreCall with statistics code.
+     */
     public ClientResponseImpl call(boolean resetHash, Object[] paramListIn) {
-        return call(true, paramListIn, true);
+        return call(true, paramListIn, true, false);
     }
 
     /**
@@ -300,7 +304,10 @@ public class ProcedureRunner {
      * @param returnResults if it is true, return result tables in the response
      * @return result of the procedure being invoked
      */
-    private ClientResponseImpl call(boolean resetHash, Object[] paramListIn, boolean returnResults) {
+    private ClientResponseImpl call(boolean resetHash,
+                                    Object[] paramListIn,
+                                    boolean returnResults,
+                                    boolean keepParamsImmutable) {
         m_perCallStats = m_statsCollector.beginProcedure();
 
         // if we're keeping track, calculate parameter size
@@ -310,7 +317,7 @@ public class ProcedureRunner {
             m_perCallStats.setParameterSize(params.getSerializedSize());
         }
 
-        ClientResponseImpl result = coreCall(resetHash, paramListIn, returnResults);
+        ClientResponseImpl result = coreCall(resetHash, paramListIn, returnResults, keepParamsImmutable);
 
         // if we're keeping track, calculate result size
         if (m_perCallStats != null) {
@@ -337,7 +344,10 @@ public class ProcedureRunner {
     }
 
     @SuppressWarnings("finally")
-    private ClientResponseImpl coreCall(boolean resetHash, Object[] paramListIn, boolean returnResults) {
+    private ClientResponseImpl coreCall(boolean resetHash,
+                                        Object[] paramListIn,
+                                        boolean returnResults,
+                                        boolean keepParamsImmutable) {
         // verify per-txn state has been reset
         assert(m_statusCode == ClientResponse.SUCCESS);
         assert(m_statusString == null);
@@ -389,7 +399,7 @@ public class ProcedureRunner {
 
             for (int i = 0; i < m_paramTypes.length; i++) {
                 try {
-                    paramList[i] = ParameterConverter.tryToMakeCompatible(m_paramTypes[i], paramList[i]);
+                    paramList[i] = ParameterConverter.tryToMakeCompatible(m_paramTypes[i], paramList[i], keepParamsImmutable);
                     // check the result type in an assert
                     assert(ParameterConverter.verifyParameterConversion(paramList[i], m_paramTypes[i]));
                 } catch (Exception e) {
@@ -1215,7 +1225,7 @@ public class ProcedureRunner {
 
     /**
      * Test whether or not the given stack frame is within a procedure invocation
-     * @param The name of the procedure
+     * @param procedureName name of the procedure
      * @param stel a stack trace element
      * @return true if it is, false it is not
      */

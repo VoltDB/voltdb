@@ -82,6 +82,14 @@ public class StoredProcedureInvocation implements JSONString {
     private int m_partitionDestination = NO_PARTITION;
     private boolean m_batchCall = false;
 
+    private volatile boolean keepParamsImmutable = false;
+    public void setKeepParamsImmutable(boolean flag) {
+        keepParamsImmutable = flag;
+    }
+    public boolean getKeepParamsImmutable(){
+        return keepParamsImmutable;
+    }
+
     /*
      * StoredProcedureInvocations (SPI) are created with the SYSTEM_PRIORITY by default,
      * which is the highest in the system and is not supposed to be requested by VoltDB clients.
@@ -131,6 +139,7 @@ public class StoredProcedureInvocation implements JSONString {
         copy.m_allPartition = m_allPartition;
         copy.m_partitionDestination = m_partitionDestination;
         copy.m_batchCall = m_batchCall;
+        copy.keepParamsImmutable = keepParamsImmutable;
 
         return copy;
     }

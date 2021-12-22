@@ -33,6 +33,7 @@ import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
@@ -112,7 +113,11 @@ abstract public class ProcedureTask extends TransactionTask
                 runner.setupTransaction(m_txnState);
 
                 // execute the procedure
-                cr = runner.call(callerParams, (taskMessage.shouldReturnResultTables() || taskMessage.isEveryPartition()));
+                SystemSettingsType.Procedure procedureSetting = VoltDB.instance().getCatalogContext().getDeployment().getSystemsettings().getProcedure();
+                boolean keepImmutable = taskMessage.getStoredProcedureInvocation().getKeepParamsImmutable() &&
+                                        ( procedureSetting == null || procedureSetting.isCopyparameters() );
+                cr = runner.call(callerParams, (taskMessage.shouldReturnResultTables() || taskMessage.isEveryPartition()),
+                                 keepImmutable);
 
                 // pass in the first value in the hashes array if it's not null
                 Integer hash = null;
