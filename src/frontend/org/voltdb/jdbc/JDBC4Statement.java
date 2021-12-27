@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2021 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -662,7 +662,7 @@ public class JDBC4Statement implements java.sql.Statement
     public SQLWarning getWarnings() throws SQLException
     {
         checkClosed();
-        throw SQLError.noSupport();
+        return null;
     }
 
     // Retrieves whether this Statement object has been closed.
