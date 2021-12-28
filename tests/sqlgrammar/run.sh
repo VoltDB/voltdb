@@ -1,4 +1,5 @@
 #!/bin/bash
+# Arbitrary change (#1 to 'internal'), to test error message improvements.
 # Script used to run the SQL-grammar-generator tests, including all the steps
 # needed for the tests to work, such as: building VoltDB, creating Jar files,
 # starting a VoltDB server, running the associated DDL files, passing arguments
