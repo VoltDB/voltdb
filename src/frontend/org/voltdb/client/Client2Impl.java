@@ -1131,7 +1131,8 @@ public class Client2Impl implements Client2 {
                                                                  requestPrio, procName, params);
         ClientConnection cxn = findConnection(invocation);
         if (cxn == null) {
-            completeUnqueuedRequest(future, handle, "No connections to cluster at this time");
+            String msg = "No connections to cluster at this time";
+            future.completeExceptionally(new NoConnectionsException(msg));
             return future;
         }
 
@@ -1838,17 +1839,6 @@ public class Client2Impl implements Client2 {
             throw new LocalTimeoutException(now - startTime, timeout);
         }
         return remaining;
-    }
-
-    /*
-     * Fail a request when we didn't even get as far as setting
-     * up a request context for it.
-     */
-    private void completeUnqueuedRequest(CompletableFuture<ClientResponse> future, long handle, String err) {
-        ClientResponseImpl resp = new ClientResponseImpl(ClientResponse.CLIENT_ERROR_TXN_NOT_SENT,
-                                                         new VoltTable[0], err);
-        resp.setClientHandle(handle);
-        future.complete(resp);
     }
 
     /*

@@ -275,6 +275,7 @@ public interface Client2 extends Closeable {
      * @throws ProcCallException the procedure call failed
      * @see ClientResponse
      * @see ProcCallException
+     * @see NoConnectionsException
      */
     ClientResponse callProcedureSync(String procName, Object... parameters)
         throws IOException, ProcCallException;
@@ -307,6 +308,7 @@ public interface Client2 extends Closeable {
      * @see Client2CallOptions
      * @see ClientResponse
      * @see ProcCallException
+     * @see NoConnectionsException
      */
     ClientResponse callProcedureSync(Client2CallOptions options, String procName, Object... parameters)
         throws IOException, ProcCallException;
