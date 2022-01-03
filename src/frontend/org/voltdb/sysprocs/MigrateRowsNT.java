@@ -71,6 +71,15 @@ public class MigrateRowsNT extends VoltNTSystemProcedure {
         }
     }
 
+    public static interface MigrateResultTable {
+        public static final String ROWS_MIGRATED = "ROWS_MIGRATED";
+        public static final String ROWS_LEFT = "ROWS_LEFT";
+        public static final String MIGRATED_LAST_ROUND = "MIGRATED_LAST_ROUND";
+        public static final String LAST_MIGRATED_TIMESTAMP = "LAST_MIGRATED_TIMESTAMP";
+        public static final String STATUS = "STATUS";
+        public static final String MESSAGE = "MESSAGE";
+    }
+
     static class NibbleStatus {
         final AtomicLong rowsMoved;
         long rowsToBeMoved;
@@ -163,12 +172,13 @@ public class MigrateRowsNT extends VoltNTSystemProcedure {
             exportLog.trace(String.format("Executing migrate rows, table %s, column %s, value %s, batchsize %d, frequency %d" ,
                     tableName, columnName, valueStr, chunksize, maxFrequency));
         }
-        VoltTable returnTable = new VoltTable(new ColumnInfo("ROWS_MIGRATED", VoltType.BIGINT),
-                                new ColumnInfo("ROWS_LEFT", VoltType.BIGINT),
-                                new ColumnInfo("MIGRATED_LAST_ROUND", VoltType.BIGINT),
-                                new ColumnInfo("LAST_MIGRATED_TIMESTAMP", VoltType.BIGINT),
-                                new ColumnInfo("STATUS", VoltType.BIGINT),
-                                new ColumnInfo("MESSAGE", VoltType.STRING));
+        VoltTable returnTable = new VoltTable(
+                   new ColumnInfo(MigrateResultTable.ROWS_MIGRATED,             VoltType.BIGINT),
+                   new ColumnInfo(MigrateResultTable.ROWS_LEFT,                 VoltType.BIGINT),
+                   new ColumnInfo(MigrateResultTable.MIGRATED_LAST_ROUND,       VoltType.BIGINT),
+                   new ColumnInfo(MigrateResultTable.LAST_MIGRATED_TIMESTAMP,   VoltType.BIGINT),
+                   new ColumnInfo(MigrateResultTable.STATUS,                    VoltType.BIGINT),
+                   new ColumnInfo(MigrateResultTable.MESSAGE,                   VoltType.STRING));
 
         // collect all the validated info and metadata needed
         // these throw helpful errors if they run into problems

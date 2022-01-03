@@ -31,18 +31,24 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.apache.commons.lang3.StringUtils;
 import org.hsqldb_voltpatches.TimeToLiveVoltDB;
 import org.hsqldb_voltpatches.lib.StringUtil;
+import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.catalog.Column;
+import org.voltdb.catalog.ColumnRef;
+import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
 import org.voltdb.catalog.TimeToLive;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.iv2.MpTransactionState;
 import org.voltdb.sysprocs.LowImpactDeleteNT.ResultTable;
+import org.voltdb.sysprocs.MigrateRowsNT.MigrateResultTable;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.TimeUtils;
 
@@ -241,10 +247,10 @@ public class TTLManager extends StatsSource{
         final Random random = new Random();
         for (Table t : ttlTables.values()) {
             TimeToLive ttl = t.getTimetolive().get(TimeToLiveVoltDB.TTL_NAME);
-            if (!CatalogUtil.isColumnIndexed(t, ttl.getTtlcolumn())) {
-                hostLog.warn("An index is missing on column " + t.getTypeName() + "." + ttl.getTtlcolumn().getName() +
-                        " for TTL. No records will be purged until an index is added.");
-                continue;
+            if (!checkTTLIndex(t, ttl.getTtlcolumn())) {
+                //
+                // NOTE: we let the TTL task be created in order to log rate limited error messages
+                // repeatedly in the logs, complaining about the missing or incorrect index.
             }
             TTLTask task = m_tasks.get(t.getTypeName());
             if (task == null) {
@@ -265,6 +271,34 @@ public class TTLManager extends StatsSource{
                 hostLog.info(String.format(info + " has been updated.", t.getTypeName()));
             }
         }
+    }
+
+    private boolean checkTTLIndex(Table table, Column column) {
+        boolean migrate = TableType.isPersistentMigrate(table.getTabletype());
+        for (Index index : table.getIndexes()) {
+            for (ColumnRef colRef : index.getColumns()) {
+                if (column.equals(colRef.getColumn())){
+                    if (migrate && !index.getMigrating()) {
+                        hostLog.warnFmt("The index on column %s.%s must be declared as \"CREATE INDEX %s ON %s (%s) WHERE NOT MIGRATING\"."
+                                + " Until this is corrected, no records will be migrated.",
+                                table.getTypeName(), column.getName(), index.getTypeName(), table.getTypeName(), column.getName());
+                        return false;
+                    }
+                 return true;
+                }
+            }
+        }
+
+        if (migrate) {
+            hostLog.warnFmt("An index is missing on column %s.%s for migrating."
+                    + " It must be declared as \"CREATE INDEX myIndex ON %s (%s) WHERE NOT MIGRATING\""
+                    + " Until this is corrected, no records will be migrated.",
+                    table.getTypeName(), column.getName(), table.getTypeName(), column.getName());
+        } else {
+            hostLog.warnFmt("An index is missing on column %s.%s for TTL. No records will be purged until an index is added.",
+                    table.getTypeName(), column.getName());
+        }
+        return false;
     }
 
     public void shutDown() {
@@ -322,10 +356,25 @@ public class TTLManager extends StatsSource{
                     hostLog.warn(String.format("Fail to execute nibble export on table: %s, column: %s, status: %s",
                             task.tableName, task.getColumnName(), resp.getStatusString()));
                 }
+                else if (resp.getResults() != null && resp.getResults().length > 0) {
+                    // Procedure call may succeed but response may carry a migration error
+                    VoltTable t = resp.getResults()[0];
+                    t.advanceRow();
+                    long status = t.getLong(MigrateResultTable.STATUS);
+                    if (status != ClientResponse.SUCCESS) {
+                        String error = t.getString(ResultTable.MESSAGE);
+                        if (t.wasNull()) {
+                            error = null;
+                        }
+                        hostLog.rateLimitedLog(LOG_SUPPRESSION_INTERVAL_SECONDS, Level.WARN, null,
+                                "Error migrating table %s: %s", task.tableName,
+                                parseTTLError(error));
+                    }
+                }
                 latch.countDown();
             }
         };
-        cl.getDispatcher().getInternelAdapterNT().callProcedure(cl.getInternalUser(), true, NT_PROC_TIMEOUT, cb,
+        cl.getDispatcher().getInternalAdapterNT().callProcedure(cl.getInternalUser(), true, NT_PROC_TIMEOUT, cb,
                 "@MigrateRowsNT", new Object[] {task.tableName, task.getColumnName(), task.getValue(), "<=", task.getBatchSize(),
                         TIMEOUT, task.getMaxFrequency(), INTERVAL});
         try {
@@ -365,7 +414,8 @@ public class TTLManager extends StatsSource{
                             }
                         }
                         hostLog.rateLimitedLog(LOG_SUPPRESSION_INTERVAL_SECONDS, Level.WARN, null,
-                                "Errors occured on TTL table %s: %s %s", task.tableName, error, drLimitError);
+                                "Errors occured on TTL table %s: %s %s", task.tableName,
+                                parseTTLError(error), drLimitError);
                     } else {
                         task.stats.update(t.getLong(ResultTable.ROWS_DELETED),
                                           t.getLong(ResultTable.ROWS_LEFT),
@@ -375,7 +425,7 @@ public class TTLManager extends StatsSource{
                 latch.countDown();
             }
         };
-        cl.getDispatcher().getInternelAdapterNT().callProcedure(cl.getInternalUser(), true, NT_PROC_TIMEOUT, cb,
+        cl.getDispatcher().getInternalAdapterNT().callProcedure(cl.getInternalUser(), true, NT_PROC_TIMEOUT, cb,
                 "@LowImpactDeleteNT", new Object[] {task.tableName, task.getColumnName(), task.getValue(), "<=", task.getBatchSize(),
                         TIMEOUT, task.getMaxFrequency(), INTERVAL});
         try {
@@ -384,4 +434,35 @@ public class TTLManager extends StatsSource{
             hostLog.warn("TTL waiting interrupted" + e.getMessage());
         }
     }
+
+    private String parseTTLError(String errorMsg) {
+        String ret = "no reported error";
+        if (StringUtils.isBlank(errorMsg)) {
+            return ret;
+        }
+        ret = errorMsg;
+
+        // Some of the reported errors may be JSON-serialized ClientResponseImpl objects
+        try {
+            JSONObject jsonObj = new JSONObject(errorMsg);
+            String jsonMsg = jsonObj.getString("statusstring");
+            if (!StringUtils.isBlank(jsonMsg)) {
+                ret = jsonMsg;
+            }
+        }
+        catch (Exception ex) {
+            // Ignore any errors/exceptions occurring in this branch
+        }
+
+        // Keep only the first line if the message seems to contain a backtrace,
+        // e.g. the most probable error on incorrect index for migrate:
+        // "VOLTDB ERROR: USER ABORT Could not find migrating index. example: CREATE INDEX myindex ON ORDERS() WHERE NOT MIGRATING\n    at org.voltdb.sysprocs.MigrateRowsSP.run(MigrateRowsSP.java:28)"
+        int idx = ret.indexOf('\n');
+        if (idx != -1 && ret.contains("at org.")) {
+            ret = ret.substring(0, idx);
+        }
+
+        return ret;
+    }
+
 }

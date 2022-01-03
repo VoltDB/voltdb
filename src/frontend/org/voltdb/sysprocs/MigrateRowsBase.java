@@ -98,7 +98,7 @@ public class MigrateRowsBase extends VoltSystemProcedure {
             }
         }
         if (!hasMigratingIndex) {
-            String msg = String.format("Could not find migrating index. example: CREATE MIGRATING INDEX myindex ON %s()",
+            String msg = String.format("Could not find migrating index, example: \"CREATE INDEX myindex ON %s() WHERE NOT MIGRATING\"",
                     table.getTypeName());
             throw new VoltAbortException(msg);
         }

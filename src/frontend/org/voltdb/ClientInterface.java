@@ -1263,7 +1263,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         }
                     };
 
-                    m_dispatcher.getInternelAdapterNT().callProcedure(m_catalogContext.get().authSystem.getInternalAdminUser(),
+                    m_dispatcher.getInternalAdapterNT().callProcedure(m_catalogContext.get().authSystem.getInternalAdminUser(),
                             true, 1000 * 120, cb, invocation.getProcName(), itm.getParameters());
                 } else if (message instanceof SiteFailureForwardMessage) {
                     SiteFailureForwardMessage msg = (SiteFailureForwardMessage)message;

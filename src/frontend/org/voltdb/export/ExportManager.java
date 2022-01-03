@@ -644,7 +644,7 @@ public class ExportManager implements ExportManagerInterface
 
     @Override
     public void invokeMigrateRowsDelete(int partition, String tableName, long deletableTxnId,  ProcedureCallback cb) {
-        m_ci.getDispatcher().getInternelAdapterNT().callProcedure(m_ci.getInternalUser(), true, TTLManager.NT_PROC_TIMEOUT, cb,
+        m_ci.getDispatcher().getInternalAdapterNT().callProcedure(m_ci.getInternalUser(), true, TTLManager.NT_PROC_TIMEOUT, cb,
                 "@MigrateRowsDeleterNT", new Object[] {partition, tableName, deletableTxnId});
     }
 

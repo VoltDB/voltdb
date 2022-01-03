@@ -25,10 +25,10 @@ package org.voltdb.compiler;
 
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.mock;
 
 import java.io.File;
 import java.io.IOException;
@@ -46,20 +46,19 @@ import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.hsqldb_voltpatches.HsqlException;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.runner.RunWith;
 import org.mockito.Mockito;
-
+import org.powermock.api.mockito.PowerMockito;
+import org.powermock.core.classloader.annotations.PowerMockIgnore;
+import org.powermock.core.classloader.annotations.PrepareForTest;
+import org.powermock.modules.junit4.PowerMockRunner;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CatalogContext;
-import org.powermock.api.mockito.PowerMockito;
-import org.powermock.core.classloader.annotations.PrepareForTest;
-import org.powermock.core.classloader.annotations.PowerMockIgnore;
-import org.powermock.modules.junit4.PowerMockRunner;
-import org.junit.runner.RunWith;
-import org.junit.Before;
-import org.junit.After;
-import org.voltdb.VoltDB;
 import org.voltdb.ProcedurePartitionData;
 import org.voltdb.TableType;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltDBInterface;
 import org.voltdb.VoltType;
@@ -368,7 +367,7 @@ public class TestVoltCompiler extends TestCase {
 
         expectedError =
                 "Procedure ProcedureWithArrayParams contains a mutable array parameter " +
-                        "but the databse is configure not to copy parameter before execution. " +
+                        "but the database is configured not to copy parameters before execution. " +
                         "This can result in unpredictable behavior, crashes or data corruption " +
                         "if stored procedure modifies the content of the parameters. " +
                         "Set the copyparameters configuration option to true to avoid this danger " +

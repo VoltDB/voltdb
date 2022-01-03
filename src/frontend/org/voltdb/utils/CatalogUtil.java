@@ -3772,17 +3772,6 @@ public abstract class CatalogUtil {
         return ttls;
     }
 
-    public static boolean isColumnIndexed(Table table, Column column) {
-        for (Index index : table.getIndexes()) {
-            for (ColumnRef colRef : index.getColumns()) {
-                if(column.equals(colRef.getColumn())){
-                 return true;
-                }
-            }
-        }
-        return false;
-    }
-
     public static boolean getIsreplicated(String tableName) {
         Table table = VoltDB.instance().getCatalogContext().tables.get(tableName);
         if (table != null) {
