@@ -396,6 +396,18 @@ public class AsyncExportClient {
                      ", migrating: " + migrating +
                      ", not migrating: " + not_migrating);
         }
+        catch (ProcCallException e) {
+            // Proc call failed. OK if connection went down, tests expect that.
+            // In any case, no action taken other than logging.
+            byte st = e.getClientResponse().getStatus();
+            String err = String.format("Procedure call failed in log_migrating_counts: %s (status %d)",
+                                       e.getClientResponse().getStatusString(), st)
+            if (st == ClientResponse.CONNECTION_LOST || st == ClientResponse.CONNECTION_TIMEOUT) {
+                log.info(err);
+            } else {
+                log.error(err);
+            }
+        }
         catch (Exception e) {
             // log it and otherwise ignore it.  it's not fatal to fail if the
             // SELECTS due to a migrate or some other exception
