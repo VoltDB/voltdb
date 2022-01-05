@@ -401,7 +401,7 @@ public class AsyncExportClient {
             // In any case, no action taken other than logging.
             byte st = e.getClientResponse().getStatus();
             String err = String.format("Procedure call failed in log_migrating_counts: %s (status %d)",
-                                       e.getClientResponse().getStatusString(), st)
+                                       e.getClientResponse().getStatusString(), st);
             if (st == ClientResponse.CONNECTION_LOST || st == ClientResponse.CONNECTION_TIMEOUT) {
                 log.info(err);
             } else {
