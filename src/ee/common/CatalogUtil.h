@@ -18,8 +18,6 @@
 #ifndef CATALOGUTIL_H
 #define CATALOGUTIL_H
 
-#include "catalog/connector.h"
-#include "catalog/connectortableinfo.h"
 #include "catalog/database.h"
 #include "catalog/table.h"
 #include "common/types.h"

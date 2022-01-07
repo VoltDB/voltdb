@@ -78,17 +78,17 @@ begin CommandLog javaonly     "Configuration for a command log"
   int logSize                 "Size of the command log in megabytes"
 end
 
-begin ConnectorTableInfo    "Per-export connector table configuration"
-  Table? table              "Reference to the table being appended"
-  bool appendOnly           "DEPRECATED: True if this table is an append-only table for export."
+begin ConnectorTableInfo javaonly   "Per-export connector table configuration"
+  Table? table                      "Reference to the table being appended"
+  bool appendOnly                   "DEPRECATED: True if this table is an append-only table for export."
 end
 
-begin ConnectorProperty    "Connector configuration property"
-  string name              "Configuration property name"
-  string value             "Configuration property value"
+begin ConnectorProperty javaonly    "Connector configuration property"
+  string name                       "Configuration property name"
+  string value                      "Configuration property value"
 end
 
-begin Connector                 "Export connector"
+begin Connector javaonly        "Export connector"
   string loaderclass            "The class name of the connector"
   string threadpoolname         "The name of the thread pool"
   bool enabled                  "Is the connector enabled"

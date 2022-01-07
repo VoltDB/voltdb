@@ -50,7 +50,6 @@
 #include "catalog/cluster.h"
 #include "catalog/column.h"
 #include "catalog/columnref.h"
-#include "catalog/connector.h"
 #include "catalog/function.h"
 #include "catalog/functionparameter.h"
 #include "catalog/index.h"

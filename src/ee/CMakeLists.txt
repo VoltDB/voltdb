@@ -121,9 +121,6 @@ SET (VOLTDB_SRC
   catalog/cluster.cpp
   catalog/column.cpp
   catalog/columnref.cpp
-  catalog/connector.cpp
-  catalog/connectorproperty.cpp
-  catalog/connectortableinfo.cpp
   catalog/constraint.cpp
   catalog/constraintref.cpp
   catalog/database.cpp
