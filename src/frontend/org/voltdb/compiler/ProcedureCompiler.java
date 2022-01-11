@@ -731,7 +731,7 @@ public abstract class ProcedureCompiler {
                 String infoMsg = "Procedure "+ shortName + " contains a mutable array parameter." +
                         " VoltDb can be optimized by disabling copyparameters configuration option." +
                         " In that case, all parameters including arrays must remain immutable within the scope of Stored Procedures.";
-                compiler.addWarn(infoMsg);
+                compiler.addInfo(infoMsg);
             }
             else {
                 String warnMsg = "Procedure " + shortName +

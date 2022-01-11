@@ -354,18 +354,6 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.ProcedureWithArrayParams; " +
                 "PARTITION PROCEDURE ProcedureWithArrayParams ON TABLE FOO COLUMN PKEY; ";
         String expectedError =
-                "Procedure ProcedureWithArrayParams contains a mutable array parameter. " +
-                        "VoltDb can be optimized by disabling copyparameters configuration option. " +
-                        "In that case, all parameters including arrays must remain immutable within " +
-                        "the scope of Stored Procedures.";
-
-        VoltCompiler compiler = new VoltCompiler(false);
-        boolean success = compileDDL(ddl, compiler);
-        assertTrue(success);
-        boolean status = isFeedbackPresent(expectedError,compiler.m_warnings);
-        assertTrue(status);
-
-        expectedError =
                 "Procedure ProcedureWithArrayParams contains a mutable array parameter " +
                         "but the database is configured not to copy parameters before execution. " +
                         "This can result in unpredictable behavior, crashes or data corruption " +
@@ -374,10 +362,11 @@ public class TestVoltCompiler extends TestCase {
                         "if the stored procedures might modify parameter content.";
 
         procedureType.setCopyparameters(false);
-        compiler = new VoltCompiler(false);
-        success = compileDDL(ddl, compiler);
+
+        VoltCompiler compiler = new VoltCompiler(false);
+        boolean success = compileDDL(ddl, compiler);
         assertTrue(success);
-        status = isFeedbackPresent(expectedError,compiler.m_warnings);
+        boolean status = isFeedbackPresent(expectedError,compiler.m_warnings);
         assertTrue(status);
     }
 
