@@ -25,28 +25,34 @@ package client.benchmark;
 
 import org.voltdb.CLIConfig;
 import org.voltdb.CLIConfig.Option;
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ClientStatusListenerExt;
+import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.VoltType;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.MathContext;
-import java.io.IOException;
+import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.Random;
 import java.util.SortedSet;
 import java.util.TreeSet;
-import java.util.Random;
 
 /** Benchmark for when Deletes, Updates, and a Snapshot, are all happening at
  *  the same time; needed especially for the DRO (deterministic row order)
@@ -67,7 +73,7 @@ public class DUSBenchmark {
     private DUSBenchmarkStats stats;
 
     private static final int backpressureSleepMillis = 1000;
-    private static boolean backpressure = false;
+    private static Boolean backpressure = null;
     private static int countBackpressureCalls = 0;
     private static int countBackpressureDelays = 0;
 
@@ -78,6 +84,12 @@ public class DUSBenchmark {
     private static Map<String,Long> countStoredProcCalls = new ConcurrentHashMap<String,Long>();
     private static Map<String,Long> countStoredProcResults = new ConcurrentHashMap<String,Long>();
     private static Map<String,List<Long>> randomValues = new ConcurrentHashMap<String,List<Long>>();
+    private static String JUST_DASHES = "----------------------------------------";
+    private static String JUST_DOUBLE_DASHES = JUST_DASHES+JUST_DASHES;
+    private static String DASHES = "\n"+JUST_DASHES+"\n";
+    private static String DOUBLE_DASHES = "\n"+JUST_DOUBLE_DASHES;
+    // Set this to true, to get LOTS of debug output
+    private static boolean DEBUG = false;
 
     private long insertBlockSize = -1;
     private long minimumId = -1;
@@ -93,19 +105,22 @@ public class DUSBenchmark {
         this.config = config;
 
         // Echo input option values (useful for debugging):
-        System.out.println("\nIn DUSBenchmark constructor:");
-        System.out.println("  displayinterval: "+config.displayinterval);
-        System.out.println("  seed           : "+config.seed);
-        System.out.println("  tabletypes     : "+config.tabletypes);
-        System.out.println("  columntypes    : "+config.columntypes);
-        System.out.println("  insertnumrows  : "+config.insertnumrows);
-        System.out.println("  deleteupdatenumrows: "+config.deleteupdatenumrows);
-        System.out.println("  deleteupdatevalues: "+config.deleteupdatevalues);
-        System.out.println("  deleteupdatecolumn: "+config.deleteupdatecolumn);
-        System.out.println("  deleteupdateorder : "+config.deleteupdateorder);
-        System.out.println("  rate limit     : "+config.ratelimit);
-        System.out.println("  statsfile      : "+config.statsfile);
-        System.out.println("  servers        : "+config.servers);
+        if (DEBUG) {
+            System.out.println(DASHES+"In DUSBenchmark constructor:");
+            System.out.println("  displayinterval: "+config.displayinterval);
+            System.out.println("  seed           : "+config.seed);
+            System.out.println("  tabletypes     : "+config.tabletypes);
+            System.out.println("  columntypes    : "+config.columntypes);
+            System.out.println("  insertnumrows  : "+config.insertnumrows);
+            System.out.println("  deleteupdatenumrows: "+config.deleteupdatenumrows);
+            System.out.println("  maxinsertsinglerows: "+config.maxinsertsinglerows);
+            System.out.println("  deleteupdatevalues : "+config.deleteupdatevalues);
+            System.out.println("  deleteupdatecolumn : "+config.deleteupdatecolumn);
+            System.out.println("  deleteupdateorder  : "+config.deleteupdateorder);
+            System.out.println("  rate limit     : "+config.ratelimit);
+            System.out.println("  statsfile      : "+config.statsfile);
+            System.out.println("  servers        : "+config.servers);
+        }
 
         rand.setSeed(config.seed);
         DUSBClientListener dusbcl = new DUSBClientListener(config.insertnumrows);
@@ -117,7 +132,9 @@ public class DUSBenchmark {
 
         String[] serverArray = config.servers.split(",");
         // Echo server array values (useful for debugging):
-        System.out.println("  serverArray    : "+Arrays.toString(serverArray));
+        if (DEBUG) {
+            System.out.println("  serverArray    : "+Arrays.toString(serverArray));
+        }
         for (String server : serverArray) {
             try {
                 client.createConnection(server);
@@ -174,6 +191,12 @@ public class DUSBenchmark {
                 + "blocksize - 1, i.e., MOD_ID = ID % blocksize; default: 1000.")
         long deleteupdatenumrows = 1000;
 
+        @Option(desc = "The maximum number of rows to be inserted singly, i.e. one at "
+                + "a time (which can be very slow), at the start. If the 'block' size "
+                + "is larger than this, INSERT FROM SELECT statements will be used "
+                + "instead; default: 1,000 (ten thousand).")
+        long maxinsertsinglerows = 10000;
+
         @Option(desc = "The manner in which to delete and update: 'single' to indicate "
                 + "just one value at a time (e.g. using 'WHERE MOD_ID = ?'); or 'range' "
                 + "to indicate a range of values (e.g. using 'WHERE MOD_ID <= ? AND "
@@ -200,7 +223,8 @@ public class DUSBenchmark {
                 + "default: Integer.MAX_VALUE.")
         int ratelimit = Integer.MAX_VALUE;
 
-        @Option(desc = "Filename to write raw summary statistics to.")
+        @Option(desc = "Filename to write raw summary statistics to; default: "
+                + "deleteupdatesnapshot.csv.")
         String statsfile = "deleteupdatesnapshot.csv";
 
         @Override
@@ -243,7 +267,12 @@ public class DUSBenchmark {
     private void init() throws Exception {
 
         // Debug print:
-        System.out.println("\n\nStart of DUSBenchmark.init()");
+        LocalDateTime initTime = LocalDateTime.now();
+        if (DEBUG) {
+            String initTimeStr = getTimeString(initTime);
+            System.out.println("\n"+DOUBLE_DASHES+"\nStart of DUSBenchmark.init()"
+                    +initTimeStr+DOUBLE_DASHES);
+        }
 
         // Get the lists of table names to which to add, delete, and update rows
         List<String> tableNamesForInsertValues = new ArrayList<String>();
@@ -272,19 +301,12 @@ public class DUSBenchmark {
         String[] colValuesArray = null;
 
         // Compute the number of "blocks" of rows to insert, from the total
-        // number of rows, and the delete/update block size (num. rows):
+        // number of rows, and the delete/update block size (i.e. num. rows)
         long minId = 0;
         long minBlockId = 0;
         long numRows = config.insertnumrows;
         long numInsertBlocks = config.deleteupdatenumrows;
-        // If it divides evenly, it's simple
-        insertBlockSize = numRows / numInsertBlocks;
-        // Otherwise, round to one decimal place, i.e., to the nearest 0.1;
-        // then take the "ceiling" (nearest integer above or equal to)
-        if (numRows % numInsertBlocks != 0) {
-            insertBlockSize = (long) Math.ceil( Math.round(10.0D * numRows / numInsertBlocks)
-                                                         / 10.0D );
-        }
+        insertBlockSize = divideAndRoundUp(numRows, numInsertBlocks);
 
         // If we are deleting (& updating) by block, then the above values are reversed
         if ("blockid".equals(delUpdColumnLowerCase)) {
@@ -292,8 +314,17 @@ public class DUSBenchmark {
             insertBlockSize = config.deleteupdatenumrows;
         }
 
+        // Normally we insert individual rows for the first "block", but if the
+        // block size is too big, we break that first block into sub-blocks of
+        // smaller size, and insert individual rows for only the first sub-block,
+        // and then insert the rest via INSERT FROM SELECT statements
+        long numSingleRowsToInsert = Math.min(insertBlockSize, config.maxinsertsinglerows);
 
-        // Insert the initial rows (1 "block"), one at a time
+        // Insert the initial rows, one "block" (or "sub-block) at a time - for
+        // each table that needs rows inserted (which is normally just the one
+        // replicated table)
+        ClientResponse cr = null;
+        VoltTable vt = null;
         for (String tableName : tableNamesForInsertValues) {
             String procName = "InsertOneRow";
             if (tableName != null && PARTITIONED_BY_ID.contains(tableName.toUpperCase())) {
@@ -301,106 +332,481 @@ public class DUSBenchmark {
             }
 
             // Debug print:
-            System.out.println( "\nIn DUSBenchmark.init()"
-                    +": tableNames(insert) "+tableNamesForInsertValues
-                    +", tableNames(select) "+tableNamesForInsertFromSelect
-                    +", tableNames(del&upd) "+tableNamesForDeleteAndUpdate
-                    +", tableName "+tableName
-                    +", duration(max) "+config.duration
-                    +"\ncolumnNames: "+Arrays.toString(colNamesArray)
-                    +"\nminId "+minId
-                    +", insertnumrows "+numRows
-                    +", deleteupdatenumrows "+config.deleteupdatenumrows
-                    +", numInsertBlocks "+numInsertBlocks
-                    +", insertBlockSize "+insertBlockSize );
+            if (DEBUG) {
+                System.out.println( "\nIn DUSBenchmark.init()"
+                        +": tableNames(insert) "+tableNamesForInsertValues
+                        +", tableNames(select) "+tableNamesForInsertFromSelect
+                        +", tableNames(del&upd) "+tableNamesForDeleteAndUpdate
+                        +", tableName(current) "+tableName
+                        +", duration(max) "+config.duration
+                        +"\ncolumnNames: "+Arrays.toString(colNamesArray)
+                        +"\ninsertnumrows "+numRows
+                        +", maxinsertsinglerows "+config.maxinsertsinglerows
+                        +", deleteupdatenumrows "+config.deleteupdatenumrows
+                        +", numInsertBlocks "+numInsertBlocks
+                        +", minId "+minId
+                        +", numSingleRowsToInsert "+numSingleRowsToInsert );
+            }
 
-            for (long rowId=0; rowId < insertBlockSize; rowId++) {
+            // Insert rows one at a time
+            for (long rowId=minId; rowId < numSingleRowsToInsert + minId; rowId++) {
                 // Get the array of random column values to be set, for those
                 // columns that will be non-null
                 colValuesArray = getColumnValues(colNamesArray);
 
                 // Occasional debug print:
                 boolean debugPrint = false;
-                if (rowId == 0 || rowId == insertBlockSize / 2
-                               || rowId == insertBlockSize - 1) {
-                    debugPrint = true;
-                    System.out.println( "\ncolValuesArray, row "+rowId+": "
-                                        + Arrays.toString(colValuesArray) );
+                if (rowId == 0 || rowId == numSingleRowsToInsert / 2
+                               || rowId == numSingleRowsToInsert - 1) {
+                    if (DEBUG) {
+                        debugPrint = true;
+                        System.out.println( "\nRow "+rowId+", colValuesArray: "
+                                            + Arrays.toString(colValuesArray) );
+                    }
                 }
 
                 // Insert one row
-                ClientResponse cr = client.callProcedure(procName, rowId, minBlockId,
-                                    tableName, colNamesArray, colValuesArray);
-                VoltTable vt = cr.getResults()[0];
+                cr = client.callProcedure(procName, rowId, minBlockId, tableName,
+                                          colNamesArray, colValuesArray);
+                vt = cr.getResults()[0];
 
                 // Debug print: occasionally, or when something goes wrong
-                if  (debugPrint || cr.getStatus() != ClientResponse.SUCCESS ||
-                        vt.getStatusCode() != -128 ) {
-                    System.out.println( "\nRow "+rowId
-                             +": vt.getStatusCode "+vt.getStatusCode()
-                             +", cr.getStatus "+cr.getStatus()
-                             +" (SUCCESS="+ClientResponse.SUCCESS+")"
+                if  (debugPrint || cr.getStatus() != ClientResponse.SUCCESS
+                                || vt.getStatusCode() != -128 ) {
+                    System.out.println( "Row "+rowId+" result"
+                             +": vt.getStatusCode "+vt.getStatusCode()+" (-128"
+                             +" is normal), cr.getStatus "+cr.getStatus()
+                             +" ("+ClientResponse.SUCCESS+"=SUCCESS)"
                              +", cr.getStatusString: "+cr.getStatusString() );
                 }
             }
+
+            // Only in the case where the block size is very big, so it was
+            // divided into "sub-blocks": having inserted the first sub-block
+            // one row at a time above, now use INSERT FROM SELECT statements
+            // for the rest of the sub-blocks
+            if (numSingleRowsToInsert < insertBlockSize) {
+                if (DEBUG) {
+                    System.out.println( DASHES+"Calling insertFromSelect for sub-blocks; "
+                            +"tableName "+tableName+", insertBlockSize "+insertBlockSize
+                            +", numSingleRowsToInsert "+numSingleRowsToInsert+":" );
+                }
+
+                // Insert the rest of the sub-blocks, completing the first block
+                insertFromSelect(tableName, insertBlockSize, numSingleRowsToInsert);
+
+                // The columnd MOD_ID should equal ID for the entire first block,
+                // not just for the first sub-block
+                updateModIdToId(tableName, minId, insertBlockSize+minId);
+
+                if (DEBUG || cr.getStatus() != ClientResponse.SUCCESS
+                          || vt.getStatusCode() != -128) {
+                    long rowCount = getRowCount(tableName);
+                    System.out.println( DASHES+"Updated MOD_ID in the first block:"
+                            +" rowCount "+rowCount+" (should be "+insertBlockSize
+                            +");\nvt.getStatusCode "+vt.getStatusCode()+" (-128 is normal),"
+                            + " cr.getStatus "+cr.getStatus()+" ("+ClientResponse.SUCCESS
+                            +"=SUCCESS), cr.getStatusString: "+cr.getStatusString() );
+                }
+            }
+            if (DEBUG) {
+                System.out.println( JUST_DASHES+"\nRows in "+tableName+", after "
+                        +"inserting to all 'sub-blocks': "+getRowCount(tableName) );
+            }
         }
 
+        // Now use INSERT FROM SELECT statements to populate the table(s) that
+        // will actually be used for the test - typically just one partitioned
+        // table, populated from the replicated table into which one "block"
+        // of rows was inserted above
         for (String tableName : tableNamesForInsertFromSelect) {
+            int index = tableNamesForInsertFromSelect.indexOf(tableName);
+            index = Math.min(index, tableNamesForInsertValues.size() - 1);
+            String fromTableName = tableNamesForInsertValues.get(index);
 
-            // Due to limits  on Partioned tables, they need to be populated by
-            // INSERT FROM SELECT queries that select from a Replicated table; so
-            // a Partioned table needs to copy one extra "block" at the beginning,
-            // whereas a Replicated table is copying from itself, so the first
-            // "block" has already been populated
-            long minBlock = minBlockId;
-            if (REPLICATED_TABLES.contains(tableName.toUpperCase())) {
-                minBlock = minBlockId + 1;
+            if (DEBUG) {
+                System.out.println( DOUBLE_DASHES+"\nBlocks calling insertFromSelect: "
+                        +"tableName "+tableName+" (fromTableName "+fromTableName+")"
+                        +", numRows "+numRows+", insertBlockSize "+insertBlockSize );
             }
 
-            // Insert lots more rows, using InsertFromSelect, i.e., queries of the form:
-            // INSERT INTO <table1> SELECT ...  FROM <table2> WHERE ...
-            long maxId = insertBlockSize;
-            for (long block = minBlock; block < numInsertBlocks + minBlockId; block++) {
-                long addToId = block * insertBlockSize;
+            // Insert all the "blocks" into the (usually partitioned) table
+            insertFromSelect(tableName, numRows, insertBlockSize);
 
-                // For the last block, only in the case where the insertBlockSize
-                // did not divide evenly
-                if (block == numInsertBlocks - 1 && numRows % numInsertBlocks != 0) {
-                    maxId = numInsertBlocks*insertBlockSize - numRows;
-                }
-
-                // Insert many rows
-                ClientResponse cr = client.callProcedureWithTimeout( 60000,
-                        "InsertFromSelect", tableName, addToId, block, minId, maxId );
-                VoltTable vt = cr.getResults()[0];
-
-                // Debug print: occasionally, or when something goes wrong
-                if ( block <= 1 || block == numInsertBlocks / 2 ||
-                        block == numInsertBlocks - 1  ||
-                        cr.getStatus() != ClientResponse.SUCCESS ||
-                        vt.getStatusCode() != -128 ) {
-                    System.out.println( "\nBlock "+block
-                            +": addToId "+addToId+", numInsertBlocks "+numInsertBlocks
-                            +", vt.getStatusCode "+vt.getStatusCode()
-                            +", cr.getStatus "+cr.getStatus()
-                            +" (SUCCESS="+ClientResponse.SUCCESS+"), "
-                            +"cr.getStatusString: "+cr.getStatusString() );
-                }
+            // Check the number of rows inserted
+            long rowCount = getRowCount(tableName);
+            String warning = "";
+            if (rowCount != numRows) {
+                warning = "WARNING: ";
             }
+            System.out.println( JUST_DOUBLE_DASHES+"\n"+warning+"Inserted "+rowCount
+                                +" rows into table "+tableName+"; should be "+numRows
+                                +"."+DOUBLE_DASHES );
         }
 
         // Set values needed by runBenchmark()
         minimumId = minimumModId = minId;
         minimumBlockId = minBlockId;
-        // Technically, these are one more than the maximum allowed value
+        // Technically, the values below represent one more than the maximum
+        // allowed value; i.e., the minimums above are inclusive, but the
+        // maximums below are exclusive
         maximumId = numRows + minId;
         maximumModId = insertBlockSize + minId;
         maximumBlockId = numInsertBlocks + minBlockId;
 
         // Debug print:
-        System.out.println("\nEnd of DUSBenchmark.init()");
+        if (DEBUG) {
+            LocalDateTime endTime = LocalDateTime.now();
+            String endTimeStr = getTimeString(endTime);
+            long diffSeconds = initTime.until(endTime, ChronoUnit.SECONDS);
+            System.out.println("\nEnd of DUSBenchmark.init(), at: "+endTimeStr
+                    +"; took "+diffSeconds+" seconds"+DOUBLE_DASHES);
+        }
 
     } // end of init()
+
+
+    /** Divide the <i>dividend</i> by the <i>divisor</i> (both long values),
+     *  but if the result is not an integer, round up to the nearest integer
+     *  above. In other words, return the smallest integer greater than or
+     *  equal to the quotient.
+     * @param dividend - the value to be divided (long)
+     * @param divisor - the value to divide by (long)
+     * @return the quotient, rounded up to the nearest integer (long)
+     * @throws ArithmeticException if the divisor is zero
+     */
+    private long divideAndRoundUp(long dividend, long divisor) throws ArithmeticException {
+        if (divisor == 0) {
+            throw new ArithmeticException("Divide by zero.");
+        }
+
+        long result = 0;
+        if (dividend % divisor == 0) {
+            // If it divides evenly, it's simple
+            result = dividend / divisor;
+        } else {
+            // Otherwise, round to one decimal place, i.e., to the nearest 0.1;
+            // then take the "ceiling" (nearest integer above or equal to)
+            result = (long) Math.ceil( Math.round(10.0D *
+                            dividend / divisor) / 10.0D );
+        }
+
+        return result;
+    } // end of divideAndRoundUp()
+
+
+    /** Handle a ProcCallException that was just enccountered, by first checking
+     *  if it was one of the (3) types we expect to sometimes see, in which
+     *  case return a short summary of the exception's message; or if not,
+     *  rethrow the ProcCallException (as a RuntimeException).
+     *  @param methodNameOrMsg - the name of the method in which the
+     *  ProcCallException was encountered, optionally followed by an
+     *  additional message
+     *  @param excep - the ProcCallException that was encountered
+     *  @return a short summary of the exception's message  */
+    private String handleProcCallException(String methodNameOrMsg, ProcCallException excep) {
+        String msgSummary = "";
+
+        if (excep.getMessage().contains("More than 100 MB of temp table memory used while executing SQL")) {
+            msgSummary = "temp table memory exceeded 100MB";
+        } else if (excep.getMessage().contains("No response received in the allotted time")) {
+            msgSummary = "no response in the allotted time";
+        } else if (excep.getMessage().contains("CONSTRAINT VIOLATION Attempted violation of constraint")) {
+            msgSummary = "constraint violation";
+        } else {
+            String message = "ProcCallException thrown while calling "+methodNameOrMsg
+                             +", with message: "+excep.getMessage();
+            System.err.println(DOUBLE_DASHES+"\nFATAL ERROR: "+message+DOUBLE_DASHES);
+            throw new RuntimeException(message, excep);
+        }
+
+        return msgSummary;
+    }
+
+
+    /** Insert lots of rows into the specified table, using INSERT FROM SELECT
+     *  statements - on the assumption that <i>minBlockId</i>, <i>minId</i> and
+     *  <i>skipRows</i> are zero, as usual, and that splitting into smaller
+     *  blocks is allowed. That is, SQL statements of the form:<pre>
+     *      INSERT INTO <i>tableName</i> SELECT ...  FROM <i>fromTableName</i> WHERE ...</pre>
+     * @param tableName - the table into which rows will be inserted
+     * @param numRows - the total number of rows to be inserted
+     * @param blockSize - the size of each "block" to be inserted by a single
+     * INSERT FROM SELECT statement
+     */
+    private void insertFromSelect(String tableName, long numRows, long blockSize)
+            throws Exception {
+        insertFromSelect(tableName, numRows, blockSize,
+                         REPLICATED_TABLES.get(0), 0, true);
+    } // end of insertFromSelect() - short version
+
+
+    /** Insert lots of rows into the specified table, using INSERT FROM SELECT
+     *  statements, i.e., SQL statements of the form:<pre>
+     *      INSERT INTO <i>tableName</i> SELECT ...  FROM <i>fromTableName</i> WHERE ...</pre>
+     * @param tableName - the table into which rows will be inserted
+     * @param numRows - the total number of rows to be inserted
+     * @param blockSize - the size of each "block" to be inserted by a single
+     * INSERT FROM SELECT statement
+     * @param fromTableName - the (replicated) table from which rows will be selected
+     * @param minFromId - the minimum ID, in the 'from' (replicated) table (usually 0).
+     * @param allowLargerBlocks - allow blocks to be combined (boolean)
+     */
+    private void insertFromSelect(String tableName, long numRows, long blockSize,
+            String fromTableName, long minFromId, boolean allowLargerBlocks)
+                    throws Exception {
+
+        // Compute additional 'from' table values
+        long minSelectId = minFromId;
+        long maxFromId = minFromId + blockSize;
+
+        // The number of blocks is the number of rows to be inserted divided by
+        // the block size - rounding up, if necessary
+        long numBlocks = divideAndRoundUp(numRows, blockSize);
+
+        // Compute additional 'to' table values
+        long skipRows = 0;
+        long minBlock = 0;
+        long minToId = minFromId;
+        long initRowCount = getRowCount(tableName);
+        if (initRowCount >= numRows) {
+            return;
+        } else if (initRowCount > 0) {
+            minToId = getMinId(tableName);
+            skipRows = getMaxId(tableName) + 1 - minToId;
+            // The first block to be inserted is the number of rows to be
+            // skipped (because they were already inserted) divided by the
+            // block size (rounding down)
+            minBlock = skipRows / blockSize;
+            minSelectId += skipRows - minBlock*blockSize ;
+        }
+        long maxToId = minToId + numRows;
+
+        // Debug print
+        long rowCount0 = -2, rowCount1 = -2;
+        if (DEBUG) {
+            rowCount0 = getRowCount(tableName);
+            System.out.println( JUST_DASHES+"\nIn insertFromSelect: tableName "
+                    +tableName+", numRows "+numRows+", blockSize "+blockSize
+                    +", fromTableName "+fromTableName+", minFromId "+minFromId
+                    +", maxFromId "+maxFromId+", allowLargerBlocks "+allowLargerBlocks
+                    +"; skipRows "+skipRows+", minBlock "+minBlock+", minToId "+minToId
+                    +" (last 3 often 0); maxToId "+maxToId+", numBlocks "+numBlocks+"." );
+        }
+
+        // Check if the number of blocks is too large to insert quickly.
+        // Note: the '2*' is quite arbitrary; we just don't want to change
+        // the blocks if the number was only a little larger than the max.
+        if (allowLargerBlocks && numBlocks > 2*config.maxinsertsinglerows) {
+            long newBlockRowCount0 = -3, newBlockRowCount1 = -3, numFromTableRows = -3;
+            if (DEBUG) {
+                newBlockRowCount0 = getRowCount(tableName);
+            }
+
+            // Determine the new, larger block-size
+            long largeBlockSize = config.maxinsertsinglerows * blockSize;
+            long numLargeBlocks = divideAndRoundUp(numRows, largeBlockSize);
+            long numSmallBlocks = divideAndRoundUp(largeBlockSize, blockSize);
+            System.out.println( JUST_DASHES+"\nBlock size increased, to "
+                    +"decrease the number of blocks (was "+numBlocks+"): after "
+                    +"initial insert to 'from' table "+fromTableName+" of "
+                    +numSmallBlocks+" blocks of (original) size "+blockSize
+                    +" (product is "+(numSmallBlocks * blockSize)+"), "
+                    +numLargeBlocks+" larger blocks of size "+largeBlockSize
+                    +" (product is "+(numLargeBlocks * largeBlockSize)+") "
+                    +"will be inserted into table "+tableName
+                    +" - for a total number of "+numRows+" rows." );
+
+            // Insert additional rows into fromTableName, if there are not enough
+            // to support the 'Insert larger blocks' call below (recursive call)
+            long initFromTableRows = getRowCount(fromTableName);
+            if (initFromTableRows < largeBlockSize) {
+                insertFromSelect(fromTableName, largeBlockSize, initFromTableRows,
+                                 fromTableName, minFromId, false);
+            }
+
+            if (DEBUG) {
+                numFromTableRows = getRowCount(fromTableName);
+                System.out.println( JUST_DASHES+"\nNumber of rows in "
+                        +"'from' table "+fromTableName
+                        +": before inserting extra blocks: "+initFromTableRows
+                        +"; after inserting extra blocks: "+numFromTableRows
+                        +" - should be "+largeBlockSize+".\n"+JUST_DASHES );
+            }
+
+            // Insert larger blocks into the 'to' table (recursive call)
+            insertFromSelect(tableName, numRows, largeBlockSize,
+                             fromTableName, minFromId, false);
+            if (DEBUG) {
+                newBlockRowCount1 = getRowCount(tableName);
+                System.out.println( JUST_DASHES+"\nNumber of rows in "+tableName
+                        +": before inserting larger blocks: "+newBlockRowCount0
+                        +"; after inserting larger blocks: "+newBlockRowCount1
+                        +" - should be "+numRows+".\n"+JUST_DASHES );
+            }
+
+            return;
+        }
+
+        // Initial (almost) "empty" objects, to be replaced below; defined
+        // here only to avoid NPEs when there's a ProcCallException
+        ClientResponse cr = new ClientResponseImpl();
+        ColumnInfo ci = new ColumnInfo("init", VoltType.TINYINT);
+        VoltTable vt = new VoltTable(ci);
+
+        // Insert lots of rows, using the original block-size, and using
+        // INSERT FROM SELECT, i.e., queries of the form:
+        // INSERT INTO <i>tableName</i> SELECT ...  FROM [replicate-table] WHERE ...
+        for (long block = minBlock; block < numBlocks; block++) {
+            long addToId = block * blockSize;
+
+            // For the last block, only in the case where the numBlocks
+            // did not divide evenly into numRows
+            if (block == numBlocks - 1 && numRows % blockSize != 0) {
+                maxFromId = blockSize - (numBlocks*blockSize - numRows);
+            }
+
+            // Insert many rows
+            try {
+                cr = client.callProcedure( "InsertFromSelect",
+                        tableName, addToId, block, minSelectId, maxFromId );
+                vt = cr.getResults()[0];
+
+            } catch (ProcCallException e) {
+                String methodNameAndMsg = "insertFromSelect, with tableName "+tableName
+                        +", fromTableName "+fromTableName+", numRows "+numRows
+                        +", blockSize "+blockSize+", minFromId "+minFromId
+                        +", allowLargerBlocks "+allowLargerBlocks
+                        +"; minSelectId "+minSelectId+", maxFromId "+maxFromId
+                        +", minBlock "+minBlock+", numBlocks "+numBlocks
+                        +", block "+block+", addToId "+addToId;
+
+                // If the query was "too big", "too slow", or a constraint
+                // violation, try a smaller block size (which will also reset
+                // which rows to skip, hopefully avoiding another constraint
+                // violation); otherwise, rethrow the ProcCallException
+                String msgSummary = handleProcCallException(methodNameAndMsg, e);
+                String message = "Caught '"+msgSummary+"' in "+methodNameAndMsg;
+                long smallerBlockSize = divideAndRoundUp(blockSize, 2);
+
+                // The exact value of minBlockSize is quite arbitrary, but we
+                // certainly cannot keep reducing the block size indefinitely,
+                // via repeated recursive calls
+                long minBlockSize = 4;
+                if (smallerBlockSize < minBlockSize) {
+                    message += "; but unable to reduce block size ("+blockSize
+                                +") any further (e.g. to "+smallerBlockSize+").";
+                    throw new RuntimeException(message, e);
+                }
+
+                System.out.println( JUST_DASHES+"\n"+message+"; will reduce block "
+                        +"size to "+smallerBlockSize+" and try again." );
+
+                long smallBlockRowCount0 = -4;
+                if (DEBUG) {
+                    smallBlockRowCount0 = getRowCount(tableName);
+                }
+
+
+                if (!"constraint violation".equals(msgSummary)) {
+                    allowLargerBlocks = false;
+                }
+                // Recursive call using smaller blocks
+                insertFromSelect(tableName, numRows, smallerBlockSize,
+                                 fromTableName, minFromId, allowLargerBlocks);
+
+                if (DEBUG) {
+                    long smallBlockRowCount1 = getRowCount(tableName);
+                    System.out.println( JUST_DASHES+"\nNumber of rows in "+tableName
+                            +": before inserting smaller blocks: "+smallBlockRowCount0
+                            +"; after: "+smallBlockRowCount1+" - should be "+numRows
+                            +"\n"+JUST_DASHES );
+                }
+                return;
+            }
+
+            // Debug print: occasionally, or when something goes wrong
+            if ( ( DEBUG && ( block <= 1 || block == numBlocks / 2
+                           || block >= numBlocks - 1 ) )
+                    || cr.getStatus() != ClientResponse.SUCCESS
+                    || vt.getStatusCode() != -128 ) {
+                System.out.println( "\nBlock "+block
+                        +", addToId "+addToId+" (= block * blockSize)"
+                        +", maxFromId "+maxFromId+" (= blockSize, except last perhaps)"
+                        +";\nvt.getStatusCode "+vt.getStatusCode()
+                        +" (-128 is normal), cr.getStatus "+cr.getStatus()
+                        +" ("+ClientResponse.SUCCESS+"=SUCCESS), "
+                        +"cr.getStatusString: "+cr.getStatusString() );
+            }
+
+            // Always true after the first loop iteration
+            minSelectId = minFromId;
+
+        } // end of for loop
+
+        if (DEBUG) {
+            rowCount1 = getRowCount(tableName);
+            System.out.println( JUST_DASHES+"\nNumber of rows in "+tableName
+                    +": before insertFromSelect: "+rowCount0
+                    +"; after insertFromSelect: "+rowCount1
+                    +" - should be "+numRows+"\n"+JUST_DASHES );
+        }
+    } // end of insertFromSelect() - long version
+
+
+    /** Set the MOD_ID column equal to ID, for the rows with ID between 0
+     *  (inclusive) and the specified maximum row number (exclusive) the
+     *  main purpose of this method is to catch any exceptions and, if
+     *  appropriate, split the query into two smaller queries.  */
+    private long updateModIdToId(String tableName, long minRowNum, long maxRowNum)
+            throws Exception {
+        if (minRowNum > maxRowNum) {
+            throw new RuntimeException( "In updateModIdToId (with tableName "
+                    +tableName+"), minRowNum ("+minRowNum+") cannot "
+                    +"be larger than maxRowNum ("+maxRowNum+")." );
+        }
+        long maxRows = 0;
+
+        if (DEBUG) {
+            System.out.println( JUST_DASHES+"\nIn updateModIdToId: tableName "+tableName
+                    +", minRowNum "+minRowNum+", maxRowNum "+maxRowNum+"." );
+        }
+
+        try {
+            ClientResponse cr = client.callProcedure( "@AdHoc", "UPDATE "+tableName
+                    +" SET MOD_ID = ID WHERE ID >= ? AND ID <= ? ;", minRowNum, maxRowNum );
+            VoltTable vt = cr.getResults()[0];
+            maxRows = maxRowNum - minRowNum;
+
+        } catch (ProcCallException e) {
+            // If the query was "too big" or too slow, try splitting it into two
+            // halves; otherwise, rethrow the ProcCallException
+            String methodNameAndMsg = "updateModIdToId, with tableName "+tableName
+                                      +", minRowNum "+minRowNum+", maxRowNum "+maxRowNum;
+            String msgSummary = handleProcCallException(methodNameAndMsg, e);
+
+            long halfWay = minRowNum + (maxRowNum - minRowNum)/2;
+            System.out.println( JUST_DASHES+"\nReducing number of rows to update, "
+                    +"due to '"+msgSummary+"' in "+methodNameAndMsg+": by splitting "
+                    +"it at row "+halfWay+"\n"+JUST_DASHES );
+
+            // Recursive call using only the first half of the original rows
+            maxRows = updateModIdToId(tableName, minRowNum, halfWay);
+
+            // In case the recursive call above also produced its own
+            // ProcCallException, break up the second half into smaller
+            // pieces; but if not, this loop will only have one iteration,
+            // which will cover the whole second half at once
+            long minMaxRows = maxRows, temp = 0;
+            for (long minRow = halfWay; minRow < maxRowNum; minRow += maxRows) {
+                temp = updateModIdToId(tableName, minRow, minRow + maxRows);
+                minMaxRows = Math.min(minMaxRows, temp);
+            }
+            maxRows = minMaxRows;
+        }
+        return maxRows;
+
+    } // end of updateModIdToId()
 
 
     /** Get the list of column names to be set, for those columns that
@@ -642,6 +1048,57 @@ public class DUSBenchmark {
     } // end of getRandomGeographyString(...)
 
 
+    /** Returns the specified aggregate function value, in the specified table. **/
+    private long getAggregateResult(String tableName, String aggregateFunction) {
+        long result = -1;
+        ClientResponse cr = null;
+        VoltTable vt = null;
+        try {
+            cr = client.callProcedure("@AdHoc", "SELECT "+aggregateFunction
+                                      +" FROM "+tableName);
+            vt = cr.getResults()[0];
+        } catch (Throwable e) {
+            result = -999;
+        }
+        if (vt != null && vt.advanceRow()) {
+            result = vt.getLong(0);
+        }
+        return result;
+    } // end of getAggregateResult()
+
+
+    /** Returns the number of rows in the specified table. **/
+    private long getRowCount(String tableName) {
+        return getAggregateResult(tableName, "COUNT(*)");
+    }
+
+
+    /** Returns the minimum ID column, in the specified table. **/
+    private long getMinId(String tableName) {
+        return getAggregateResult(tableName, "MIN(ID)");
+    }
+
+
+    /** Returns the maximum ID column, in the specified table. **/
+    private long getMaxId(String tableName) {
+        return getAggregateResult(tableName, "MAX(ID)");
+    }
+
+
+
+    /** Turns a LocalDateTime into a nicely formated String. **/
+    private String getTimeString(LocalDateTime localDateTime) {
+        String str = localDateTime.toString().replace('T', ' ');
+
+        int index = str.indexOf(".");
+        if (index < 0) {
+            index = str.length();
+        }
+
+        return str.substring(0, index);
+    }
+
+
     /** Throw an IllegalArgumentException, for the specified argument name and
      *  value, with an additional error message. **/
     private void throwIllegalArgException(String argName, String argValue,
@@ -670,24 +1127,29 @@ public class DUSBenchmark {
         public synchronized void backpressure(boolean status) {
             countBackpressureCalls++;
             backpressure = status;
-            if (countBackpressureCalls < 10 || countBackpressureCalls > numRows - 5 ||
-                    (numRows / 10) % countBackpressureCalls == 0 ) {
-                System.out.println("\nDUSBClientListener.backpressure called, with status: "
-                        +status+",\nafter "+countStoredProcCalls.get("total")+" calls and "
+            if ( DEBUG && ( countBackpressureCalls < 3 || countBackpressureCalls > numRows - 4
+                       || (numRows / 4) % countBackpressureCalls == 0 )) {
+                System.out.println("\nDUSBClientListener.backpressure call (#"
+                        +countBackpressureCalls+"), with status: "+status
+                        +",\nafter "+countStoredProcCalls.get("total")+" calls and "
                         +countStoredProcResults.get("total")+" results (total).");
             }
         }
 
         @Override
-        public void connectionLost(String hostname, int port, int connectionsLeft, DisconnectCause cause) {
-            System.out.println("\nDUSBClientListener.connectionLost called, with: hostname "+hostname
-                    +", port "+port+", connectionsLeft "+connectionsLeft+", cause "+cause+"\n");
+        public void connectionCreated(String hostname, int port, AutoConnectionStatus status) {
+            if (DEBUG) {
+                System.out.println("\nDUSBClientListener.connectionCreated called, with: hostname "
+                        +hostname+", port "+port+", status "+status+"\n");
+            }
         }
 
         @Override
-        public void connectionCreated(String hostname, int port, AutoConnectionStatus status) {
-            System.out.println("\nDUSBClientListener.connectionCreated called, with: hostname "
-                    +hostname+", port "+port+", status "+status+"\n");
+        public void connectionLost(String hostname, int port, int connectionsLeft, DisconnectCause cause) {
+            if (DEBUG) {
+                System.out.println(DOUBLE_DASHES+"\nDUSBClientListener.connectionLost called, with: hostname "
+                        +hostname+", port "+port+", connectionsLeft "+connectionsLeft+", cause "+cause);
+            }
         }
 
         @Override
@@ -764,7 +1226,7 @@ public class DUSBenchmark {
         }
 
         // Debug print, occasionally or when there is backpressure
-        if (debugPrint || backpressure) {
+        if (debugPrint || ( DEBUG && backpressure != null && countBackpressureCalls < 3)) {
             if ("@SnapshotSave".equals(procName)) {
                 // For @SnapshotSave, the meanings of the parameters are different
                 System.out.println("Calling "+procName+" with parameters"
@@ -781,8 +1243,11 @@ public class DUSBenchmark {
 
         // Check for backpressure: if it exists, wait until it passes before
         // calling anymore stored procedures
-        while (backpressure) {
+        while (backpressure != null) {
             countBackpressureDelays++;
+            if (!backpressure) {
+                backpressure = null;
+            }
             try {
                 Thread.sleep(backpressureSleepMillis);
             } catch (InterruptedException e) {
@@ -815,6 +1280,7 @@ public class DUSBenchmark {
                 } else {
                     cr = client.callProcedure(procName, minValue, tableName, inlineOrOutline);
                 }
+
             } else if (procName != null && procName.equals("@SnapshotSave")) {
                 cr = client.callProcedure(procName, tableName, columnName, minValue);
 
@@ -920,26 +1386,28 @@ public class DUSBenchmark {
 
     /** Returns the next Long value in a named List of random (Long) values;
      *  the first time called with a new <i>name</i>, it generates the List. */
-    private long getNextRandomValue(int i, int numIterations, String name) {
+    private long getNextRandomValue(int i, int listSize, String name) {
         if (randomValues.get(name) == null) {
-            randomValues.put(name, getRandomValuesList(numIterations));
+            randomValues.put(name, getRandomValuesList(listSize));
 
-            // TODO: temp. debug:
-            System.out.println("In getNextRandomValue:\n    name '"+name+"', numIterations "
-                    +numIterations+", i "+i+", randomValues.get("+name+"):");
-            if (numIterations <= 100) {
-                // Print the whole (fairly short) List of random (Long) values
-                System.out.println(randomValues.get(name));
-            } else {
-                // Print part of the (quite long) List of random (Long) values
-                int halfway = numIterations/2 - 1;
-                List<Long> all = randomValues.get(name);
-                List<Long> begin  = all.subList(0,10);
-                List<Long> middle = all.subList(halfway-5,halfway+5);
-                List<Long> end    = all.subList(numIterations-10,numIterations);
-                System.out.println(begin.toString().replace("]", ", ...") + "\n"
-                                 +middle.toString().replace("[", " ").replace("]", ", ...") + "\n"
-                                    +end.toString().replace("[", " ") );
+            // Debug print:
+            if (DEBUG) {
+                System.out.println("In getNextRandomValue:\n    name '"+name+"', numIterations "
+                        +listSize+", i "+i+", randomValues.get("+name+"):");
+                if (listSize <= 100) {
+                    // Print the whole (fairly short) List of random (Long) values
+                    System.out.println(randomValues.get(name));
+                } else {
+                    // Print part of the (quite long) List of random (Long) values
+                    int halfway = listSize/2 - 1;
+                    List<Long> all = randomValues.get(name);
+                    List<Long> begin  = all.subList(0, 10);
+                    List<Long> middle = all.subList(halfway-5, halfway+5);
+                    List<Long> end    = all.subList(listSize-10, listSize);
+                    System.out.println(begin.toString().replace("]", ", ...") + "\n"
+                                     +middle.toString().replace("[", " ").replace("]", ", ...") + "\n"
+                                        +end.toString().replace("[", " ") );
+                }
             }
 
         }
@@ -950,7 +1418,9 @@ public class DUSBenchmark {
     /** Run the DUSBenchmark, by simultaneously running a snapshot, while
      *  updating and deleting lots of table rows. **/
     private void runBenchmark() throws Exception {
-        System.out.println("\n\nStart of DUSBenchmark.runBenchmark()");
+        if (DEBUG) {
+            System.out.println("\n"+DOUBLE_DASHES+"\nStart of DUSBenchmark.runBenchmark()"+DOUBLE_DASHES);
+        }
 
         // Prepare values used in the for loop below
         String columnName = null;
@@ -1105,36 +1575,47 @@ public class DUSBenchmark {
         }
 
         // TODO: debug print:
-        System.out.println("\nValues used in the main for loop"
-                +": minimumId "+minimumId
-                +", maximumId "+maximumId
-                +", insertBlockSize "+insertBlockSize
-                +", minimumModId "+minimumModId
-                +", maximumModId "+maximumModId
-                +", modIdIncrement "+modIdIncrement
-                +", minimumBlockId "+minimumBlockId
-                +", maximumBlockId "+maximumBlockId
-                +", blockIdIncrement "+blockIdIncrement
-                +": randomOrder "+randomOrder
-                +": random2Orders "+random2Orders
-                +";\ncolumnName "+columnName
-                +", initMinValue "+initMinValue
-                +", minValueIncrement "+minValueIncrement
-                +", numIterations "+numIterations
-                +", startSnapshotAtIteration "+config.startSnapshotAtIteration
-                +", updateInlineOrOutlineColumns "+updateInlineOrOutlineColumns
-                +";\ntableNamesForDeleteAndUpdate: "+tableNamesForDeleteAndUpdate+"\n" );
+        if (DEBUG) {
+            System.out.println("\nValues used in the main for loop"
+                    +": minimumId "+minimumId
+                    +", maximumId "+maximumId
+                    +", insertBlockSize "+insertBlockSize
+                    +", minimumModId "+minimumModId
+                    +", maximumModId "+maximumModId
+                    +", modIdIncrement "+modIdIncrement
+                    +", minimumBlockId "+minimumBlockId
+                    +", maximumBlockId "+maximumBlockId
+                    +", blockIdIncrement "+blockIdIncrement
+                    +": randomOrder "+randomOrder
+                    +": random2Orders "+random2Orders
+                    +";\ncolumnName "+columnName
+                    +", initMinValue "+initMinValue
+                    +", minValueIncrement "+minValueIncrement
+                    +", numIterations "+numIterations
+                    +", startSnapshotAtIteration "+config.startSnapshotAtIteration
+                    +", updateInlineOrOutlineColumns "+updateInlineOrOutlineColumns
+                    +";\ntableNamesForDeleteAndUpdate: "+tableNamesForDeleteAndUpdate );
+        }
 
         // Set a few final values before starting the actual benchmark
+        String initTableName = tableNamesForDeleteAndUpdate.get(0);
+        long initRowCount = getRowCount(initTableName);
         long maxValueIncrement = Math.abs(minValueIncrement);
         long halfway = numIterations/2 - 1;
         LocalDateTime startTime = LocalDateTime.now();
         LocalDateTime maxEndTime = startTime.plusSeconds(config.duration);
+        String startTimeStr = getTimeString(startTime);
+        System.out.println( JUST_DOUBLE_DASHES+"\nBenchmark beginning at "+startTimeStr
+                            +" (inserts and preliminaries are complete)."+DOUBLE_DASHES );
 
         stats.startBenchmark(config.displayinterval);
         for (long i=0; i < numIterations; i++) {
+
             // Do not exceed the maximum duration
             if (LocalDateTime.now().isAfter(maxEndTime)) {
+                String maxEndTimeStr = getTimeString(maxEndTime);
+                System.out.println( DASHES+"Reached maximum duration of "+config.duration
+                                    +" seconds ("+startTimeStr+" - "+maxEndTimeStr+")" );
                 break;
             }
 
@@ -1146,9 +1627,9 @@ public class DUSBenchmark {
             long maxValue = minValue + maxValueIncrement;
 
             boolean debugPrint = false;
-            if (i < 3 || i > numIterations - 3 ||
+            if (i < 3 || i > numIterations - 4 ||
                     (i >= halfway-1 && i <= halfway+1)) {
-                debugPrint = true;
+                debugPrint = DEBUG;
             }
 
             if (i == config.startSnapshotAtIteration) {
@@ -1162,7 +1643,7 @@ public class DUSBenchmark {
                     callStoredProc( new DUSBenchmarkCallback("@SnapshotSave"),
                             "@SnapshotSave", ".", "dusbsnapshot0", 0,
                             -1, "", true );
-                } catch (Exception e) {
+                } catch (Throwable e) {
                     throw new RuntimeException( "Failed to start snapshot, by "
                             + "calling '@SnapshotSave', with parameters: "
                             + "'.', 'dusbsnapshot0', 0.", e );
@@ -1187,27 +1668,38 @@ public class DUSBenchmark {
                             maxValue, inlineOrOutline, debugPrint );
                 }
             }
-
         }
 
         // End of the DUS Benchmark
         LocalDateTime endTime = LocalDateTime.now();
+        String endTimeStr = getTimeString(endTime);
+        long diffSeconds = Duration.between(startTime, endTime).getSeconds();
+        System.out.println( DASHES+"Benchmark ending at "+endTimeStr+" ("
+                            +startTimeStr+" - "+endTimeStr+")\n-- after "
+                            +diffSeconds+" seconds."+DOUBLE_DASHES+"\n\n" );
+
         stats.endBenchmark(config.statsfile);
+        long finalRowCount = getRowCount(initTableName);
         client.drain();
         DUSBenchmarkCallback.printAllResults();
         client.close();
 
-        System.out.println("\nTotal counts:"
+        System.out.println(DOUBLE_DASHES+"\nTotal counts:"
                             +"\n  Synchronous calls "+countSynchronousCalls
                             +", and Asynchronous "+countAsynchronousCalls
                             +printProcCounts()
                             +"\n  Backpressure Calls "+countBackpressureCalls
                             +", and Delays "+countBackpressureDelays
+                            +"\n  Initial Row Count: "+initRowCount
+                            +"\n  Final   Row Count: "+finalRowCount
+                            +"\n  Num. Rows Deleted: "+(initRowCount - finalRowCount)
                             +"\n  No response received in the allotted time: "
                             +countNoResponseInTime
-                            +"\n  Other Errors: "+countOtherErrors );
+                            +"\n  Other Errors: "+countOtherErrors+DOUBLE_DASHES+"\n" );
 
-        System.out.println("\nEnd of DUSBenchmark.runBenchmark()\n");
+        if (DEBUG) {
+            System.out.println("End of DUSBenchmark.runBenchmark()"+DOUBLE_DASHES+"\n");
+        }
 
     } // end of runBenchmark()
 
