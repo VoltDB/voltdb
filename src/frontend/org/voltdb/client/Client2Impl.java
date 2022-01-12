@@ -301,6 +301,7 @@ public class Client2Impl implements Client2 {
         void start() {
             String name = String.format("Client2-Worker-%d", connection.connectionId());
             worker = new Thread(workerGroup, () -> connectionWorker(ClientConnection.this), name);
+            worker.setDaemon(true);
             worker.start();
         }
 
@@ -457,9 +458,9 @@ public class Client2Impl implements Client2 {
     // Background executor used for timeout tasks and for
     // all system procedure calls issued by Client2 itself
     private ScheduledExecutorService timerService =
-        Executors.newSingleThreadScheduledExecutor((r) -> new Thread(r, "Client2-Timer"));
+        Executors.newSingleThreadScheduledExecutor((r) -> newDaemonThread(r, "Client2-Timer"));
     private ScheduledExecutorService execService =
-        Executors.newSingleThreadScheduledExecutor((r) -> new Thread(r, "Client2-Exec"));
+        Executors.newSingleThreadScheduledExecutor((r) -> newDaemonThread(r, "Client2-Exec"));
 
     // Response handler; this is used to handle responses from the network
     // so that we do not execute completions on network threads. Application
@@ -545,7 +546,7 @@ public class Client2Impl implements Client2 {
             responseThreadCount = config.responseThreadCount;
             responseService =
                 Executors.newFixedThreadPool(responseThreadCount,
-                                             (r) -> new Thread(r, "Client2-Response-" + respThreadNum.incrementAndGet()));
+                                             (r) -> newDaemonThread(r, "Client2-Response-" + respThreadNum.incrementAndGet()));
             stopResponseServiceAtShutdown = true;
         }
 
@@ -2463,6 +2464,16 @@ public class Client2Impl implements Client2 {
             debug("Client/admin heuristic indeterminate: %d connections using admin port, %d not", admins, peons);
         }
         return peons == 0 && admins != 0 ? "ADMINPORT" : "CLIENTPORT";
+    }
+
+    /*
+     * Utility daemon thread creator. All threads created by Client2 must
+     * be daemons, so that process exit without prior close() won't hang.
+     */
+    private static Thread newDaemonThread(Runnable func, String name) {
+        Thread t = new Thread(func, name);
+        t.setDaemon(true);
+        return t;
     }
 
     /*
