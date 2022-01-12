@@ -100,7 +100,7 @@ public class NibbleDeleteBase extends VoltSystemProcedure {
         }
         // error no index found
         if (candidates.size() == 0) {
-            String msg = String.format("Count not find index to support LowImpactDelete on column %s.%s. ",
+            String msg = String.format("Could not find index to support LowImpactDelete on column %s.%s. ",
                     table.getTypeName(), column.getTypeName());
             msg += String.format("Please create an index where column %s.%s is the first or only indexed column.",
                     table.getTypeName(), column.getTypeName());
