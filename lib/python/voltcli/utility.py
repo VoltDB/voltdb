@@ -847,12 +847,34 @@ def get_java_version(javaHome="java", verbose=False):
         version.wait()
         if verbose:
             return out
-        for version in ('11.0', '1.8', '1.7'):
+        for version in ('17.0', '11.0', '1.8', '1.7'):
             if version in out.decode("utf-8"):
                 return version
         return ""
     except (OSError):
         return ""
+
+#===============================================================================
+def get_java_version_major(javaHome="java"):
+#===============================================================================
+    """
+    Find the major release of java based on "get_java_version()"
+    """
+    try:
+        version = get_java_version(javaHome)
+        if version in "1.7":
+            return "7"
+        elif version in "1.8":
+            return "8"
+        elif version in '11.0':
+            return "11"
+        elif version in '17.0':
+            return "17"
+        else:
+            return ""
+    except (OSError):
+        return ""
+
 
 #===============================================================================
 def is_pro_version(voltdb_jar):

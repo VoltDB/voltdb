@@ -62,7 +62,7 @@ else:
     jar = utility.find_in_path('jar')
 if not java:
     utility.abort('Could not find java in environment, set JAVA_HOME or put java in the path.')
-java_version = utility.get_java_version(java)
+java_version = utility.get_java_version_major(java)
 java_opts = []
 
 # Indicator we're running in something like kubernetes.
@@ -115,30 +115,40 @@ java_opts.append('-Dsun.net.inetaddr.ttl=300')
 java_opts.append('-Dsun.net.inetaddr.negative.ttl=3600')
 java_opts.append('-XX:+HeapDumpOnOutOfMemoryError')
 java_opts.append('-XX:HeapDumpPath=/tmp')
-java_opts.append('-XX:+UseConcMarkSweepGC')
-java_opts.append('-XX:+CMSParallelRemarkEnabled')
 java_opts.append('-XX:+UseTLAB')
-java_opts.append('-XX:CMSInitiatingOccupancyFraction=75')
-java_opts.append('-XX:+UseCMSInitiatingOccupancyOnly')
 java_opts.append('-XX:+UseCondCardMark')
 java_opts.append('-Dsun.rmi.dgc.server.gcInterval=9223372036854775807')
 java_opts.append('-Dsun.rmi.dgc.client.gcInterval=9223372036854775807')
-java_opts.append('-XX:CMSWaitDuration=120000')
-java_opts.append('-XX:CMSMaxAbortablePrecleanTime=120000')
 java_opts.append('-XX:+ExplicitGCInvokesConcurrent')
-java_opts.append('-XX:+CMSScavengeBeforeRemark')
-java_opts.append('-XX:+CMSClassUnloadingEnabled')
+
+if java_version=="17":
+    java_opts.append('-XX:+UseG1GC')
+else:
+    java_opts.append('-XX:+UseConcMarkSweepGC')
+    java_opts.append('-XX:+CMSParallelRemarkEnabled')
+    java_opts.append('-XX:CMSInitiatingOccupancyFraction=75')
+    java_opts.append('-XX:+UseCMSInitiatingOccupancyOnly')
+    java_opts.append('-XX:CMSWaitDuration=120000')
+    java_opts.append('-XX:CMSMaxAbortablePrecleanTime=120000')
+    java_opts.append('-XX:+CMSScavengeBeforeRemark')
+    java_opts.append('-XX:+CMSClassUnloadingEnabled')
+
 
 # skip PermSize in Java 8 and above
-if "1.7" in java_version:
+if java_version=="7":
     java_opts.append('-XX:PermSize=64m')
 
 # Suppress Illegal reflective access warning
-if "11." in java_version:
+if java_version=="11" or java_version=="17":
     java_opts.extend(['--add-opens', 'java.base/java.lang=ALL-UNNAMED'])
     java_opts.extend(['--add-opens', 'java.base/sun.nio.ch=ALL-UNNAMED'])
     java_opts.extend(['--add-opens', 'java.base/java.net=ALL-UNNAMED'])
     java_opts.extend(['--add-opens', 'java.base/java.nio=ALL-UNNAMED'])
+if java_version=="17":
+    java_opts.extend(['--add-opens', 'java.base/sun.net.www.protocol.http=ALL-UNNAMED'])
+    java_opts.extend(['--add-opens', 'java.base/sun.net.www.protocol.https=ALL-UNNAMED'])
+    java_opts.extend(['--add-opens', 'java.base/sun.net.www.protocol.file=ALL-UNNAMED'])
+    java_opts.extend(['--add-opens', 'java.base/sun.net.www.protocol.ftp=ALL-UNNAMED'])
 
 def _is_tmpfs(path):
     '''

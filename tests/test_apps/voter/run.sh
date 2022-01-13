@@ -77,6 +77,12 @@ function init() {
     sqlcmd < ddl.sql
 }
 
+version=$(java -version 2>&1 | awk -F '"' '/version/ {print $2}')
+add_open=
+if [[ $version == 11.0* ]] || [[ $version == 17.0* ]] ; then
+        add_open="--add-opens java.base/sun.nio.ch=ALL-UNNAMED"
+fi
+
 # run the client that drives the example
 function client() {
     async-benchmark
@@ -103,7 +109,8 @@ function async-benchmark-help() {
 # ratelimit: must be a reasonable value if lantencyreport is ON
 function async-benchmark() {
     jars-ifneeded
-    java -classpath voter-client.jar:$CLIENTCLASSPATH voter.AsyncBenchmark \
+    java $add_open \
+	-classpath voter-client.jar:$CLIENTCLASSPATH voter.AsyncBenchmark \
         --displayinterval=5 \
         --warmup=5 \
         --duration=120 \
@@ -116,7 +123,8 @@ function async-benchmark() {
 # ratelimit: must be a reasonable value if latencyreport is ON
 function nonblocking-benchmark() {
     jars-ifneeded
-    java -classpath voter-client.jar:$CLIENTCLASSPATH voter.NonblockingAsyncBenchmark \
+    java $add_open \
+	-classpath voter-client.jar:$CLIENTCLASSPATH voter.NonblockingAsyncBenchmark \
         --displayinterval=5 \
         --warmup=5 \
         --duration=120 \
@@ -129,7 +137,8 @@ function nonblocking-benchmark() {
 
 function client2-async-benchmark() {
     jars-ifneeded
-    java -classpath voter-client.jar:$CLIENTCLASSPATH voter.Client2AsyncBenchmark \
+    java $add_open \
+	-classpath voter-client.jar:$CLIENTCLASSPATH voter.Client2AsyncBenchmark \
         --displayinterval=5 \
         --warmup=5 \
         --duration=120 \
@@ -140,7 +149,8 @@ function client2-async-benchmark() {
 
 function client2-sync-benchmark() {
     jars-ifneeded
-    java -classpath voter-client.jar:$CLIENTCLASSPATH voter.Client2SyncBenchmark \
+    java $add_open \
+	-classpath voter-client.jar:$CLIENTCLASSPATH voter.Client2SyncBenchmark \
         --displayinterval=5 \
         --warmup=5 \
         --duration=120 \
@@ -166,7 +176,8 @@ function sync-benchmark-help() {
 
 function sync-benchmark() {
     jars-ifneeded
-    java -classpath voter-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
+    java $add_open \
+	-classpath voter-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
         voter.SyncBenchmark \
         --displayinterval=5 \
         --warmup=5 \
@@ -186,7 +197,8 @@ function jdbc-benchmark-help() {
 
 function jdbc-benchmark() {
     jars-ifneeded
-    java -classpath voter-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
+    java $add_open \
+	-classpath voter-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
         voter.JDBCBenchmark \
         --displayinterval=5 \
         --duration=120 \
@@ -198,7 +210,8 @@ function jdbc-benchmark() {
 
 # AdHoc benchmark, previously in test_apps/voter-adhoc.
 function adhoc-benchmark() {
-    java -classpath voter-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
+    java $add_open \
+	-classpath voter-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
         voter.AdHocBenchmark \
         --displayinterval=5 \
         --warmup=5 \
