@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -59,7 +59,6 @@ import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.security.cert.X509Certificate;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -81,6 +80,7 @@ import org.apache.http.client.methods.HttpPut;
 import org.apache.http.client.methods.HttpRequestBase;
 import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
 import org.apache.http.conn.ssl.SSLContextBuilder;
+import org.apache.http.conn.ssl.TrustSelfSignedStrategy;
 import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
@@ -92,7 +92,6 @@ import org.voltdb.utils.Base64;
 import org.voltdb.utils.Encoder;
 
 import junit.framework.TestCase;
-import static junit.framework.TestCase.assertTrue;
 import org.apache.http.Header;
 import org.apache.http.conn.HttpHostConnectException;
 import org.junit.Test;
@@ -215,7 +214,7 @@ public class TestJSONInterfaceSession extends TestCase {
             server.start();
             server.waitForInitialization();
 
-            SSLContext sslContext = new SSLContextBuilder().loadTrustMaterial(null, (X509Certificate[] arg0, String arg1) -> true).build();
+            SSLContext sslContext = new SSLContextBuilder().loadTrustMaterial(null, new TrustSelfSignedStrategy()).build();
             SSLConnectionSocketFactory sf = new SSLConnectionSocketFactory(sslContext,
               SSLConnectionSocketFactory.ALLOW_ALL_HOSTNAME_VERIFIER);
 

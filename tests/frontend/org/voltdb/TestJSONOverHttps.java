@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -56,13 +56,10 @@ package org.voltdb;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URL;
-import java.security.cert.CertificateException;
-import java.security.cert.X509Certificate;
 
 import javax.net.ssl.SSLContext;
 
 import junit.framework.TestCase;
-import static junit.framework.TestCase.assertTrue;
 import org.apache.http.Header;
 
 import org.apache.http.HttpEntity;
@@ -78,7 +75,7 @@ import org.apache.http.conn.socket.ConnectionSocketFactory;
 import org.apache.http.conn.socket.PlainConnectionSocketFactory;
 import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
 import org.apache.http.conn.ssl.SSLContextBuilder;
-import org.apache.http.conn.ssl.TrustStrategy;
+import org.apache.http.conn.ssl.TrustSelfSignedStrategy;
 import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
@@ -105,12 +102,7 @@ public class TestJSONOverHttps extends TestCase {
 
     private String callProcOverJSON(String varString, final int expectedCode) throws Exception {
         URI uri = URI.create("https://localhost:" + m_port + "/api/1.0/");
-        SSLContext sslContext = new SSLContextBuilder().loadTrustMaterial(null, new TrustStrategy() {
-            @Override
-            public boolean isTrusted(X509Certificate[] arg0, String arg1) throws CertificateException {
-                return true;
-            }
-        }).build();
+        SSLContext sslContext = new SSLContextBuilder().loadTrustMaterial(null, new TrustSelfSignedStrategy()).build();
         SSLConnectionSocketFactory sf = new SSLConnectionSocketFactory(sslContext,
           SSLConnectionSocketFactory.ALLOW_ALL_HOSTNAME_VERIFIER);
         Registry<ConnectionSocketFactory> socketFactoryRegistry = RegistryBuilder.<ConnectionSocketFactory>create()
