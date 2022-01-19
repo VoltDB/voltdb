@@ -2831,7 +2831,7 @@ inline NValue NValue::initFromTupleStorage(const void *storage, ValueType type, 
             retval.getGeographyPointValue() = *reinterpret_cast<const GeographyPointValue*>(storage);
             break;
         default:
-            VOLT_WARN("NValue:invalid column. Stack: %s", boost::stacktrace::stacktrace().c_str());
+            VOLT_WARN("NValue:invalid column. Stack: %s", boost::stacktrace::to_string(boost::stacktrace::stacktrace()).c_str());
             throwDynamicSQLException("NValue::initFromTupleStorage() invalid column type '%s'",
                     getTypeName(type).c_str());
     }
