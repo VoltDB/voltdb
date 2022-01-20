@@ -124,7 +124,7 @@ else
   exit 1
 fi
 
-LIB_JARS="super-csv-2.4.0.jar netty-all-4.1.53.Final.jar netty-tcnative-boringssl-static-2.0.34.Final.jar"
+LIB_JARS="super-csv-2.4.0.jar netty-all-4.1.53.Final.jar netty-tcnative-boringssl-static-2.0.46.Final.jar"
 for jar in $LIB_JARS; do
   jar_path="${VOLTDB_LIB}/${jar}"
   if [ ! -f ${jar_path} ]; then
