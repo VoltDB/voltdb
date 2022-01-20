@@ -2096,11 +2096,19 @@ TEST CASES
         <isset property="enableiv2"/>
     </condition>
 
+    <fileset id='junit.tests' dir='${build.test.dir}'>
+        <include name="**/${junitclass}.class"/>
+    </fileset>
+
+    <fail message='No such test as ${junitclass}'>
+        <condition>
+            <resourcecount refid='junit.tests' count='0'/>
+        </condition>
+    </fail>
+
     <run_junit>
         <tests>
-            <fileset dir='${build.test.dir}'>
-              <include name="**/${junitclass}.class"/>
-            </fileset>
+            <fileset refid="junit.tests"/>
         </tests>
     </run_junit>
     <fail if="junit.failures" message="JUnit had failures" />
