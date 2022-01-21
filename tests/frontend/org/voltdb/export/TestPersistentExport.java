@@ -138,14 +138,26 @@ public class TestPersistentExport extends ExportLocalClusterBase {
         }
         m_verifier.waitForTuplesAndVerify(client);
 
-        // Change trigger to update_new
-        client.callProcedure("@AdHoc", "ALTER TABLE T3 ALTER EXPORT TO TARGET FOO3 ON UPDATE_NEW,DELETE;");
+        // Change trigger to update_old
+        client.callProcedure("@AdHoc", "ALTER TABLE T3 ALTER EXPORT TO TARGET FOO3 ON UPDATE_OLD,DELETE;");
         client.callProcedure("@AdHoc", "update T3 set b = 200 where a < 10000;");
         // Update verifier with update after tuples
         for (int i = 0; i < 100; ++i) {
             data[0] = 4;
             data[1] = i;
-            data[2] = 200;
+            data[2] = 100;
+            m_verifier.addRow(client, "T3", null, data);
+        }
+        m_verifier.waitForTuplesAndVerify(client);
+
+        // Change trigger to update_new
+        client.callProcedure("@AdHoc", "ALTER TABLE T3 ALTER EXPORT TO TARGET FOO3 ON UPDATE_NEW,DELETE;");
+        client.callProcedure("@AdHoc", "update T3 set b = 300 where a < 10000;");
+        // Update verifier with update after tuples
+        for (int i = 0; i < 100; ++i) {
+            data[0] = 4;
+            data[1] = i;
+            data[2] = 300;
             m_verifier.addRow(client, "T3", null, data);
         }
         m_verifier.waitForTuplesAndVerify(client);
@@ -155,7 +167,7 @@ public class TestPersistentExport extends ExportLocalClusterBase {
         for (int i = 0; i < 100; ++i) {
             data[0] = 2;
             data[1] = i;
-            data[2] = 200;
+            data[2] = 300;
             m_verifier.addRow(client, "T3", null, data);
         }
         m_verifier.waitForTuplesAndVerify(client);
