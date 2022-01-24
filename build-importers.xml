@@ -127,7 +127,7 @@
             <zipfileset src="${base.dir}/lib/zstd-jni-1.4.4-2.jar" />
             <zipfileset src="${base.dir}/third_party/java/jars/slf4j-api-1.7.21.jar" />
             <zipfileset src="${base.dir}/third_party/java/jars/slf4j-log4j12-1.7.21.jar" />
-            <!-- <zipfileset src="${base.dir}/third_party/java/jars/log4j-1.2.17.jar" /> -->
+            <zipfileset src="${base.dir}/third_party/java/jars/log4j-1.2.17.jar" />
             <manifest>
                 <attribute name="Bundle-Activator" value="org.voltdb.importclient.kafka10.KafkaStreamImporterFactory" />
                 <attribute name="Bundle-ManifestVersion" value="2" />
