@@ -131,6 +131,7 @@ public class UpdateClassesThread extends BenchmarkThread {
                             || cr.getStatusString().contains("Transaction dropped due to change in mastership")
                             || cr.getStatusString().contains("Server is shutting down")
                             || cr.getStatusString().contains("connection lost")
+                            || cr.getStatusString().contains("Procedure call not queued: timed out waiting for host connection")
                             || cr.getStatusString().equals("Invalid catalog update.  Catalog or deployment change was planned against one version of the cluster configuration but that version was no longer live when attempting to apply the change.  This is likely the result of multiple concurrent attempts to change the cluster configuration.  Please make such changes synchronously from a single connection to the cluster.")
                             || cr.getStatusString().equals("An invocation of procedure @VerifyCatalogAndWriteJar on all hosts returned null result or time out.")
                             || cr.getStatusString().equals("An invocation of procedure @VerifyCatalogAndWriteJar on all hosts timed out.")
@@ -139,7 +140,8 @@ public class UpdateClassesThread extends BenchmarkThread {
                     else
                         m_needsBlock.set(true);
                 }
-                if (cr.getStatus() == ClientResponse.SERVER_UNAVAILABLE) {
+                if (cr.getStatus() == ClientResponse.SERVER_UNAVAILABLE || cr.getStatus() == ClientResponse.CONNECTION_LOST
+                  || cr.getStatus() == ClientResponse.CONNECTION_TIMEOUT) {
                     log.warn("UpdateClasses got SERVER_UNAVAILABLE on proc call. Will sleep.");
                     m_needsBlock.set(true);
                 }

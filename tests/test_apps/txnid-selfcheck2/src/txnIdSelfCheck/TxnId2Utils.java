@@ -55,6 +55,7 @@ public enum TxnId2Utils {;
                 statusString.matches(".*Server is currently unavailable; try again later.*") ||
                 statusString.matches(".*Server is paused.*") ||
                 statusString.matches("(?s).*Server is shutting down.*") ||
+                statusString.matches(".*Procedure call not queued: timed out waiting for host connection.*") ||
                 statusString.matches("(?s).*VoltDB failed to create the transaction internally.*it should be safe to resend the work, as the work was never started.*"); /*-5 SERVER_UNAVAILABLE*/
     }
 
