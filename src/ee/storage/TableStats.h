@@ -94,6 +94,8 @@ private:
     int64_t m_lastAllocatedTupleMemory;
     int64_t m_lastOccupiedTupleMemory;
     int64_t m_lastStringDataMemory;
+    voltdb::NValue m_trueValue;
+    voltdb::NValue m_falseValue;
 };
 
 }

@@ -116,7 +116,10 @@ TempTable* TableStats::generateEmptyTableStatsTable() {
 TableStats::TableStats(Table* table)
     : StatsSource(), m_table(table), m_lastTupleCount(0),
       m_lastAllocatedTupleMemory(0), m_lastOccupiedTupleMemory(0),
-      m_lastStringDataMemory(0) { }
+      m_lastStringDataMemory(0) {
+    m_trueValue = ValueFactory::getTempStringValue("true");
+    m_falseValue = ValueFactory::getTempStringValue("false");
+}
 
 /**
  * Configure a StatsSource superclass for a set of statistics. Since this class is only used in the EE it can be assumed that
@@ -184,20 +187,16 @@ void TableStats::updateStatsTuple(TableTuple *tuple) {
     tuple->setNValue(StatsSource::m_columnName2Index["STRING_DATA_MEMORY"],
             ValueFactory::getBigIntValue(string_data_mem_kb));
 
-    string isDR = "false";
-    string isExport = "false";
-    if (persistentTable) {
+    tuple->setNValue( StatsSource::m_columnName2Index["EXPORT"], m_falseValue);
+    tuple->setNValue( StatsSource::m_columnName2Index["DR"], m_falseValue);
+    if (persistentTable != NULL) {
         TableType tableType = persistentTable->getTableType();
         if (isTableWithStream(tableType)) {
-            isExport = "true";
+            tuple->setNValue( StatsSource::m_columnName2Index["EXPORT"], m_trueValue);
         } else if (persistentTable->isDREnabled()) {
-            isDR = "true";
+            tuple->setNValue( StatsSource::m_columnName2Index["DR"], m_trueValue);
         }
-    } else {
-        isExport = "true";
     }
-    tuple->setNValue( StatsSource::m_columnName2Index["DR"], ValueFactory::getTempStringValue(isDR));
-    tuple->setNValue( StatsSource::m_columnName2Index["EXPORT"], ValueFactory::getTempStringValue(isExport));
 }
 
 /**
@@ -212,4 +211,6 @@ void TableStats::populateSchema(vector<ValueType> &types, vector<int32_t> &colum
 TableStats::~TableStats() {
     m_tableName.free();
     m_tableType.free();
+    m_trueValue.free();
+    m_falseValue.free();
 }
