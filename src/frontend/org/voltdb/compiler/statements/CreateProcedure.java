@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -37,6 +37,13 @@ public abstract class CreateProcedure extends StatementProcessor {
         super(ddlCompiler);
     }
 
+    /*
+     * Type as determined by SQL parsing. Names of enum constants
+     * are used directly in parser error messages, and therefore
+     * must match tokens in SQL syntax.
+     */
+    private enum ProcType { PARTITION, DIRECTED };
+
     /**
      * Parse and validate the substring containing ALLOW and PARTITION
      * clauses for CREATE PROCEDURE.
@@ -55,15 +62,17 @@ public abstract class CreateProcedure extends StatementProcessor {
         if (clauses == null || clauses.isEmpty()) {
             return null;
         }
-        ProcedurePartitionData data = null;
 
+        ProcType procType = null;
+        ProcedurePartitionData data = null;
         Matcher matcher = SQLParser.matchAnyCreateProcedureStatementClause(clauses);
         int start = 0;
+
         while (matcher.find(start)) {
             start = matcher.end();
 
             if (matcher.group(1) != null) {
-                // Add roles if it's an ALLOW clause. More that one ALLOW clause is okay.
+                // Add roles if it's an ALLOW clause. More than one ALLOW clause is okay.
                 for (String roleName : StringUtils.split(matcher.group(1), ',')) {
                     // Don't put the same role in the list more than once.
                    String roleNameFixed = roleName.trim().toLowerCase();
@@ -72,18 +81,35 @@ public abstract class CreateProcedure extends StatementProcessor {
                     }
                 }
             } else {
-                // Add partition info if it's a PARTITION clause. Only one is allowed.
-                if (data != null) {
-                    throw m_compiler.new VoltCompilerException(
-                        "Only one PARTITION clause is allowed for CREATE PROCEDURE.");
-                }
+                ProcedurePartitionData thisData = null;
+                ProcType thisType = null;
                 if (matcher.group(8) != null) {
                     // Create DIRECTED as a single partition procedure
-                    data = new ProcedurePartitionData(true);
+                    thisData = new ProcedurePartitionData(true);
+                    thisType = ProcType.DIRECTED;
                 } else {
-                    data = new ProcedurePartitionData(matcher.group(2), matcher.group(3), matcher.group(4),
-                            matcher.group(5), matcher.group(6), matcher.group(7));
+                    // (2) PARTITION clause: table name
+                    // (3) PARTITION clause: column name
+                    // (4) PARTITION clause: parameter number
+                    // (5) PARTITION clause: table name 2
+                    // (6) PARTITION clause: column name 2
+                    // (7) PARTITION clause: parameter number 2
+                    thisData = new ProcedurePartitionData(matcher.group(2), matcher.group(3), matcher.group(4),
+                                                          matcher.group(5), matcher.group(6), matcher.group(7));
+                    thisType = ProcType.PARTITION;
                 }
+                // Can't mix and match types; and no repetition of clauses
+                if (procType != null) {
+                    String msg;
+                    if (thisType == procType) {
+                        msg = String.format("Only one %s clause is allowed for CREATE PROCEDURE.", procType);
+                    } else {
+                        msg = String.format("Cannot combine %s and %s clauses for CREATE PROCEDURE.", procType, thisType);
+                    }
+                    throw m_compiler.new VoltCompilerException(msg);
+                }
+                procType = thisType;
+                data = thisData;
             }
         }
 
