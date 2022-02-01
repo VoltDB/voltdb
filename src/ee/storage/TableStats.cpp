@@ -117,8 +117,6 @@ TableStats::TableStats(Table* table)
     : StatsSource(), m_table(table), m_lastTupleCount(0),
       m_lastAllocatedTupleMemory(0), m_lastOccupiedTupleMemory(0),
       m_lastStringDataMemory(0) {
-    m_trueValue = ValueFactory::getTempStringValue("true");
-    m_falseValue = ValueFactory::getTempStringValue("false");
 }
 
 /**
@@ -135,6 +133,8 @@ void TableStats::configure(std::string const& name) {
     StatsSource::configure(name);
     m_tableName = ValueFactory::getStringValue(m_table->name());
     m_tableType = ValueFactory::getStringValue(m_table->tableType());
+    m_trueValue = ValueFactory::getStringValue("true");
+    m_falseValue = ValueFactory::getStringValue("false");
 }
 
 /**
@@ -187,16 +187,18 @@ void TableStats::updateStatsTuple(TableTuple *tuple) {
     tuple->setNValue(StatsSource::m_columnName2Index["STRING_DATA_MEMORY"],
             ValueFactory::getBigIntValue(string_data_mem_kb));
 
-    tuple->setNValue( StatsSource::m_columnName2Index["EXPORT"], m_falseValue);
-    tuple->setNValue( StatsSource::m_columnName2Index["DR"], m_falseValue);
+    NValue *drValue = &m_falseValue;
+    NValue *expValue = &m_falseValue;
     if (persistentTable != NULL) {
         TableType tableType = persistentTable->getTableType();
         if (isTableWithStream(tableType)) {
-            tuple->setNValue( StatsSource::m_columnName2Index["EXPORT"], m_trueValue);
+            expValue = &m_trueValue;
         } else if (persistentTable->isDREnabled()) {
-            tuple->setNValue( StatsSource::m_columnName2Index["DR"], m_trueValue);
+            drValue = &m_trueValue;
         }
     }
+    tuple->setNValue( StatsSource::m_columnName2Index["EXPORT"], *expValue);
+    tuple->setNValue( StatsSource::m_columnName2Index["DR"], *drValue);
 }
 
 /**
