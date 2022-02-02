@@ -106,6 +106,7 @@ public abstract class CatalogSchemaTools {
             boolean isExportOnly, String streamPartitionColumn, String streamTarget, String topicName) {
         assert(!catalog_tbl.getColumns().isEmpty());
         boolean tableIsView = (viewQuery != null);
+        boolean toTopic = !StringUtils.isBlank(topicName);
 
         // We need the intermediate results of building the table schema string so that
         // we can return the full CREATE TABLE statement, so accumulate it separately
@@ -129,35 +130,35 @@ public abstract class CatalogSchemaTools {
                     + " cannot export to target " + streamTarget + " and to topic " + topicName;
                     table_sb.append(" EXPORT TO TARGET ").append(streamTarget);
                 }
-                else if (topicName != null) {
+                else if (toTopic) {
                     assert streamTarget == null || streamTarget.equalsIgnoreCase(Constants.CONNECTORLESS_STREAM_TARGET_NAME)
                             : "Table " + catalog_tbl.getTypeName() + " cannot export to target " + streamTarget + " and to topic " + topicName;
                     table_sb.append(" EXPORT TO TOPIC ").append(topicName);
-
-                    // Optional topic clauses must have been set in catalog
-                    String keyColumns = catalog_tbl.getTopickeycolumnnames();
-                    String valueColumns = catalog_tbl.getTopicvaluecolumnnames();
-
-                    if (!StringUtils.isBlank(keyColumns) || !StringUtils.isBlank(valueColumns)) {
-                        table_sb.append(" WITH ");
-                    }
-                    if (!StringUtils.isBlank(keyColumns)) {
-                        table_sb.append("KEY (").append(keyColumns).append(") ");
-                    }
-                    if (!StringUtils.isBlank(valueColumns)) {
-                        table_sb.append("VALUE (").append(valueColumns).append(") ");
-                    }
+                    addTopicClauses(table_sb, catalog_tbl);
                 }
             } else {
                 table_sb.append("CREATE TABLE ").append(catalog_tbl.getTypeName());
                 if (!StringUtil.isEmpty(catalog_tbl.getMigrationtarget())) {
-                    table_sb.append(" MIGRATE TO TARGET ").append(catalog_tbl.getMigrationtarget());
+                    if (toTopic) {
+                        table_sb.append(" MIGRATE TO TOPIC ").append(catalog_tbl.getMigrationtarget());
+                        addTopicClauses(table_sb, catalog_tbl);
+                    } else {
+                        table_sb.append(" MIGRATE TO TARGET ").append(catalog_tbl.getMigrationtarget());
+                    }
                 }
                 if (TableType.isPersistentExport(catalog_tbl.getTabletype())) {
-                    table_sb.append(" EXPORT TO TARGET ");
-                    table_sb.append(streamTarget);
+                    if (toTopic) {
+                        table_sb.append(" EXPORT TO TOPIC ");
+                        table_sb.append(topicName);
+                    } else {
+                        table_sb.append(" EXPORT TO TARGET ");
+                        table_sb.append(streamTarget);
+                    }
                     table_sb.append(" ON " + TableType.toPersistentExportString(catalog_tbl.getTabletype()));
                     table_sb.append(" ");
+                    if (toTopic) {
+                        addTopicClauses(table_sb, catalog_tbl);
+                    }
                 }
             }
             table_sb.append(" (");
@@ -445,6 +446,22 @@ public abstract class CatalogSchemaTools {
         // Canonical DDL generation for this table is done, now just hand the CREATE TABLE
         // statement to whoever might be interested (DDLCompiler, I'm looking in your direction)
         return table_sb.toString();
+    }
+
+    private static void addTopicClauses(StringBuilder sb, Table catalog_tbl) {
+        // Optional topic clauses must have been set in catalog
+        String keyColumns = catalog_tbl.getTopickeycolumnnames();
+        String valueColumns = catalog_tbl.getTopicvaluecolumnnames();
+
+        if (!StringUtils.isBlank(keyColumns) || !StringUtils.isBlank(valueColumns)) {
+            sb.append(" WITH ");
+        }
+        if (!StringUtils.isBlank(keyColumns)) {
+            sb.append("KEY (").append(keyColumns).append(") ");
+        }
+        if (!StringUtils.isBlank(valueColumns)) {
+            sb.append("VALUE (").append(valueColumns).append(") ");
+        }
     }
 
     /**

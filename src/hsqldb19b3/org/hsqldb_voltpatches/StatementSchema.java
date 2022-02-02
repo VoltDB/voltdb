@@ -446,7 +446,8 @@ public class StatementSchema extends Statement {
                     String target = (String)arguments[1];
                     @SuppressWarnings("unchecked")
                     List<String> triggers = (List<String>)arguments[2];
-                    table.addPersistentExport(target, triggers);
+                    boolean isTopic = ((Boolean)arguments[3]).booleanValue();
+                    table.addPersistentExport(target, triggers, isTopic);
                     break;
                 } catch (HsqlException e) {
                     return Result.newErrorResult(e, sql);

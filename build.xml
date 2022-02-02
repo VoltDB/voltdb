@@ -315,6 +315,7 @@
     <include name='org/voltdb/compiler/TestPartitionDDL.class' />
     <include name='org/voltdb/compiler/TestProcCompiler.class' />
     <include name='org/voltdb/compiler/TestVoltCompiler.class' />
+    <include name='org/voltdb/compiler/TestVoltCompilerTableExport.class' />
     <include name='org/voltdb/exportclient/TestJDBCExportClient.class' />
     <include name='org/voltdb/exportclient/decode/TestEndpointExpander.class' />
     <include name='org/voltdb/exportclient/decode/TestJsonObjectDecoer.class' />

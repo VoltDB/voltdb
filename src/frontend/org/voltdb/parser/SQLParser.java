@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2021 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -116,49 +116,140 @@ public class SQLParser extends SQLPatternFactory
         ).compile("PAT_PARTITION_TABLE");
 
     /**
-     * Pattern: CREATE TABLE table_name [EXPORT TO target migrate_target_name [ON...]].
+     * Pattern: CREATE TABLE table_name (column...) other-stuff
+     *
+     * Plain, no EXPORT or MIGRATE clause
+     *
+     * Capture groups:
+     *  (1) table name
+     */
+    private static final Pattern PAT_CREATE_TABLE_PLAIN =
+            SPF.statement(
+                    SPF.token("create"), SPF.token("table"),
+                    SPF.capture(SPF.databaseObjectName()),
+                    new SQLPatternPartString("\\s*"), // see ENG-11862 for reason about adding this pattern
+                    SPF.anyColumnFields().withFlags(ADD_LEADING_SPACE_TO_CHILD),
+                    SPF.anythingOrNothing().withFlags(ADD_LEADING_SPACE_TO_CHILD) // TODO, is this valid here?
+            ).compile("PAT_CREATE_TABLE_PLAIN");
+
+    /**
+     * Pattern part: ON trigger...
+     * used for EXPORT TO TARGET|TOPIC
+     */
+    public static final String CAPTURE_TRIGGER_LIST = "triggerList";
+
+    private static final SQLPatternPart TRIGGER_CLAUSE =
+        SPF.clause(SPF.token("on"),
+                   SPF.capture(CAPTURE_TRIGGER_LIST, SPF.commaList(SPF.databaseTrigger())));
+
+    /**
+     * Pattern part: WITH [KEY (key...)] [VALUE (value...)]
+     * used for EXPORT|MIGRATE TO TOPIC
+     */
+    public static final String CAPTURE_TOPIC_KEY_COLUMNS = "keyColumns";
+    public static final String CAPTURE_TOPIC_VALUE_COLUMNS = "valueColumns";
+
+    private static final SQLPatternPart KEY_VALUE_CLAUSE =
+        SPF.clause(SPF.token("with"),
+                   SPF.optional(SPF.token("key\\s*\\(\\s*"),
+                                SPF.capture(CAPTURE_TOPIC_KEY_COLUMNS, SPF.commaList(SPF.databaseObjectName()))
+                                   .withFlags(ADD_LEADING_SPACE_TO_CHILD),
+                                SPF.token("\\s*\\)")
+                                   .withFlags(ADD_LEADING_SPACE_TO_CHILD)),
+                   SPF.optional(SPF.token("value\\s*\\(\\s*"),
+                                SPF.capture(CAPTURE_TOPIC_VALUE_COLUMNS, SPF.commaList(SPF.databaseObjectName()))
+                                   .withFlags(ADD_LEADING_SPACE_TO_CHILD),
+                                SPF.token("\\s*\\)")
+                                   .withFlags(ADD_LEADING_SPACE_TO_CHILD)));
+
+    /**
+     * Pattern: CREATE TABLE table_name EXPORT TO TARGET target_name
+     *                 [ON trigger...] (column...) other-stuff
      *
      * Capture groups:
      *  (1) table name
      *  (2) target name
      *  (3) [triggers, comma separated]
      */
-    private static final Pattern PAT_CREATE_EXPORT_TABLE =
+    private static final Pattern PAT_CREATE_TABLE_EXPORT_TO_TARGET =
             SPF.statement(
                     SPF.token("create"), SPF.token("table"),
-                    SPF.capture("tableName", SPF.databaseObjectName()),
+                    SPF.capture(SPF.databaseObjectName()),
                     SPF.token("export"), SPF.token("to"), SPF.token("target"),
-                    SPF.capture("migrateTargetName", SPF.databaseObjectName()),
-                    SPF.optional(SPF.clause(
-                            SPF.token("on"),
-                            SPF.group(true, SPF.commaList(SPF.userName())))),
+                    SPF.capture(SPF.databaseObjectName()),
+                    SPF.optional(TRIGGER_CLAUSE),
                     new SQLPatternPartString("\\s*"),
                     SPF.anyColumnFields().withFlags(ADD_LEADING_SPACE_TO_CHILD),
                     SPF.anythingOrNothing().withFlags(ADD_LEADING_SPACE_TO_CHILD)
-            ).compile("PAT_CREATE_EXPORT_TABLE");
+            ).compile("PAT_CREATE_TABLE_EXPORT_TO_TARGET");
 
     /**
-     * Pattern: CREATE TABLE table_name [MIGRATE TO target migrate_target_name].
+     * Pattern: CREATE TABLE table_name EXPORT TO TOPIC topic_name
+     *                 [ON trigger...] [WITH [KEY key...] [VALUE value...]]
+     *                 (column...) other-stuff
      *
      * Capture groups:
      *  (1) table name
-     *  [(2) target name]
+     *  (2) topic name
+     *  (3) [triggers, comma separated]
+     *  (n) [topic key/value lists]
      */
-    private static final Pattern PAT_CREATE_TABLE =
+    private static final Pattern PAT_CREATE_TABLE_EXPORT_TO_TOPIC =
             SPF.statement(
                     SPF.token("create"), SPF.token("table"),
-                    SPF.capture("tableName", SPF.databaseObjectName()),
-                    SPF.optional(SPF.clause(SPF.token("migrate"), SPF.token("to"),
-                            SPF.token("target"),
-                            SPF.capture("migrateTargetName", SPF.databaseObjectName()))),
+                    SPF.capture(SPF.databaseObjectName()),
+                    SPF.token("export"), SPF.token("to"), SPF.token("topic"),
+                    SPF.capture(SPF.databaseObjectName()),
+                    SPF.optional(TRIGGER_CLAUSE),
+                    SPF.optional(KEY_VALUE_CLAUSE),
+                    new SQLPatternPartString("\\s*"),
+                    SPF.anyColumnFields().withFlags(ADD_LEADING_SPACE_TO_CHILD),
+                    SPF.anythingOrNothing().withFlags(ADD_LEADING_SPACE_TO_CHILD)
+            ).compile("PAT_CREATE_TABLE_EXPORT_TO_TOPIC");
+
+    /**
+     * Pattern: CREATE TABLE table_name MIGRATE TO TARGET target_name
+     *                 (column...) other-stuff
+     *
+     * Capture groups:
+     *  (1) table name
+     *  (2) target name
+     */
+    private static final Pattern PAT_CREATE_TABLE_MIGRATE_TO_TARGET =
+            SPF.statement(
+                    SPF.token("create"), SPF.token("table"),
+                    SPF.capture(SPF.databaseObjectName()),
+                    SPF.token("migrate"), SPF.token("to"), SPF.token("target"),
+                    SPF.capture(SPF.databaseObjectName()),
                     new SQLPatternPartString("\\s*"), // see ENG-11862 for reason about adding this pattern
                     SPF.anyColumnFields().withFlags(ADD_LEADING_SPACE_TO_CHILD),
                     SPF.anythingOrNothing().withFlags(ADD_LEADING_SPACE_TO_CHILD)
             ).compile("PAT_CREATE_TABLE");
 
     /**
-     * Pattern: CREATE TABLE tablename
+     * Pattern: CREATE TABLE table_name MIGRATE TO TOPIC topic_name
+     *                 [WITH [KEY key...] [VALUE value...]]
+     *                 (column...) other-stuff
      *
+     * Capture groups:
+     *  (1) table name
+     *  (2) topic name
+     *  (n) [topic key/value lists]
+     */
+    private static final Pattern PAT_CREATE_TABLE_MIGRATE_TO_TOPIC =
+            SPF.statement(
+                    SPF.token("create"), SPF.token("table"),
+                    SPF.capture(SPF.databaseObjectName()),
+                    SPF.token("migrate"), SPF.token("to"), SPF.token("topic"),
+                    SPF.capture(SPF.databaseObjectName()),
+                    SPF.optional(KEY_VALUE_CLAUSE),
+                    new SQLPatternPartString("\\s*"), // see ENG-11862 for reason about adding this pattern
+                    SPF.anyColumnFields().withFlags(ADD_LEADING_SPACE_TO_CHILD),
+                    SPF.anythingOrNothing().withFlags(ADD_LEADING_SPACE_TO_CHILD)
+            ).compile("PAT_CREATE_TABLE");
+
+    /**
+     * Pattern: ALTER TABLE tablename
      *
      * Capture groups:
      *  (1) table name
@@ -169,6 +260,7 @@ public class SQLParser extends SQLPatternFactory
             SPF.token("using"), SPF.token("TTL"),
             SPF.anythingOrNothing()
         ).compile("PAT_ALTER_TTL");
+
     /**
      * PARTITION PROCEDURE procname ON TABLE tablename COLUMN columnname [PARAMETER paramnum]
      *
@@ -917,12 +1009,31 @@ public class SQLParser extends SQLPatternFactory
     }
 
     /**
+     * Match statement against create table ...  pattern,
+     * with no migrate or export clause.
+     * @param statement statement to match against
+     * @return          pattern matcher object
+     */
+    public static Matcher matchCreateTablePlain(String statement) {
+        return PAT_CREATE_TABLE_PLAIN.matcher(statement);
+    }
+
+    /**
      * Match statement against create table ... migrate to target ... pattern.
      * @param statement statement to match against
      * @return          pattern matcher object
      */
-    public static Matcher matchCreateTableMigrateTo(String statement) {
-        return PAT_CREATE_TABLE.matcher(statement);
+    public static Matcher matchCreateTableMigrateToTarget(String statement) {
+        return PAT_CREATE_TABLE_MIGRATE_TO_TARGET.matcher(statement);
+    }
+
+     /**
+     * Match statement against create table ... migrate to topic ... pattern.
+     * @param statement statement to match against
+     * @return          pattern matcher object
+     */
+    public static Matcher matchCreateTableMigrateToTopic(String statement) {
+        return PAT_CREATE_TABLE_MIGRATE_TO_TOPIC.matcher(statement);
     }
 
     /**
@@ -930,8 +1041,17 @@ public class SQLParser extends SQLPatternFactory
      * @param statement statement to match against
      * @return          pattern matcher object
      */
-    public static Matcher matchCreateTableExportTo(String statement) {
-        return PAT_CREATE_EXPORT_TABLE.matcher(statement);
+    public static Matcher matchCreateTableExportToTarget(String statement) {
+        return PAT_CREATE_TABLE_EXPORT_TO_TARGET.matcher(statement);
+    }
+
+    /**
+     * Match statement against create table ... export to topic ... pattern.
+     * @param statement statement to match against
+     * @return          pattern matcher object
+     */
+    public static Matcher matchCreateTableExportToTopic(String statement) {
+        return PAT_CREATE_TABLE_EXPORT_TO_TOPIC.matcher(statement);
     }
 
     public static Matcher matchAlterTTL(String statement)
@@ -1345,9 +1465,7 @@ public class SQLParser extends SQLPatternFactory
     public static final String CAPTURE_EXPORT_TOPIC = "topicName";
     public static final String CAPTURE_STREAM_PARTITION_COLUMN = "partitionColumnName";
 
-    public static final String CAPTURE_TOPIC_KEY_COLUMNS = "keyColumns";
-    public static final String CAPTURE_TOPIC_VALUE_COLUMNS = "valueColumns";
-
+    // TODO: consider using KEY_VALUE_CLAUSE
     private static SQLPatternPart makeInnerStreamModifierClausePattern(boolean captureTokens)
     {
         return

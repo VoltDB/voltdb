@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2021 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -88,6 +88,7 @@ import org.voltdb.compiler.statements.SetGlobalParam;
 import org.voltdb.compiler.statements.VoltDBStatementProcessor;
 import org.voltdb.compilereport.TableAnnotation;
 import org.voltdb.e3.topics.TopicProperties;
+import org.voltdb.exportclient.ExportRowSchema;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractExpression.UnsafeOperatorsForDDL;
 import org.voltdb.expressions.ExpressionUtil;
@@ -239,7 +240,7 @@ public class DDLCompiler {
                                 .addNextProcessor(new CreateTask(this))
                                 .addNextProcessor(new DropTask(this))
                                 .addNextProcessor(new AlterTask(this))
-                                // CatchAllVoltDBStatement need to be the last processor in the chain.
+                                // CatchAllVoltDBStatement needs to be the last processor in the chain.
                                 .addNextProcessor(new CatchAllVoltDBStatement(this, m_voltStatementProcessor));
     }
 
@@ -547,10 +548,7 @@ public class DDLCompiler {
             String tableName = entry.getKey();
             assert(tableName.startsWith("table"));
             tableName = tableName.substring("table".length());
-            if (!validatePersistentExport(entry.getValue())) {
-                throw m_compiler.new VoltCompilerException(String.format("The export target on table %s cann't be altered", tableName));
-            }
-
+            validatePersistentExport(tableName, entry.getValue());
             m_compiler.markTableAsDirty(tableName);
         }
         for (VoltXMLElement tableXML : stmtDiff.getRemovedNodes()) {
@@ -612,22 +610,31 @@ public class DDLCompiler {
         }
     }
 
-    private boolean validatePersistentExport(VoltXMLDiff stmtdiff) {
-        String addedTarget = null;
-        for (VoltXMLElement persistentXML : stmtdiff.getAddedNodes()) {
-            if (PersistentExport.PERSISTENT_EXPORT.equals(persistentXML.name)) {
-                addedTarget = persistentXML.attributes.get("target");
-                break;
+    private void validatePersistentExport(String tableName, VoltXMLDiff stmtdiff) throws VoltCompilerException {
+        VoltXMLElement added = findPersistentExport(stmtdiff.getAddedNodes());
+        VoltXMLElement removed = findPersistentExport(stmtdiff.getRemovedNodes());
+        if (added == null || removed == null) {
+            return; // accepted
+        }
+
+        boolean addedTopic = Boolean.parseBoolean(added.attributes.get("isTopic"));
+        boolean removedTopic = Boolean.parseBoolean(removed.attributes.get("isTopic"));
+        String addedName =  added.attributes.get("target");
+        String removedName = removed.attributes.get("target");
+        if (addedTopic ^ removedTopic || !addedName.equalsIgnoreCase(removedName)) {
+            String type = removedTopic ? "topic" : "target";
+            throw m_compiler.new VoltCompilerException(String.format("The export %s on table %s cannot be altered",
+                                                                     type, tableName));
+        }
+    }
+
+    private VoltXMLElement findPersistentExport(List<VoltXMLElement> nodes) {
+        for (VoltXMLElement node : nodes) {
+            if (PersistentExport.PERSISTENT_EXPORT.equals(node.name)) {
+                return node;
             }
         }
-        if (addedTarget != null) {
-            for (VoltXMLElement persistentXML : stmtdiff.getRemovedNodes()) {
-                if (PersistentExport.PERSISTENT_EXPORT.equals(persistentXML.name)) {
-                    return (addedTarget.equalsIgnoreCase(persistentXML.attributes.get("target")));
-                }
-            }
-        }
-        return true;
+        return null;
     }
 
     /**
@@ -773,37 +780,94 @@ public class DDLCompiler {
     }
 
     /**
-     * Process a VoltDB-specific create table ... migrate to target ... DDL statement.
+     * Process a VoltDB-specific 'create table ... migrate/export to target/topic ...' DDL statement.
      * @param stmt
      * @throws VoltCompilerException
      */
     private void processCreateTableStatement(DDLStatement stmt) throws VoltCompilerException {
         final String statement = stmt.statement;
-        Matcher statementMatcher = SQLParser.matchCreateTableMigrateTo(statement);
-        if (statementMatcher.matches()) {
-            // if we have migrate to target clause
-            if ((statementMatcher.groupCount() > 1) &&
-                    (statementMatcher.group(2) != null) &&
-                    (!statementMatcher.group(2).isEmpty())) {
-                String tableName = checkIdentifierStart(statementMatcher.group(1), statement);
-                String targetName = checkIdentifierStart(statementMatcher.group(2), statement);
-
-                VoltXMLElement tableXML = m_schema.findChild("table", tableName.toUpperCase());
-                if (tableXML == null) {
-                    throw m_compiler.new VoltCompilerException(String.format(
-                            "Invalid DDL statement: table %s does not exist", tableName));
-                }
-
-                tableXML.attributes.put("migrateExport", targetName);
-            }
+        // If a plain 'create table' without migrate or export clause
+        Matcher matcher = SQLParser.matchCreateTablePlain(statement);
+        if (matcher.matches()) {
+            // Nothing needed here
             return;
         }
-        // if we have export to target clause
-        statementMatcher = SQLParser.matchCreateTableExportTo(statement);
-        if (!statementMatcher.matches()) {
-            throw m_compiler.new VoltCompilerException(String.format("Invalid CREATE TABLE statement: \"%s\", "
-                            + "expected syntax: CREATE TABLE <table> [MIGRATE/EXPORT TO TARGET <target>] (column datatype, ...); ",
-                    statement.substring(0, statement.length() - 1)));
+        // If we have 'migrate to target' clause
+        matcher = SQLParser.matchCreateTableMigrateToTarget(statement);
+        if (matcher.matches()) {
+            VoltXMLElement tableXML = matchedTableXML(matcher, statement);
+            String targetName = checkIdentifierStart(matcher.group(2), statement);
+            tableXML.attributes.put("migrateExport", targetName);
+            return;
+        }
+        // If we have 'migrate to topic' clause
+        matcher = SQLParser.matchCreateTableMigrateToTopic(statement);
+        if (matcher.matches()) {
+            VoltXMLElement tableXML = matchedTableXML(matcher, statement);
+            String topicName = checkIdentifierStart(matcher.group(2), statement);
+            tableXML.attributes.put("migrateExport", topicName);
+            tableXML.attributes.put("topicName", topicName);
+            saveKeysAndValues(matcher, tableXML);
+            return;
+        }
+        // If we have 'export to target' clause
+        matcher = SQLParser.matchCreateTableExportToTarget(statement);
+        if (matcher.matches()) {
+            VoltXMLElement tableXML = matchedTableXML(matcher, statement);
+            String targetName = checkIdentifierStart(matcher.group(2), statement);
+            // Nothing stored here - syntax check only
+            // Triggers are available through the PersistentExport node
+            return;
+        }
+        // If we have 'export to topic' clause
+        matcher = SQLParser.matchCreateTableExportToTopic(statement);
+        if (matcher.matches()) {
+            VoltXMLElement tableXML = matchedTableXML(matcher, statement);
+            String topicName = checkIdentifierStart(matcher.group(2), statement);
+            tableXML.attributes.put("topicName", topicName);
+            saveKeysAndValues(matcher, tableXML);
+            // Triggers are available through the PersistentExport node
+            return;
+        }
+        // No matching variant: try and refine the error message (a little hacky but it seems
+        // better than spitting out a message with the entire syntax)
+        String syntax = "CREATE TABLE name";
+        List<String>words = Arrays.asList(statement.toUpperCase().split("\\s+"));
+        boolean migrate = words.contains("MIGRATE");
+        boolean export = words.contains("EXPORT");
+        boolean target = words.contains("TARGET");
+        boolean topic = words.contains("TOPIC");
+        if (migrate ^ export && target ^ topic) { // if intent is clearly one type
+            syntax += (export ? " EXPORT TO" : " MIGRATE TO") +
+                      (topic ? " TOPIC name" : " TARGET name") +
+                      (export ? " [ON trigger,...]" : "") +
+                      (topic ? " [WITH KEY (key,...) VALUE (value,...)]" : "");
+        } else { // abbreviated complete syntax
+            syntax += " [EXPORT|MIGRATE TO TARGET|TOPIC name] [options]";
+        }
+        syntax += " (column datatype, ...);";
+        throw m_compiler.new VoltCompilerException(String.format("Invalid CREATE TABLE statement: \"%s\" expected syntax: %s",
+                                                                  statement.substring(0, statement.length() - 1), syntax));
+    }
+
+    private VoltXMLElement matchedTableXML(Matcher matcher, String statement) throws VoltCompilerException {
+        String tableName = checkIdentifierStart(matcher.group(1), statement);
+        VoltXMLElement tableXML = m_schema.findChild("table", tableName.toUpperCase());
+        if (tableXML == null) {
+            throw m_compiler.new VoltCompilerException(String.format("Invalid DDL statement: table %s does not exist",
+                                                                     tableName));
+        }
+        return tableXML;
+    }
+
+    private void saveKeysAndValues(Matcher matcher, VoltXMLElement tableXML) {
+        String keys = matcher.group(SQLParser.CAPTURE_TOPIC_KEY_COLUMNS);
+        String values= matcher.group(SQLParser.CAPTURE_TOPIC_VALUE_COLUMNS);
+        if (keys != null) {
+            tableXML.attributes.put("topicKeyColumnNames", keys);
+        }
+        if (values != null) {
+            tableXML.attributes.put("topicValueColumnNames", values);
         }
     }
 
@@ -928,7 +992,7 @@ public class DDLCompiler {
                     }
                 }
             }
-            else if (!StringUtils.isBlank(table.getTopicname())) {
+            else if (!StringUtils.isBlank(table.getTopicname()) && TableType.isStream(table.getTabletype())) {
                 // Reject out of hand non-partitioned streams exporting to topics,
                 // even if the topic isn't declared yet in the deployment
                 throw m_compiler.new VoltCompilerException(String.format(
@@ -1064,19 +1128,24 @@ public class DDLCompiler {
                 String drTable = e.attributes.get("drTable");
                 String migrateTarget = e.attributes.get("migrateExport");
                 export = StringUtil.isEmpty(export) ? migrateTarget : export;
+                boolean isTopic = !StringUtils.isBlank(e.attributes.get("topicName"));
                 final boolean isStream = (e.attributes.get("stream") != null);
                 if (partitionCol != null) {
                     m_tracker.addPartition(tableName, partitionCol);
                 } else {
                     m_tracker.removePartition(tableName);
                 }
-                if (!StringUtil.isEmpty(export)) {
+                if (!StringUtil.isEmpty(export) && !isTopic) {
                     m_tracker.addExportedTable(tableName, export, isStream);
                 } else {
                     m_tracker.removeExportedTable(tableName, isStream);
                 }
                 if (drTable != null) {
                     m_tracker.addDRedTable(tableName, drTable);
+                }
+
+                if (isTopic) {
+                    continue;
                 }
 
                 for (VoltXMLElement subNode : e.children) {
@@ -1397,9 +1466,11 @@ public class DDLCompiler {
             // how CREATE TABLE statement is processed by Calcite.
             return;
         }
-        // create a table node in the catalog
+
+        // create a table node in the catalog, persistent until we find otherwise
         final Table table = db.getTables().add(name);
         table.setTabletype(TableType.PERSISTENT.get());
+
         // add the original DDL to the table (or null if it's not there)
         TableAnnotation annotation = new TableAnnotation();
         table.setAnnotation(annotation);
@@ -1443,6 +1514,11 @@ public class DDLCompiler {
         for (VoltXMLElement subNode : node.children) {
 
             if (subNode.name.equals(PersistentExport.PERSISTENT_EXPORT)) {
+                // indicates EXPORT TO TARGET|TOPIC
+                boolean isTopic = Boolean.parseBoolean(subNode.attributes.get("isTopic"));
+                if (isTopic && node.attributes.get("topicName") == null) {
+                    throw m_compiler.new VoltCompilerException("XML error, EXPORT TO TOPIC but no topic name");
+                }
                 streamTarget = subNode.attributes.get("target");
                 List<String> items= Stream.of(subNode.attributes.get("triggers").split(","))
                         .map(String::trim)
@@ -1450,6 +1526,7 @@ public class DDLCompiler {
                 int tblType = TableType.getPersistentExportTrigger(items);
                 table.setTabletype(tblType);
             }
+
             if (subNode.name.equals("columns")) {
                 int colIndex = 0;
                 for (VoltXMLElement columnNode : subNode.children) {
@@ -1510,38 +1587,13 @@ public class DDLCompiler {
         }
 
         // If table is a stream, initialize stream type
+        // If stream is a topic, it is created as a CONNECTOR_LESS_STREAM and will be changed to STREAM,
+        // if the topic is found to exist (see CatalogUtil.setTopics).
         if (isStream) {
             if(streamTarget != null && !Constants.CONNECTORLESS_STREAM_TARGET_NAME.equals(streamTarget)) {
                 table.setTabletype(TableType.STREAM.get());
             } else {
                 table.setTabletype(TableType.CONNECTOR_LESS_STREAM.get());
-            }
-        }
-
-        // If table is a topic, it is created as a CONNECTOR_LESS_STREAM and will be changed to STREAM,
-        // if the topic is found to exist (see CatalogUtil.setTopics).
-        final String topicName = node.attributes.get("topicName");
-        if (!StringUtils.isBlank(topicName)) {
-            table.setTopicname(topicName);
-
-            // Set the optional clauses
-            Map<String, String> columnProperties = new HashMap<>();
-            String keyColumns = node.attributes.get("topicKeyColumnNames");
-            if (!StringUtils.isBlank(keyColumns)) {
-                table.setTopickeycolumnnames(keyColumns);
-                columnProperties.put(TopicProperties.Key.CONSUMER_KEY.name(), keyColumns);
-            }
-            String valueColumns = node.attributes.get("topicValueColumnNames");
-            if (!StringUtils.isBlank(valueColumns)) {
-                table.setTopicvaluecolumnnames(valueColumns);
-                columnProperties.put(TopicProperties.Key.CONSUMER_VALUE.name(), valueColumns);
-            }
-
-            // Validate the topic columns by creating a TopicProperties instance parsing the column lists
-            if (!columnProperties.isEmpty()) {
-                TopicProperties topicProperties = new TopicProperties(columnProperties);
-                validateTopicColumns(topicName, table.getTypeName(), columnMap, topicProperties.get(TopicProperties.Key.CONSUMER_KEY));
-                validateTopicColumns(topicName, table.getTypeName(), columnMap, topicProperties.get(TopicProperties.Key.CONSUMER_VALUE));
             }
         }
 
@@ -1563,7 +1615,7 @@ public class DDLCompiler {
         }
 
         if (ttlNode != null) {
-            TimeToLive ttl =   table.getTimetolive().add(TimeToLiveVoltDB.TTL_NAME);
+            TimeToLive ttl = table.getTimetolive().add(TimeToLiveVoltDB.TTL_NAME);
             String column = ttlNode.attributes.get("column");
             int ttlValue = Integer.parseInt(ttlNode.attributes.get("value"));
             ttl.setTtlunit(ttlNode.attributes.get("unit"));
@@ -1577,6 +1629,33 @@ public class DDLCompiler {
                     ttl.setTtlcolumn(col);
                     break;
                 }
+            }
+        }
+
+        String topicName = node.attributes.get("topicName");
+        if (!StringUtils.isBlank(topicName)) {
+            table.setTopicname(topicName);
+
+            // Set the optional clauses
+            Map<String, String> columnProperties = new HashMap<>();
+            String keyColumns = node.attributes.get("topicKeyColumnNames");
+            if (!StringUtils.isBlank(keyColumns)) {
+                table.setTopickeycolumnnames(keyColumns);
+                columnProperties.put(TopicProperties.Key.CONSUMER_KEY.name(), keyColumns);
+            }
+            String valueColumns = node.attributes.get("topicValueColumnNames");
+            if (!StringUtils.isBlank(valueColumns)) {
+                table.setTopicvaluecolumnnames(valueColumns);
+                columnProperties.put(TopicProperties.Key.CONSUMER_VALUE.name(), valueColumns);
+            }
+
+            // Validate the topic columns by creating a TopicProperties instance parsing the column lists
+            if (!columnProperties.isEmpty()) {
+                TopicProperties topicProperties = new TopicProperties(columnProperties);
+                validateTopicColumns(topicName, table.getTypeName(), isStream,
+                        columnMap, topicProperties.get(TopicProperties.Key.CONSUMER_KEY));
+                validateTopicColumns(topicName, table.getTypeName(), isStream,
+                        columnMap, topicProperties.get(TopicProperties.Key.CONSUMER_VALUE));
             }
         }
 
@@ -1657,11 +1736,12 @@ public class DDLCompiler {
      *
      * @param topicName         name of topic
      * @param tableName         name of table
+     * @param isStream          {@code true} if table is stream
      * @param tableColumns      map of columns defined in {@link Table}
      * @param selectedColumns   list of selected column names in topic
      * @throws VoltCompilerException
      */
-    private void validateTopicColumns(String topicName, String tableName,
+    private void validateTopicColumns(String topicName, String tableName, boolean isStream,
             Map<String, Column> tableColumns, List<String> selectedColumns) throws VoltCompilerException {
         if (selectedColumns != null && !selectedColumns.isEmpty()) {
             // If there is only * in the list, go for all columns.
@@ -1671,10 +1751,16 @@ public class DDLCompiler {
 
             for (String columnName : selectedColumns) {
                 if (tableColumns.get(columnName) == null) {
-                    throw m_compiler.new VoltCompilerException(String.format(
-                            "Invalid topic %s: column %s specified in WITH clause is not defined in stream %s",
-                            topicName, columnName, tableName));
-                }
+                    if (ExportRowSchema.isMetadataColumn(columnName)) {
+                        // Accept metadata column names. TopicsValidator will complement
+                        // the checks once topic and table/stream are connected
+                        continue;
+                    }
+                    String tableType = isStream ? "stream" : "table";
+                     throw m_compiler.new VoltCompilerException(String.format(
+                            "Invalid topic %s: column %s specified in WITH clause is not defined in %s %s",
+                            topicName, columnName, tableType, tableName));
+                 }
             }
         }
     }

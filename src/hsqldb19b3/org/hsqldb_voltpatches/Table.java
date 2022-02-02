@@ -1,4 +1,5 @@
 /* Copyright (c) 1995-2000, The Hypersonic SQL Group.
+ * Copyright (c) 2010-2022, VoltDB Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -2747,6 +2748,7 @@ public class Table extends TableBase implements SchemaObject {
             VoltXMLElement pe = new VoltXMLElement(PersistentExport.PERSISTENT_EXPORT);
             pe.attributes.put("target", persistentExport.target);
             pe.attributes.put("triggers", String.join(",", persistentExport.triggers));
+            pe.attributes.put("isTopic", Boolean.toString(persistentExport.isTopic));
             table.children.add(pe);
         }
         return table;
@@ -2783,8 +2785,8 @@ public class Table extends TableBase implements SchemaObject {
         timeToLive = null;
     }
 
-    public void addPersistentExport(String target, List<String> triggers) {
-        persistentExport = new PersistentExport(target, triggers);
+    public void addPersistentExport(String target, List<String> triggers, boolean isTopic) {
+        persistentExport = new PersistentExport(target, triggers, isTopic);
     }
 
     public PersistentExport getPersistentExport() {

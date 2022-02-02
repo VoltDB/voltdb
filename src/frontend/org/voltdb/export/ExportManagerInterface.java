@@ -218,6 +218,7 @@ public interface ExportManagerInterface extends Promotable {
      * @param committedSequenceNumber
      * @param tupleCount
      * @param uniqueId
+     * @param committedSpHandle
      * @param buffer
      */
     public void pushBuffer(
@@ -227,6 +228,7 @@ public interface ExportManagerInterface extends Promotable {
             long committedSequenceNumber,
             long tupleCount,
             long uniqueId,
+            long committedSpHandle,
             BBContainer buffer);
 
     /**

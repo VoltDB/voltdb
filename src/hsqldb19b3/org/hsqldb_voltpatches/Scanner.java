@@ -1,4 +1,5 @@
 /* Copyright (c) 2001-2009, The HSQL Development Group
+ * Copyright (c) 2010-2022, VoltDB Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -770,6 +771,8 @@ public class Scanner {
             case 'U' :
                 if (charAt(currentPosition + 1) == '&') {
                     if (charAt(currentPosition + 1) == '"') {
+                        // TODO: note bug above. But Unicode delimited identifiers
+                        // are not currently supported, so the bug remains in place.
                         currentPosition += 3;
 
                         boolean result = scanUnicodeIdentifier();
@@ -1691,6 +1694,23 @@ public class Scanner {
         }
 
         scanIdentifierChain();
+
+        // If the token type at this point is X_IDENTIFIER then all we really
+        // know is that it's an undelimited sequence of alphanumerics/underscores.
+        // It might be an SQL keyword, in which case we'll return the corresponding
+        // token type instead of X_IDENTIFIER.
+        //
+        // SQL keywords fall into two types, SQL-reserved and SQL-nonreserved.
+        // The former case has as a subset core HSQL-reserved identifiers.
+        //
+        // Parsers that want to accept keywords as valid identifiers should
+        // test for isUndelimitedIdentifier being true, rather than comparing
+        // tokenType to X_IDENTIFIER. If you want to screen out reserved
+        // keywords, also ensure isReservedIdentifier is false.
+        //
+        // Delimited identfiers are quoted, either "..." or U&"...", though the
+        // latter form (for Unicode delimited identifiers) is not currently
+        // supported in VoltDB.
 
         if (token.tokenType == Tokens.X_IDENTIFIER) {
             token.isUndelimitedIdentifier = true;

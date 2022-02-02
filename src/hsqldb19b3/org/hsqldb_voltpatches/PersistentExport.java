@@ -39,8 +39,11 @@ public class PersistentExport {
     public final static String PERSISTENT_EXPORT = "PersistentExport";
     final List<String> triggers = new ArrayList<>();
     final String target;
-    public PersistentExport(String exportTarget, List<String> operationTriggers) {
+    final boolean isTopic;
+
+    public PersistentExport(String exportTarget, List<String> operationTriggers, boolean topicFlag) {
         target = exportTarget;
         triggers.addAll(operationTriggers);
+        isTopic = topicFlag;
     }
 }

@@ -27,6 +27,7 @@ import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Table;
 import org.voltdb.catalog.Topic;
+import org.voltdb.serdes.FieldDescription;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.SerializationHelper;
 
@@ -84,6 +85,30 @@ public class ExportRowSchema extends ExportRow {
         super(tableName, columnNames, t, l, new Object[] {}, null, partitionColumnIndex, partitionId, generation);
         initialGenerationId = initialGeneration;
 
+    }
+
+    /**
+     * @return list of {@code FieldDescription} of the export metadata columns
+     */
+    public static List<FieldDescription> getMetadataFields() {
+        List<FieldDescription> metaFields = new ArrayList<>(META_COL_NAMES.size());
+
+        Iterator<String> itNames = META_COL_NAMES.iterator();
+        Iterator<VoltType> itTypes = META_COL_TYPES.iterator();
+        while(itNames.hasNext()) {
+            metaFields.add(new FieldDescription(itNames.next(), itTypes.next(), false));
+        }
+        return metaFields;
+    }
+
+    /**
+     * Checks if name is a metadata column name
+     *
+     * @param name  column name
+     * @return      {@code true} if name is a metadata column name
+     */
+    public static boolean isMetadataColumn(String name) {
+        return META_COL_NAMES.contains(name);
     }
 
     /**

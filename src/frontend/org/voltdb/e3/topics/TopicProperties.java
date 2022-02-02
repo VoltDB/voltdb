@@ -131,9 +131,13 @@ public class TopicProperties extends TypedPropertiesBase<TopicProperties.Key<?>>
         // Properties for specifying record encoding.
         // Note producer.format.value is not supported so related properties are not implemented
 
-        // Historical: topic format is an XML attribute but is converted to a property to
-        // preserve the format selection logic, which was designed to be based on properties.
+        // Historical: the following properties should not be documented. They are capturing
+        // XML or DDL configuration clauses which were declared late in the project, with too
+        // much existing code depending on them being properties and not catalog attributes.
         public static final Key<EncodeFormat> TOPIC_FORMAT = new FormatKey("topic.format");
+        public static final Key<List<String>> CONSUMER_KEY = new ColumnsKey("consumer.key", ImmutableList.of());
+        public static final Key<List<String>> CONSUMER_VALUE = new ColumnsKey("consumer.value", ALL_COLUMNS);
+        // Historical end.
 
         // Formats which just apply to producer records
         public static final Key<EncodeFormat> PRODUCER_FORMAT_VALUE = new FormatKey("producer.format.value");
@@ -149,10 +153,7 @@ public class TopicProperties extends TypedPropertiesBase<TopicProperties.Key<?>>
         public static final Key<Boolean> PRODUCER_PARAMETERS_INCLUDE_KEY = new BooleanKey(
                 "producer.parameters.includeKey", Boolean.FALSE);
 
-        public static final Key<List<String>> CONSUMER_KEY = new ColumnsKey("consumer.key", ImmutableList.of());
-
-        // Default to * to indicate all columns are in the value
-        public static final Key<List<String>> CONSUMER_VALUE = new ColumnsKey("consumer.value", ALL_COLUMNS);
+        public static final Key<Boolean> CONSUMER_SKIP_INTERNALS = new BooleanKey("consumer.skip.internals", Boolean.TRUE);
 
         // Mutable property allowing skipping over consumer errors
         public static final Key<Boolean> CONSUMER_SKIP_ERRORS = new BooleanKey("consumer.skip.errors", Boolean.FALSE);

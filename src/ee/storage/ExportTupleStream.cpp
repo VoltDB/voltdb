@@ -232,6 +232,7 @@ void ExportTupleStream::commit(VoltDBEngine* engine, int64_t currentTxnId, int64
         }
         m_committedSequenceNumber = m_nextSequenceNumber-1;
         m_currBlock->setCommittedSequenceNumber(m_committedSequenceNumber);
+        m_currBlock->recordLastCommittedSpHandle(m_committedTxnId);
 
         pushPendingBlocks();
     }

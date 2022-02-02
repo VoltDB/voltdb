@@ -39,6 +39,7 @@ import javax.xml.bind.JAXBElement;
 import javax.xml.bind.JAXBException;
 import javax.xml.bind.Marshaller;
 
+import org.apache.commons.lang3.StringUtils;
 import org.voltdb.BackendTarget;
 import org.voltdb.ProcedurePartitionData;
 import org.voltdb.VoltDB;
@@ -82,6 +83,7 @@ import org.voltdb.compiler.deploymentfile.SslType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType.Temptables;
 import org.voltdb.compiler.deploymentfile.ThreadPoolsType;
+import org.voltdb.compiler.deploymentfile.TopicType;
 import org.voltdb.compiler.deploymentfile.TopicsType;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.compiler.deploymentfile.UsersType.User;
@@ -892,6 +894,32 @@ public class VoltProjectBuilder {
         }
 
         getExportsConfiguration().getConfiguration().add(exportConfig);
+    }
+
+    public TopicType addTopic(String topicName) {
+        return addTopic(topicName, null, null);
+    }
+
+    public TopicType addTopic(String topicName, String procName, Map<String, String> properties) {
+        assert !StringUtils.isBlank(topicName);
+        TopicType topic = new TopicType();
+        topic.setName(topicName);
+
+        if (procName != null) {
+            topic.setProcedure(procName);
+        }
+
+        if (properties != null) {
+            properties.forEach((k, v) -> {
+                PropertyType prop = new PropertyType();
+                prop.setName(k);
+                prop.setValue(v);
+                topic.getProperty().add(prop);
+            });
+        }
+
+        getTopicsConfiguration().getTopic().add(topic);
+        return topic;
     }
 
     public void setCompilerDebugPrintStream(final PrintStream out) {

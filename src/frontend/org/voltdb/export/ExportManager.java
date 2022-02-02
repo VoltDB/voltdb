@@ -548,6 +548,7 @@ public class ExportManager implements ExportManagerInterface
             long committedSequenceNumber,
             long tupleCount,
             long uniqueId,
+            long committedSpHandle,
             long bufferPtr,
             BBContainer container) {
         if (container != null) {
@@ -556,7 +557,7 @@ public class ExportManager implements ExportManagerInterface
         ExportManagerInterface instance = VoltDB.getExportManager();
         instance.pushBuffer(partitionId, tableName,
                 startSequenceNumber, committedSequenceNumber,
-                tupleCount, uniqueId, container);
+                tupleCount, uniqueId, committedSpHandle, container);
     }
 
     @Override
@@ -567,6 +568,7 @@ public class ExportManager implements ExportManagerInterface
             long committedSequenceNumber,
             long tupleCount,
             long uniqueId,
+            long committedSpHandle,     // unused
             BBContainer container) {
 
         try {

@@ -170,7 +170,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
     m_pushExportBufferMID = m_jniEnv->GetStaticMethodID(
             m_exportManagerClass,
             "pushExportBuffer",
-            "(ILjava/lang/String;JJJJJLorg/voltcore/utils/DBBPool$BBContainer;)V");
+            "(ILjava/lang/String;JJJJJJLorg/voltcore/utils/DBBPool$BBContainer;)V");
     if (m_pushExportBufferMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         vassert(m_pushExportBufferMID != NULL);
@@ -607,6 +607,7 @@ void JNITopend::pushExportBuffer(
                 block->getCommittedSequenceNumber(),
                 block->getRowCount(),
                 block->lastSpUniqueId(),
+                block->lastCommittedSpHandle(),
                 reinterpret_cast<jlong>(block->rawPtr()),
                 container);
         m_jniEnv->DeleteLocalRef(container);
@@ -617,6 +618,7 @@ void JNITopend::pushExportBuffer(
                 m_pushExportBufferMID,
                 partitionId,
                 tableNameString,
+                static_cast<int64_t>(0),
                 static_cast<int64_t>(0),
                 static_cast<int64_t>(0),
                 static_cast<int64_t>(0),

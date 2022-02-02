@@ -544,6 +544,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     // start sequence number - 8 bytes
                     // tupleCount - 8 bytes
                     // uniqueId - 8 bytes
+                    // last committed SpHandle - 8 bytes
                     // export buffer length - 4 bytes
                     // export buffer - export buffer length bytes
                     int partitionId = getBytes(4).getInt();
@@ -555,6 +556,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     long committedSequenceNumber = getBytes(8).getLong();
                     long tupleCount = getBytes(8).getLong();
                     long uniqueId = getBytes(8).getLong();
+                    long lastCommittedSpHandle = getBytes(8).getLong();
                     int length = getBytes(4).getInt();
                     ByteBuffer buffer = length == 0 ? null : getBytes(length);
                     ExportManager.pushExportBuffer(
@@ -564,7 +566,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                             committedSequenceNumber,
                             tupleCount,
                             uniqueId,
-                            0,
+                            lastCommittedSpHandle,
+                            0L,
                             buffer == null ? null : DBBPool.wrapBB(buffer));
                 }
                 else if (status == ExecutionEngine.ERRORCODE_DECODE_BASE64_AND_DECOMPRESS) {

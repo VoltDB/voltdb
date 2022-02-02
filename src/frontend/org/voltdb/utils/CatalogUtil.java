@@ -2066,7 +2066,7 @@ public abstract class CatalogUtil {
     }
 
     /**
-     * Set {@code Topic} instances in catalog, and connect their streams.
+     * Set {@code Topic} instances in catalog, and connect their streams or tables.
      * <p>
      * Historically topics were created by a CREATE TOPIC DDL command, which
      * has been replaced by deployment file specification. However, inline encoding
@@ -2074,6 +2074,12 @@ public abstract class CatalogUtil {
      * <p>
      * Note: on @UpdateClasses this is called with deployment already compiled in the
      * catalog. Overwrite the existing objects (FIXME: not efficient).
+     * <p>
+     * Note: STREAM objects are kept 'connector-less' in order to defer creating
+     * {@link E3ExportDataSource} instances until they are associated with a topic.
+     * This is because STREAM topics can be stored encoded (topic.store.encoded = true)
+     * and it is not possible to change this property on the fly. This behavior does not
+     * apply to tables since tables exporting to topic cannot be stored encoded.
      *
      * @param catalog {@code Catalog} being built
      * @param topicsType {@code TopicsType} from deployment
@@ -2086,15 +2092,11 @@ public abstract class CatalogUtil {
             return;
         }
 
-        // Build a map of streams referring to topics - multiple streams to same topic is caught here,
+        // Build a map of streams/tables referring to topics - multiple streams/tables to same topic is caught here,
         // not in validation. Since catalog rejects homonyms differing by case, perform case-insensitive checks.
         Map<String, Table> topicStreams = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
         for (Table table : db.getTables()) {
             if (!StringUtils.isBlank(table.getTopicname())) {
-                // For now we only support streams exporting to topic
-                assert TableType.isStream(table.getTabletype()) : "Table " + table.getTypeName()
-                    + " has invalid type " + table.getTabletype() + " for topics";
-
                 Table curTable = topicStreams.put(table.getTopicname(), table);
                 if (curTable != null) {
                     throw new RuntimeException(String.format("Streams %s and %s refer to the same topic %s",
@@ -2106,7 +2108,7 @@ public abstract class CatalogUtil {
         // Detect topic duplicates here since we have an update logic below: note case-insensitive check
         HashSet<String> topics = new HashSet<>();
 
-        // Create topics, connecting them to streams as we go
+        // Create topics, connecting them to streams or tables as we go
         CatalogMap<Topic> cataTopics = db.getTopics();
         cataTopics.clear();
         for (TopicType topic : topicsType.getTopic()) {
@@ -2154,14 +2156,16 @@ public abstract class CatalogUtil {
                 cataProps.add(TopicProperties.Key.TOPIC_FORMAT.name()).setValue(formatName);
             }
 
-            // Connect stream to topic
+            // Connect stream/tables to topic
             String streamName = null;
             Table table = topicStreams.get(cataTopic.getTypeName());
             if (table != null) {
                 streamName = table.getTypeName();
 
-                // On DDL update, stream exporting to topics are set to connectorless.
-                // If stream exports to topic, change stream type.
+                // On DDL update, streams exporting to topics are set to connectorless.
+                // If stream exports to topic, change stream type: this will enable creating
+                // the data sources for this STREAM.
+                //
                 // Note that on LOAD CLASSES the table type is already set
                 if (TableType.isConnectorLessStream(table.getTabletype())) {
                     table.setTabletype(TableType.STREAM.get());
@@ -2184,13 +2188,28 @@ public abstract class CatalogUtil {
             cataTopic.setStreamname(streamName);
         }
 
-        // Handle the cases where the topic is removed from deployment: any
-        // stream referring to it must be converted to connectorless.
+        // Handle the cases where the topic does not exist in deployment:
+        // - Any STREAM referring to it must be converted to connectorless in order to drop
+        //   the data sources.
+        // - Reject any persistent TABLE referring to a non-existent topic.
+        Set<String> orphanTables = new HashSet<>();
         for (Table table : topicStreams.values()) {
-            if (cataTopics.get(table.getTopicname()) != null || TableType.isConnectorLessStream(table.getTabletype())) {
+            int tableType = table.getTabletype();
+            if (cataTopics.get(table.getTopicname()) != null || TableType.isConnectorLessStream(tableType)) {
                 continue;
             }
-            table.setTabletype(TableType.CONNECTOR_LESS_STREAM.get());
+
+            if (TableType.isStream(tableType)) {
+                table.setTabletype(TableType.CONNECTOR_LESS_STREAM.get());
+            }
+            else {
+                orphanTables.add(table.getTypeName());
+            }
+        }
+
+        if (!orphanTables.isEmpty()) {
+            throw new RuntimeException(String.format(
+                    "The following tables export to topics that are missing in deployment: %s", orphanTables));
         }
     }
 

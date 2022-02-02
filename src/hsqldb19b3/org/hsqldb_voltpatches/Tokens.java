@@ -1,4 +1,5 @@
-/* Copyright (c) 2001-2021, The HSQL Development Group
+/* Copyright (c) 2001-2009, The HSQL Development Group
+ * Copyright (c) 2010-2022, VoltDB Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -1980,10 +1981,6 @@ public class Tokens {
         reservedKeys.put(Tokens.T_UNIQUE, UNIQUE);
         // A VoltDB extension to support the assume unique index attribute
         reservedKeys.put(Tokens.T_ASSUMEUNIQUE, ASSUMEUNIQUE);
-        // A VoltDB extension to support the migrating index attribute
-        // TODO: by making MIGRATING not reserved key word, we allow HSQL to parse MIGRATING as a SQL function name.
-        // In future (ENG-15699), we shall remove code introduced for CREATE MIGRATING INDEX syntax.
-        //reservedKeys.put(Tokens.T_MIGRATING, MIGRATING);
         // End of VoltDB extension
         reservedKeys.put(Tokens.T_UNKNOWN, UNKNOWN);
         reservedKeys.put(Tokens.T_UNNEST, UNNEST);
