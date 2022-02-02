@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -82,8 +82,13 @@ public enum QueryType {
      * @return Type of query
      */
     public static QueryType getFromSQL(String stmt) {
-        // trim the front whitespace, substring to the first word and normalize
-        stmt = StringUtils.stripStart(stmt, null).substring(0, 6).toLowerCase();
+        // trim the front whitespace, substring to the first 6 chars
+        // (an approximation to the first word), and normalize
+        stmt = StringUtils.stripStart(stmt, null);
+        if (stmt.length() > 6) {
+            stmt = stmt.substring(0, 6);
+        }
+        stmt = stmt.toLowerCase();
 
         // determine the type of the query
         if (stmt.startsWith("insert")) {
