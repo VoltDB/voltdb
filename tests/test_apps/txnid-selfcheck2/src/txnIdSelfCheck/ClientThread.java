@@ -251,6 +251,8 @@ public class ClientThread extends BenchmarkThread {
         if (cri.getStatus() == ClientResponse.CONNECTION_LOST ||
                 cri.getStatus() == ClientResponse.CONNECTION_TIMEOUT ||
                 cri.getStatus() == ClientResponse.SERVER_UNAVAILABLE ||
+                cri.getStatus() == ClientResponse.CLIENT_REQUEST_TIMEOUT ||
+                cri.getStatus() == ClientResponse.CLIENT_RESPONSE_TIMEOUT ||
                 cri.getStatus() == ClientResponse.RESPONSE_UNKNOWN) {
 
             log.warn("ClientThread had a proc-call exception that didn't indicate bad data: " + e.getMessage());
