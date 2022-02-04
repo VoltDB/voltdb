@@ -248,32 +248,15 @@ public class ClientThread extends BenchmarkThread {
             return;
         }
         // other proc call exceptions are logged, but don't stop the thread
-        if (cri.getStatus() == ClientResponse.CONNECTION_LOST ||
-                cri.getStatus() == ClientResponse.CONNECTION_TIMEOUT ||
-                cri.getStatus() == ClientResponse.SERVER_UNAVAILABLE ||
-                cri.getStatus() == ClientResponse.CLIENT_REQUEST_TIMEOUT ||
-                cri.getStatus() == ClientResponse.CLIENT_RESPONSE_TIMEOUT ||
-                cri.getStatus() == ClientResponse.RESPONSE_UNKNOWN) {
+        if (TxnId2Utils.isServerUnavailableStatus(cri.getStatus())||
+                TxnId2Utils.isServerUnavailableIssue(cri.getStatusString())) {
 
             log.warn("ClientThread had a proc-call exception that didn't indicate bad data: " + e.getMessage());
             log.warn(cri.toJSONString());
-
-            // take a breather to avoid slamming the log (stay paused if no connections)
-            int connectedHosts = 0;
-            do {
-                try { Thread.sleep(3000); } catch (Exception e2) {} // sleep for 3s
-                // bail on wakeup if we're supposed to bail
-                if (!m_shouldContinue.get()) {
-                    return;
-                }
-                connectedHosts = m_client2 == null?
-                        m_client.getConnectedHostList().size() : m_client2.connectedHosts().size();
-            }
-            while (connectedHosts== 0);
-
+            takeABreather();
         }
-        // this implies bad data and is fatal
         else{
+            // this implies bad data and is fatal
             hardStop("ClientThread had a proc-call exception that indicated bad data", cri);
         }
     }
@@ -287,18 +270,7 @@ public class ClientThread extends BenchmarkThread {
             }
             catch (NoConnectionsException e) {
                 log.error("ClientThread got NoConnectionsException on proc call. Will sleep.");
-                // take a breather to avoid slamming the log (stay paused if no connections)
-                int connectedHosts = 0;
-                do {
-                    try { Thread.sleep(3000); } catch (Exception e2) {} // sleep for 3s
-                    // bail on wakeup if we're supposed to bail
-                    if (!m_shouldContinue.get()) {
-                        return;
-                    }
-                    connectedHosts = m_client2 == null?
-                            m_client.getConnectedHostList().size() : m_client2.connectedHosts().size();
-                }
-                while (connectedHosts== 0);
+                takeABreather( );
             }
             catch (ProcCallException e) {
                 ClientResponseImpl cri = (ClientResponseImpl) e.getClientResponse();
@@ -318,5 +290,20 @@ public class ClientThread extends BenchmarkThread {
                 hardStop("ClientThread had a non proc-call exception", e);
             }
         }
+    }
+
+    private void takeABreather() {
+        // take a breather to avoid slamming the log (stay paused if no connections)
+        int connectedHosts = 0;
+        do {
+            try { Thread.sleep(3000); } catch (Exception e2) {} // sleep for 3s
+            // bail on wakeup if we're supposed to bail
+            if (!m_shouldContinue.get()) {
+                return;
+            }
+            connectedHosts = m_client2 == null?
+                    m_client.getConnectedHostList().size() : m_client2.connectedHosts().size();
+        }
+        while (connectedHosts== 0);
     }
 }

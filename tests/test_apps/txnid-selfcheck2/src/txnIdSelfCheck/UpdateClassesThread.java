@@ -23,14 +23,19 @@
 
 package txnIdSelfCheck;
 
+import java.io.BufferedInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Random;
+import java.util.concurrent.atomic.AtomicBoolean;
+
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
-
-import java.io.*;
-import java.util.Random;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 
 public class UpdateClassesThread extends BenchmarkThread {
@@ -140,9 +145,8 @@ public class UpdateClassesThread extends BenchmarkThread {
                     else
                         m_needsBlock.set(true);
                 }
-                if (cr.getStatus() == ClientResponse.SERVER_UNAVAILABLE || cr.getStatus() == ClientResponse.CONNECTION_LOST
-                  || cr.getStatus() == ClientResponse.CONNECTION_TIMEOUT) {
-                    log.warn("UpdateClasses got SERVER_UNAVAILABLE on proc call. Will sleep.");
+                if (TxnId2Utils.isServerUnavailableStatus(cr.getStatus())) {
+                    log.warn("UpdateClasses got a server unavailable status on proc call. Will sleep.");
                     m_needsBlock.set(true);
                 }
             }

@@ -160,8 +160,11 @@ public class Benchmark {
         @Option(desc = "Target data size for the partitioned filler table.")
         long partfillerrowmb = 128;
 
+        @Option(desc = "Client Timeout: increased from default to pass recover tests.")
+        int clienttimeout = 240;
+
         @Option(desc = "Timeout that kills the client if progress is not made.")
-        int progresstimeout = 120;
+        int progresstimeout = 240;
 
         @Option(desc = "Whether or not to disable adhoc writes.")
         boolean disableadhoc = false;
@@ -386,7 +389,8 @@ public class Benchmark {
     Client2 getClient2() {
         Client2Config clientConfig = new Client2Config()
                 .clientRequestLimit(REQUEST_LIMIT)
-                .outstandingTransactionLimit(REQUEST_LIMIT / 10);
+                .outstandingTransactionLimit(REQUEST_LIMIT / 10)
+                .procedureCallTimeout(config.clienttimeout, TimeUnit.SECONDS);
         if (config.sslfile.trim().length() > 0) {
             clientConfig.trustStoreFromPropertyFile(config.sslfile);
             clientConfig.enableSSL();
@@ -413,6 +417,7 @@ public class Benchmark {
         log.info(config.getConfigDumpString());
 
         ClientConfig clientConfig = new ClientConfig(config.username, config.password, new StatusListener());
+        clientConfig.setProcedureCallTimeout(TimeUnit.SECONDS.toMillis(config.clienttimeout));
         if (config.sslfile.trim().length() > 0) {
             clientConfig.setTrustStoreConfigFromPropertyFile(config.sslfile);
             clientConfig.enableSSL();

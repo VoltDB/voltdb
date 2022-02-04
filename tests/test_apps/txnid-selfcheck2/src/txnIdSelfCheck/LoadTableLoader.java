@@ -23,11 +23,6 @@
 
 package txnIdSelfCheck;
 
-import org.voltdb.ClientResponseImpl;
-import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
-import org.voltdb.client.*;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -38,6 +33,15 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+
+import org.voltdb.ClientResponseImpl;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
+import org.voltdb.client.Client;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NoConnectionsException;
+import org.voltdb.client.ProcCallException;
+import org.voltdb.client.ProcedureCallback;
 
 /**
  * The LoadTableLoader gets passed in with tableName for which the thread does loading of data using sysproc. For MP
@@ -160,11 +164,7 @@ public class LoadTableLoader extends BenchmarkThread {
         public void clientCallback(ClientResponse clientResponse) throws Exception {
             latch.countDown();
             byte status = clientResponse.getStatus();
-            if (status != ClientResponse.SUCCESS
-                    && status != ClientResponse.CONNECTION_LOST
-                    && status != ClientResponse.CONNECTION_TIMEOUT
-                    && status != ClientResponse.SERVER_UNAVAILABLE
-                    && status != ClientResponse.RESPONSE_UNKNOWN) {
+            if (status != ClientResponse.SUCCESS && !TxnId2Utils.isServerUnavailableStatus(status)) {
                 // log what happened status will be logged in json error log.
                 hardStop("LoadTableLoader failed to insert into table " + m_tableName
                         + " and this shoudn't happen, source "
@@ -208,11 +208,7 @@ public class LoadTableLoader extends BenchmarkThread {
             currentRowCount.incrementAndGet();
             latch.countDown();
             byte status = clientResponse.getStatus();
-            if (status != ClientResponse.SUCCESS
-                    && status != ClientResponse.CONNECTION_LOST
-                    && status != ClientResponse.CONNECTION_TIMEOUT
-                    && status != ClientResponse.SERVER_UNAVAILABLE
-                    && status != ClientResponse.RESPONSE_UNKNOWN) {
+            if (status != ClientResponse.SUCCESS && !TxnId2Utils.isServerUnavailableStatus(status)) {
                 // log what happened
                 hardStop("LoadTableLoader gracefully failed to copy from table " + m_tableName
                         + " and this shoudn't happen. Exiting.", clientResponse);
@@ -266,11 +262,7 @@ public class LoadTableLoader extends BenchmarkThread {
         public void clientCallback(ClientResponse clientResponse) throws Exception {
             latch.countDown();
             byte status = clientResponse.getStatus();
-            if (status != ClientResponse.SUCCESS
-                    && status != ClientResponse.CONNECTION_LOST
-                    && status != ClientResponse.CONNECTION_TIMEOUT
-                    && status != ClientResponse.SERVER_UNAVAILABLE
-                    && status != ClientResponse.RESPONSE_UNKNOWN) {
+            if (status != ClientResponse.SUCCESS && !TxnId2Utils.isServerUnavailableStatus(status)) {
                 // log what happened
                 hardStop("LoadTableLoader gracefully failed to delete from table " + m_tableName
                         + " and this shoudn't happen. " + source + " Exiting.", clientResponse);

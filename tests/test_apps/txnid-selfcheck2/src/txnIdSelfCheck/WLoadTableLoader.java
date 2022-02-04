@@ -23,11 +23,6 @@
 
 package txnIdSelfCheck;
 
-import org.voltdb.ClientResponseImpl;
-import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
-import org.voltdb.client.*;
-
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -40,6 +35,15 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+
+import org.voltdb.ClientResponseImpl;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
+import org.voltdb.client.Client;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NoConnectionsException;
+import org.voltdb.client.ProcCallException;
+import org.voltdb.client.ProcedureCallback;
 
 /**
  * The WLoadTableLoader gets passed in with tableName for which the thread does loading of data using sysproc. For MP
@@ -231,11 +235,7 @@ public class WLoadTableLoader extends BenchmarkThread {
         public void clientCallback(ClientResponse clientResponse) throws Exception {
             latch.countDown();
             byte status = clientResponse.getStatus();
-            if (status != ClientResponse.SUCCESS
-                    && status != ClientResponse.CONNECTION_LOST
-                    && status != ClientResponse.CONNECTION_TIMEOUT
-                    && status != ClientResponse.SERVER_UNAVAILABLE
-                    && status != ClientResponse.RESPONSE_UNKNOWN) {
+            if (status != ClientResponse.SUCCESS && !TxnId2Utils.isServerUnavailableStatus(status)) {
                 // log what happened status will be logged in json error log.
                 hardStop("WLoadTableLoader failed to insert into table " + m_tableName
                         + " and this shoudn't happen, source "
@@ -280,11 +280,7 @@ public class WLoadTableLoader extends BenchmarkThread {
             currentRowCount.incrementAndGet();
             latch.countDown();
             byte status = clientResponse.getStatus();
-            if (status != ClientResponse.SUCCESS
-                    && status != ClientResponse.CONNECTION_LOST
-                    && status != ClientResponse.CONNECTION_TIMEOUT
-                    && status != ClientResponse.SERVER_UNAVAILABLE
-                    && status != ClientResponse.RESPONSE_UNKNOWN) {
+            if (status != ClientResponse.SUCCESS && !TxnId2Utils.isServerUnavailableStatus(status)) {
                 // log what happened
                 hardStop("WLoadTableLoader gracefully failed to copy from table " + m_tableName
                         + " and this shoudn't happen. Exiting.", clientResponse);
@@ -339,11 +335,7 @@ public class WLoadTableLoader extends BenchmarkThread {
         public void clientCallback(ClientResponse clientResponse) throws Exception {
             latch.countDown();
             byte status = clientResponse.getStatus();
-            if (status != ClientResponse.SUCCESS
-                    && status != ClientResponse.CONNECTION_LOST
-                    && status != ClientResponse.CONNECTION_TIMEOUT
-                    && status != ClientResponse.SERVER_UNAVAILABLE
-                    && status != ClientResponse.RESPONSE_UNKNOWN) {
+            if (status != ClientResponse.SUCCESS && !TxnId2Utils.isServerUnavailableStatus(status)) {
                 // log what happened
                 hardStop("WLoadTableLoader gracefully failed to delete from table " + m_tableName
                         + " and this shoudn't happen. " + source + " Exiting.", clientResponse);
@@ -517,7 +509,7 @@ public class WLoadTableLoader extends BenchmarkThread {
                     newRow.add(formatSeqNo(seq));
                 else {
                     int origin = m_random.nextInt(m_randomString.length() - m_col_len[i]);
-                    newRow.add((String) m_randomString.substring(origin, origin + m_col_len[i]));
+                    newRow.add(m_randomString.substring(origin, origin + m_col_len[i]));
                 }
             }
             else if (m_col_len[i] == -1)
