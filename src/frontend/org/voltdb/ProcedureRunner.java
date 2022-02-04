@@ -381,6 +381,9 @@ public class ProcedureRunner {
 
             // inject sysproc execution context as the first parameter.
             if (isSystemProcedure()) {
+                // Regardless of what the systemsettings says all sysprocs dont require a copy of the parameter.
+                // If you write a new sysproc that modifies param you are doing it wrong.
+                keepParamsImmutable = false;
                 final Object[] combinedParams = new Object[paramList.length + 1];
                 combinedParams[0] = m_site.getSystemProcedureExecutionContext();
                 for (int i=0; i < paramList.length; ++i) {
