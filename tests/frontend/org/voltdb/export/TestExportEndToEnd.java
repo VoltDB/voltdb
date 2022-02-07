@@ -193,7 +193,6 @@ public class TestExportEndToEnd extends ExportLocalClusterBase {
         m_cluster.rejoinOne(1);
         client.drain();
 
-        client = getClient(m_cluster);
         m_verifier.waitForTuplesAndVerify(client);
         assertEquals(3, m_cluster.getLiveNodeCount());
     }
@@ -246,10 +245,9 @@ public class TestExportEndToEnd extends ExportLocalClusterBase {
         pkeyStart = 1000;
         insertToStream("t_1", pkeyStart, 100, client, data);
         client.drain();
+
         // rejoin node back
         m_cluster.rejoinOne(0);
-
-        client = getClient(m_cluster);
         m_verifier.waitForTuples(client);
 
         // make sure no partition has more than active stream
