@@ -48,7 +48,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Consumer;
+import java.util.function.BooleanSupplier;
+import java.util.function.Function;
 
 import org.junit.After;
 import org.junit.Before;
@@ -92,6 +93,9 @@ public class TestTaskManager {
 
     private static final String PROCEDURE_NAME = "SomeProcedure";
     private static final String USER_NAME = "user";
+
+    // This test is timing-sensitive so use a 1s wait timeout
+    private static final long WAIT_TIMEOUT = TimeUnit.SECONDS.toNanos(1);
 
     @Rule
     public final TestName m_name = new TestName();
@@ -151,17 +155,16 @@ public class TestTaskManager {
         Task task = createTask(TestActionScheduler.class, TaskScope.DATABASE);
 
         startSync(ImmutableMap.of());
-        assertEquals(0, s_firstActionSchedulerCallCount.get());
+        check(() -> 0 == s_firstActionSchedulerCallCount.get());
 
         processUpdateSync(ImmutableMap.of(), task);
-        assertEquals(0, s_firstActionSchedulerCallCount.get());
+        check(() -> 0 == s_firstActionSchedulerCallCount.get());
 
         promoteToLeaderSync(ImmutableMap.of(task.getName(), true), task);
-        // Long sleep because it sometimes takes a while for the first execution
-        Thread.sleep(50);
-        assertEquals(1, s_firstActionSchedulerCallCount.get());
-        assertTrue("ActionScheduler should have been called at least once: " + s_postRunActionSchedulerCallCount.get(),
-                s_postRunActionSchedulerCallCount.get() > 0);
+        check(() -> 1 == s_firstActionSchedulerCallCount.get());
+
+        // ActionScheduler should have been called at least once
+        check(() -> s_postRunActionSchedulerCallCount.get() > 0);
 
         dropScheduleAndAssertCounts();
     }
@@ -176,14 +179,13 @@ public class TestTaskManager {
         m_procedure.setTransactional(false);
 
         startSync(ImmutableMap.of());
-        assertEquals(0, s_firstActionSchedulerCallCount.get());
+        check(() -> 0 == s_firstActionSchedulerCallCount.get());
 
         processUpdateSync(ImmutableMap.of(task.getName(), true), task);
-        // Long sleep because it sometimes takes a while for the first execution
-        Thread.sleep(50);
-        assertEquals(1, s_firstActionSchedulerCallCount.get());
-        assertTrue("ActionScheduler should have been called at least once: " + s_postRunActionSchedulerCallCount.get(),
-                s_postRunActionSchedulerCallCount.get() > 0);
+        check(() -> 1 == s_firstActionSchedulerCallCount.get());
+
+        // ActionScheduler should have been called at least once
+        check(() -> s_postRunActionSchedulerCallCount.get() > 0);
 
         dropScheduleAndAssertCounts();
     }
@@ -201,29 +203,25 @@ public class TestTaskManager {
         m_procedure.setPartitionparameter(-1);
 
         startSync(ImmutableMap.of());
-        assertEquals(0, s_firstActionSchedulerCallCount.get());
+        check(() -> 0 == s_firstActionSchedulerCallCount.get());
 
         processUpdateSync(ImmutableMap.of(task.getName(), true), task);
-        assertEquals(0, s_firstActionSchedulerCallCount.get());
+        check(() -> 0 == s_firstActionSchedulerCallCount.get());
 
         promotedPartitionsSync(0, 4);
-        // Long sleep because it sometimes takes a while for the first execution
-        Thread.sleep(50);
-        assertEquals(2, s_firstActionSchedulerCallCount.get());
-        assertTrue("ActionScheduler should have been called at least once: " + s_postRunActionSchedulerCallCount.get(),
-                s_postRunActionSchedulerCallCount.get() > 0);
+        check(() -> 2 == s_firstActionSchedulerCallCount.get());
+
+        // ActionScheduler should have been called at least once
+        check(() -> s_postRunActionSchedulerCallCount.get() > 0);
 
         demotedPartitionsSync(0, 4);
         assertCountsAfterScheduleCanceled(2, 0);
 
         int previousCount = s_postRunActionSchedulerCallCount.get();
         promotedPartitionsSync(0);
-        // Long sleep because it sometimes takes a while for the first execution
-        Thread.sleep(20);
-        assertTrue(
-                "ActionScheduler should have been called at least " + previousCount + " times: "
-                        + s_postRunActionSchedulerCallCount.get(),
-                s_postRunActionSchedulerCallCount.get() > previousCount);
+
+        // ActionScheduler should have been called at least previousCount times
+        check(() -> s_postRunActionSchedulerCallCount.get() > previousCount);
 
         dropScheduleAndAssertCounts(3);
     }
@@ -236,17 +234,16 @@ public class TestTaskManager {
         Task task = createTask(TestActionSchedulerParams.class, TaskScope.DATABASE, 5, "TESTING", "AFFA47");
 
         startSync(ImmutableMap.of());
-        assertEquals(0, s_firstActionSchedulerCallCount.get());
+        check(() -> 0 == s_firstActionSchedulerCallCount.get());
 
         processUpdateSync(ImmutableMap.of(), task);
-        assertEquals(0, s_firstActionSchedulerCallCount.get());
+        check(() -> 0 == s_firstActionSchedulerCallCount.get());
 
         promoteToLeaderSync(ImmutableMap.of(task.getName(), true), task);
-        // Long sleep because it sometimes takes a while for the first execution
-        Thread.sleep(50);
-        assertEquals(1, s_firstActionSchedulerCallCount.get());
-        assertTrue("ActionScheduler should have been called at least once: " + s_postRunActionSchedulerCallCount.get(),
-                s_postRunActionSchedulerCallCount.get() > 0);
+        check(() -> 1 == s_firstActionSchedulerCallCount.get());
+
+        // ActionScheduler should have been called at least once
+        check(() -> s_postRunActionSchedulerCallCount.get() > 0);
 
         dropScheduleAndAssertCounts();
     }
@@ -257,7 +254,6 @@ public class TestTaskManager {
     @Test
     public void schedulerWithBadParameters() throws Exception {
         Task task = createTask(TestActionSchedulerParams.class, TaskScope.DATABASE, 5, "TESTING", "ZZZ");
-
         assertFalse(validateTask(task).isValid());
 
         task.getSchedulerparameters().get("0").setParameter("NAN");
@@ -288,8 +284,8 @@ public class TestTaskManager {
         startSync(ImmutableMap.of(task2.getName(), true), task1, task2);
         promoteToLeaderSync(ImmutableMap.of(task1.getName(), true), task1, task2);
         promotedPartitionsSync(0, 1, 2, 3);
-        Thread.sleep(50);
-        assertEquals(5, s_firstActionSchedulerCallCount.get());
+
+        check(() -> 5 == s_firstActionSchedulerCallCount.get());
         m_taskManager.shutdown().get();
     }
 
@@ -302,10 +298,9 @@ public class TestTaskManager {
 
         startSync(ImmutableMap.of(), task);
         promoteToLeaderSync(ImmutableMap.of(task.getName(), true), task);
-        // Long sleep because it sometimes takes a while for the first execution
-        Thread.sleep(50);
-        assertEquals(1, s_firstActionSchedulerCallCount.get());
-        assertEquals(4, s_postRunActionSchedulerCallCount.get());
+
+        check(() -> 1 == s_firstActionSchedulerCallCount.get());
+        check(() -> 4 == s_postRunActionSchedulerCallCount.get());
     }
 
     /*
@@ -318,17 +313,14 @@ public class TestTaskManager {
 
         startSync(ImmutableMap.of());
         promoteToLeaderSync(ImmutableMap.of(task.getName(), true), task);
-        Thread.sleep(50);
-        assertEquals(1, s_firstActionSchedulerCallCount.get());
+        check(() -> 1 == s_firstActionSchedulerCallCount.get());
 
         task.setEnabled(false);
         processUpdateSync(ImmutableMap.of(), task);
-        Thread.sleep(5);
-        validateStats(1, "DISABLED", null);
+        checkStats(1, "DISABLED", null);
 
         task.setEnabled(true);
         processUpdateSync(ImmutableMap.of(), task);
-        Thread.sleep(20);
         dropScheduleAndAssertCounts(2);
     }
 
@@ -346,32 +338,32 @@ public class TestTaskManager {
 
         promotedPartitionsSync(0, 1);
 
-        assertEquals(2, getScheduleStats().getRowCount());
+        check(() -> 2 == getScheduleStats().getRowCount());
 
         task.setEnabled(true);
         processUpdateSync(ImmutableMap.of(), task);
 
-        assertEquals(2, getScheduleStats().getRowCount());
+        check(() -> 2 == getScheduleStats().getRowCount());
 
         promotedPartitionsSync(2, 3);
-        assertEquals(4, getScheduleStats().getRowCount());
+        check(() -> 4 == getScheduleStats().getRowCount());
 
         task.setEnabled(false);
         processUpdateSync(ImmutableMap.of(), task);
 
         promotedPartitionsSync(4, 5);
-        assertEquals(6, getScheduleStats().getRowCount());
+        check(() -> 6 == getScheduleStats().getRowCount());
 
         task.setEnabled(true);
         processUpdateSync(ImmutableMap.of(), task);
 
-        assertEquals(6, getScheduleStats().getRowCount());
+        check(() -> 6 == getScheduleStats().getRowCount());
 
         task.setEnabled(false);
         processUpdateSync(ImmutableMap.of(), task);
 
         demotedPartitionsSync(3, 4, 5);
-        assertEquals(3, getScheduleStats().getRowCount());
+        check(() -> 3 == getScheduleStats().getRowCount());
     }
 
     /*
@@ -383,9 +375,8 @@ public class TestTaskManager {
         Task task = createTask(TestActionScheduler.class, TaskScope.DATABASE);
         startSync(ImmutableMap.of());
         promoteToLeaderSync(ImmutableMap.of(task.getName(), true), task);
-        Thread.sleep(50);
-        assertEquals(1, s_firstActionSchedulerCallCount.get());
-        assertEquals(0, s_postRunActionSchedulerCallCount.get());
+        check(() -> 1 == s_firstActionSchedulerCallCount.get());
+        check(() -> 0 == s_postRunActionSchedulerCallCount.get());
     }
 
     /*
@@ -397,13 +388,7 @@ public class TestTaskManager {
         Task task = createTask(TestActionScheduler.class, TaskScope.DATABASE);
         startSync(ImmutableMap.of());
         promoteToLeaderSync(ImmutableMap.of(task.getName(), true), task);
-        Thread.sleep(100);
-        do {
-            if (s_firstActionSchedulerCallCount.get() == 1 && s_postRunActionSchedulerCallCount.get() == 1) {
-                break;
-            }
-            Thread.sleep(25);
-        } while (true);
+        check(() -> s_firstActionSchedulerCallCount.get() == 1 && s_postRunActionSchedulerCallCount.get() == 1);
     }
 
     /*
@@ -426,47 +411,106 @@ public class TestTaskManager {
         processUpdateSync(ImmutableMap.of(task1.getName(), true, task2.getName(), true), jarFile.getLoader(), false,
                 task1, task2);
 
-        Thread.sleep(100);
-
-        VoltTable table = getScheduleStats();
+        // Track invocations
         Map<String, Long> invocationCounts = new HashMap<>();
-        while (table.advanceRow()) {
-            invocationCounts.put(table.getString("TASK_NAME"), table.getLong("SCHEDULER_INVOCATIONS"));
+        invocationCounts.put("TestActionScheduler", 0L);
+        invocationCounts.put("TestActionSchedulerRerun", 0L);
+
+        // Wait for both tasks to appear in stats
+        VoltTable table = null;
+        long start = System.nanoTime();
+        while (true) {
+            table = getScheduleStats();
+            Map<String, Long> ic = new HashMap<>();
+            while (table.advanceRow()) {
+                ic.put(table.getString("TASK_NAME"), table.getLong("SCHEDULER_INVOCATIONS"));
+            }
+            if (invocationCounts.keySet().containsAll(ic.keySet())) {
+                invocationCounts.putAll(ic);
+                break;
+            }
+            else if (System.nanoTime() - start > WAIT_TIMEOUT) {
+                assertTrue(invocationCounts.keySet().containsAll(ic.keySet()));
+            }
+            else {
+                Thread.sleep(10);
+            }
         }
 
         // No schedules should restart since class and deps did not change
         processUpdateSync(ImmutableMap.of(), jarFile.getLoader(), false,
                 task1, task2);
-        Thread.sleep(5);
 
-        table = getScheduleStats();
-        while (table.advanceRow()) {
-            String scheduleName = table.getString("TASK_NAME");
-            long currentCount = table.getLong("SCHEDULER_INVOCATIONS");
-            assertTrue("Count decreased for " + scheduleName,
-                    invocationCounts.put(scheduleName, currentCount) < currentCount);
-        }
-
-        Thread.sleep(5);
+        // Verify that the counts decrease
+        start = System.nanoTime();
+        Try1:
+            while(true) {
+                boolean elapsed = System.nanoTime() - start > WAIT_TIMEOUT;
+                table = getScheduleStats();
+                Map<String, Long> ic = new HashMap<>();
+                while (table.advanceRow()) {
+                    String scheduleName = table.getString("TASK_NAME");
+                    long currentCount = table.getLong("SCHEDULER_INVOCATIONS");
+                    if (invocationCounts.get(scheduleName) >= currentCount) {
+                        if (elapsed) {
+                            assertTrue("Count decreased for " + scheduleName,
+                                    ic.get(scheduleName) < currentCount);
+                        }
+                        else {
+                            Thread.sleep(10);
+                            continue Try1;
+                        }
+                    }
+                    else {
+                        ic.put(scheduleName, currentCount);
+                    }
+                }
+                if (invocationCounts.keySet().containsAll(ic.keySet())) {
+                    invocationCounts.putAll(ic);
+                    break;
+                }
+            }
 
         // Only schedules which do not specify deps should restart
         processUpdateSync(ImmutableMap.of(task2.getName(), true), jarFile.getLoader(), true,
                 task1, task2);
-        Thread.sleep(5);
 
-        table = getScheduleStats();
-        while (table.advanceRow()) {
-            String scheduleName = table.getString("TASK_NAME");
-            long currentCount = table.getLong("SCHEDULER_INVOCATIONS");
-            long previousCount = invocationCounts.put(scheduleName, currentCount);
-            if (scheduleName.equals("TestActionScheduler")) {
-                assertTrue("Count decreased for " + scheduleName, previousCount < currentCount);
-            } else {
-                assertTrue("Count should be greater than 0: " + scheduleName, currentCount > 0);
+        // Verify the counts
+        start = System.nanoTime();
+        Try2:
+            while(true) {
+                boolean elapsed = System.nanoTime() - start > WAIT_TIMEOUT;
+                table = getScheduleStats();
+                Map<String, Long> ic = new HashMap<>();
+                while (table.advanceRow()) {
+                    String scheduleName = table.getString("TASK_NAME");
+                    long currentCount = table.getLong("SCHEDULER_INVOCATIONS");
+                    long previousCount = invocationCounts.put(scheduleName, currentCount);
+                    if (scheduleName.equals("TestActionScheduler")) {
+                        if (previousCount >= currentCount) {
+                            if (elapsed) {
+                                assertTrue("Count decreased for " + scheduleName, previousCount < currentCount);
+                            }
+                            else {
+                                Thread.sleep(10);
+                                continue Try2;
+                            }
+                        }
+                    } else if (currentCount == 0) {
+                        if (elapsed) {
+                            assertTrue("Count should be greater than 0: " + scheduleName, currentCount > 0);
+                        }
+                        else {
+                            Thread.sleep(10);
+                            continue Try2;
+                        }
+                    }
+                }
+                if (invocationCounts.keySet().containsAll(ic.keySet())) {
+                    invocationCounts.putAll(ic);
+                    break;
+                }
             }
-        }
-
-        Thread.sleep(5);
 
         // Update class dep so all should restart
         vc = new VoltCompiler(false);
@@ -475,16 +519,31 @@ public class TestTaskManager {
         jarFile.removeClassFromJar(TestActionSchedulerParams.class.getName());
         processUpdateSync(ImmutableMap.of(task1.getName(), true, task2.getName(), true), jarFile.getLoader(), true,
                 task1, task2);
-        Thread.sleep(5);
 
-        table = getScheduleStats();
-        while (table.advanceRow()) {
-            String scheduleName = table.getString("TASK_NAME");
-            long currentCount = table.getLong("SCHEDULER_INVOCATIONS");
-            assertTrue("Count should be greater than 0: " + scheduleName, currentCount > 0);
-        }
-
-        Thread.sleep(5);
+        start = System.nanoTime();
+        Try3:
+            while(true) {
+                boolean elapsed = System.nanoTime() - start > WAIT_TIMEOUT;
+                table = getScheduleStats();
+                Map<String, Long> ic = new HashMap<>();
+                while (table.advanceRow()) {
+                    String scheduleName = table.getString("TASK_NAME");
+                    long currentCount = table.getLong("SCHEDULER_INVOCATIONS");
+                    if (currentCount == 0) {
+                        if (elapsed) {
+                            assertTrue("Count should be greater than 0: " + scheduleName, currentCount > 0);
+                        }
+                        else {
+                            Thread.sleep(10);
+                            continue Try3;
+                        }
+                    }
+                }
+                if (invocationCounts.keySet().containsAll(ic.keySet())) {
+                    invocationCounts.putAll(ic);
+                    break;
+                }
+            }
 
         // Update implicit sub class dep so all should restart
         vc = new VoltCompiler(false);
@@ -494,14 +553,31 @@ public class TestTaskManager {
         jarFile.removeClassFromJar(TestActionScheduler.Dummy.class.getName());
         processUpdateSync(ImmutableMap.of(task1.getName(), true, task2.getName(), true), jarFile.getLoader(), true,
                 task1, task2);
-        Thread.sleep(5);
 
-        table = getScheduleStats();
-        while (table.advanceRow()) {
-            String scheduleName = table.getString("TASK_NAME");
-            long currentCount = table.getLong("SCHEDULER_INVOCATIONS");
-            assertTrue("Count should be greater than 0: " + scheduleName, currentCount > 0);
-        }
+        start = System.nanoTime();
+        Try4:
+            while(true) {
+                boolean elapsed = System.nanoTime() - start > WAIT_TIMEOUT;
+                table = getScheduleStats();
+                Map<String, Long> ic = new HashMap<>();
+                while (table.advanceRow()) {
+                    String scheduleName = table.getString("TASK_NAME");
+                    long currentCount = table.getLong("SCHEDULER_INVOCATIONS");
+                    if (currentCount == 0) {
+                        if (elapsed) {
+                            assertTrue("Count should be greater than 0: " + scheduleName, currentCount > 0);
+                        }
+                        else {
+                            Thread.sleep(10);
+                            continue Try4;
+                        }
+                    }
+                }
+                if (invocationCounts.keySet().containsAll(ic.keySet())) {
+                    invocationCounts.putAll(ic);
+                    break;
+                }
+            }
     }
 
     /*
@@ -518,18 +594,18 @@ public class TestTaskManager {
         promotedPartitionsSync(0, 1, 2, 3, 4, 5);
 
         // Long sleep because it sometimes takes a while for the first execution
-        Thread.sleep(50);
-        assertEquals(6, s_firstActionSchedulerCallCount.get());
-        assertTrue("ActionScheduler should have been called at least once: " + s_postRunActionSchedulerCallCount.get(),
-                s_postRunActionSchedulerCallCount.get() > 0);
+        check(() -> 6 == s_firstActionSchedulerCallCount.get());
+        check(() -> s_postRunActionSchedulerCallCount.get() > 0);
 
-        validateStats(6, "RUNNING", r -> assertNull(r.getString("SCHEDULER_STATUS")));
+        checkStats(6, "RUNNING", r -> null == r.getString("SCHEDULER_STATUS"));
 
         task.setOnerror("ABORT");
         processUpdateSync(ImmutableMap.of(), task);
-        Thread.sleep(5);
 
-        validateStats(6, "ERROR", r -> assertTrue(r.getString("SCHEDULER_STATUS").startsWith("Procedure ")));
+        checkStats(6, "ERROR", r -> {
+            String status = r.getString("SCHEDULER_STATUS");
+            return status != null && status.startsWith("Procedure ");
+        });
     }
 
     /*
@@ -562,10 +638,8 @@ public class TestTaskManager {
         startSync(ImmutableMap.of());
         promoteToLeaderSync(ImmutableMap.of(task.getName(), true), task);
 
-        Thread.sleep(50);
-        assertEquals(1, s_firstActionSchedulerCallCount.get());
-        assertTrue("ActionSchedule should have been called at least once: " + s_postRunActionSchedulerCallCount.get(),
-                s_postRunActionSchedulerCallCount.get() > 0);
+        check(() -> 1 == s_firstActionSchedulerCallCount.get());
+        check(() -> s_postRunActionSchedulerCallCount.get() > 0);
 
         // SingleProcGenerator does a procedure lookup so include it
         dropScheduleAndAssertCounts(1, 1);
@@ -581,18 +655,16 @@ public class TestTaskManager {
         startSync(ImmutableMap.of());
         promoteToLeaderSync(ImmutableMap.of(task.getName(), true), task);
 
-        Thread.sleep(50);
-        assertEquals(1, s_firstActionSchedulerCallCount.get());
-        assertTrue("ActionSchedule should have been called at least once: " + s_postRunActionSchedulerCallCount.get(),
-                s_postRunActionSchedulerCallCount.get() > 0);
-        validateStats(1);
+        check(() -> 1 == s_firstActionSchedulerCallCount.get());
+        check(() -> s_postRunActionSchedulerCallCount.get() > 0);
+
+        checkStats(1);
         processUpdateSync(ImmutableMap.of(task.getName(), false));
 
         // Same as assertCountsAfterScheduleCanceled(1) except only 1/2 the calls are to the procedure
         int previousCount = s_postRunActionSchedulerCallCount.get();
-        Thread.sleep(10);
-        assertEquals(1, s_firstActionSchedulerCallCount.get());
-        assertEquals(previousCount, s_postRunActionSchedulerCallCount.get());
+        check(() -> 1 == s_firstActionSchedulerCallCount.get());
+        check(() -> previousCount == s_postRunActionSchedulerCallCount.get());
 
         int procedureCalls = previousCount/2;
 
@@ -637,19 +709,19 @@ public class TestTaskManager {
         task2.setEnabled(false);
 
         startSync(ImmutableMap.of(task2.getName(), true), task1, task2);
-        validateStats(0);
+        checkStats(0);
 
         promoteToLeaderSync(ImmutableMap.of(task1.getName(), true), task1, task2);
-        validateStats(1, "DISABLED", null);
+        checkStats(1, "DISABLED", null);
 
         promotedPartitionsSync(0, 1, 2, 3);
-        validateStats(5, "DISABLED", null);
+        checkStats(5, "DISABLED", null);
 
         // Enable tasks
         task1.setEnabled(true);
         task2.setEnabled(true);
         processUpdateSync(ImmutableMap.of(), task1, task2);
-        validateStats(5);
+        checkStats(5);
     }
 
     @Test
@@ -680,20 +752,18 @@ public class TestTaskManager {
         m_procedure.setPartitionparameter(-1);
 
         startSync(ImmutableMap.of(task.getName(), true), task);
-        assertEquals(0, s_firstActionSchedulerCallCount.get());
+        check(() -> 0 == s_firstActionSchedulerCallCount.get());
 
         promotedPartitionsSync(0, 1, 2, 3);
-        assertEquals(0, s_firstActionSchedulerCallCount.get());
+        check(() -> 0 == s_firstActionSchedulerCallCount.get());
 
         enableTasksOnPartitionsSync();
-        Thread.sleep(50);
-        assertEquals(4, s_firstActionSchedulerCallCount.get());
+        check(() -> 4 == s_firstActionSchedulerCallCount.get());
 
         promotedPartitionsSync(4);
-        Thread.sleep(5);
-        assertEquals(5, s_firstActionSchedulerCallCount.get());
+        check(() -> 5 == s_firstActionSchedulerCallCount.get());
 
-        validateStats(5);
+        checkStats(5);
     }
 
     /*
@@ -709,129 +779,128 @@ public class TestTaskManager {
         Task task2 = createTask(TestReadOnlyScheduler.class, TaskScope.DATABASE);
 
         startSync(ImmutableMap.of(), task1, task2);
-        assertEquals(0, s_firstActionSchedulerCallCount.get());
+        check(() -> 0 == s_firstActionSchedulerCallCount.get());
 
         promoteToLeaderSync(ImmutableMap.of(task1.getName(), true, task2.getName(), true), task1, task2);
-        Thread.sleep(50);
-        assertEquals(1, s_firstActionSchedulerCallCount.get());
+        check(() -> 1 == s_firstActionSchedulerCallCount.get());
 
-        validateStats(2, null, r -> {
+        checkStats(2, null, r -> {
             String name = r.getString("TASK_NAME");
             String state = r.getString("STATE");
 
             if (task1.getName().equalsIgnoreCase(name)) {
-                assertEquals("PAUSED", state);
+                if (!state.equals("PAUSED")) return false;
             } else if (task2.getName().equalsIgnoreCase(name)) {
-                assertEquals("RUNNING", state);
+                if (!state.equals("RUNNING")) return false;
             } else {
                 fail("Unknown task: " + name);
             }
+            return true;
         });
 
         // DISABLE task should convert state to DISABLED
         task1.setEnabled(false);
         processUpdateSync(ImmutableMap.of(), getClass().getClassLoader(),
                 false, task1, task2);
-        Thread.sleep(5);
-        assertEquals(1, s_firstActionSchedulerCallCount.get());
+        check(() ->  1 == s_firstActionSchedulerCallCount.get());
 
-        validateStats(2, null, r -> {
+        checkStats(2, null, r -> {
             String name = r.getString("TASK_NAME");
             String state = r.getString("STATE");
 
             if (task1.getName().equalsIgnoreCase(name)) {
-                assertEquals("DISABLED", state);
+                if (!state.equals("DISABLED")) return false;
             } else if (task2.getName().equalsIgnoreCase(name)) {
-                assertEquals("RUNNING", state);
+                if (!state.equals("RUNNING")) return false;
             } else {
                 fail("Unknown task: " + name);
             }
+            return true;
         });
 
         // ENABLE should have state go back to PAUSED
         task1.setEnabled(true);
         processUpdateSync(ImmutableMap.of(), getClass().getClassLoader(),
                 false, task1, task2);
-        Thread.sleep(5);
-        assertEquals(1, s_firstActionSchedulerCallCount.get());
+        check(() -> 1 == s_firstActionSchedulerCallCount.get());
 
-        validateStats(2, null, r -> {
+        checkStats(2, null, r -> {
             String name = r.getString("TASK_NAME");
             String state = r.getString("STATE");
 
             if (task1.getName().equalsIgnoreCase(name)) {
-                assertEquals("PAUSED", state);
+                if (!state.equals("PAUSED")) return false;
             } else if (task2.getName().equalsIgnoreCase(name)) {
-                assertEquals("RUNNING", state);
+                if (!state.equals("RUNNING")) return false;
             } else {
                 fail("Unknown task: " + name);
             }
+            return true;
         });
+
 
         // Disable the second task and then come out of R/O mode and make sure it stays disabled
         task2.setEnabled(false);
         processUpdateSync(ImmutableMap.of(), task1, task2);
-        Thread.sleep(5);
-        assertEquals(1, s_firstActionSchedulerCallCount.get());
+        check(() -> 1 == s_firstActionSchedulerCallCount.get());
 
-        validateStats(2, null, r -> {
+        checkStats(2, null, r -> {
             String name = r.getString("TASK_NAME");
             String state = r.getString("STATE");
 
             if (task1.getName().equalsIgnoreCase(name)) {
-                assertEquals("PAUSED", state);
+                if (!state.equals("PAUSED")) return false;
             } else if (task2.getName().equalsIgnoreCase(name)) {
-                assertEquals("DISABLED", state);
+                if (!state.equals("DISABLED")) return false;
             } else {
                 fail("Unknown task: " + name);
             }
+            return true;
         });
 
         // Make the system read/write and everything should run
         m_readOnly = false;
         m_taskManager.evaluateReadOnlyMode().get();
-        Thread.sleep(5);
-        assertEquals(2, s_firstActionSchedulerCallCount.get());
+        check(() -> 2 == s_firstActionSchedulerCallCount.get());
 
-        validateStats(2, null, r -> {
+        checkStats(2, null, r -> {
             String name = r.getString("TASK_NAME");
             String state = r.getString("STATE");
 
             if (task1.getName().equalsIgnoreCase(name)) {
-                assertEquals("RUNNING", state);
+                if (!state.equals("RUNNING")) return false;
             } else if (task2.getName().equalsIgnoreCase(name)) {
-                assertEquals("DISABLED", state);
+                if (!state.equals("DISABLED")) return false;
             } else {
                 fail("Unknown task: " + name);
             }
+            return true;
         });
 
         task2.setEnabled(true);
         processUpdateSync(ImmutableMap.of(), task1, task2);
-        Thread.sleep(5);
-        assertEquals(3, s_firstActionSchedulerCallCount.get());
-        validateStats(2);
+        check(() -> 3 == s_firstActionSchedulerCallCount.get());
+        checkStats(2);
 
         // Go back to read only mode
         m_readOnly = true;
 
         // Let the tasks run a bit before calling evaluateReadOnlyMode so they should see server unavailable errors
-        Thread.sleep(5);
-        validateStats(2);
+        checkStats(2);
 
         m_taskManager.evaluateReadOnlyMode().get();
-        Thread.sleep(5);
-        validateStats(2, null, r -> {
+        checkStats(2, null, r -> {
             String name = r.getString("TASK_NAME");
             String state = r.getString("STATE");
 
             if (task1.getName().equalsIgnoreCase(name)) {
-                assertEquals("PAUSED", state);
+                if (!state.equals("PAUSED")) return false;
             } else if (task2.getName().equalsIgnoreCase(name)) {
-                assertEquals("RUNNING", state);
+                if (!state.equals("RUNNING")) return false;
             } else {
                 fail("Unknown task: " + name);
             }
+            return true;
         });
     }
 
@@ -841,25 +910,21 @@ public class TestTaskManager {
     @Test
     public void systemTask() throws Exception {
         m_taskManager.addSystemTask(m_name.getMethodName(), TaskScope.PARTITIONS, h -> new TestActionScheduler()).get();
-        assertEquals(0, s_firstActionSchedulerCallCount.get());
+        check(() -> 0 == s_firstActionSchedulerCallCount.get());
 
         startSync(ImmutableMap.of());
-        assertEquals(0, s_firstActionSchedulerCallCount.get());
+        check(() -> 0 == s_firstActionSchedulerCallCount.get());
 
         promotedPartitionsSync(0, 1, 2, 3);
 
         // Long sleep because it sometimes takes a while for the first execution
-        Thread.sleep(50);
-        assertEquals(4, s_firstActionSchedulerCallCount.get());
-        int postRunActionSchedulerCallCount = s_postRunActionSchedulerCallCount.get();
-        assertTrue("ActionScheduler should have been called at least once: " + postRunActionSchedulerCallCount,
-                postRunActionSchedulerCallCount > 0);
+        check(() -> 4 == s_firstActionSchedulerCallCount.get());
+        check(() ->  s_postRunActionSchedulerCallCount.get() > 0);
 
         // Update of no tasks does not affect system tasks
+        int postRunActionSchedulerCallCount = s_postRunActionSchedulerCallCount.get();
         processUpdateSync(ImmutableMap.of());
-        Thread.sleep(5);
-        assertTrue("postRunActionSchedulerCallCount should have increased: " + postRunActionSchedulerCallCount,
-                postRunActionSchedulerCallCount < s_postRunActionSchedulerCallCount.get());
+        check(() -> postRunActionSchedulerCallCount < s_postRunActionSchedulerCallCount.get());
 
         assertTrue(m_taskManager.removeSystemTask(m_name.getMethodName()).get());
         assertCountsAfterScheduleCanceled(4, 0);
@@ -876,7 +941,7 @@ public class TestTaskManager {
     }
 
     private void dropScheduleAndAssertCounts(int startCount, int extraProcLookups) throws Exception {
-        validateStats(1);
+        checkStats(1);
         for (Boolean modification : m_taskManager.processUpdate(m_schedulesConfig, Collections.emptyList(),
                 m_authSystem, getClass().getClassLoader(), false).get().values()) {
             assertFalse(modification);
@@ -885,20 +950,19 @@ public class TestTaskManager {
     }
 
     private void assertCountsAfterScheduleCanceled(int startCount, int extraProcLookups)
-            throws InterruptedException {
-        int previousCount = s_postRunActionSchedulerCallCount.get();
-        Thread.sleep(10);
-        assertEquals(startCount, s_firstActionSchedulerCallCount.get());
-        assertEquals(previousCount, s_postRunActionSchedulerCallCount.get());
+            throws Exception {
+        final int previousCount = s_postRunActionSchedulerCallCount.get();
+        check(() -> startCount == s_firstActionSchedulerCallCount.get());
+        check(() -> previousCount == s_postRunActionSchedulerCallCount.get());
 
         verify(m_internalConnectionHandler, atLeast(previousCount)).callProcedure(any(), any(), eq(false), any(),
                 eq(m_procedure), any(), eq(false), any());
         verify(m_internalConnectionHandler, atMost(previousCount + startCount)).callProcedure(any(), any(), eq(false),
                 any(), eq(m_procedure), any(), eq(false), any());
 
-        previousCount += extraProcLookups * startCount;
-        verify(m_clientInterface, atLeast(previousCount)).getProcedureFromName(eq(PROCEDURE_NAME));
-        verify(m_clientInterface, atMost(previousCount + startCount)).getProcedureFromName(eq(PROCEDURE_NAME));
+        int previousCount2 = previousCount + (extraProcLookups * startCount);
+        verify(m_clientInterface, atLeast(previousCount2)).getProcedureFromName(eq(PROCEDURE_NAME));
+        verify(m_clientInterface, atMost(previousCount2 + startCount)).getProcedureFromName(eq(PROCEDURE_NAME));
     }
 
     private Task createTask(Class<? extends Initializable> clazz, TaskScope scope, Object... params) {
@@ -997,29 +1061,69 @@ public class TestTaskManager {
         return m_statsAgent.getStatsAggregate(StatsSelector.TASK, false, System.currentTimeMillis());
     }
 
-    private void validateStats(int statsCount) {
-        validateStats(statsCount, "RUNNING", null);
+    private void checkStats(int statsCount) throws Exception {
+        checkStats(statsCount, "RUNNING", null);
     }
 
-    private void validateStats(int statsCount, String state, Consumer<VoltTableRow> validator) {
-        VoltTable table = getScheduleStats();
+    private void checkStats(int statsCount, String state, Function<VoltTableRow, Boolean> validator) throws Exception {
+        long start = System.nanoTime();
         long totalActionSchedulerInvocations = 0;
         long totalProcedureInvocations = 0;
-        assertEquals(statsCount, table.getRowCount());
-        while (table.advanceRow()) {
-            if (validator != null) {
-                validator.accept(table);
+        TryStats:
+        do {
+            boolean elapsed = System.nanoTime() - start > WAIT_TIMEOUT;
+            totalActionSchedulerInvocations = 0;
+            totalProcedureInvocations = 0;
+
+            VoltTable table = getScheduleStats();
+            // First check the count
+            if (statsCount != table.getRowCount()) {
+                if (elapsed) {
+                    assertEquals(statsCount, table.getRowCount());
+                }
+                else {
+                    Thread.sleep(10);
+                    continue TryStats;
+                }
             }
-            if (state != null) {
-                assertEquals(state, table.getString("STATE"));
+
+            // Next Validate the rows
+            while (table.advanceRow()) {
+                if (validator != null) {
+                    boolean accepted = validator.apply(table);
+                    if (elapsed) {
+                        assertTrue(accepted);
+                    }
+                    else if (!accepted) {
+                        Thread.sleep(10);
+                        continue TryStats;
+                    }
+                }
+                if (state != null) {
+                    if (!state.equals(table.getString("STATE"))) {
+                        if (elapsed) {
+                            assertEquals(state, table.getString("STATE"));
+                        }
+                        else {
+                            Thread.sleep(10);
+                            continue TryStats;
+                        }
+                    }
+                }
+
+                // Update counts for this row
+                totalActionSchedulerInvocations += table.getLong("SCHEDULER_INVOCATIONS");
+                totalProcedureInvocations += table.getLong("PROCEDURE_INVOCATIONS");
             }
-            totalActionSchedulerInvocations += table.getLong("SCHEDULER_INVOCATIONS");
-            totalProcedureInvocations += table.getLong("PROCEDURE_INVOCATIONS");
-        }
+
+            // All rows valid, done
+            break;
+        } while (true);
 
         assertTrue(totalActionSchedulerInvocations >= totalProcedureInvocations);
         assertTrue(totalActionSchedulerInvocations <= s_firstActionSchedulerCallCount.get()
                 + s_postRunActionSchedulerCallCount.get());
+
     }
 
     private TaskValidationResult validateTask(Task task) {
@@ -1166,5 +1270,14 @@ public class TestTaskManager {
         public boolean isReadOnly() {
             return true;
         }
+    }
+
+    private void check(BooleanSupplier s) throws Exception {
+        long start = System.nanoTime();
+        boolean b;
+        while (!(b = s.getAsBoolean()) && System.nanoTime() - start < WAIT_TIMEOUT) {
+            Thread.sleep(10);
+        }
+        assertTrue(b);
     }
 }
