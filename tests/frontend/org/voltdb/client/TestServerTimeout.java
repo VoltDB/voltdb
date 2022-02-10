@@ -117,69 +117,71 @@ public class TestServerTimeout extends TestCase {
 
     volatile boolean goodResponse = false;
     volatile boolean threw = false;
-    volatile long endTime = 0;
-    volatile long roundTrip = 0;
-    volatile Throwable lastThrown = null;
-    volatile int respStatus = 0;
-
-    private void checkResponse(ClientResponse resp) {
-        endTime = System.nanoTime();
-        assertNotNull(resp);
-        System.out.printf("checkResponse: status %d %s\n", resp.getStatus(), resp.getStatusString());
-        assertEquals("Did not get expected success status", ClientResponse.SUCCESS, resp.getStatus());
-        roundTrip = resp.getClientRoundtripNanos();
-        respStatus = resp.getStatus();
-        goodResponse = true;
-    }
 
     private void checkTimedOut(ClientResponse resp) {
-        endTime = System.nanoTime();
         assertNotNull(resp);
         byte sts = resp.getStatus();
         System.out.printf("checkTimedOut: status %d %s\n", sts, resp.getStatusString());
-        assertTrue("Did not get expected timeout status", sts == ClientResponse.CLIENT_REQUEST_TIMEOUT || sts == ClientResponse.CLIENT_RESPONSE_TIMEOUT);
-        roundTrip = resp.getClientRoundtripNanos();
-        respStatus = sts;
+        switch (sts) {
+        case ClientResponse.CLIENT_REQUEST_TIMEOUT:
+        case ClientResponse.CLIENT_RESPONSE_TIMEOUT:
+            clientTmoCount.incrementAndGet();
+            break;
+        case ClientResponse.GRACEFUL_FAILURE:
+            String msg = resp.getStatusString();
+            assertTrue("Did not get expected timeout message", msg != null && msg.contains("timed out"));
+            serverTmoCount.incrementAndGet();
+            break;
+        default:
+            fail("Did not get expected timeout status");
+            break;
+        }
         goodResponse = true; // 'good' as in 'expected'
     }
 
     private Void screamAndShout(Throwable th) {
-        endTime = System.nanoTime();
         assertNotNull(th);
         System.out.printf("Call completed exceptionally: %s\n", th);
         threw = true;
-        lastThrown = th;
-        respStatus = -999; // unknowable
-        roundTrip = -999; // unknowable
         return null;
     }
 
     AtomicInteger lateRespCount = new AtomicInteger();
     AtomicInteger lateRespFail = new AtomicInteger();
+    AtomicInteger clientTmoCount = new AtomicInteger();
+    AtomicInteger serverTmoCount = new AtomicInteger();
 
     private void lateResponse(ClientResponse resp, String host, int port) {
-        lateRespCount.incrementAndGet();
         byte sts = resp.getStatus();
         String msg = resp.getStatusString();
-        System.out.printf("lateResponse: status %d %s\n", sts, msg);
+        int rtt = resp.getClusterRoundtrip(); // as measured by server; does not include client+network time
+        System.out.printf("lateResponse: rtt %dms status %d %s\n", rtt, sts, msg);
         if (sts != ClientResponse.SUCCESS) {
             lateRespFail.incrementAndGet();
             assertEquals("Did not get expected late response status", ClientResponse.GRACEFUL_FAILURE, sts);
             assertTrue("Did not get expected late response error message", msg != null && msg.contains("timed out"));
         }
+        lateRespCount.incrementAndGet();
     }
 
     private void waitForLateResp(int count, long timeout) {
         long start = System.currentTimeMillis();
         int lateCount;
-        while ((lateCount = lateRespCount.get()) < count && System.currentTimeMillis() - start < timeout) {
+        long delta;
+        System.out.printf("Waiting for remaining %d late responses\n", count - lateRespCount.get());
+        while ((lateCount = lateRespCount.get()) < count & (delta = System.currentTimeMillis() - start) < timeout) {
             Thread.yield();
         }
-        System.out.printf("Late response count: %d\n", lateCount);
+        System.out.printf("Late response count: %d (after %d ms)\n", lateCount, delta);
     }
 
     /**
-     * Test operation of server-side timeout
+     * Test operation of server-side timeout.
+     * This is intrinsically tricky since calls are independently
+     * timed out by client and server. The client will normally report
+     * a timeout as soon as its periodic check detects timer runout.
+     * The server detects timeout when it dequeues an invocation that
+     * has been queued for too long.
      */
     public void testSpProcTimeout() throws Exception {
         Client2Config config = new Client2Config()
@@ -191,27 +193,36 @@ public class TestServerTimeout extends TestCase {
 
         // SPH=1 so all requests end up on the same site.
         // All requests should get client timeouts after 1 sec.
+        // System dynamics may sometimes let us see the server
+        // timeout before the client timeout, which we allow..
         final int CALLCOUNT = 4;
+        final int EXECTIME = 4000;
         goodResponse = threw = false;
         CountDownLatch allUndone = new CountDownLatch(CALLCOUNT);
         for (int i=1; i<=CALLCOUNT; i++) {
-            client.callProcedureAsync("ServerTimeoutTestProc", "row_"+i, 2000)
+            client.callProcedureAsync("ServerTimeoutTestProc", "row_"+i, EXECTIME)
                 .thenAccept(this::checkTimedOut)
                 .exceptionally(this::screamAndShout)
                 .whenComplete((v,t) -> allUndone.countDown());
             Thread.sleep(10); // insert a little spacing
         }
 
+        // All should complete 'soon' after the client times them out
+        // after about a second, so the '5' here is arbitrary
         boolean finished = allUndone.await(5, TimeUnit.SECONDS);
+        assertFalse("Threw exception", threw);
         assertTrue("Unfinished", finished);
         assertTrue("Ungood response", goodResponse);
-        assertFalse("Threw exception", threw);
 
-        // First should have executed for 2 secs, rest should
-        // have got server timeouts, seen as late responses.
-        waitForLateResp(CALLCOUNT, 4000);
-        assertEquals("Wrong late-response total count", CALLCOUNT, lateRespCount.get());
-        assertEquals("Wrong late-response fail count", CALLCOUNT-1, lateRespFail.get());
+        // First call should have executed for 4 secs, rest should
+        // then have got server timeouts, seen as late responses.
+        // Wait for up to the execution time plus a couple of
+        // seconds leeway.
+        int srvTmoNotLate = serverTmoCount.get();
+        int expectedLate = CALLCOUNT - srvTmoNotLate;
+        waitForLateResp(expectedLate, EXECTIME+2000);
+        assertEquals("Wrong server-response count", CALLCOUNT, lateRespCount.get() + srvTmoNotLate);
+        assertEquals("Wrong server-fail count", CALLCOUNT-1, lateRespFail.get() + srvTmoNotLate);
 
         client.close();
     }
