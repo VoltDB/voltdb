@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2021 VoltDB Inc.
+ * Copyright (C) 2021-2022 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -27,10 +27,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.Random;
 
 import org.voltdb.ServerThread;
-import org.voltdb.TableHelper;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.Configuration;
-import org.voltdb.VoltTable;
 import org.voltdb.compiler.CatalogBuilder;
 import org.voltdb.compiler.DeploymentBuilder;
 
@@ -126,66 +124,6 @@ public class TestClient2SyncCall extends TestCase {
 
         // response had better be here after ~4 sec (3.2 more sec after expected 1.1 sec timeout)
         assertTrue(waitForLateResp(3200));
-    }
-
-    /**
-     * Test special exception for slow snapshots or catalogs updates
-     * Both features are pro only
-     */
-    public void testLongCallNoTimeout() throws Exception {
-        Client2Config config = new Client2Config()
-            .procedureCallTimeout(500, TimeUnit.MILLISECONDS)
-            .lateResponseHandler(this::lateResponse);
-
-        Client2 client = ClientFactory.createClient(config);
-        client.connectSync("localhost");
-
-        // build a catalog with a ton of indexes so catalog update will be slow
-        CatalogBuilder builder = new CatalogBuilder();
-        builder.addSchema(getClass().getResource("clientfeatures-wellindexed.sql"));
-        builder.addProcedures(ArbitraryDurationProc.class);
-        byte[] catalogToUpdate = builder.compileToBytes();
-        assert(catalogToUpdate != null);
-
-        // make a copy of the table from ddl for loading
-        // (shouldn't have to do this, but for now, the table loader requires
-        //  a VoltTable, and can't read schema. Could fix by using this VoltTable
-        //  to generate schema or by teaching to loader how to discover tables)
-        TableHelper.Configuration helperConfig = new TableHelper.Configuration();
-        helperConfig.rand = new Random();
-        TableHelper helper = new TableHelper(helperConfig);
-        VoltTable t = TableHelper.quickTable("indexme (pkey:bigint, " +
-                                             "c01:varchar63, " +
-                                             "c02:varchar63, " +
-                                             "c03:varchar63, " +
-                                             "c04:varchar63, " +
-                                             "c05:varchar63, " +
-                                             "c06:varchar63, " +
-                                             "c07:varchar63, " +
-                                             "c08:varchar63, " +
-                                             "c09:varchar63, " +
-                                             "c10:varchar63) " +
-                                             "PKEY(pkey)");
-
-        // get a client with a normal timeout
-        // uses old client for now; this is not the test
-        Client clientX = ClientFactory.createClient();
-        clientX.createConnection("localhost");
-        helper.fillTableWithBigintPkey(t, 400, 0, clientX, 0, 1);
-
-        // run a catalog update that *might* normally timeout
-        long start = System.nanoTime();
-        ClientResponse response = client.callProcedureSync("@UpdateApplicationCatalog", catalogToUpdate, depBuilder.getXML());
-        double duration = (System.nanoTime() - start) / 1_000_000_000.0;
-        System.out.printf("Catalog update duration: %.2f sec\n", duration);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-
-        // run a blocking snapshot that *might* normally timeout
-        start = System.nanoTime();
-        response = client.callProcedureSync("@SnapshotSave", Configuration.getPathToCatalogForTest(""), "slow", 1);
-        duration = (System.nanoTime() - start) / 1_000_000_000.0;
-        System.out.printf("Snapshot save duration: %.2f sec\n", duration);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
     }
 
     /**
