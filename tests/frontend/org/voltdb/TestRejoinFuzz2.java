@@ -32,6 +32,7 @@ import java.util.Random;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.junit.Ignore;
 import org.junit.Test;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltDB.Configuration;
@@ -52,6 +53,7 @@ public class TestRejoinFuzz2 extends RejoinTestBase {
     // but it is worth having.
     //
     @Test
+    @Ignore("test for debugging")
     public void testRejoinFuzz2ElectricBoogaloo() throws Exception {
         VoltProjectBuilder builder = getBuilderForTest();
         builder.setSecurityEnabled(true, true);
