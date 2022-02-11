@@ -306,6 +306,7 @@
     <include name='org/voltdb/canonicalddl/TestCanonicalDDLThroughSQLcmd.class' />
     <include name='org/voltdb/catalog/Test*.class' />
     <include name='org/voltdb/common/TestPermission.class' />
+    <include name='org/voltdb/compiler/TestCompilerCanary.class' />
     <include name='org/voltdb/compiler/TestAsyncCompilerAgent.class' />
     <include name='org/voltdb/compiler/TestCatalogVersionUpgrade.class' />
     <include name='org/voltdb/compiler/TestClassMatcher.class' />

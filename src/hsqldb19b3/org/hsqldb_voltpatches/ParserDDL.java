@@ -51,6 +51,7 @@ import org.hsqldb_voltpatches.types.Charset;
 import org.hsqldb_voltpatches.types.Type;
 import org.hsqldb_voltpatches.types.UserTypeModifier;
 
+
 /**
  * Parser for DDL statements
  *
