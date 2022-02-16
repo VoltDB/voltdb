@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2021 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -33,13 +33,13 @@ import java.nio.file.Files;
 import java.util.Arrays;
 
 import org.apache.commons.io.FileUtils;
+import org.junit.Test;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.sysprocs.saverestore.SystemTable;
-import org.voltdb.utils.VoltFile;
 
 public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
 
@@ -53,7 +53,7 @@ public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
     @Override
     public void setUp() throws Exception
     {
-        VoltFile.recursivelyDelete(new File(TMPDIR));
+        FileUtils.deleteDirectory(new File(TMPDIR));
         File f = new File(TMPDIR);
         f.mkdirs();
         super.setUp();
@@ -89,8 +89,8 @@ public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
 
         assertTrue(srcCluster.m_hostCount == destCluster.m_hostCount);
         for (int i=0; i<srcCluster.m_hostCount; i++) {
-            File src_dir = new File(srcCluster.getSubRoots().get(i).getAbsolutePath() + TMPDIR);
-            String destPath = destCluster.getSubRoots().get(i).getAbsolutePath() + TMPDIR;
+            File src_dir = new File(srcCluster.getServerSpecificScratchDir(String.valueOf(i)) + TMPDIR);
+            String destPath = destCluster.getServerSpecificScratchDir(String.valueOf(i)) + TMPDIR;
             File destDir = new File(destPath);
             if(!destDir.exists()){
                 try {
@@ -113,6 +113,7 @@ public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
         }
     }
 
+    @Test
     public void testEmptySnapshotSaveRestore() throws Exception
     {
         if (isValgrind()) {
@@ -140,8 +141,7 @@ public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
         client = getClient();
 
         try {
-            String necPath = m_emptyConfig.getSubRoots().get(0).getAbsolutePath();
-            results = client.callProcedure("@SnapshotRestore", necPath + TMPDIR, TESTNONCE).getResults();
+            results = client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE).getResults();
 
             assertEquals(getSystemTableRowCount(), results[0].getRowCount());
         } catch (ProcCallException e) {
@@ -152,6 +152,7 @@ public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
         System.out.println("finished testEmptySnapshotSaveRestore");
     }
 
+    @Test
     public void testSaveAndRestoreFromEmptyDatabase() throws Exception
     {
         if (isValgrind()) {
@@ -181,9 +182,7 @@ public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
         client = getClient();
 
         try {
-            String necPath = m_emptyConfig.getSubRoots().get(0).getAbsolutePath();
-            results = client.callProcedure("@SnapshotRestore", necPath + TMPDIR,
-                    TESTNONCE).getResults();
+            results = client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE).getResults();
 
             while (results[0].advanceRow()) {
                 if (results[0].getString("RESULT").equals("FAILURE")) {
@@ -200,6 +199,7 @@ public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
         System.out.println("finished testSaveAndRestoreFromEmptyDatabase");
     }
 
+    @Test
     public void testSaveAndRestoreFromNonEmptyDatabase() throws Exception
     {
         if (isValgrind()) {
@@ -232,9 +232,7 @@ public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
         client.callProcedure("@AdHoc", "CREATE TABLE foo (a integer)");
 
         try {
-            String necPath = m_emptyConfig.getSubRoots().get(0).getAbsolutePath();
-            results = client.callProcedure("@SnapshotRestore", necPath + TMPDIR,
-                    TESTNONCE).getResults();
+            results = client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE).getResults();
 
             while (results[0].advanceRow()) {
                 assertNotEquals(results[0].getString("ERR_MSG"), "FAILURE", results[0].getString("RESULT"));
@@ -247,6 +245,7 @@ public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
         System.out.println("finished testSaveAndRestoreFromNonEmptyDatabase");
     }
 
+    @Test
     public void testSaveAndRestoreFromCatalogDatabase() throws Exception
     {
         if (isValgrind()) {
@@ -277,9 +276,7 @@ public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
 
         try
         {
-            String necPath = m_emptyCatalogConfig.getSubRoots().get(0).getAbsolutePath();
-            results = client.callProcedure("@SnapshotRestore", necPath + TMPDIR,
-                    TESTNONCE).getResults();
+            results = client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE).getResults();
             fail("Should have thrown ProcCallException");
         }
         catch (ProcCallException ex)
@@ -299,8 +296,7 @@ public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
     private void switchRunningConfig(LocalCluster newConfig) throws InterruptedException {
         m_nonEmptyConfig.shutDown();
         newConfig.setCallingMethodName(m_methodName);
-        newConfig.getSubRoots().clear();
-        newConfig.startUp(false);
+        newConfig.startUp();
 
         moveSnapshotFiles(TESTNONCE, m_nonEmptyConfig, newConfig);
 
@@ -329,16 +325,16 @@ public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
         project.addSchema(TestSQLTypesSuite.class.getResource("sqltypessuite-ddl.sql"));
 
         m_nonEmptyConfig = new LocalCluster("non-empty-database.jar", SITE_COUNT, HOST_COUNT, 0, BackendTarget.NATIVE_EE_JNI);
-        //TODO: Migrate to new cli
-        m_nonEmptyConfig.setOldCli();
+        m_nonEmptyConfig.setHasLocalServer(false);
+        m_nonEmptyConfig.setEnableVoltSnapshotPrefix(true);
         boolean compile = m_nonEmptyConfig.compile(project);
         assertTrue(compile);
         builder.addServerConfig(m_nonEmptyConfig, MultiConfigSuiteBuilder.ReuseServer.NEVER);
 
 
         m_emptyConfig = new LocalCluster("empty-database.jar", SITE_COUNT, HOST_COUNT, 0, BackendTarget.NATIVE_EE_JNI);
-        //TODO: Migrate to new cli
-        m_emptyConfig.setOldCli();
+        m_emptyConfig.setHasLocalServer(false);
+        m_emptyConfig.setEnableVoltSnapshotPrefix(true);
         project = new VoltProjectBuilder();
         project.setUseDDLSchema(true);
         compile = m_emptyConfig.compile(project);
@@ -346,12 +342,11 @@ public class TestRestoreEmptyDatabaseSuite extends SaveRestoreBase {
 
 
         m_emptyCatalogConfig = new LocalCluster("empty-catalog-database.jar", SITE_COUNT, HOST_COUNT, 0, BackendTarget.NATIVE_EE_JNI);
-        //TODO: Migrate to new cli
-        m_emptyCatalogConfig.setOldCli();
+        m_emptyCatalogConfig.setHasLocalServer(false);
+        m_emptyCatalogConfig.setEnableVoltSnapshotPrefix(true);
         project = new VoltProjectBuilder();
         compile = m_emptyCatalogConfig.compile(project);
         assertTrue(compile);
-
 
         return builder;
     }

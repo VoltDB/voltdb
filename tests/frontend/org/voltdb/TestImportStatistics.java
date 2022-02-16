@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2021 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -21,7 +21,6 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-
 package org.voltdb;
 
 import java.io.File;
@@ -38,6 +37,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.log4j.net.SocketAppender;
@@ -51,7 +51,6 @@ import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
 import org.voltdb.regressionsuites.RegressionSuite;
 import org.voltdb.regressionsuites.TestSQLTypesSuite;
-import org.voltdb.utils.VoltFile;
 
 /**
  * Import statistics tests using the socket importer and a test log4j importer.
@@ -74,7 +73,7 @@ public class TestImportStatistics extends RegressionSuite {
     @Override
     public void setUp() throws Exception
     {
-        VoltFile.recursivelyDelete(new File("/tmp/" + System.getProperty("user.name")));
+        FileUtils.deleteDirectory(new File("/tmp/" + System.getProperty("user.name")));
         File f = new File("/tmp/" + System.getProperty("user.name"));
         f.mkdirs();
 

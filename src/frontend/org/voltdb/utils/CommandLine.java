@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2021 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -118,7 +118,7 @@ public class CommandLine extends VoltDB.Configuration
         cl.rmi_host_name = rmi_host_name;
         cl.log4j = log4j;
         cl.gcRollover = gcRollover;
-        cl.voltFilePrefix = voltFilePrefix;
+        cl.voltSnapshotFilePrefix = voltSnapshotFilePrefix;
         cl.initialHeap = initialHeap;
         cl.maxHeap = maxHeap;
         cl.classPath = classPath;
@@ -132,7 +132,6 @@ public class CommandLine extends VoltDB.Configuration
         cl.m_hostCount = m_hostCount;
         cl.m_enableAdd = m_enableAdd;
         cl.m_voltdbRoot = m_voltdbRoot;
-        cl.m_oldCli = m_oldCli;
         cl.m_sslEnable = m_sslEnable;
         cl.m_sslExternal = m_sslExternal;
         cl.m_sslInternal = m_sslInternal;
@@ -353,11 +352,9 @@ public class CommandLine extends VoltDB.Configuration
         return this;
     }
 
-    String voltFilePrefix = "";
-    public CommandLine voltFilePrefix(String voltFilePrefix) {
-        if (m_oldCli) {
-            this.voltFilePrefix = voltFilePrefix;
-        }
+    String voltSnapshotFilePrefix = "";
+    public CommandLine voltSnapshotFilePrefix(String voltSnapshotFilePrefix) {
+        this.voltSnapshotFilePrefix = voltSnapshotFilePrefix;
         return this;
     }
 
@@ -431,7 +428,7 @@ public class CommandLine extends VoltDB.Configuration
     }
 
     public CommandLine voltdbRoot(String voltdbRoot) {
-        m_voltdbRoot = new VoltFile(voltdbRoot);
+        m_voltdbRoot = new File(voltdbRoot);
         return this;
     }
 
@@ -511,7 +508,7 @@ public class CommandLine extends VoltDB.Configuration
     public void dumpToFile(String filename) {
         try {
             FileWriter out = new FileWriter(filename);
-            List<String> lns = createCommandLine();
+            List<String> lns = createCommandLine(true);
             for (String l : lns) {
                 assert(l != null);
                 out.write(l.toCharArray());
@@ -528,7 +525,7 @@ public class CommandLine extends VoltDB.Configuration
     public String toString()
     {
         StringBuilder sb = new StringBuilder();
-        List<String> lns = createCommandLine();
+        List<String> lns = createCommandLine(true);
         for (String l : lns)
         {
             sb.append(l).append(" ");
@@ -546,7 +543,7 @@ public class CommandLine extends VoltDB.Configuration
     }
 
     // Return a command line list compatible with ProcessBuilder.command()
-    public List<String> createCommandLine() {
+    public List<String> createCommandLine(boolean enableVoltSnapshotFilePrefix) {
         List<String> cmdline = new ArrayList<>(50);
         cmdline.add(javaExecutable);
         cmdline.add("-XX:+HeapDumpOnOutOfMemoryError");
@@ -599,12 +596,12 @@ public class CommandLine extends VoltDB.Configuration
         }
         cmdline.add("-classpath"); cmdline.add(classPath);
 
+        if (enableVoltSnapshotFilePrefix) {
+            cmdline.add("-DVoltSnapshotFilePrefix=" + voltSnapshotFilePrefix);
+        }
         if (includeTestOpts)
         {
             cmdline.add("-DLOG_SEGMENT_SIZE=8");
-            if (m_oldCli) {
-                cmdline.add("-DVoltFilePrefix=" + voltFilePrefix);
-            }
             cmdline.add("-ea");
             cmdline.add("-XX:MaxDirectMemorySize=2g");
         }
@@ -992,7 +989,6 @@ public class CommandLine extends VoltDB.Configuration
 
         /**
          * Truncate the option so that it may be looked up in
-         * {@link $mayOtherwiseSpecify} and {@link $mayNotSpecify}
          *
          * @param option an option token
          * @return an optionally truncated option
@@ -1091,16 +1087,6 @@ public class CommandLine extends VoltDB.Configuration
 
             return sb.toString();
         }
-    }
-
-    boolean m_oldCli = false;
-
-    boolean isOldCli() {
-        return m_oldCli;
-    }
-
-    public void setOldCli() {
-        m_oldCli = true;
     }
 
     String m_placementGroup = "";

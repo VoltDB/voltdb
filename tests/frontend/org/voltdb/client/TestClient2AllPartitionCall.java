@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2021 VoltDB Inc.
+ * Copyright (C) 2021-2022 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -35,8 +35,8 @@ import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
-import org.voltdb.utils.VoltFile;
 
+import org.apache.commons.io.FileUtils;
 import junit.framework.TestCase;
 
 /**
@@ -54,7 +54,7 @@ public class TestClient2AllPartitionCall extends TestCase {
     {
         System.out.printf("=-=-=-=-=-=-= Starting test %s =-=-=-=-=-=-=\n", getName());
 
-        VoltFile.recursivelyDelete(new File("/tmp/" + System.getProperty("user.name")));
+        FileUtils.deleteDirectory(new File("/tmp/" + System.getProperty("user.name")));
         File f = new File("/tmp/" + System.getProperty("user.name"));
         f.mkdirs();
 

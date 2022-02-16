@@ -35,7 +35,7 @@ import org.voltdb.messaging.SnapshotCheckResponseMessage;
 import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 import org.voltdb.sysprocs.saverestore.SnapshotRequestConfig;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
-import org.voltdb.utils.VoltFile;
+import org.voltdb.utils.VoltSnapshotFile;
 
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
@@ -142,7 +142,7 @@ public class SnapshotIOAgentImpl extends SnapshotIOAgent {
         // Check if the snapshot file can be created successfully.
         if (format.isFileBased()) {
             // Check snapshot directory no matter table exists or not. If not, try to create the directory.
-            File parent = new VoltFile(file_path);
+            File parent = new VoltSnapshotFile(file_path);
             if (!parent.exists() && !parent.mkdirs()) {
                 result.addRow(m_messenger.getHostId(), m_messenger.getHostname(), "", "FAILURE",
                         "FILE LOCATION UNWRITABLE: failed to create parent directory " + parent.getPath());

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -70,7 +70,6 @@ import org.voltdb.types.TimestampType;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
-import org.voltdb.utils.VoltFile;
 import org.voltdb.utils.VoltTrace;
 
 import com.google_voltpatches.common.base.Splitter;
@@ -104,6 +103,7 @@ public class VoltDB {
     // Staged filenames for advanced deployments
     public static final String INITIALIZED_MARKER = ".initialized";
     public static final String TERMINUS_MARKER = ".shutdown_snapshot";
+    public static final String TERMINUS_NONCE_START = "SHUTDOWN_";
     public static final String INITIALIZED_PATHS = ".paths";
     public static final String STAGED_MESH = "_MESH";
     public static final String DEFAULT_CLUSTER_NAME = "database";
@@ -339,7 +339,7 @@ public class VoltDB {
         public String m_clusterName = DEFAULT_CLUSTER_NAME;
 
         /** command line provided voltdbroot */
-        public File m_voltdbRoot = new VoltFile(DBROOT);
+        public File m_voltdbRoot = new File(DBROOT);
 
         /** configuration UUID */
         public final UUID m_configUUID = UUID.randomUUID();
@@ -594,9 +594,9 @@ public class VoltDB {
                     m_getOutput = m_getOption.getDefaultOutput();
                     break;
                 case "getvoltdbroot":
-                    m_voltdbRoot = new VoltFile(val);
+                    m_voltdbRoot = new File(val);
                     if (!DBROOT.equals(m_voltdbRoot.getName())) {
-                        m_voltdbRoot = new VoltFile(m_voltdbRoot, DBROOT);
+                        m_voltdbRoot = new File(m_voltdbRoot, DBROOT);
                     }
                     if (!m_voltdbRoot.exists()) {
                         referToDocAndExit("%s does not contain a  valid database root directory."
@@ -703,9 +703,9 @@ public class VoltDB {
                     m_versionCompatibilityRegexOverrideForTest = (n < args.length ? args[n++] : val);
                     break;
                 case "voltdbroot":
-                    m_voltdbRoot = new VoltFile(val);
+                    m_voltdbRoot = new File(val);
                     if (!DBROOT.equals(m_voltdbRoot.getName())) {
-                        m_voltdbRoot = new VoltFile(m_voltdbRoot, DBROOT);
+                        m_voltdbRoot = new File(m_voltdbRoot, DBROOT);
                     }
                     if (!m_voltdbRoot.exists() && !m_voltdbRoot.mkdirs()) {
                         referToDocAndExit("Could not create directory \"%s\"", m_voltdbRoot.getPath());
@@ -839,7 +839,7 @@ public class VoltDB {
         }
 
         private boolean isInitialized() {
-            File inzFH = new VoltFile(m_voltdbRoot, VoltDB.INITIALIZED_MARKER);
+            File inzFH = new File(m_voltdbRoot, VoltDB.INITIALIZED_MARKER);
             return inzFH.exists() && inzFH.isFile() && inzFH.canRead();
         }
 
@@ -855,10 +855,10 @@ public class VoltDB {
                                   + " Use the --dir option to specify the path to the root.",
                                   parentPath);
             }
-            File configInfoDir = new VoltFile(m_voltdbRoot, Constants.CONFIG_DIR);
+            File configInfoDir = new File(m_voltdbRoot, Constants.CONFIG_DIR);
             switch (m_getOption) {
                 case DEPLOYMENT: {
-                    File depFH = new VoltFile(configInfoDir, "deployment.xml");
+                    File depFH = new File(configInfoDir, "deployment.xml");
                     if (!depFH.exists()) {
                         referToDocAndExit("Deployment file \"%s\" not found", depFH.getAbsolutePath());
                     }
@@ -870,7 +870,7 @@ public class VoltDB {
                     // catalog.jar contains DDL and proc classes with which the database was
                     // compiled. Check if catalog.jar exists as it is needed to fetch ddl (get
                     // schema) as well as procedures (get classes)
-                    File catalogFH = new VoltFile(configInfoDir, CatalogUtil.CATALOG_FILE_NAME);
+                    File catalogFH = new File(configInfoDir, CatalogUtil.CATALOG_FILE_NAME);
                     if (!catalogFH.exists()) {
                         System.err.printf("Catalog file \"%s\" not found.%n", catalogFH.getAbsolutePath());
                         try {
@@ -888,7 +888,7 @@ public class VoltDB {
                     if(!m_isEnterprise) {
                         referToDocAndExit("Community Edition of VoltDB does not have license files");
                     }
-                    File licFH = new VoltFile(m_voltdbRoot, "license.xml");
+                    File licFH = new File(m_voltdbRoot, "license.xml");
                     m_pathToLicense = licFH.getAbsolutePath();
                     if (!licFH.exists()) {
                         referToDocAndExit("License file \"%s\" not found.", m_pathToLicense);
@@ -943,11 +943,11 @@ public class VoltDB {
 
         List<File> getInitMarkers() {
             return ImmutableList.<File>builder()
-                    .add(new VoltFile(m_voltdbRoot, VoltDB.INITIALIZED_MARKER))
-                    .add(new VoltFile(m_voltdbRoot, VoltDB.INITIALIZED_PATHS))
-                    .add(new VoltFile(m_voltdbRoot, Constants.CONFIG_DIR))
-                    .add(new VoltFile(m_voltdbRoot, VoltDB.STAGED_MESH))
-                    .add(new VoltFile(m_voltdbRoot, VoltDB.TERMINUS_MARKER))
+                    .add(new File(m_voltdbRoot, VoltDB.INITIALIZED_MARKER))
+                    .add(new File(m_voltdbRoot, VoltDB.INITIALIZED_PATHS))
+                    .add(new File(m_voltdbRoot, Constants.CONFIG_DIR))
+                    .add(new File(m_voltdbRoot, VoltDB.STAGED_MESH))
+                    .add(new File(m_voltdbRoot, VoltDB.TERMINUS_MARKER))
                     .build();
         }
 
@@ -955,13 +955,13 @@ public class VoltDB {
          * Checks for the initialization marker on initialized voltdbroot directory
          */
         private void checkInitializationMarker() {
-            File inzFH = new VoltFile(m_voltdbRoot, VoltDB.INITIALIZED_MARKER);
+            File inzFH = new File(m_voltdbRoot, VoltDB.INITIALIZED_MARKER);
             File deploymentFH;
             if (runningUnderKubernetes() && StringUtils.isNotEmpty(m_voltdbContainerDeployment)) {
                 hostLog.info("Running in kubernetes environment, using deployment from: " + m_voltdbContainerDeployment);
-                deploymentFH = new VoltFile(m_voltdbContainerDeployment);
+                deploymentFH = new File(m_voltdbContainerDeployment);
             } else {
-                deploymentFH = new VoltFile(new VoltFile(m_voltdbRoot, Constants.CONFIG_DIR), "deployment.xml");
+                deploymentFH = new File(new File(m_voltdbRoot, Constants.CONFIG_DIR), "deployment.xml");
             }
             File configCFH = null;
             File optCFH = null;
@@ -974,7 +974,7 @@ public class VoltDB {
                     referToDocAndExit();
                 }
                 try {
-                    optCFH = new VoltFile(m_pathToDeployment).getCanonicalFile();
+                    optCFH = new File(m_pathToDeployment).getCanonicalFile();
                 } catch (IOException e) {
                     hostLog.fatal("Could not resolve file location " + optCFH, e);
                     referToDocAndExit();
@@ -1009,7 +1009,7 @@ public class VoltDB {
             }
             try {
                 if (m_meshBrokers == null || m_meshBrokers.trim().isEmpty()) {
-                    File meshFH = new VoltFile(m_voltdbRoot, VoltDB.STAGED_MESH);
+                    File meshFH = new File(m_voltdbRoot, VoltDB.STAGED_MESH);
                     if (meshFH.exists() && meshFH.isFile() && meshFH.canRead()) {
                         try (BufferedReader br = new BufferedReader(new FileReader(meshFH))) {
                             m_meshBrokers = br.readLine();

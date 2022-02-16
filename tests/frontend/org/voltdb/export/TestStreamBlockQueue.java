@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -40,9 +40,9 @@ import org.voltdb.MockVoltDB;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.utils.BinaryDequeReader;
-import org.voltdb.utils.VoltFile;
 
 import junit.framework.TestCase;
+import org.apache.commons.io.FileUtils;
 
 public class TestStreamBlockQueue extends TestCase {
 
@@ -83,14 +83,9 @@ public class TestStreamBlockQueue extends TestCase {
         VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
         g_seqNo = 0;
         File testDir = new File(TEST_DIR);
-        if (testDir.exists()) {
-            for (File f : testDir.listFiles()) {
-                VoltFile.recursivelyDelete(f);
-            }
-            testDir.delete();
-        }
+        FileUtils.deleteDirectory(testDir);
         testDir.mkdir();
-        m_sbq = new StreamBlockQueue(  TEST_DIR, TEST_NONCE, "TableName", 1, m_mockVoltDB.getCatalogContext().m_genId);
+        m_sbq = new StreamBlockQueue(TEST_DIR, TEST_NONCE, "TableName", 1, m_mockVoltDB.getCatalogContext().m_genId);
         defaultBuffer.clear();
     }
 

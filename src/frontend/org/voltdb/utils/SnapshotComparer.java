@@ -914,7 +914,7 @@ class SnapshotLoader {
      * return InMemoryJarfile of a snapshot jar file
      */
     private InMemoryJarfile getInMemoryJarFileBySnapShotName(String location, String nonce) throws IOException {
-        final File file = new VoltFile(location, nonce + ".jar");
+        final File file = new VoltSnapshotFile(location, nonce + ".jar");
         byte[] bytes = MiscUtils.fileToBytes(file);
         return CatalogUtil.loadInMemoryJarFile(bytes);
     }

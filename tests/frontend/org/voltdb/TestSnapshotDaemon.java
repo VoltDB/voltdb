@@ -59,7 +59,7 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
-import org.voltdb.utils.VoltFile;
+import org.voltdb.utils.VoltSnapshotFile;
 
 import com.google_voltpatches.common.util.concurrent.Callables;
 
@@ -125,7 +125,7 @@ public class TestSnapshotDaemon {
         }
     }
 
-    private static File tempDir = new VoltFile("/tmp/" + System.getProperty("user.name"));
+    private static File tempDir = new VoltSnapshotFile("/tmp/" + System.getProperty("user.name"));
     protected Initiator m_initiator;
     protected SnapshotDaemon m_daemon;
     protected SnapshotIOAgent m_ioAgent;
@@ -375,6 +375,7 @@ public class TestSnapshotDaemon {
 
     @Test
     public void testBadFrequencyAndBasicInit() throws Exception {
+        System.out.println("--------------\n  testBadFrequencyAndBasicInit\n---------------");
         SnapshotDaemon noSnapshots = getSnapshotDaemon(false);
         Thread.sleep(60);
         assertNull(m_initiator.procedureName);
@@ -606,6 +607,7 @@ public class TestSnapshotDaemon {
 
     @Test
     public void testFailedScan() throws Exception {
+        System.out.println("--------------\n  testFailedScan\n---------------");
 
         SnapshotDaemon daemon = getBasicDaemon(false);
 
@@ -787,6 +789,7 @@ public class TestSnapshotDaemon {
 
     @Test
     public void testSuccessfulScan() throws Exception {
+        System.out.println("--------------\n  testSuccessfulScan\n---------------");
         SnapshotDaemon daemon = getBasicDaemon(false);
 
         long handle = m_initiator.clientData;
@@ -825,6 +828,7 @@ public class TestSnapshotDaemon {
 
     @Test
     public void testDoSnapshot() throws Exception {
+        System.out.println("--------------\n  testDoSnapshot\n---------------");
         SnapshotDaemon daemon = getBasicDaemon(false);
 
         long handle = m_initiator.clientData;
@@ -986,6 +990,7 @@ public class TestSnapshotDaemon {
 
     @Test
     public void testShutdownGrooming() throws Exception {
+        System.out.println("--------------\n  testShutdownGrooming\n---------------");
         SnapshotDaemon daemon = getBasicDaemon(false);
         long handle = m_initiator.clientData;
         m_initiator.clear();

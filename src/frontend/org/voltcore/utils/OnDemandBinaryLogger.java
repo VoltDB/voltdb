@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -29,7 +29,6 @@ import java.nio.ByteOrder;
 import java.nio.channels.FileChannel.MapMode;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.voltdb.utils.VoltFile;
 import org.xerial.snappy.SnappyInputStream;
 import org.xerial.snappy.SnappyOutputStream;
 
@@ -61,7 +60,7 @@ public class OnDemandBinaryLogger {
     private static Stuff getStream(final String name) throws IOException {
         Stuff s = m_files.get(name);
         if (s == null) {
-            File f = new VoltFile(path, name);
+            File f = new File(path, name);
             f.delete();
             RandomAccessFile ras = new RandomAccessFile(f, "rw");
             ras.seek(8);

@@ -59,15 +59,15 @@ public class TestReplicatedTableSnapshotRestore extends JUnit4LocalClusterTest {
         // Create a table with a very large VARCHAR column, so it will be very easy for
         // the snapshot to have more than one block during restore.
         String ddl = "create table t (s1 varchar(1048576), s2 varchar(1048560));\n";
-        // Reset the VoltFile prefix that may have been set by previous tests in this suite
-        org.voltdb.utils.VoltFile.resetSubrootForThisProcess();
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema(ddl);
         // Must have k-factor here.
         int sitesPerHost = 4, hostCount = 4, kFactor = 3;
         LocalCluster cluster = new LocalCluster("eng15174.jar", sitesPerHost,
                 hostCount, kFactor, BackendTarget.NATIVE_EE_JNI);
-        cluster.overrideAnyRequestForValgrind();
+        if (cluster.isValgrind()) {
+            return;
+        }
         assertTrue(cluster.compile(builder));
         MiscUtils.copyFile(builder.getPathToDeployment(), VoltDB.Configuration.getPathToCatalogForTest("rejoin.xml"));
         cluster.setHasLocalServer(false);

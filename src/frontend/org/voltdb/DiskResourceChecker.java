@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2021 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -30,7 +30,6 @@ import org.voltdb.snmp.FaultFacility;
 import org.voltdb.snmp.SnmpTrapSender;
 import org.voltdb.snmp.ThresholdType;
 import org.voltdb.utils.MiscUtils;
-import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 
@@ -240,15 +239,15 @@ public class DiskResourceChecker
     {
         switch(featureName) {
         case COMMANDLOG :
-            return new VoltFile(VoltDB.instance().getCommandLogPath());
+            return new File(VoltDB.instance().getCommandLogPath());
         case COMMANDLOGSNAPSHOT :
-            return new VoltFile(VoltDB.instance().getCommandLogSnapshotPath());
+            return new File(VoltDB.instance().getCommandLogSnapshotPath());
         case DROVERFLOW:
-            return new VoltFile(VoltDB.instance().getDROverflowPath());
+            return new File(VoltDB.instance().getDROverflowPath());
         case EXPORTOVERFLOW:
             return VoltDB.instance().getExportOverflowPath();
         case SNAPSHOTS:
-            return new VoltFile(VoltDB.instance().getSnapshotPath());
+            return new File(VoltDB.instance().getSnapshotPath());
         case TOPICSDATA:
             return VoltDB.instance().getTopicsDataPath();
         default: // Not a valid feature or one that is supported for disk limit monitoring.

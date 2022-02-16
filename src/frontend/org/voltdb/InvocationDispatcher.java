@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2021 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -73,7 +73,7 @@ import org.voltdb.settings.NodeSettings;
 import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.MiscUtils;
-import org.voltdb.utils.VoltFile;
+import org.voltdb.utils.VoltSnapshotFile;
 import org.voltdb.utils.VoltTrace;
 
 import com.google_voltpatches.common.base.Throwables;
@@ -1209,7 +1209,7 @@ public final class InvocationDispatcher {
         case SNAP_CL:
             return new File(paths.resolveToAbsolutePath(paths.getCommandLogSnapshot()), catFN);
         default:
-            File snapDH = new VoltFile(snapJo.getString(SnapshotUtil.JSON_PATH));
+            File snapDH = new VoltSnapshotFile(snapJo.getString(SnapshotUtil.JSON_PATH));
             return new File(snapDH, catFN);
         }
     }
@@ -1229,7 +1229,7 @@ public final class InvocationDispatcher {
         final File catalogFH;
         try {
             JSONObject jsObj = new JSONObject(task.getParams().getParam(0).toString());
-             catalogFH = getSnapshotCatalogFile(jsObj);
+            catalogFH = getSnapshotCatalogFile(jsObj);
         } catch (JSONException e) {
             return unexpectedFailureResponse("Unable to parse parameters.", task.clientHandle);
         }

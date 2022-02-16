@@ -40,7 +40,6 @@ import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
-import org.voltdb.utils.VoltFile;
 
 import junit.framework.TestCase;
 
@@ -1360,7 +1359,7 @@ public class TestCatalogDiffs extends TestCase {
     private static Catalog generateCatalogWithDeployment(String ddl, String defaultDepXml) throws IOException {
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema(ddl);
-        final File jarPath = VoltFile.createTempFile("drrole", "jar");
+        final File jarPath = File.createTempFile("drrole", "jar");
         builder.compile(jarPath.getAbsolutePath());
         Catalog catalog = catalogForJar(jarPath.getAbsolutePath());
         File file = VoltProjectBuilder.writeStringToTempFile(defaultDepXml);

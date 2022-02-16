@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -60,7 +60,6 @@ import org.voltdb.exportclient.PersistedMetadata;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.snmp.SnmpTrapSender;
 import org.voltdb.utils.BinaryDequeReader;
-import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Throwables;
@@ -243,7 +242,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             exportLog.debug(toString() + " reads gap tracker from PBD:" + m_gapTracker.toString());
         }
 
-        m_adFile = new VoltFile(overflowPath, nonce + ".ad");
+        m_adFile = new File(overflowPath, nonce + ".ad");
         if (exportLog.isDebugEnabled()) {
             exportLog.debug("Creating ad for " + nonce);
         }

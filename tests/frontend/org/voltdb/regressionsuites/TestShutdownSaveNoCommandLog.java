@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2021 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -137,9 +137,6 @@ public class TestShutdownSaveNoCommandLog extends RegressionSuite
             assertTrue("(" + i + ") snapshot did not finish " + Arrays.asList(finished),
                     finished.length == 1 && finished[0].exists() && finished[0].isFile());
         }
-        if (cluster.isOldCli()) {
-            cluster.overrideStartCommandVerb("recover");
-        }
         m_config.startUp(false);
         client2 = this.getClient();
 
@@ -166,12 +163,8 @@ public class TestShutdownSaveNoCommandLog extends RegressionSuite
     }
 
     static File getSnapshotPathForHost(LocalCluster cluster, int hostId) {
-        if (!cluster.isOldCli()) {
-            return new File(cluster.getServerSpecificRoot(Integer.toString(hostId)), "snapshots");
-        } else {
-            List<File> subRoots = cluster.getSubRoots();
-            return new File (subRoots.get(hostId), "/tmp/" + System.getProperty("user.name") + "/snapshots");
-        }
+        List<File> subRoots = cluster.getSubRoots();
+        return new File (subRoots.get(hostId) + "/voltdbroot/snapshots");
     }
     static int HOST_COUNT = 3;
 

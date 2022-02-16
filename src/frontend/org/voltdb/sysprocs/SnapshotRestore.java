@@ -114,7 +114,7 @@ import org.voltdb.sysprocs.saverestore.TableSaveFile;
 import org.voltdb.sysprocs.saverestore.TableSaveFileState;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CompressionService;
-import org.voltdb.utils.VoltFile;
+import org.voltdb.utils.VoltSnapshotFile;
 import org.voltdb.utils.VoltTableUtil;
 
 import com.google_voltpatches.common.collect.Lists;
@@ -152,6 +152,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
 
     private static synchronized void initializeTableSaveFiles(
             String filePath,
+            String filePathType,
             String fileNonce,
             String tableName,
             int originalHostIds[],
@@ -183,7 +184,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
         }
 
         for (int originalHostId : originalHostIds) {
-            final File f = getSaveFileForPartitionedTable(filePath, fileNonce,
+            final File f = getSaveFileForPartitionedTable(filePath, filePathType, fileNonce,
                     tableName,
                     originalHostId);
             TableSaveFile savefile = getTableSaveFile(
@@ -359,7 +360,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                                 + m_filePath + ", " + m_fileNonce);
                     }
                     List<JSONObject> digests =
-                            SnapshotUtil.retrieveDigests(m_filePath, m_fileNonce, SNAP_LOG);
+                            SnapshotUtil.retrieveDigests(m_filePath, m_filePathType, m_fileNonce, SNAP_LOG);
 
                     for (JSONObject obj : digests) {
                         String jsonDigest = obj.toString();
@@ -403,7 +404,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 List<ByteBuffer> configs;
                 try {
                     configs = SnapshotUtil.retrieveHashinatorConfigs(
-                                    m_filePath, m_fileNonce, 1, SNAP_LOG);
+                                    m_filePath, m_filePathType, m_fileNonce, 1, SNAP_LOG);
                     for (ByteBuffer config : configs) {
                         assert (config.hasArray());
                         result.addRow(config.array(), "SUCCESS", null);
@@ -487,7 +488,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                     dupPath = (SnapshotPathType.valueOf(m_filePathType) == SnapshotPathType.SNAP_PATH ?
                             dupPath : m_filePath);
 
-                    VoltFile outputPath = new VoltFile(dupPath);
+                    VoltSnapshotFile outputPath = new VoltSnapshotFile(dupPath);
                     String errorMsg = null;
                     if (!outputPath.exists()) {
                         errorMsg = "Path \"" + outputPath + "\" does not exist";
@@ -508,7 +509,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                     TRACE_LOG.trace("Checking saved table state for restore of: "
                             + m_filePath + ", " + m_fileNonce);
                 }
-                File[] savefiles = SnapshotUtil.retrieveRelevantFiles(m_filePath, m_fileNonce);
+                File[] savefiles = SnapshotUtil.retrieveRelevantFiles(m_filePath, m_filePathType, m_fileNonce);
                 if (savefiles == null) {
                     return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_restoreScan, result);
                 }
@@ -776,7 +777,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
              */
 
             long cnt = 0;
-            try (TableSaveFile savefile = getTableSaveFile(getSaveFileForReplicatedTable(table_name), 3, null)) {
+            try (TableSaveFile savefile = getTableSaveFile(getSaveFileForReplicatedTable(table_name, m_filePathType), 3, null)) {
 
                 TableConverter converter = createConverter(table_name, isRecover);
                 while (savefile.hasMoreChunks()) {
@@ -846,7 +847,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 TRACE_LOG.trace(CoreUtils.hsIdToString(context.getSiteId()) + " distributing replicated table: " + tableName +
                         " to host " + destHostId + ", recover:" + isRecover);
             }
-            VoltTable result = performDistributeReplicatedTable(tableName, context, destHostId, false, isRecover);
+            VoltTable result = performDistributeReplicatedTable(tableName, m_filePathType, context, destHostId, false, isRecover);
             assert(result != null);
             return new DependencyPair.TableDependencyPair(resultDepId, result);
         }
@@ -909,7 +910,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                 TRACE_LOG.trace("Loading replicated-to-partitioned table: " + tableName);
             }
 
-            VoltTable result = performDistributeReplicatedTable(tableName, context, -1, true, isRecover);
+            VoltTable result = performDistributeReplicatedTable(tableName, m_filePathType, context, -1, true, isRecover);
             assert(result != null);
             return new DependencyPair.TableDependencyPair(depId, result);
         }
@@ -981,7 +982,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
 
         path = SnapshotUtil.getRealPath(SnapshotPathType.valueOf(pathType), path);
         final long startTime = System.currentTimeMillis();
-        CONSOLE_LOG.info("Restoring from path: " + path + " with nonce: " + nonce);
+        CONSOLE_LOG.info("Restoring from path: " + path + " with nonce: " + nonce + " Path Type: " + pathType);
 
         // Fetch all the savefile metadata from the cluster
         VoltTable[] savefile_data;
@@ -1478,17 +1479,18 @@ public class SnapshotRestore extends VoltSystemProcedure {
         return results;
     }
 
-    private File getSaveFileForReplicatedTable(String tableName)
+    private File getSaveFileForReplicatedTable(String tableName, String filePathType)
     {
         StringBuilder filename_builder = new StringBuilder(m_fileNonce);
         filename_builder.append("-");
         filename_builder.append(tableName);
         filename_builder.append(".vpt");
-        return new VoltFile(m_filePath, new String(filename_builder));
+        return (SnapshotUtil.isCommandLogOrTerminusSnapshot(filePathType, m_fileNonce)) ? new File(m_filePath, new String(filename_builder)) : new VoltSnapshotFile(m_filePath, new String(filename_builder));
     }
 
     private static File getSaveFileForPartitionedTable(
             String filePath,
+            String filePathType,
             String fileNonce,
             String tableName,
             int originalHostId)
@@ -1499,7 +1501,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
         filename_builder.append("-host_");
         filename_builder.append(originalHostId);
         filename_builder.append(".vpt");
-        return new VoltFile(filePath, new String(filename_builder));
+        return (SnapshotUtil.isCommandLogOrTerminusSnapshot(filePathType, fileNonce)) ? new File(filePath, new String(filename_builder)) : new VoltSnapshotFile(filePath, new String(filename_builder));
     }
 
     private static TableSaveFile getTableSaveFile(File saveFile, int readAheadChunks, Integer relevantPartitionIds[])
@@ -2115,6 +2117,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
     // so the emma coverage is weak.
     private VoltTable performDistributeReplicatedTable(
             String tableName,
+            String filePathType,
             SystemProcedureExecutionContext ctx,
             int destHostId, // only used in replicated-to-replicated case
             boolean asPartitioned,
@@ -2122,7 +2125,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
         String hostname = CoreUtils.getHostnameOrAddress();
         TableSaveFile savefile = null;
         try {
-            savefile = getTableSaveFile(getSaveFileForReplicatedTable(tableName), 3, null);
+            savefile = getTableSaveFile(getSaveFileForReplicatedTable(tableName, filePathType), 3, null);
             assert(savefile.getCompleted());
         } catch (IOException e) {
             VoltTable result = constructResultsTable();
@@ -2300,6 +2303,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
         {
             initializeTableSaveFiles(
                     m_filePath,
+                    m_filePathType,
                     m_fileNonce,
                     tableName,
                     originalHostIds,

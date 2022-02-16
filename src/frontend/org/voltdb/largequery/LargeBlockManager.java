@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -16,6 +16,7 @@
  */
 package org.voltdb.largequery;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
@@ -35,8 +36,8 @@ import java.util.Set;
 import java.util.concurrent.Future;
 
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
+import org.apache.commons.io.FileUtils;
 import org.voltcore.utils.CoreUtils;
-import org.voltdb.utils.VoltFile;
 
 /**
  * A class that manages large blocks produced by large queries.
@@ -150,14 +151,8 @@ public class LargeBlockManager {
                     + "there are still managed blocks; use releaseAllBlocks() instead");
         }
 
-        try (DirectoryStream<Path> dirStream = Files.newDirectoryStream(m_largeQuerySwapPath)) {
-            Iterator<Path> it = dirStream.iterator();
-            while (it.hasNext()) {
-                Path path = it.next();
-                VoltFile.recursivelyDelete(path.toFile());
-            }
-        }
-    }
+        FileUtils.cleanDirectory(m_largeQuerySwapPath.toFile());
+   }
 
     public Future<LargeBlockResponse> submitTask(LargeBlockTask task) {
         return m_es.submit(task);

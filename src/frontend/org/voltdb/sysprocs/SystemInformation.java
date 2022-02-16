@@ -224,10 +224,10 @@ public class SystemInformation extends VoltSystemProcedure
                     if (second_value == null || !second_value.equals(first_entry.getValue()))
                     {
                         // Ignore deltas due to LocalCluster's use of
-                        // VoltFileRoot
+                        // VoltSnapshotFilePrefix
                         if ((((first_entry.getKey())).contains("path") ||
                                 ((first_entry.getKey())).contains("root")) &&
-                                (System.getProperty("VoltFilePrefix") != null))
+                                (System.getProperty("VoltSnapshotFilePrefix") != null))
                         {
                             continue;
                         }

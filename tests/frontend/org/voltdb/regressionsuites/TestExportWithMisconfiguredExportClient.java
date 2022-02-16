@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -39,9 +39,9 @@ import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportTestClient;
 import org.voltdb.export.ExportTestVerifier;
 import org.voltdb.export.TestExportBaseSocketExport;
-import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
+import org.apache.commons.io.FileUtils;
 
 
 public class TestExportWithMisconfiguredExportClient extends RegressionSuite {
@@ -72,7 +72,7 @@ public class TestExportWithMisconfiguredExportClient extends RegressionSuite {
     {
         m_username = "default";
         m_password = "password";
-        VoltFile.recursivelyDelete(new File("/tmp/" + System.getProperty("user.name")));
+        FileUtils.deleteDirectory(new File("/tmp/" + System.getProperty("user.name")));
         File f = new File("/tmp/" + System.getProperty("user.name"));
         f.mkdirs();
         ExportTestVerifier.m_paused = false;

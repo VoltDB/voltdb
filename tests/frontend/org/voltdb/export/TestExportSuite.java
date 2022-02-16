@@ -223,30 +223,31 @@ public class TestExportSuite extends TestExportBaseSocketExport {
             params = convertValsToParams("S_NO_NULLS", i, rowdata);
             client.callProcedure("ExportInsertNoNulls", params);
         }
-
-        String snapshotDir = "obj/release/snapshots/" + getName();
-
+        String snapshotDir = "testExportPlusSnapshot";
         // this blocks until the snapshot is complete
         client.callProcedure("@SnapshotSave", snapshotDir, "testExportPlusSnapshot", (byte) 1).getResults();
 
-        // verify. copied from TestSaveRestoreSysprocSuite
-        final ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        final PrintStream ps = new PrintStream(baos);
-        final PrintStream original = System.out;
-        new java.io.File(snapshotDir).mkdir();
-        try {
-            System.setOut(ps);
-            final String args[] = new String[] {
-                    "testExportPlusSnapshot",
-                    "--dir",
-                    snapshotDir
-            };
-            SnapshotVerifier.main(args);
-            ps.flush();
-            final String reportString = baos.toString("UTF-8");
-            assertTrue(reportString, reportString.contains("Snapshot valid\n"));
-        } finally {
-            System.setOut(original);
+        LocalCluster ccluster = (LocalCluster)m_config;
+        for (int i = 0; i < ccluster.getNodeCount(); i++) {
+            String sdir = ccluster.getServerSpecificScratchDir(String.valueOf(i)) + File.separator + snapshotDir;
+            // verify. copied from TestSaveRestoreSysprocSuite
+            final ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            final PrintStream ps = new PrintStream(baos);
+            final PrintStream original = System.out;
+            try {
+                System.setOut(ps);
+                final String args[] = new String[]{
+                        "testExportPlusSnapshot",
+                        "--dir",
+                        sdir
+                };
+                SnapshotVerifier.main(args);
+                ps.flush();
+                final String reportString = baos.toString("UTF-8");
+                assertTrue(reportString, reportString.contains("Snapshot valid\n"));
+            } finally {
+                System.setOut(original);
+            }
         }
 
         // verify the el data
@@ -297,6 +298,7 @@ public class TestExportSuite extends TestExportBaseSocketExport {
         config = new LocalCluster("export-ddl-cluster-rep.jar", 2, 3, k_factor,
                 BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);
         config.setHasLocalServer(false);
+        config.setEnableVoltSnapshotPrefix(true);
         config.setMaxHeap(1024);
         boolean compile = config.compile(project);
         MiscUtils.copyFile(project.getPathToDeployment(),
@@ -311,6 +313,7 @@ public class TestExportSuite extends TestExportBaseSocketExport {
         config = new LocalCluster("export-ddl-sans-nonulls.jar", 2, 3, k_factor,
                 BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);
         config.setHasLocalServer(false);
+        config.setEnableVoltSnapshotPrefix(true);
         config.setMaxHeap(1024);
         project = new VoltProjectBuilder();
         project.addRoles(GROUPS);

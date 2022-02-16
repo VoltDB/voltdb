@@ -16,6 +16,7 @@
  */
 package org.voltdb;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
@@ -30,8 +31,9 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
-import org.voltdb.utils.VoltFile;
+import org.voltdb.utils.VoltSnapshotFile;
 
 import com.google_voltpatches.common.annotations.VisibleForTesting;
 import com.google_voltpatches.common.util.concurrent.UnsynchronizedRateLimiter;
@@ -110,35 +112,38 @@ public abstract class NativeSnapshotDataTarget implements SnapshotDataTarget {
      * @param timestamp     of snapshot
      * @return {@link Factory} to create {@link NativeSnapshotDataTarget} instances
      */
-    public static Factory getFactory(String directory, int hostId, final String clusterName,
-            final String databaseName, int numPartitions, List<Integer> partitions, long txnId, long timestamp) {
+    public static Factory getFactory(String directory, String pathType, String nonce, int hostId, final String clusterName,
+            final String databaseName, int numPartitions, List<Integer> partitions, long txnId, long timestamp, boolean isTruncationSnapshot) {
         // Grab the currently configured operator and replace it with a no-op so only the targets returned by this
         // factory are affected
         UnaryOperator<FileChannel> channelOperator = SNAPSHOT_FILE_CHANEL_OPERATER;
         SNAPSHOT_FILE_CHANEL_OPERATER = UnaryOperator.identity();
 
-        return getFactory(directory, hostId, clusterName, databaseName, numPartitions, partitions, txnId, timestamp,
-                channelOperator);
+        return getFactory(directory, pathType, nonce, hostId, clusterName, databaseName, numPartitions, partitions, txnId, timestamp,
+                isTruncationSnapshot, channelOperator);
     }
 
     /**
      * Factory method for tests to allow them to inject misbehaving {@link FileChannel}s into targets
      *
-     * @see #getFactory(String, int, String, String, int, List, long, long)
+     * @see #getFactory(String, String, String, int, String, String, int, List, long, long, boolean, UnaryOperator<FileChannel>)
      */
     @VisibleForTesting
-    public static Factory getFactory(String directory, int hostId, final String clusterName, final String databaseName,
-            int numPartitions, List<Integer> partitions, long txnId, long timestamp,
+    public static Factory getFactory(String directory, String pathType, String nonce, int hostId, final String clusterName, final String databaseName,
+            int numPartitions, List<Integer> partitions, long txnId, long timestamp, boolean isTruncationSnapshot,
             UnaryOperator<FileChannel> channelOperator) {
         // If direct IO is enabled and supported in directory return a direct IO target
         if (s_enableDirectIoSnapshots && DirectIoSnapshotDataTarget.directIoSupported(directory)) {
             return DirectIoSnapshotDataTarget.factory(directory, hostId, clusterName, databaseName, numPartitions,
-                    partitions, txnId, timestamp, s_currentVersion, channelOperator);
+                    partitions, txnId, timestamp, s_currentVersion, isTruncationSnapshot, channelOperator);
         }
 
-        return (fileName, tableName, isReplicated, schema) -> new DefaultSnapshotDataTarget(
-                new VoltFile(directory, fileName), hostId, clusterName, databaseName, tableName, numPartitions,
-                isReplicated, partitions, schema, txnId, timestamp, s_currentVersion, channelOperator);
+        return (fileName, tableName, isReplicated, schema) -> {
+            File f = (SnapshotUtil.isCommandLogOrTerminusSnapshot(pathType, nonce)) ? new File(directory, fileName) : new VoltSnapshotFile(directory, fileName);
+            return new DefaultSnapshotDataTarget(
+                    f, hostId, clusterName, databaseName, tableName, numPartitions,
+                    isReplicated, partitions, schema, txnId, timestamp, s_currentVersion, isTruncationSnapshot, channelOperator);
+        };
     }
 
     NativeSnapshotDataTarget(boolean isReplicated) {

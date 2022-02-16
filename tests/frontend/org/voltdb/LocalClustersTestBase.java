@@ -67,7 +67,6 @@ import org.voltdb.e3.topics.TopicProperties;
 import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.test.utils.RandomTestRule;
-import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.collect.ImmutableList;
 
@@ -181,7 +180,6 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
         // Parameterized tests add ]
         m_methodName = m_name.getMethodName().replaceAll("[\\[\\]]", "_");
         System.out.println("Running " + m_methodName);
-        VoltFile.resetSubrootForThisProcess();
     }
 
     @After
@@ -363,7 +361,6 @@ public class LocalClustersTestBase extends JUnit4LocalClusterTest {
         Pair<LocalCluster, Client> pair = CLUSTERS_AND_CLIENTS.get(clusterId);
 
         LocalCluster lc = pair.getFirst();
-        lc.overrideStartCommandVerb("recover");
         lc.startUp(false);
 
         Client client = lc.createAdminClient(createClientConfig());

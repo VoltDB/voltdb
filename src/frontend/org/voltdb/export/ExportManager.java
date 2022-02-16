@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -55,10 +55,10 @@ import org.voltdb.export.ExportDataSource.StreamStartAction;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.LogKeys;
-import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.collect.HashMultimap;
+import org.apache.commons.io.FileUtils;
 
 /**
  * Bridges the connection to an OLAP system and the buffers passed
@@ -235,7 +235,7 @@ public class ExportManager implements ExportManagerInterface
         try {
             exportLog.info(
                 String.format("Cleaning out contents of export overflow directory %s for create with force", overflowDir));
-            VoltFile.recursivelyDelete(overflowDir, false);
+            FileUtils.cleanDirectory(overflowDir);
         } catch(IOException e) {
             String msg = String.format("Error cleaning out export overflow directory %s: %s",
                     overflowDir, e.getMessage());

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -39,6 +39,7 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import junit.framework.Assert;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.junit.AfterClass;
@@ -53,7 +54,6 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.regressionsuites.RegressionSuite;
 import org.voltdb.sysprocs.AdHocNTBase;
 import org.voltdb.types.TimestampType;
-import org.voltdb.utils.VoltFile;
 
 public class TestAdHocQueries extends AdHocQueryTester {
 
@@ -63,7 +63,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
     @AfterClass
     public static void tearDownClass() {
         try {
-            VoltFile.recursivelyDelete(new File("/tmp/" + System.getProperty("user.name")));
+            FileUtils.deleteDirectory(new File("/tmp/" + System.getProperty("user.name")));
         } catch (IOException ignored) {}
     }
 

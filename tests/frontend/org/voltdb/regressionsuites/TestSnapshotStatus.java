@@ -126,6 +126,7 @@ public class TestSnapshotStatus extends SaveRestoreBase {
         LocalCluster lcconfig = new LocalCluster("testsnapshotstatus.jar", 2, 2, 1,
                                                BackendTarget.NATIVE_EE_JNI);
         assertTrue(lcconfig.compile(project));
+        lcconfig.setHasLocalServer(false);
         builder.addServerConfig(lcconfig, MultiConfigSuiteBuilder.ReuseServer.NEVER);
 
         return builder;

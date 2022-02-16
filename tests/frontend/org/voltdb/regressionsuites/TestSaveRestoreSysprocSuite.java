@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2021 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -22,8 +22,6 @@
  */
 
 package org.voltdb.regressionsuites;
-
-import static org.junit.Assert.assertNotEquals;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
@@ -55,6 +53,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
 
+import com.google_voltpatches.common.collect.Sets;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -65,7 +64,6 @@ import org.voltcore.zk.ZKUtil;
 import org.voltdb.BackendTarget;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.FlakyTestRule;
-import org.voltdb.FlakyTestRule.Flaky;
 import org.voltdb.SnapshotErrorInjectionUtils;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
@@ -89,9 +87,9 @@ import org.voltdb.types.GeographyValue;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.SnapshotConverter;
 import org.voltdb.utils.SnapshotVerifier;
-import org.voltdb.utils.VoltFile;
+import org.voltdb.utils.VoltSnapshotFile;
 
-import com.google_voltpatches.common.collect.Sets;
+import static org.junit.Assert.assertNotEquals;
 
 /**
  * Test the SnapshotSave and SnapshotRestore system procedures
@@ -639,7 +637,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
             return; // snapshot doesn't run in valgrind ENG-4034
         }
 
-        System.out.println("Starting testRestoreWithGhostPartitionAndJoin");
+        System.out.println("Starting testRestoreWithDifferentTopology");
         m_config.shutDown();
 
         int num_replicated_items = 1000;
@@ -648,9 +646,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         SaveRestoreTestProjectBuilder project = new SaveRestoreTestProjectBuilder();
         project.addAllDefaults();
         LocalCluster lc = new LocalCluster(JAR_NAME, 1, 2, 0, BackendTarget.NATIVE_EE_JNI);
-        lc.setOldCli();
-        // Fails if local server flag is true. Collides with m_config.
         lc.setHasLocalServer(false);
+        lc.setEnableVoltSnapshotPrefix(true);
 
         // Save snapshot for 2 site/host cluster.
         lc.compile(project);
@@ -676,9 +673,11 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         }
 
         // Copy over snapshot data from removed node
-        Path[] dirs = lc.getPathInSubroots(TMPDIR);
-        for (Path p : Files.newDirectoryStream(dirs[1], TESTNONCE + "*")) {
-            Path dest = dirs[0].resolve(p.getFileName());
+        String srcDir = lc.getServerSpecificScratchDir("1") + TMPDIR;
+        String destDir = lc.getServerSpecificScratchDir("0") + TMPDIR;
+        Path destPath = Paths.get(destDir);
+        for (Path p : Files.newDirectoryStream(Paths.get(srcDir), TESTNONCE + "*")) {
+            Path dest = destPath.resolve(p.getFileName());
             System.out.println("Copying " + p + " to " + dest);
             Files.copy(p, dest, StandardCopyOption.REPLACE_EXISTING);
         }
@@ -732,7 +731,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         SaveRestoreTestProjectBuilder project = new SaveRestoreTestProjectBuilder();
         project.addAllDefaults();
         LocalCluster lc = new LocalCluster(JAR_NAME, 1, 2, 0, BackendTarget.NATIVE_EE_JNI);
-        lc.setOldCli();
+        lc.setEnableVoltSnapshotPrefix(true);
         lc.setJavaProperty("ELASTIC_TOTAL_TOKENS", "4");
         // Fails if local server flag is true. Collides with m_config.
         lc.setHasLocalServer(false);
@@ -767,9 +766,11 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
         System.out.println("testRestoreWithGhostPartitionAndJoin - Copy over snapshot data from removed node");
         //Copy over snapshot data from removed node
-        Path[] dirs = lc.getPathInSubroots(TMPDIR);
-        for (Path p : Files.newDirectoryStream(dirs[1], TESTNONCE + "*")) {
-            Path dest = dirs[0].resolve(p.getFileName());
+        String srcDir = lc.getServerSpecificScratchDir("1") + TMPDIR;
+        String destDir = lc.getServerSpecificScratchDir("0") + TMPDIR;
+        Path destPath = Paths.get(destDir);
+        for (Path p : Files.newDirectoryStream(Paths.get(srcDir), TESTNONCE + "*")) {
+            Path dest = destPath.resolve(p.getFileName());
             System.out.println("Copying " + p + " to " + dest);
             Files.copy(p, dest, StandardCopyOption.REPLACE_EXISTING);
         }
@@ -833,7 +834,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
      * site counts.
      */
     @Test
-    @Flaky(description="TestSaveRestoreSysprocSuite.testIgnoreTransactionIdsForRestore, for sub-class TestReplicatedSaveRestoreSysprocSuite")
+    @FlakyTestRule.Flaky(description="TestSaveRestoreSysprocSuite.testIgnoreTransactionIdsForRestore, for sub-class TestReplicatedSaveRestoreSysprocSuite")
     public void testIgnoreTransactionIdsForRestore()
     throws Exception
     {
@@ -857,7 +858,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         saveTablesWithDefaultOptions(client, TESTNONCE);
         validateSnapshot(true, TESTNONCE);
 
-        JSONObject digest = SnapshotUtil.CRCCheck(new VoltFile(TMPDIR, TESTNONCE + "-host_0.digest"), LOG);
+        JSONObject digest = SnapshotUtil.CRCCheck(new VoltSnapshotFile(TMPDIR, TESTNONCE + "-host_0.digest"), LOG);
         JSONObject transactionIds = digest.getJSONObject("partitionTransactionIds");
         System.out.println("TRANSACTION IDS: " + transactionIds.toString());
         assertEquals( 4, transactionIds.length());
@@ -887,7 +888,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
         saveTables(client, TMPDIR, TESTNONCE + 2, null, null, true, false);
 
-        digest = SnapshotUtil.CRCCheck(new VoltFile(TMPDIR, TESTNONCE + "2-host_0.digest"), LOG);
+        digest = SnapshotUtil.CRCCheck(new VoltSnapshotFile(TMPDIR, TESTNONCE + "2-host_0.digest"), LOG);
         JSONObject newTransactionIds = digest.getJSONObject("partitionTransactionIds");
         assertEquals(newTransactionIds.length(), 2);
 
@@ -935,7 +936,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         saveTablesWithDefaultOptions(client, TESTNONCE);
         validateSnapshot(true, TESTNONCE);
 
-        JSONObject digest = SnapshotUtil.CRCCheck(new VoltFile(TMPDIR, TESTNONCE + "-host_0.digest"), LOG);
+        JSONObject digest = SnapshotUtil.CRCCheck(new VoltSnapshotFile(TMPDIR, TESTNONCE + "-host_0.digest"), LOG);
         JSONObject transactionIds = digest.getJSONObject("partitionTransactionIds");
         System.out.println("TRANSACTION IDS: " + transactionIds.toString());
         assertEquals( 4, transactionIds.length());
@@ -961,7 +962,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
         saveTables(client, TMPDIR, TESTNONCE + 2, null, null, true, false);
 
-        digest = SnapshotUtil.CRCCheck(new VoltFile(TMPDIR, TESTNONCE + "2-host_0.digest"), LOG);
+        digest = SnapshotUtil.CRCCheck(new VoltSnapshotFile(TMPDIR, TESTNONCE + "2-host_0.digest"), LOG);
         JSONObject newTransactionIds = digest.getJSONObject("partitionTransactionIds");
         assertEquals(transactionIds.length(), newTransactionIds.length());
 
@@ -995,11 +996,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
         LocalCluster lc = new LocalCluster( JAR_NAME, 2, 3, 0, BackendTarget.NATIVE_EE_JNI);
         lc.setHasLocalServer(false);
-        //TODO: figure out snapshot save restore with new CLI
-        //  (I guess no-one figured it out yet?)
-        if (!lc.isOldCli()) {
-            lc.setOldCli();
-        }
+        lc.setEnableVoltSnapshotPrefix(true);
         SaveRestoreTestProjectBuilder project = new SaveRestoreTestProjectBuilder();
         project.addAllDefaults();
         lc.compile(project);
@@ -1017,16 +1014,15 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
                 loadTable(client, "PARTITION_TESTER", false, partition_table);
                 saveTablesWithDefaultOptions(client, TESTNONCE);
 
-                boolean skipFirst = true;
                 int deletedFiles = 0;
-                for (File f : lc.listFiles(new File(TMPDIR))) {
-                    if (f.getName().startsWith(TESTNONCE + "-REPLICATED")) {
-                        if (skipFirst) {
-                            skipFirst = false;
-                            continue;
+                // Delete REPLICATED tables files from first 2 nodes.
+                for (int i = 0; i < lc.m_hostCount -1; i++) {
+                    String scratch = lc.getServerSpecificScratchDir(String.valueOf(i));
+                    for (File f : (new File(scratch + TMPDIR).listFiles())) {
+                        if (f.getName().startsWith(TESTNONCE + "-REPLICATED")) {
+                            assertTrue(f.delete());
+                            deletedFiles++;
                         }
-                        assertTrue(f.delete());
-                        deletedFiles++;
                     }
                 }
                 assertEquals(deletedFiles, 2);
@@ -1569,8 +1565,6 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         validateSnapshot(true, TESTNONCE);
         generateAndValidateTextFile( new TreeSet<>(expectedText), true);
 
-        deleteTestFiles(TESTNONCE);
-
         client.callProcedure("@SnapshotSave",
                 "{ uripath:\"file://" + TMPDIR +
                 "\", nonce:\"" + TESTNONCE + "\", block:true, format:\"csv\" }");
@@ -1722,7 +1716,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     // of @Statistics SnapshotStatus, @SnapshotScan and @SnapshotDelete
     //
     @Test
-    @Flaky(description="TestSaveRestoreSysprocSuite.testSnapshotSave, for sub-class TestReplicatedSaveRestoreSysprocSuite")
+    @FlakyTestRule.Flaky(description="TestSaveRestoreSysprocSuite.testSnapshotSave, for sub-class TestReplicatedSaveRestoreSysprocSuite")
     public void testSnapshotSave() throws Exception
     {
         if (isValgrind()) {
@@ -2023,7 +2017,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     }
 
     @Test
-    @Flaky(description="TestSaveRestoreSysprocSuite.testSaveReplicatedAndRestorePartitionedTable, for sub-class TestReplicatedSaveRestoreSysprocSuite")
+    @FlakyTestRule.Flaky(description="TestSaveRestoreSysprocSuite.testSaveReplicatedAndRestorePartitionedTable, for sub-class TestReplicatedSaveRestoreSysprocSuite")
     public void testSaveReplicatedAndRestorePartitionedTable()
     throws Exception
     {
@@ -2126,7 +2120,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     }
 
     @Test
-    @Flaky(description="TestSaveRestoreSysprocSuite.testSavePartitionedAndRestoreReplicatedTable, for sub-class TestReplicatedSaveRestoreSysprocSuite")
+    @FlakyTestRule.Flaky(description="TestSaveRestoreSysprocSuite.testSavePartitionedAndRestoreReplicatedTable, for sub-class TestReplicatedSaveRestoreSysprocSuite")
     public void testSavePartitionedAndRestoreReplicatedTable()
     throws Exception
     {
@@ -2619,7 +2613,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
     // Test that we fail properly when there are no savefiles available
     @Test
-    @Flaky(description="TestSaveRestoreSysprocSuite.testRestoreMissingFiles, for sub-class TestReplicatedSaveRestoreSysprocSuite")
+    @FlakyTestRule.Flaky(description="TestSaveRestoreSysprocSuite.testRestoreMissingFiles, for sub-class TestReplicatedSaveRestoreSysprocSuite")
     public void testRestoreMissingFiles()
     throws IOException, InterruptedException
     {
@@ -3162,10 +3156,9 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         SaveRestoreTestProjectBuilder project = new SaveRestoreTestProjectBuilder();
         project.addAllDefaults();
         LocalCluster lc = new LocalCluster(JAR_NAME, 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        //Add not supported yet.
-        lc.setOldCli();
         // Fails if local server flag is true. Collides with m_config.
         lc.setHasLocalServer(false);
+        lc.setEnableVoltSnapshotPrefix(true);
 
         // Save snapshot for 1 site/host cluster.
         lc.compile(project);
@@ -3193,6 +3186,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         // Restore snapshot to 2 nodes 1 sites/host cluster.
         lc.setHostCount(2);
         lc.compile(project);
+        // Init second node.
+        lc.initOne(1, false, false);
         lc.startUp(false);
         try {
             Client client = ClientFactory.createClient();
@@ -3273,6 +3268,8 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
         LocalCluster lc = new LocalCluster( JAR_NAME, 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
         lc.setHasLocalServer(false);
+        // We are going to use snapshots directory for restoring snapshots inside of volt
+        lc.setEnableVoltSnapshotPrefix(false);
         SaveRestoreTestProjectBuilder project = new SaveRestoreTestProjectBuilder();
         project.addAllDefaults();
         lc.compile(project);
@@ -3340,6 +3337,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         int num_partitioned_items = 126;
 
         LocalCluster lc = new LocalCluster( JAR_NAME, 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        lc.setEnableVoltSnapshotPrefix(false);
         lc.setHasLocalServer(false);
         SaveRestoreTestProjectBuilder project = new SaveRestoreTestProjectBuilder();
         project.addAllDefaults();
@@ -3449,6 +3447,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         int num_partitioned_items = 126;
 
         LocalCluster lc = new LocalCluster( JAR_NAME, 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        lc.setEnableVoltSnapshotPrefix(false);
         lc.setHasLocalServer(false);
         SaveRestoreTestProjectBuilder project = new SaveRestoreTestProjectBuilder();
         project.addAllDefaults();
@@ -3543,6 +3542,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
         // 2 node k=1 cluster
         LocalCluster lc = new LocalCluster( JAR_NAME, 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
+        lc.setEnableVoltSnapshotPrefix(false);
         lc.setHasLocalServer(false);
         SaveRestoreTestProjectBuilder project = new SaveRestoreTestProjectBuilder();
         project.addAllDefaults();
@@ -3585,11 +3585,15 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
                     }
                 }
                 String nonce = snapshotNonces.lastEntry().getValue();
+                int deleted = 0;
                 for (File child : snapshotPath.listFiles()) {
                     if (child.getName().startsWith(nonce)) {
-                        MiscUtils.deleteRecursively(child);
+                        if (MiscUtils.deleteRecursively(child)) {
+                            deleted++;
+                        }
                     }
                 }
+                assertTrue("We must have some files deleted.", (deleted > 0));
                 // Two nodes have different snapshots, system recover should pick up the latest snapshot on node 1
 
             } finally {
@@ -3639,6 +3643,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
         // 2 node k=1 cluster
         LocalCluster lc = new LocalCluster( JAR_NAME, 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
+        lc.setEnableVoltSnapshotPrefix(false);
         lc.setHasLocalServer(false);
         SaveRestoreTestProjectBuilder project = new SaveRestoreTestProjectBuilder();
         project.addAllDefaults();
@@ -3802,6 +3807,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         LocalCluster lc = new LocalCluster(JAR_NAME, site_count, host_count, k_factor,
                                            BackendTarget.NATIVE_EE_JNI);
         lc.setHasLocalServer(false);
+        lc.setEnableVoltSnapshotPrefix(true);
         SaveRestoreTestProjectBuilder project =
             new SaveRestoreTestProjectBuilder();
         project.addAllDefaults();
@@ -3989,8 +3995,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         return builder;
     }
 
-    static void waitForSnapshotToFinish(Client client)
-            throws NoConnectionsException, IOException, ProcCallException, InterruptedException {
+    static void waitForSnapshotToFinish(Client client) throws IOException, ProcCallException, InterruptedException {
         for (int i = 0; i < 20; ++i) {
             if (isSnapshotFinished(client)) {
                 return;
@@ -4000,8 +4005,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         fail("Snapshot did not complete before timeout");
     }
 
-    static boolean isSnapshotFinished(Client client)
-            throws NoConnectionsException, IOException, ProcCallException {
+    static boolean isSnapshotFinished(Client client) throws IOException, ProcCallException {
         ClientResponse cr = client.callProcedure("@Statistics", "SNAPSHOTSTATUS");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         VoltTable table = cr.getResults()[0];

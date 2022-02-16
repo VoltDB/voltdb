@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2021 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -41,7 +41,8 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.export.TestExportBaseSocketExport.ServerListener;
 import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
 import org.voltdb.regressionsuites.LocalCluster;
-import org.voltdb.utils.VoltFile;
+
+import org.apache.commons.io.FileUtils;
 
 /**
  * A convenient base class to write export end-to-end test case by using local cluster. Comparing
@@ -105,7 +106,7 @@ public class ExportLocalClusterBase extends JUnit4LocalClusterTest {
 
     public static void resetDir() throws IOException {
         File f = new File("/tmp/" + System.getProperty("user.name"));
-         VoltFile.recursivelyDelete(f);
+         FileUtils.deleteDirectory(f);
          f.mkdirs();
     }
 

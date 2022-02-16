@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -31,7 +31,8 @@ import java.util.concurrent.CountDownLatch;
 
 import org.junit.Ignore;
 import org.voltdb.regressionsuites.RegressionSuite;
-import org.voltdb.utils.VoltFile;
+
+import org.apache.commons.io.FileUtils;
 
 @Ignore public class TestCSVFormatterSuiteBase extends RegressionSuite {
 
@@ -41,7 +42,7 @@ import org.voltdb.utils.VoltFile;
 
     @Override
     public void setUp() throws Exception {
-        VoltFile.recursivelyDelete(new File("/tmp/" + System.getProperty("user.name")));
+        FileUtils.deleteDirectory(new File("/tmp/" + System.getProperty("user.name")));
         File f = new File("/tmp/" + System.getProperty("user.name"));
         f.mkdirs();
 

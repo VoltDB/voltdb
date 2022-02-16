@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2021 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -41,8 +41,8 @@ import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
 import org.voltdb.regressionsuites.VoltServerConfig;
 import org.voltdb.utils.MiscUtils;
-import org.voltdb.utils.VoltFile;
 
+import org.apache.commons.io.FileUtils;
 
 /**
  * End to end Export tests using the injected custom export.
@@ -59,7 +59,7 @@ public class TestSnapshotWithViews extends TestExportBase {
     {
         m_username = "default";
         m_password = "password";
-        VoltFile.recursivelyDelete(new File("/tmp/" + System.getProperty("user.name")));
+        FileUtils.deleteDirectory(new File("/tmp/" + System.getProperty("user.name")));
         File f = new File("/tmp/" + System.getProperty("user.name"));
         f.mkdirs();
         super.setUp();
@@ -331,7 +331,6 @@ public class TestSnapshotWithViews extends TestExportBase {
                 BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, additionalEnv);
         config.setHasLocalServer(false);
         //TODO: Snapshot test to use old CLI
-        config.setOldCli();
         config.setMaxHeap(1024);
         boolean compile = config.compile(project);
         assertTrue(compile);

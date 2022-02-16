@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2021 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -74,7 +74,7 @@ public class TestSaveSnapshotAtDefaultLocation extends RegressionSuite {
         }
         assertNotNull(scanResults);
         System.out.println(scanResults.toFormattedString());
-        assertEquals(m_config.isOldCli() ? HOSTS : 1, scanResults.getRowCount());
+        assertEquals(1, scanResults.getRowCount());
         assertEquals( 10, scanResults.getColumnCount());
         scanResults.advanceRow();
         //Make sure nonce has MAGIC in it.

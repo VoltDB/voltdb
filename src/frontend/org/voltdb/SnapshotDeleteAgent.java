@@ -29,7 +29,7 @@ import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotPathType;
-import org.voltdb.utils.VoltFile;
+import org.voltdb.utils.VoltSnapshotFile;
 
 /**
  * Agent responsible for collecting SnapshotDelete info on this host.
@@ -218,7 +218,7 @@ public class SnapshotDeleteAgent extends OpsAgent
 
     // Foe auto snaps, the nonce has the prefix and a timestamp
     private final List<File> retrieveRelevantFiles(String filePath, String nonce) {
-        final File path = new VoltFile(filePath);
+        final File path = new VoltSnapshotFile(filePath);
 
         if (!path.exists()) {
             //m_errorString = "Provided search path does not exist: " + filePath;

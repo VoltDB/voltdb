@@ -57,7 +57,6 @@ import org.voltdb.parser.SQLParser.ParseRecallResults;
 import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.utils.Encoder;
-import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.base.Joiner;
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -1212,7 +1211,6 @@ public class TestSQLParser extends JUnit4LocalClusterTest {
     }
 
     private LocalCluster createLocalCluster(String testMethod) throws IOException {
-        VoltFile.resetSubrootForThisProcess();
         VoltProjectBuilder builder = new VoltProjectBuilder();
 
         // Add the patterns to be searched for in advance

@@ -105,9 +105,9 @@ public class TestUpdateInExportRecoverWithView extends JUnit4LocalClusterTest {
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
         assertEquals(response.getResults()[0].asScalarLong(), 10);
         Thread.sleep(500);
-        db.overrideStartCommandVerb("recover");
         if (MiscUtils.isPro()) {
-            db.shutDown();
+            db.shutdown(adminClient);
+            db.waitForNodesToShutdown();
         } else {
             client.close();
             db.shutdownSave(adminClient);

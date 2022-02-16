@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2021 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -55,9 +55,9 @@ import org.voltdb.MockVoltDB;
 import org.voltdb.VoltDB;
 import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.exportclient.ExportDecoderBase.RestartBlockException;
-import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.base.Charsets;
+import org.apache.commons.io.FileUtils;
 
 import au.com.bytecode.opencsv_voltpatches.CSVWriter;
 
@@ -74,7 +74,7 @@ public class TestExportToFileClient extends ExportClientTestBase {
     {
         super.setup();
         try {
-            VoltFile.recursivelyDelete(new File(m_dir));
+            FileUtils.deleteDirectory(new File(m_dir));
             (new File(m_dir)).mkdirs();
         } catch (IOException e) {
             fail(e.getMessage());

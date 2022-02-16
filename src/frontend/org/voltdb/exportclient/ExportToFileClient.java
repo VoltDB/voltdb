@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2021 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -60,7 +60,6 @@ import org.voltdb.export.ExportManagerInterface.ExportMode;
 import org.voltdb.exportclient.ExportDecoderBase.BinaryEncoding;
 import org.voltdb.exportclient.decode.CSVWriterDecoder;
 import org.voltdb.utils.TimeUtils;
-import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
@@ -349,7 +348,7 @@ public class ExportToFileClient extends ExportClientBase {
                     File dirContainingFiles = null;
                     do {
                         start = new Date();
-                        dirContainingFiles = new VoltFile(getPathOfBatchDir(ACTIVE_PREFIX));
+                        dirContainingFiles = new File(getPathOfBatchDir(ACTIVE_PREFIX));
                         if (dirContainingFiles.exists()) {
                             try {
                                 Thread.sleep(1000);
@@ -450,13 +449,13 @@ public class ExportToFileClient extends ExportClientBase {
             String oldPath = getPathOfBatchDir(ACTIVE_PREFIX);
             String newPath = getPathOfBatchDir("");
 
-            File oldDir = new VoltFile(oldPath);
+            File oldDir = new File(oldPath);
             assert(oldDir.exists());
             assert(oldDir.isDirectory());
             assert(oldDir.canWrite());
 
             if (oldDir.listFiles().length > 0) {
-                File newDir = new VoltFile(newPath);
+                File newDir = new File(newPath);
                 if (!oldDir.renameTo(newDir)) {
                     m_logger.error("Failed to rename export directory from " + oldPath + " to " + newPath);
                 }
@@ -491,7 +490,7 @@ public class ExportToFileClient extends ExportClientBase {
 
             for (FileHandle handle : keys) {
                 String oldPath = handle.getActivePath();
-                File oldFile = new VoltFile(oldPath);
+                File oldFile = new File(oldPath);
                 assert(oldFile.exists());
                 assert(oldFile.isFile());
                 assert(oldFile.canWrite());
@@ -520,7 +519,7 @@ public class ExportToFileClient extends ExportClientBase {
         File getNonConflictingFinalFile(FileHandle handle) {
             for (int i = 0; i < 10; i++) {
                 String finalPath = handle.getPath("", i);
-                File finalFile = new VoltFile(finalPath);
+                File finalFile = new File(finalPath);
                 if (!finalFile.exists()) {
                     if (i > 0) {
                         m_logger.info("Created new revision: " + finalPath);
@@ -539,7 +538,7 @@ public class ExportToFileClient extends ExportClientBase {
                 return writer;
 
             String path = handle.getActivePath();
-            File newFile = new VoltFile(path);
+            File newFile = new File(path);
             if (newFile.exists()) {
                 m_logger.error("Error: Output file for next period already exists at path: " + newFile.getPath()
                         + " Consider using a more specific timestamp in your filename or cleaning up your export data directory."
@@ -589,7 +588,7 @@ public class ExportToFileClient extends ExportClientBase {
                     return;
                 }
 
-                File newFile = new VoltFile(path);
+                File newFile = new File(path);
                 try {
                     OutputStreamWriter osw = new OutputStreamWriter(new FileOutputStream(newFile, false), StandardCharsets.UTF_8);
                     BufferedWriter writer = new BufferedWriter(osw);
@@ -925,7 +924,7 @@ public class ExportToFileClient extends ExportClientBase {
             //This is so that tests dont end up calling getVoltDBRootPath which gives NPE when no cluster.
             dir = getVoltDBRootPath() + File.separator + "file_export";
         }
-        File outdir = new VoltFile(dir);
+        File outdir = new File(dir);
         if (!outdir.isAbsolute()) {
             outdir = new File(getVoltDBRootPath(), outdir.getPath());
         }

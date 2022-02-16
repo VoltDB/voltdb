@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2021 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -110,12 +110,7 @@ public class TestCollector extends JUnit4LocalClusterTest {
         File voltDbRoot;
         cluster.startUp(true);
         //Get server specific root after startup.
-        if (!cluster.isOldCli()) {
-            voltDbRoot = new File(cluster.getServerSpecificRoot("0"));
-        } else {
-            String voltDbFilePrefix = cluster.getSubRoots().get(0).getPath();
-            voltDbRoot = new File(voltDbFilePrefix, builder.getPathToVoltRoot().getPath());
-        }
+        voltDbRoot = new File(cluster.getServerSpecificRoot("0"));
 
         verifyConfigFilesPresent(voltDbRoot);
 
@@ -248,7 +243,7 @@ public class TestCollector extends JUnit4LocalClusterTest {
             // maintain the file naming format
             String fileText = "This is a dummy log file.";
             String workingDir = getWorkingDir(m_voltDbRootPath);
-            VoltFile logFolder = new VoltFile(workingDir + "/obj/release/testoutput/");
+            File logFolder = new File(workingDir + "/obj/release/testoutput/");
             logFolder.mkdir();
 
             for (File oldLogFile : logFolder.listFiles()) {
@@ -284,7 +279,7 @@ public class TestCollector extends JUnit4LocalClusterTest {
             fileDates[5] = cal.getTime();
 
             for (Date fileDate : fileDates) {
-                VoltFile file = new VoltFile(logFolder, LOG_NAME_PREFIX + formatter.format(fileDate));
+                File file = new File(logFolder, LOG_NAME_PREFIX + formatter.format(fileDate));
                 file.createNewFile();
 
                 BufferedWriter writer = new BufferedWriter(new FileWriter(file.getAbsolutePath()));
@@ -300,10 +295,10 @@ public class TestCollector extends JUnit4LocalClusterTest {
             }
 
             // Create a repeat file for today
-            VoltFile repeatFileFolder = new VoltFile(logFolder, "test");
+            File repeatFileFolder = new File(logFolder, "test");
             repeatFileFolder.mkdir();
             String fileDateFormatted = formatter.format(fileDates[0]);
-            VoltFile file = new VoltFile(repeatFileFolder, LOG_NAME_PREFIX + fileDateFormatted);
+            File file = new File(repeatFileFolder, LOG_NAME_PREFIX + fileDateFormatted);
             file.createNewFile();
 
             BufferedWriter writer = new BufferedWriter(new FileWriter(file.getAbsolutePath()));

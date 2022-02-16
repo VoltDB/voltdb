@@ -106,6 +106,7 @@ public class DefaultSnapshotDataTarget extends NativeSnapshotDataTarget {
             final long txnId,
             final long timestamp,
             int version[],
+            boolean isTruncationSnapshot,
             UnaryOperator<FileChannel> channelOperator
             ) throws IOException {
         super(isReplicated);

@@ -44,14 +44,12 @@ public class TestCommandLine
         cl.setInitialHeap(2048);
         System.out.println(cl);
         assertTrue(cl.toString().contains("-DLOG_SEGMENT_SIZE"));
-        assertFalse(cl.toString().contains("-DVoltFilePrefix")); // old CLI only
         assertTrue(cl.toString().contains("MaxDirectMemorySize"));
         assertTrue(cl.toString().contains("timestampsalt"));
         assertFalse(cl.toString().contains("HeapDumpPath=/tmp"));
         assertFalse(cl.toString().contains("-Xms"));
         cl.addTestOptions(false);
         assertFalse(cl.toString().contains("-DLOG_SEGMENT_SIZE"));
-        assertFalse(cl.toString().contains("-DVoltFilePrefix"));
         assertFalse(cl.toString().contains("MaxDirectMemorySize"));
         assertFalse(cl.toString().contains("timestampsalt"));
         assertTrue(cl.toString().contains("HeapDumpPath=/tmp"));
@@ -72,7 +70,7 @@ public class TestCommandLine
         cl.javaLibraryPath("sweet");
         cl.rmiHostName("springsteen");
         cl.log4j("whats");
-        cl.voltFilePrefix("mine");
+        cl.voltSnapshotFilePrefix("mine");
         cl.setInitialHeap(470);
         cl.setMaxHeap(740);
         cl.classPath("say");

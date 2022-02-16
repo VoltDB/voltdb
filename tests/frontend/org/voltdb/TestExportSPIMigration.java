@@ -54,7 +54,6 @@ import org.voltdb.export.ExportLocalClusterBase;
 import org.voltdb.exportclient.SocketExporter;
 import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
 import org.voltdb.regressionsuites.LocalCluster;
-import org.voltdb.utils.VoltFile;
 
 import au.com.bytecode.opencsv_voltpatches.CSVParser;
 
@@ -72,7 +71,6 @@ public class TestExportSPIMigration extends JUnit4LocalClusterTest
         ExportLocalClusterBase.resetDir();
         m_serverSocket = new ServerListener(5001);
         m_serverSocket.start();
-        VoltFile.resetSubrootForThisProcess();
         exportMessageSet = new HashSet<>();
         LocalCluster cluster = null;
         VoltProjectBuilder builder = null;

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -71,10 +71,10 @@ import org.voltdb.catalog.Table;
 import org.voltdb.export.ExportDataSource.ReentrantPollException;
 import org.voltdb.export.ExportDataSource.StreamStartAction;
 import org.voltdb.export.processors.GuestProcessor;
-import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+import org.apache.commons.io.FileUtils;
 
 import junit.framework.TestCase;
 
@@ -200,12 +200,7 @@ public class TestExportDataSource extends TestCase {
         m_mockVoltDB.addColumnToTable("RepTableName", "COL1", VoltType.INTEGER, false, null, VoltType.INTEGER);
         m_mockVoltDB.addColumnToTable("RepTableName", "COL2", VoltType.STRING, false, null, VoltType.STRING);
         VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
-        if (TEST_DIR.exists()) {
-            for (File f : TEST_DIR.listFiles()) {
-                VoltFile.recursivelyDelete(f);
-            }
-            TEST_DIR.delete();
-        }
+        FileUtils.deleteDirectory(TEST_DIR);
         TEST_DIR.mkdir();
         m_generation = new TestGeneration();
         m_processor = getProcessor();

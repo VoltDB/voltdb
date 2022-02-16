@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -39,7 +39,8 @@ import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.iv2.UniqueIdGenerator;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
-import org.voltdb.utils.VoltFile;
+
+import org.apache.commons.io.FileUtils;
 
 public class TestTaskLog {
     private TaskLogImpl m_log = null;
@@ -64,7 +65,7 @@ public class TestTaskLog {
         if (m_log != null) {
             m_log.close(true);
         }
-        VoltFile.recursivelyDelete(m_tempDir);
+        FileUtils.deleteDirectory(m_tempDir);
         m_tempDir = null;
         m_log = null;
         System.gc();

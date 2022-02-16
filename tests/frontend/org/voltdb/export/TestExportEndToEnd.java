@@ -44,7 +44,6 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.export.TestExportBaseSocketExport.ServerListener;
 import org.voltdb.regressionsuites.LocalCluster;
-import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.Maps;
@@ -86,7 +85,6 @@ public class TestExportEndToEnd extends ExportLocalClusterBase {
     public void setUp() throws Exception {
         streamNames.clear();
         resetDir();
-        VoltFile.resetSubrootForThisProcess();
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.setUseDDLSchema(true);
         builder.setPartitionDetectionEnabled(true);

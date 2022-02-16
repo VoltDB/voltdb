@@ -88,7 +88,7 @@ import org.voltdb.common.Constants;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.InMemoryJarfile;
-import org.voltdb.utils.VoltFile;
+import org.voltdb.utils.VoltSnapshotFile;
 
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
@@ -156,6 +156,10 @@ public class SnapshotUtil {
         return new VoltTable(partitionResultsColumns);
     }
 
+    public static boolean isCommandLogOrTerminusSnapshot(String snapPathType, String nonce) {
+        return (SnapshotPathType.valueOf(snapPathType) == SnapshotPathType.SNAP_CL || nonce.startsWith(VoltDB.TERMINUS_NONCE_START));
+    }
+
     /**
      * Create a digest for a snapshot
      * @param txnId   transaction ID when snapshot was initiated
@@ -183,7 +187,7 @@ public class SnapshotUtil {
         boolean isTruncationSnapshot)
     throws IOException
     {
-        final File f = new VoltFile(path, constructDigestFilenameForNonce(nonce, hostId));
+        final File f = (isCommandLogOrTerminusSnapshot(pathType, nonce)) ? new File(path, constructDigestFilenameForNonce(nonce, hostId)) : new VoltSnapshotFile(path, constructDigestFilenameForNonce(nonce, hostId));
         if (f.exists()) {
             if (!f.delete()) {
                 throw new IOException("Unable to write table list file " + f);
@@ -296,13 +300,14 @@ public class SnapshotUtil {
     public static Runnable writeHashinatorConfig(
         InstanceId instId,
         String path,
+        String pathType,
         String nonce,
         int hostId,
         HashinatorSnapshotData hashData,
         boolean isTruncationSnapshot)
     throws IOException
     {
-        final File file = new VoltFile(path, constructHashinatorConfigFilenameForNonce(nonce, hostId));
+        final File file = (isCommandLogOrTerminusSnapshot(pathType, nonce)) ? new File(path, constructHashinatorConfigFilenameForNonce(nonce, hostId)) : new VoltSnapshotFile(path, constructHashinatorConfigFilenameForNonce(nonce, hostId));
         if (file.exists()) {
             if (!file.delete()) {
                 if (isTruncationSnapshot) {
@@ -410,9 +415,9 @@ public class SnapshotUtil {
         throw new IllegalArgumentException("Bad snapshot filename: " + filename);
     }
 
-    public static List<JSONObject> retrieveDigests(String path,
+    public static List<JSONObject> retrieveDigests(String path, String pathType,
             String nonce, VoltLogger logger) throws Exception {
-        VoltFile directoryWithDigest = new VoltFile(path);
+        File directoryWithDigest = (isCommandLogOrTerminusSnapshot(pathType, nonce)) ? new File(path) : new VoltSnapshotFile(path);
         ArrayList<JSONObject> digests = new ArrayList<JSONObject>();
         if (directoryWithDigest.listFiles() == null) {
             return digests;
@@ -440,11 +445,12 @@ public class SnapshotUtil {
      */
     public static List<ByteBuffer> retrieveHashinatorConfigs(
         String path,
+        String pathType,
         String nonce,
         int maxConfigs,
         VoltLogger logger) throws IOException
    {
-        VoltFile directory = new VoltFile(path);
+        File directory = (isCommandLogOrTerminusSnapshot(pathType, nonce)) ? new File(path) : new VoltSnapshotFile(path);
         ArrayList<ByteBuffer> configs = new ArrayList<ByteBuffer>();
         if (directory.listFiles() == null) {
             return configs;
@@ -477,13 +483,19 @@ public class SnapshotUtil {
      * Write the current catalog associated with the database snapshot
      * to the snapshot location
      */
-    public static Runnable writeSnapshotCatalog(String path, String nonce, boolean isTruncationSnapshot)
+    public static Runnable writeSnapshotCatalog(String path, String pathType, String nonce, boolean isTruncationSnapshot)
     throws IOException
     {
+        String filepath;
         String filename = SnapshotUtil.constructCatalogFilenameForNonce(nonce);
+        if (isCommandLogOrTerminusSnapshot(pathType, nonce)) {
+            filepath = path;
+        } else {
+            filepath = (new VoltSnapshotFile(path)).getAbsolutePath();
+        }
         try
         {
-            return VoltDB.instance().getCatalogContext().writeCatalogJarToFile(path, filename,
+            return VoltDB.instance().getCatalogContext().writeCatalogJarToFile(filepath, filename,
                     CatalogJarWriteMode.RECOVER);
         }
         catch (IOException ioe)
@@ -500,9 +512,9 @@ public class SnapshotUtil {
     /**
      * Write the .complete file for finished snapshot
      */
-    public static Runnable writeSnapshotCompletion(String path, String nonce, int hostId, final VoltLogger logger, boolean isTruncationSnapshot) throws IOException {
+    public static Runnable writeSnapshotCompletion(String path, String pathType, String nonce, int hostId, final VoltLogger logger, boolean isTruncationSnapshot) throws IOException {
 
-        final File f = new VoltFile(path, constructCompletionFilenameForNonce(nonce, hostId));
+        final File f = (isCommandLogOrTerminusSnapshot(pathType, nonce)) ? new File(path, constructCompletionFilenameForNonce(nonce, hostId)) : new VoltSnapshotFile(path, constructCompletionFilenameForNonce(nonce, hostId));
         if (f.exists()) {
             if (!f.delete()) {
                 if (isTruncationSnapshot) {
@@ -824,10 +836,6 @@ public class SnapshotUtil {
      * Spider the provided directory applying the provided FileFilter. Optionally validate snapshot
      * files. Return a summary of partition counts, partition information, files, digests etc.
      * that can be used to determine if a valid restore plan exists.
-     * @param directory
-     * @param snapshots
-     * @param filter
-     * @param validate
      */
     public static void retrieveSnapshotFiles(
             File directory,
@@ -971,9 +979,6 @@ public class SnapshotUtil {
     /**
      * Returns a detailed report and a boolean indicating whether the snapshot can be successfully loaded
      * The implementation supports disabling the hashinator check, e.g. for old snapshots in tests.
-     * @param snapshotTime
-     * @param snapshot
-     * @param expectHashinator
      */
     public static Pair<Boolean, String> generateSnapshotReport(
             Long snapshotTxnId, Snapshot snapshot) {
@@ -1248,7 +1253,7 @@ public class SnapshotUtil {
             SnapshotFormat format,
             int hostId)
     {
-        return new VoltFile(filePath, SnapshotUtil.constructFilenameForTable(
+        return new VoltSnapshotFile(filePath, SnapshotUtil.constructFilenameForTable(
             table, fileNonce, format, hostId));
     }
 
@@ -1358,8 +1363,7 @@ public class SnapshotUtil {
      * Get all normal tables from the catalog. A normal table is one that's NOT a materialized view, nor an export
      * table. For the lack of a better name, I call it normal.
      *
-     * @param catalog      Catalog database
-     * @param isReplicated true to return only replicated tables, false to return all partitioned tables
+     * @param database      Catalog database
      * @return A list of tables
      */
     public static final List<SnapshotTableInfo> getPartitionedNormalTablesToSave(Database database) {
@@ -1418,7 +1422,7 @@ public class SnapshotUtil {
         return tables;
     }
 
-    public static File[] retrieveRelevantFiles(String filePath,
+    public static File[] retrieveRelevantFiles(String filePath, String filePathType,
                                                final String fileNonce)
     {
         String matchNonce = fileNonce + "-";
@@ -1431,7 +1435,7 @@ public class SnapshotUtil {
             }
         };
 
-        File save_dir = new VoltFile(filePath);
+        File save_dir = (SnapshotUtil.isCommandLogOrTerminusSnapshot(filePathType, fileNonce)) ? new File(filePath) : new VoltSnapshotFile(filePath);
         File[] save_files = save_dir.listFiles(has_nonce);
         return save_files;
     }
@@ -1711,7 +1715,7 @@ public class SnapshotUtil {
             String path, String nonce, int hostId, VoltLogger logger) throws IOException {
         HashinatorSnapshotData hashData = null;
         String expectedFileName = constructHashinatorConfigFilenameForNonce(nonce, hostId);
-        File[] files = new VoltFile(path).listFiles();
+        File[] files = new VoltSnapshotFile(path).listFiles();
         if (files != null) {
             for (File file : files) {
                 if (file.getName().equals(expectedFileName)) {
@@ -1805,9 +1809,9 @@ public class SnapshotUtil {
     }
 
     public static String getShutdownSaveNonce(final long zkTxnId) {
-        SimpleDateFormat dfmt = new SimpleDateFormat("'SHUTDOWN_'yyyyMMdd'T'HHmmss'_'");
+        SimpleDateFormat dfmt = new SimpleDateFormat("yyyyMMdd'T'HHmmss'_'");
         dfmt.setTimeZone(VoltDB.REAL_DEFAULT_TIMEZONE);
-        StringBuilder sb = new StringBuilder(64).append(dfmt.format(new Date()))
+        StringBuilder sb = new StringBuilder(64).append(VoltDB.TERMINUS_NONCE_START).append(dfmt.format(new Date()))
                 .append(Long.toString(zkTxnId, Character.MAX_RADIX));
         return sb.toString();
     }

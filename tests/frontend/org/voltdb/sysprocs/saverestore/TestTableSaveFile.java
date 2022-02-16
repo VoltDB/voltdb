@@ -126,7 +126,7 @@ public class TestTableSaveFile {
         partIds.add(2);
         partIds.add(3);
         partIds.add(4);
-        NativeSnapshotDataTarget target = createTarget(f, false, partIds, PrivateVoltTableFactory.getSchemaBytes(table),
+        NativeSnapshotDataTarget target = createTarget(f, SnapshotPathType.SNAP_PATH.toString(), false, false, partIds, PrivateVoltTableFactory.getSchemaBytes(table),
                 VERSION2);
 
         VoltTable currentChunkTable = new VoltTable(columnInfo,
@@ -159,7 +159,7 @@ public class TestTableSaveFile {
         partIds.add(2);
         partIds.add(3);
         partIds.add(4);
-        NativeSnapshotDataTarget target = createTarget(f, false, partIds, schema, VERSION1);
+        NativeSnapshotDataTarget target = createTarget(f, SnapshotPathType.SNAP_PATH.toString(), false, false, partIds, schema, VERSION1);
         target.close();
 
         FileInputStream fis = new FileInputStream(f);
@@ -314,16 +314,16 @@ public class TestTableSaveFile {
         }
     }
 
-    protected NativeSnapshotDataTarget createTarget(File file, boolean isReplicated, List<Integer> partitionIds,
+    protected NativeSnapshotDataTarget createTarget(File file, String pathType, boolean isTerminus, boolean isReplicated, List<Integer> partitionIds,
             byte[] schemaBytes, int[] version) throws IOException {
-        return createTarget(file, HOST_ID, CLUSTER_NAME, DATABASE_NAME, TABLE_NAME, TOTAL_PARTITIONS, isReplicated,
+        return createTarget(file, pathType, isTerminus, HOST_ID, CLUSTER_NAME, DATABASE_NAME, TABLE_NAME, TOTAL_PARTITIONS, isReplicated,
                 partitionIds, schemaBytes, TXN_ID, TIMESTAMP, version);
     }
 
-    protected NativeSnapshotDataTarget createTarget(File file, int hostId, String clusterName, String databaseName,
+    protected NativeSnapshotDataTarget createTarget(File file, String pathType, boolean isTerminus, int hostId, String clusterName, String databaseName,
             String tableName, int numPartitions, boolean isReplicated, List<Integer> partitionIds, byte[] schemaBytes,
             long txnId, long timestamp, int[] version) throws IOException {
         return new DefaultSnapshotDataTarget(file, hostId, clusterName, databaseName, tableName, numPartitions,
-                isReplicated, partitionIds, schemaBytes, txnId, timestamp, version, UnaryOperator.identity());
+                isReplicated, partitionIds, schemaBytes, txnId, timestamp, version, false, UnaryOperator.identity());
     }
 }

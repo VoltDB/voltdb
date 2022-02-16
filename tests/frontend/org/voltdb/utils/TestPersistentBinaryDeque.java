@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -60,6 +60,7 @@ import org.voltdb.utils.BinaryDeque.TruncatorResponse;
 import org.voltdb.utils.BinaryDequeReader.SeekErrorRule;
 
 import com.google_voltpatches.common.collect.Sets;
+import org.apache.commons.io.FileUtils;
 
 public class TestPersistentBinaryDeque {
 
@@ -93,12 +94,7 @@ public class TestPersistentBinaryDeque {
     }
 
     public static void setupTestDir() throws IOException {
-        if (TEST_DIR.exists()) {
-            for (File f : TEST_DIR.listFiles()) {
-                VoltFile.recursivelyDelete(f);
-            }
-            TEST_DIR.delete();
-        }
+        FileUtils.deleteDirectory(TEST_DIR);
         TEST_DIR.mkdir();
     }
 

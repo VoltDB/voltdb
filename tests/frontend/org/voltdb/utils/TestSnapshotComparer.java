@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2021 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -51,7 +51,7 @@ import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
 import org.voltdb.regressionsuites.LocalCluster;
 
 public class TestSnapshotComparer extends JUnit4LocalClusterTest {
-    protected static final String TMPDIR = "/tmp/Backup";
+    protected static final String TMPDIR = "Backup";
     protected static final String TESTNONCE = "testnonce";
     private static LocalCluster m_server;
     private static Client m_client;
@@ -63,14 +63,13 @@ public class TestSnapshotComparer extends JUnit4LocalClusterTest {
     public static void setUpBeforeClass() throws Exception {
         m_server = new LocalCluster("testsnapshotcomparer.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
         m_server.setHasLocalServer(false);
-        m_server.setOldCli();
+        m_server.setEnableVoltSnapshotPrefix(true);
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addLiteralSchema(
                 "CREATE TABLE T_SP(A2 VARCHAR(128), A1 INTEGER NOT NULL, A3 VARCHAR(64), A4 VARCHAR(64));" +
 
                         "CREATE TABLE T_MP(A2 VARCHAR(128), A1 INTEGER NOT NULL, A3 VARCHAR(64), A4 VARCHAR(64));");
         project.addPartitionInfo("T_SP", "A1");
-        VoltFile.resetSubrootForThisProcess();
         assertTrue(m_server.compile(project));
         File tempDir = new File(TMPDIR);
         if (!tempDir.exists()) {
@@ -147,11 +146,9 @@ public class TestSnapshotComparer extends JUnit4LocalClusterTest {
             fail();
         }
         assertEquals(2, results[0].getRowCount());
-        System.out.println(results[0]);
-        VoltTable vt = results[0];
         List<String> subdirs = new ArrayList<>();
-        while (vt.advanceRow()) {
-            subdirs.add(vt.getString("PATH"));
+        for (int i = 0; i < m_server.getNodeCount(); i++) {
+            subdirs.add(m_server.getServerSpecificScratchDir(String.valueOf(i)) + File.separator + TMPDIR);
         }
 
         // start convert to MP snapshot to csv

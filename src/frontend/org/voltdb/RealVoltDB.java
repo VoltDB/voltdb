@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2021 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -207,7 +207,6 @@ import org.voltdb.utils.PlatformProperties;
 import org.voltdb.utils.ProClass;
 import org.voltdb.utils.SystemStatsCollector;
 import org.voltdb.utils.TopologyZKUtils;
-import org.voltdb.utils.VoltFile;
 import org.voltdb.utils.VoltSampler;
 
 import com.google_voltpatches.common.base.Charsets;
@@ -510,7 +509,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     private File getConfigDirectory(File voltdbroot) {
-        return new VoltFile(voltdbroot, Constants.CONFIG_DIR);
+        return new File(voltdbroot, Constants.CONFIG_DIR);
     }
 
     private File getConfigLogDeployment() {
@@ -518,7 +517,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     private File getConfigLogDeployment(Configuration config) {
-        return new VoltFile(getConfigDirectory(config), "deployment.xml");
+        return new File(getConfigDirectory(config), "deployment.xml");
     }
 
     @Override
@@ -651,11 +650,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private static String[] ignoredFilenames = { "lost+found" };
 
     private String managedPathEmptyCheck(String voltDbRoot, String path) {
-        VoltFile managedPath;
+        File managedPath;
         if (new File(path).isAbsolute()) {
-            managedPath = new VoltFile(path);
+            managedPath = new File(path);
         } else {
-            managedPath = new VoltFile(voltDbRoot, path);
+            managedPath = new File(voltDbRoot, path);
         }
         if (!managedPath.exists()) {
             return null; // if it does not exist, there's nothing in it
@@ -759,8 +758,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     private int outputDeployment(Configuration config) {
         try {
-            File configInfoDir = new VoltFile(config.m_voltdbRoot, Constants.CONFIG_DIR);
-            File depFH = new VoltFile(configInfoDir, "deployment.xml");
+            File configInfoDir = new File(config.m_voltdbRoot, Constants.CONFIG_DIR);
+            File depFH = new File(configInfoDir, "deployment.xml");
             if (!depFH.isFile() || !depFH.canRead()) {
                 consoleLog.fatal("Failed to get configuration or deployment configuration is invalid. "
                         + depFH.getAbsolutePath());
@@ -1030,17 +1029,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 m_licensing.stageLicenseFile();
             }
 
-            if (config.m_startAction.isLegacy()) {
-                consoleLog.warn("The \"" + config.m_startAction.m_verb +
-                        "\" command is deprecated, please use \"init\" and \"start\" for your cluster operations.");
-            }
-
-            final File stagedCatalogLocation = new VoltFile(
+            final File stagedCatalogLocation = new File(
                     RealVoltDB.getStagedCatalogPath(config.m_voltdbRoot.getAbsolutePath()));
 
             if (config.m_startAction.isLegacy()) {
+                consoleLog.warn("The \"" + config.m_startAction.m_verb +
+                        "\" command is deprecated, please use \"init\" and \"start\" for your cluster operations.");
+
                 File rootFH = CatalogUtil.getVoltDbRoot(readDepl.deployment.getPaths());
-                File inzFH = new VoltFile(rootFH, VoltDB.INITIALIZED_MARKER);
+                File inzFH = new File(rootFH, VoltDB.INITIALIZED_MARKER);
                 if (inzFH.exists()) {
                     VoltDB.crashLocalVoltDB("Cannot use legacy start action "
                             + config.m_startAction + " on voltdbroot "
@@ -1053,7 +1050,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 if (cfile != null) {
                     rootFH = cfile.getParentFile();
                     if ("config".equals(cfile.getName()) && VoltDB.DBROOT.equals(rootFH.getName())) {
-                        inzFH = new VoltFile(rootFH, VoltDB.INITIALIZED_MARKER);
+                        inzFH = new File(rootFH, VoltDB.INITIALIZED_MARKER);
                         if (inzFH.exists()) {
                             VoltDB.crashLocalVoltDB("Can not use legacy start action "
                                     + config.m_startAction + " on voltdbroot "
@@ -1541,8 +1538,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             if (m_licensing.isFeatureAllowed("DR")) {
                 m_producerDRGateway = ProClass.newInstanceOf("org.voltdb.dr2.DRProducer", "DR Producer",
                         ProClass.HANDLER_CRASH,
-                        new VoltFile(VoltDB.instance().getDROverflowPath()),
-                        new VoltFile(VoltDB.instance().getSnapshotPath()),
+                        new File(VoltDB.instance().getDROverflowPath()),
+                        new File(VoltDB.instance().getSnapshotPath()),
                         willDoActualRecover() ? ProducerDRGateway.Mode.RECOVER
                                 : m_config.m_startAction.doesRejoin() ? ProducerDRGateway.Mode.REJOIN
                                         : m_config.m_startAction == StartAction.JOIN ? ProducerDRGateway.Mode.JOIN
@@ -2471,7 +2468,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private void stageDeploymentFileForInitialize(Configuration config, DeploymentType dt) {
 
         String deprootFN = dt.getPaths().getVoltdbroot().getPath();
-        File   deprootFH = new VoltFile(deprootFN);
+        File   deprootFH = new File(deprootFN);
         File   cnfrootFH = config.m_voltdbRoot;
 
         if (!cnfrootFH.exists() && !cnfrootFH.mkdirs()) {
@@ -2564,7 +2561,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (config.m_userSchemas == null && config.m_stagedClassesPaths == null) {
             return; // nothing to do
         }
-        File stagedCatalogFH = new VoltFile(getStagedCatalogPath(getVoltDBRootPath()));
+        File stagedCatalogFH = new File(getStagedCatalogPath(getVoltDBRootPath()));
 
         if (!config.m_forceVoltdbCreate && stagedCatalogFH.exists()) {
             VoltDB.crashLocalVoltDB("A previous database was initialized with a schema. You must init with --force to overwrite the schema.");
@@ -2579,7 +2576,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     private void stageInitializedMarker(Configuration config) {
-        File depFH = new VoltFile(config.m_voltdbRoot, VoltDB.INITIALIZED_MARKER);
+        File depFH = new File(config.m_voltdbRoot, VoltDB.INITIALIZED_MARKER);
         try (PrintWriter pw = new PrintWriter(new FileWriter(depFH), true)) {
             pw.println(config.m_clusterName);
         } catch (IOException e) {
@@ -3691,7 +3688,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         configInfoDir.mkdirs();
 
         InMemoryJarfile.writeToFile(catalogBytes,
-                                    new VoltFile(configInfoDir.getPath(),
+                                    new File(configInfoDir.getPath(),
                                                  InMemoryJarfile.TMP_CATALOG_JAR_FILENAME));
     }
 
@@ -3790,7 +3787,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             return;
         }
 
-        File tempJar = new VoltFile(configInfoDir.getPath(),
+        File tempJar = new File(configInfoDir.getPath(),
                                     InMemoryJarfile.TMP_CATALOG_JAR_FILENAME);
         if(tempJar.exists()) {
             tempJar.delete();
@@ -4684,7 +4681,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     private void deleteStagedCatalogIfNeeded() {
         if (((m_commandLog != null) && m_commandLog.isEnabled()) || (m_terminusNonce != null)) {
-            File stagedCatalog = new VoltFile(RealVoltDB.getStagedCatalogPath(getVoltDBRootPath()));
+            File stagedCatalog = new File(RealVoltDB.getStagedCatalogPath(getVoltDBRootPath()));
             if (stagedCatalog.exists()) {
                 if (stagedCatalog.delete()) {
                     hostLog.info("Saved copy of the initialized schema deleted because command logs and/or snapshots are in use.");
@@ -4926,10 +4923,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
      * @throws IOException
      */
    static String setupDefaultDeployment(VoltLogger logger, File voltdbroot) throws IOException {
-        File configInfoDir = new VoltFile(voltdbroot, Constants.CONFIG_DIR);
+        File configInfoDir = new File(voltdbroot, Constants.CONFIG_DIR);
         configInfoDir.mkdirs();
 
-        File depFH = new VoltFile(configInfoDir, "deployment.xml");
+        File depFH = new File(configInfoDir, "deployment.xml");
         if (!depFH.exists()) {
             logger.info("Generating default deployment file \"" + depFH.getAbsolutePath() + "\"");
 

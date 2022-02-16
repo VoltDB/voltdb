@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -39,6 +39,7 @@ import java.util.zip.GZIPInputStream;
 
 import com.google_voltpatches.common.collect.Sets;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.commons.io.FileUtils;
 
 import org.junit.After;
 import org.junit.Before;
@@ -55,7 +56,7 @@ public class TestVoltTrace {
 
     @Before
     public void setUp() throws Exception {
-        m_tempDir = VoltFile.createTempFile(FILE_NAME_PREFIX, null);
+        m_tempDir = File.createTempFile(FILE_NAME_PREFIX, null);
         assertTrue(m_tempDir.delete());
         assertTrue(m_tempDir.mkdir());
         closeFilterIfOn();
@@ -65,13 +66,13 @@ public class TestVoltTrace {
     public void tearDown() throws Exception {
         closeFilterIfOn();
         VoltTrace.closeAllAndShutdown(null, 0);
-        VoltFile.recursivelyDelete(m_tempDir);
+        FileUtils.deleteDirectory(m_tempDir);
         m_tempDir = null;
     }
 
     @Test
     public void testFileWriter() throws IOException {
-        final File f = VoltFile.createTempFile(FILE_NAME_PREFIX, "json");
+        final File f = File.createTempFile(FILE_NAME_PREFIX, "json");
         f.deleteOnExit();
 
         LinkedList<VoltTrace.TraceEventBatch> events = new LinkedList<>();

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -41,6 +41,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.junit.After;
 import org.junit.Before;
@@ -64,7 +65,6 @@ import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Database;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.messaging.RejoinMessage;
-import org.voltdb.utils.VoltFile;
 
 // I made a separate test class for live rejoin's use of the
 // Iv2RejoinCoordinator because SnapshotUtil was leaving stale threads running
@@ -128,7 +128,7 @@ public class TestIv2RejoinCoordinatorLive {
     @After
     public void tearDown() throws IOException {
         m_coordinator.close();
-        VoltFile.recursivelyDelete(m_overflow);
+        FileUtils.deleteDirectory(m_overflow);
 
         m_coordinator = null;
         m_snapshotDaemon = null;

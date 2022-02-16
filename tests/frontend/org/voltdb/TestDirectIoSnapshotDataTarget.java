@@ -52,12 +52,12 @@ public class TestDirectIoSnapshotDataTarget extends TestTableSaveFile {
     }
 
     @Override
-    protected NativeSnapshotDataTarget createTarget(File file, int hostId, String clusterName, String databaseName,
+    protected NativeSnapshotDataTarget createTarget(File file, String pathType, boolean isTerminus, int hostId, String clusterName, String databaseName,
             String tableName, int numPartitions, boolean isReplicated, List<Integer> partitionIds, byte[] schemaBytes,
             long txnId, long timestamp, int[] version) throws IOException {
 
         NativeSnapshotDataTarget.Factory factory = DirectIoSnapshotDataTarget.factory(file.getParent(), hostId,
-                clusterName, databaseName, numPartitions, partitionIds, txnId, timestamp, version,
+                clusterName, databaseName, numPartitions, partitionIds, txnId, timestamp, version, false,
                 UnaryOperator.identity());
 
         return factory.create(file.getName(), tableName, isReplicated, schemaBytes);

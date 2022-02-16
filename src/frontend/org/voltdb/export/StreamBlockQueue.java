@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -16,6 +16,7 @@
  */
 package org.voltdb.export;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -38,7 +39,6 @@ import org.voltdb.utils.BinaryDeque.TruncatorResponse;
 import org.voltdb.utils.BinaryDequeReader;
 import org.voltdb.utils.PersistentBinaryDeque;
 import org.voltdb.utils.PersistentBinaryDeque.ByteBufferTruncatorResponse;
-import org.voltdb.utils.VoltFile;
 
 /**
  * A customized queue for StreamBlocks that contain export data. The queue is able to
@@ -423,7 +423,7 @@ public class StreamBlockQueue {
         PersistedMetadata metadata = new PersistedMetadata(streamTable, m_partitionId, initialGenId, genId);
         PersistedMetadataSerializer serializer = new PersistedMetadataSerializer();
 
-        m_persistentDeque = PersistentBinaryDeque.builder(m_nonce, new VoltFile(m_path), exportLog)
+        m_persistentDeque = PersistentBinaryDeque.builder(m_nonce, new File(m_path), exportLog)
                 .initialExtraHeader(metadata, serializer)
                 .compression(!DISABLE_COMPRESSION)
                 .deleteExisting(deleteExisting)

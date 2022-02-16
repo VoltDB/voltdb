@@ -238,8 +238,6 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
     @Test
     @Ignore("Covered in testIdleRejoinThenSnapshot")
     public void testRejoin() throws Exception {
-        //Reset the VoltFile prefix that may have been set by previous tests in this suite
-        org.voltdb.utils.VoltFile.resetSubrootForThisProcess();
         LocalCluster cluster = createLocalCluster(4,3, 2, LocalCluster.FailureState.ALL_RUNNING, null, false);
 
         ClientResponse response;
@@ -342,8 +340,6 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
     @Test
     @Ignore("This test does not provide much value")
     public void testRejoinPropogateAdminMode() throws Exception {
-        //Reset the VoltFile prefix that may have been set by previous tests in this suite
-        org.voltdb.utils.VoltFile.resetSubrootForThisProcess();
         LocalCluster cluster = createLocalCluster(2, 3, 1, LocalCluster.FailureState.ALL_RUNNING, null, false);
 
         ClientResponse response;
@@ -545,8 +541,6 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
     {
         final String snapshotDir = "/tmp/" + System.getProperty("user.name");
 
-        //Reset the VoltFile prefix that may have been set by previous tests in this suite
-        org.voltdb.utils.VoltFile.resetSubrootForThisProcess();
         LocalCluster cluster = createLocalCluster(2, 3, 1, LocalCluster.FailureState.ALL_RUNNING, null, false);
 
         ClientResponse response;
@@ -611,8 +605,6 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
     @SuppressWarnings("deprecation")
     @Test
     public void testRejoinWithCatalogUpdate() throws Exception {
-        //Reset the VoltFile prefix that may have been set by previous tests in this suite
-        org.voltdb.utils.VoltFile.resetSubrootForThisProcess();
         VoltProjectBuilder builder = getBuilderForTest();
         builder.setHTTPDPort(0);
         int sitesPerHost = 2;

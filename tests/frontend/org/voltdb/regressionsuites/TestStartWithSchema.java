@@ -43,7 +43,6 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster.FailureState;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.InMemoryJarfile;
-import org.voltdb.utils.VoltFile;
 
 
 /** Tests that 'start' works with initialized schemas
@@ -83,7 +82,7 @@ final public class TestStartWithSchema {
         int total = 0;
         for (Map.Entry<String, String> entry : cluster.getHostRoots().entrySet()) {
             assert( entry.getValue().contains(Constants.DBROOT) == false ) : entry.getValue();
-            File testFile = new VoltFile(entry.getValue() + pathWithinSubroot);
+            File testFile = new File(entry.getValue() + pathWithinSubroot);
             if (testFile.canRead() && (testFile.length() > 0)) {
                 InMemoryJarfile jar = new InMemoryJarfile(testFile);
                 ensureAllCatalogDefaultArtifactsExists(jar, testFile.getAbsolutePath());

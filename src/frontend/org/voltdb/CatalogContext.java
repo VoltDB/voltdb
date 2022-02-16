@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2021 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -50,7 +50,6 @@ import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.TimeUtils;
-import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 
@@ -347,8 +346,8 @@ public class CatalogContext {
      * @throws IOException
      */
     public Runnable writeCatalogJarToFile(String path, String name, CatalogJarWriteMode mode) throws IOException {
-        File catalogFile = new VoltFile(path, name);
-        File catalogTmpFile = new VoltFile(path, name + ".tmp");
+        File catalogFile = new File(path, name);
+        File catalogTmpFile = new File(path, name + ".tmp");
 
         if (mode == CatalogJarWriteMode.CATALOG_UPDATE) {
             // This means a @UpdateCore case, the asynchronous writing of

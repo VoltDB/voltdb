@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -40,7 +40,8 @@ import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import org.voltdb.utils.VoltFile;
+
+import org.apache.commons.io.FileUtils;
 
 public class TestLargeBlockManagerSuite {
 
@@ -58,7 +59,7 @@ public class TestLargeBlockManagerSuite {
     @AfterClass
     public static void tearDown() throws IOException {
         assert (m_tempDir != null);
-        VoltFile.recursivelyDelete(m_tempDir.toFile());
+        FileUtils.deleteDirectory(m_tempDir.toFile());
         assert (! Files.exists(m_tempDir));
     }
 

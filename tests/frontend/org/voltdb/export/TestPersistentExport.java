@@ -39,7 +39,6 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.export.TestExportBaseSocketExport.ServerListener;
 import org.voltdb.regressionsuites.LocalCluster;
-import org.voltdb.utils.VoltFile;
 
 public class TestPersistentExport extends ExportLocalClusterBase {
     private LocalCluster m_cluster;
@@ -75,7 +74,6 @@ public class TestPersistentExport extends ExportLocalClusterBase {
     @Test
     public void testInsertDeleteUpdate() throws Exception {
         resetDir();
-        VoltFile.resetSubrootForThisProcess();
 
         VoltProjectBuilder builder = null;
         builder = new VoltProjectBuilder();

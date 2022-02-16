@@ -100,7 +100,6 @@ public class TestExportSuiteReplicatedSocketExportRecover extends TestExportBase
         waitForExportAllRowsDelivered(client, exStream);
         m_serverSocket.verifyExportedTuples(1000);
         client.close();
-        config.overrideStartCommandVerb("recover");
         if (MiscUtils.isPro()) {
             config.shutDown();
         } else {

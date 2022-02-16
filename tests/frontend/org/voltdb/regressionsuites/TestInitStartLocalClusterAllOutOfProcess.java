@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2021 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -93,12 +93,7 @@ public class TestInitStartLocalClusterAllOutOfProcess extends JUnit4LocalCluster
         File voltDbRoot;
         cluster.startUp(true);
         //Get server specific root after startup.
-        if (!cluster.isOldCli()) {
-            voltDbRoot = new File(cluster.getServerSpecificRoot("1"));
-        } else {
-            String voltDbFilePrefix = cluster.getSubRoots().get(0).getPath();
-            voltDbRoot = new File(voltDbFilePrefix, builder.getPathToVoltRoot().getPath());
-        }
+        voltDbRoot = new File(cluster.getServerSpecificRoot("1"));
         voltDbRootPath = voltDbRoot.getCanonicalPath();
         voltDBRootParentPath = voltDbRoot.getParentFile().getCanonicalPath();
         listener = cluster.getListenerAddresses().get(0);
@@ -127,13 +122,6 @@ public class TestInitStartLocalClusterAllOutOfProcess extends JUnit4LocalCluster
         }
         assertTrue(found);
         assertEquals(org.voltcore.common.Constants.DEFAULT_HEARTBEAT_TIMEOUT_SECONDS, timeout);
-
-        if (cluster.isOldCli()) {
-            // get command is not supported in legacy cli as voltdbroot
-            // under the parent can't be determined deterministically
-            // using voltdbroot as the root of database directory
-            return;
-        }
 
         // Test get command
         testGetDeployment();

@@ -37,7 +37,6 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
-import org.voltdb.utils.VoltFile;
 
 public class TestViewsInPartialSnapshotRestore extends SaveRestoreBase{
 
@@ -51,7 +50,6 @@ public class TestViewsInPartialSnapshotRestore extends SaveRestoreBase{
         System.out.println("Starting testPartialRestoreWithViewsIncludetables");
         LocalCluster cluster = null;
         Client client = null;
-        VoltFile.resetSubrootForThisProcess();
 
         try {
             int clusterReplicationPort = 11000;
@@ -149,7 +147,6 @@ public class TestViewsInPartialSnapshotRestore extends SaveRestoreBase{
         System.out.println("Starting testPartialRestoreWithViewsIncludeViews");
         LocalCluster cluster = null;
         Client client = null;
-        VoltFile.resetSubrootForThisProcess();
 
         try {
             int clusterReplicationPort = 11000;

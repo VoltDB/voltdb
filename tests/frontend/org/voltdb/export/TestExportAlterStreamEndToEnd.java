@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2021 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -39,7 +39,6 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.export.TestExportBaseSocketExport.ServerListener;
 import org.voltdb.regressionsuites.LocalCluster;
-import org.voltdb.utils.VoltFile;
 
 public class TestExportAlterStreamEndToEnd extends ExportLocalClusterBase
 {
@@ -58,7 +57,6 @@ public class TestExportAlterStreamEndToEnd extends ExportLocalClusterBase
     public void setUp() throws Exception
     {
         resetDir();
-        VoltFile.resetSubrootForThisProcess();
 
         VoltProjectBuilder builder = null;
         builder = new VoltProjectBuilder();
@@ -151,7 +149,7 @@ public class TestExportAlterStreamEndToEnd extends ExportLocalClusterBase
     }
 
     @Test
-    public void testAlterStreamChangeModifers() throws Exception {
+    public void testAlterStreamChangeModifiers() throws Exception {
         Client client = getClient(m_cluster);
 
         //add data to stream table

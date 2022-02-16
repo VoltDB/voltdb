@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2021 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -212,7 +212,6 @@ public class TestSSL extends JUnit4LocalClusterTest {
 
     @Test
     public void ntestLocalClusterRejoin() throws Exception {
-        org.voltdb.utils.VoltFile.resetSubrootForThisProcess();
         VoltProjectBuilder builder = getBuilderForTest();
         builder.setKeyStoreInfo(getResourcePath(KEYSTORE_RESOURCE), KEYSTORE_PASSWD);
         builder.setCertStoreInfo(getResourcePath(KEYSTORE_RESOURCE), KEYSTORE_PASSWD);
@@ -262,13 +261,11 @@ public class TestSSL extends JUnit4LocalClusterTest {
         Thread.sleep(100);
 
         VoltDB.Configuration config = new VoltDB.Configuration(LocalCluster.portGenerator);
-        config.m_startAction = m_cluster.isOldCli() ? StartAction.REJOIN : StartAction.PROBE;
+        config.m_startAction = StartAction.PROBE;
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("sslRejoin.jar");
-        if (!m_cluster.isOldCli()) {
-            config.m_voltdbRoot = new File(m_cluster.getServerSpecificRoot("0"));
-            config.m_forceVoltdbCreate = false;
-            config.m_hostCount = hostCount;
-        }
+        config.m_voltdbRoot = new File(m_cluster.getServerSpecificRoot("0"));
+        config.m_forceVoltdbCreate = false;
+        config.m_hostCount = hostCount;
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("sslRejoin.xml");
         config.m_leader = ":" + m_cluster.internalPort(1);
         config.m_coordinators = m_cluster.coordinators(1);

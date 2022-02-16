@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2021 VoltDB Inc.
+ * Copyright (C) 2021-2022 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -34,8 +34,8 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
-import org.voltdb.utils.VoltFile;
 
+import org.apache.commons.io.FileUtils;
 import junit.framework.TestCase;
 
 /**
@@ -89,7 +89,7 @@ public class TestClient2AutoConnect extends TestCase {
     private void startCluster() {
         try {
             File f = new File("/tmp/" + System.getProperty("user.name"));
-            VoltFile.recursivelyDelete(f);
+            FileUtils.deleteDirectory(f);
             f.mkdirs();
             cluster = new LocalCluster("client-all-partitions.jar", nsites, nhosts, kfactor, BackendTarget.NATIVE_EE_JNI);
             cluster.overrideAnyRequestForValgrind();

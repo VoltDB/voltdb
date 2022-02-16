@@ -18,6 +18,7 @@ package org.voltdb;
 
 import static org.voltcore.utils.Bits.roundupToPage;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
@@ -40,7 +41,7 @@ import org.voltcore.utils.Bits;
 import org.voltcore.utils.DBBPool;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.DirectIoFileChannel;
-import org.voltdb.utils.VoltFile;
+import org.voltdb.utils.VoltSnapshotFile;
 
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.util.concurrent.Futures;
@@ -93,7 +94,7 @@ class DirectIoSnapshotDataTarget extends NativeSnapshotDataTarget {
      * @return {@code true} if {@code directory} can have direct IO files written inside of it
      */
     public static boolean directIoSupported(String directory) {
-        return DirectIoFileChannel.supported(new VoltFile(directory).toPath());
+        return DirectIoFileChannel.supported(new VoltSnapshotFile(directory).toPath());
     }
 
     static DBBPool.BBContainer allocateContainer(int minSize) {
@@ -114,18 +115,20 @@ class DirectIoSnapshotDataTarget extends NativeSnapshotDataTarget {
      * @return {@link Factory} to create {@link DirectIoSnapshotDataTarget} instances
      */
     public static Factory factory(String directory, int hostId, final String clusterName, final String databaseName,
-            int numPartitions, List<Integer> partitions, long txnId, long timestamp, int[] version,
+            int numPartitions, List<Integer> partitions, long txnId, long timestamp, int[] version, boolean isTruncationSnapshot,
             UnaryOperator<FileChannel> channelOperator) {
         DirectIoSnapshotDataTarget.MemoryPool pool = new DirectIoSnapshotDataTarget.MemoryPool();
-
-        return (fileName, tableName, isReplicated, schema) -> new DirectIoSnapshotDataTarget(pool,
-                new VoltFile(directory, fileName).toPath(), hostId, clusterName, databaseName, tableName, numPartitions,
-                isReplicated, partitions, schema, txnId, timestamp, version, channelOperator);
+        return (fileName, tableName, isReplicated, schema) -> {
+            Path p = isTruncationSnapshot ? new File(directory, fileName).toPath() : new VoltSnapshotFile(directory, fileName).toPath();
+            return new DirectIoSnapshotDataTarget(pool,
+                    new VoltSnapshotFile(directory, fileName).toPath(), hostId, clusterName, databaseName, tableName, numPartitions,
+                    isReplicated, partitions, schema, txnId, timestamp, version, isTruncationSnapshot, channelOperator);
+        };
     }
 
     private DirectIoSnapshotDataTarget(MemoryPool pool, Path path, int hostId, String clusterName, String databaseName,
             String tableName, int numPartitions, boolean isReplicated, List<Integer> partitionIds, byte[] schemaBytes,
-            long txnId, long timestamp, int[] version, UnaryOperator<FileChannel> channelOperator)
+            long txnId, long timestamp, int[] version, boolean isTruncationSnapshot, UnaryOperator<FileChannel> channelOperator)
             throws IOException {
         super(isReplicated);
         m_pool = pool.reference();

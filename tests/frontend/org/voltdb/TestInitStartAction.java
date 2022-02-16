@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -56,7 +56,6 @@ import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.InMemoryJarfile;
-import org.voltdb.utils.VoltFile;
 import org.voltdb_testprocs.fakeusecase.greetings.GetGreetingBase;
 
 import com.google_voltpatches.common.base.Joiner;
@@ -155,7 +154,7 @@ final public class TestInitStartAction {
     @Test
     public void testInitStartAction() throws Exception {
 
-        File deplFH = new VoltFile(new VoltFile(new VoltFile(rootDH, "voltdbroot"), "config"), "deployment.xml");
+        File deplFH = new File(new File(new File(rootDH, "voltdbroot"), "config"), "deployment.xml");
         Configuration c1 = new Configuration(
                 new String[]{"initialize", "voltdbroot", rootDH.getPath(), "force", "deployment", legacyDeploymentFH.getPath()});
         ServerThread server = new ServerThread(c1);
@@ -288,7 +287,7 @@ final public class TestInitStartAction {
         referenceCatalog.execute(CatalogUtil.getSerializedCatalogStringFromJar(referenceCatalogJar));
 
         // verify that the staged catalog is identical
-        File stagedJarFile = new VoltFile(RealVoltDB.getStagedCatalogPath(rootDH.getPath() + File.separator + "voltdbroot"));
+        File stagedJarFile = new File(RealVoltDB.getStagedCatalogPath(rootDH.getPath() + File.separator + "voltdbroot"));
         assertTrue(stagedJarFile.isFile());
         InMemoryJarfile stagedCatalogJar = new InMemoryJarfile(stagedJarFile);
         Catalog stagedCatalog = new Catalog();

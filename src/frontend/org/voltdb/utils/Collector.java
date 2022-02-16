@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -75,7 +75,7 @@ public class Collector {
     private static String m_workingDir = null;
     private static Set<String> m_logPaths = new HashSet<String>();
     private static Properties m_systemStats = new Properties();
-    private static VoltFile m_voltdbRoot = null;
+    private static File m_voltdbRoot = null;
 
     private static String m_zipFolderBase = "";
     static String getZipCollectFolderBase() { return m_zipFolderBase; }
@@ -116,7 +116,7 @@ public class Collector {
     }
 
     private static void populateVoltDBCollectionPaths() {
-        m_voltdbRoot = new VoltFile(m_config.voltdbroot);
+        m_voltdbRoot = new File(m_config.voltdbroot);
         if (!m_voltdbRoot.exists()) {
             System.err.println(m_voltdbRoot.getParentFile().getAbsolutePath() + " does not contain a valid database "
                     + "directory. Specify valid path to the database directory.");

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2021 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -93,7 +93,6 @@ import org.voltdb.exportclient.decode.NVPairsDecoder;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.HDFSUtils;
 import org.voltdb.utils.TimeUtils;
-import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Preconditions;
@@ -578,7 +577,7 @@ public class HttpExportClient extends ExportClientBase {
     private void writeAvroSchemaToLocalFileSystem(
             ExportRow row, StringEntity schemaEntity
     ) throws PathHandlingException {
-        File schemaFH = new VoltFile(EndpointExpander.expand(m_avroSchemaLocation, row.tableName, row.generation));
+        File schemaFH = new File(EndpointExpander.expand(m_avroSchemaLocation, row.tableName, row.generation));
         File dir = schemaFH.getParentFile();
         dir.mkdirs();
         if (   !dir.exists()

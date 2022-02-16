@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -1384,7 +1384,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
                 ? ((tail == null) ? 1 : tail.segmentId() + 1)
                 : startId;
         String fname = getSegmentFileName(curId);
-        PBDSegment<M> newSegment = initializeNewSegment(curId, new VoltFile(m_path, fname), "an offer", extraHeader);
+        PBDSegment<M> newSegment = initializeNewSegment(curId, new File(m_path, fname), "an offer", extraHeader);
         m_segments.put(newSegment.segmentId(), newSegment);
 
         if (m_retentionPolicy != null) {
@@ -1477,7 +1477,7 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
             ArrayDeque<BBContainer> currentSegmentContents = segments.poll();
 
             String fname = getSegmentFileName(nextIndex);
-            PBDSegment<M> writeSegment = initializeNewSegment(nextIndex, new VoltFile(m_path, fname), "a push",
+            PBDSegment<M> writeSegment = initializeNewSegment(nextIndex, new File(m_path, fname), "a push",
                     extraHeader);
 
             // Prepare for next file

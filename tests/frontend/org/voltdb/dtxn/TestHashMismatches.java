@@ -50,7 +50,6 @@ import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
-import org.voltdb.utils.VoltFile;
 
 public class TestHashMismatches extends JUnit4LocalClusterTest {
 
@@ -94,7 +93,6 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
         createCluster(method, k, hosts, sph, false);
     }
     void createCluster(String method, int k, int hostcount, int sph, boolean clEnabled) throws IOException {
-        VoltFile.resetSubrootForThisProcess();
         File tempDir = new File(TMPDIR);
         if (!tempDir.exists()) {
             assertTrue(tempDir.mkdirs());
@@ -118,6 +116,7 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
             assertTrue("Catalog compilation failed", server.compile(builder));
 
             server.setHasLocalServer(false);
+            server.setEnableVoltSnapshotPrefix(true);
             List<String> logSearchPatterns = new ArrayList<>(1);
             logSearchPatterns.add(expectedLogMessage);
             logSearchPatterns.add(expectHashDetectionMessage);
@@ -164,7 +163,6 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
      */
     @Test(timeout = 60_000)
     public void testNonDeterministicInsert() throws Exception {
-        VoltFile.resetSubrootForThisProcess();
         createCluster("testNonDeterministicInsert");
         try {
             client.callProcedure(
@@ -478,7 +476,7 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
             long mprows = vt.asScalarLong();
             client.drain();
             System.out.println("Saving snapshot...");
-            ClientResponse resp  = client.callProcedure("@SnapshotSave", TMPDIR, TESTNONCE, (byte) 1);
+            ClientResponse resp  = client.callProcedure("@SnapshotSave", TMPDIR, TESTNONCE + "2", (byte) 1);
             vt = resp.getResults()[0];
             System.out.println(vt.toFormattedString());
             while (vt.advanceRow()) {
@@ -488,7 +486,6 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
             server.shutDown();
             Thread.sleep(2000);
             System.out.println("Shutdown cluster and recover");
-            server.overrideStartCommandVerb("RECOVER");
             server.startUp(false);
             System.out.println("cluster recovered!");
             client = ClientFactory.createClient();
@@ -497,7 +494,7 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
             System.out.println("recovered topo:\n" + vt.toFormattedString());
 
             System.out.println("Saved snapshot with " + rows + ", reloading snapshot...");
-            vt = client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE).getResults()[0];
+            vt = client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE + "2").getResults()[0];
             System.out.println(vt.toFormattedString());
             while (vt.advanceRow()) {
                 if (vt.getString("RESULT").equals("FAILURE")) {
@@ -573,7 +570,6 @@ public class TestHashMismatches extends JUnit4LocalClusterTest {
             }
             Thread.sleep(2000);
             System.out.println("Shutdown cluster and recover");
-            server.overrideStartCommandVerb("RECOVER");
             server.startUp(false);
             System.out.println("cluster recovered!");
             client = ClientFactory.createClient();
