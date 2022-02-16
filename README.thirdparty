@@ -1543,24 +1543,6 @@ ant_doxygen
  * reserved.
 
 ================================================================================
-Emma
-/* Copyright (C) 2003 Vladimir Roubtsov. All rights reserved.
- *
- * This program and the accompanying materials are made available under
- * the terms of the Common Public License v1.0 which accompanies this distribution,
- * and is available at http://www.eclipse.org/legal/cpl-v10.html
- */
-
-================================================================================
-emma_ant
-/* Copyright (C) 2003 Vladimir Roubtsov. All rights reserved.
- *
- * This program and the accompanying materials are made available under
- * the terms of the Common Public License v1.0 which accompanies this distribution,
- * and is available at http://www.eclipse.org/legal/cpl-v10.html
- */
-
-================================================================================
 Gradle 1.6 (Used in the GEB automated tests of the VMC, VoltDB Management Center)
 
 /*
@@ -1953,57 +1935,6 @@ VoltDB Studio | Web uses the following open source components:
 # CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-================================================================================
-Voltify uses the following third party libraries:
-
-virtualenv - Python virtual runtime environment
-
-https://pypi.python.org/pypi/virtualenv
-http://travis-ci.org/pypa/virtualenv
-http://www.virtualenv.org/
-
-Copyright (c) 2007 Ian Bicking and Contributors
-Copyright (c) 2009 Ian Bicking, The Open Planning Project
-Copyright (c) 2011-2013 The virtualenv developers
-
-Permission is hereby granted, free of charge, to any person obtaining
-a copy of this software and associated documentation files (the
-"Software"), to deal in the Software without restriction, including
-without limitation the rights to use, copy, modify, merge, publish,
-distribute, sublicense, and/or sell copies of the Software, and to
-permit persons to whom the Software is furnished to do so, subject to
-the following conditions:
-
-The above copyright notice and this permission notice shall be
-included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
-LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
-WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-schemaobject - MySQL live schema parser
-
-http://matuson.com/code/schemaobject/
-git://github.com/mmatuson/SchemaObject.git
-
-Copyright 2009-2010 Mitch Matuson
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
 
 ================================================================================
 Kafka Uses following Licenses:

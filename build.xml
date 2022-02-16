@@ -682,12 +682,8 @@ DISTRIBUTION
     <!-- add misc. other tools in the tools directory -->
     <copy todir="${dist.dir}/tools" >
         <fileset dir="tools" defaultexcludes="yes">
-            <include name="toolrunner.py" />
             <include name="watch_performance.py" />
             <include name="watch_flow.py" />
-            <include name="voltify" />
-            <include name="voltify-README.md" />
-            <include name="voltify.d/**" />
             <include name="kafka/**"/>
             <include name="lib/**" />
             <include name="draingen" />
@@ -2422,55 +2418,6 @@ TEST CASES
         <arg value='sqlcmdtest.py' />
         <arg value='--refresh' />
     </exec>
-</target>
-
-<!--
-***************************************
-BENCHMARKS
-***************************************
--->
-
-<target name='update_logging' depends='compile'
-    description="Invoke utility that connects to the specified VoltDB host and calls @UpdateLogging system procedure with the specified XML confiG file">
-    <java fork="true" failonerror="true"
-        classname="org.voltdb.UpdateLogging" >
-        <arg value='host=${host}' />
-        <arg value='config=${config}' />
-        <arg value='allHosts=${allHosts}' />
-        <arg value='user=${user}' />
-        <arg value='password=${password}' />
-        <classpath refid='project.classpath' />
-        <assertions><enable /></assertions>
-    </java>
-</target>
-
-<target name='tcp_throughput_sender' depends='compile'
-    description="Open a TCP connection and send fixed sized packets for a specified duration.">
-    <java fork="true" failonerror="true"
-        classname="org.voltdb.TCPThroughputSender" >
-        <jvmarg value="-server" />
-        <jvmarg value="-Xmx512m" />
-        <arg value='${address}' />
-        <arg value='${packetsize}' />
-        <arg value='${seconds}' />
-        <arg value='${numsockets}' />
-        <classpath refid='project.classpath' />
-        <assertions><enable /></assertions>
-    </java>
-</target>
-
-<target name='tcp_throughput_receiver' depends='compile'
-  description="Accept a TCP connection and log how many messages and bytes are received.">
-    <java fork="true" failonerror="true"
-        classname="org.voltdb.TCPThroughputReceiver" >
-        <jvmarg value="-server" />
-        <jvmarg value="-Xmx512m" />
-        <arg value="${respond}" />
-        <arg value="${responsesize}" />
-        <arg value="${packetsize}" />
-        <classpath refid='project.classpath' />
-        <assertions><enable /></assertions>
-    </java>
 </target>
 
 <!--
