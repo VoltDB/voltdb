@@ -198,50 +198,6 @@ public class TestQueryTimeout extends RegressionSuite {
 
     final String PROMPTMSG = " is supposed to time out, but succeeded eventually!";
 
-    private void checkTimeoutIncreasedProcSucceed(boolean sync, Client client, String procName, Object...params)
-            throws IOException, ProcCallException, InterruptedException {
-        try {
-            client.callProcedure(procName, params);
-            fail(procName + PROMPTMSG);
-        }
-        catch (ProcCallException ex) {
-            assertTrue("Unexpected exception raised in procedure \""
-                       + procName + "\": "
-                       + ex.getMessage(),
-                       ex.getMessage().contains(ERRORMSG));
-        }
-
-        // increase the individual timeout value in order to succeed running this long procedure
-        if (sync) {
-            try {
-                client.callProcedureWithTimeout(TIMEOUT_LONG, procName, params);
-            }
-            catch (Exception ex) {
-                fail(procName + " is supposed to succeed but failed with message: !"
-                        + ex.getMessage());
-            }
-        }
-        else {
-            client.callProcedureWithTimeout(m_callback, TIMEOUT_LONG, procName, params);
-            client.drain();
-            checkCallbackSuccess();
-        }
-
-        // run the same procedure again to verify the global timeout value still applies
-        try {
-            client.callProcedure(procName, params);
-            fail(procName + PROMPTMSG);
-        }
-        catch (ProcCallException ex) {
-            assertTrue("Unexpected exception raised in procedure \""
-                       + procName + "\": "
-                       + ex.getMessage(),
-                       ex.getMessage().contains(ERRORMSG));
-        }
-
-        checkDeploymentPropertyValue(client, "querytimeout", Integer.toString(TIMEOUT_NORMAL));
-    }
-
     private void checkTimeoutIncreasedProcFailed(boolean sync, Client client, String procName, Object...params)
             throws IOException, ProcCallException, InterruptedException {
         try {
@@ -281,55 +237,6 @@ public class TestQueryTimeout extends RegressionSuite {
         catch (ProcCallException ex) {
             assertTrue(ex.toString() + " did not contain " + ERRORMSG,
                        ex.getMessage().contains(ERRORMSG));
-        }
-
-        checkDeploymentPropertyValue(client, "querytimeout", Integer.toString(TIMEOUT_NORMAL));
-    }
-
-    private void checkTimeoutDecreaseProcFailed(boolean sync, Client client, String procName, Object...params)
-            throws IOException, ProcCallException, InterruptedException {
-        checkDeploymentPropertyValue(client, "querytimeout", Integer.toString(TIMEOUT_NORMAL));
-
-        try {
-            client.callProcedure(procName, params);
-        }
-        catch (Exception ex) {
-            fail(procName +
-                    " is supposed to succeed, but failed with message "
-                    + ex.getMessage());
-        }
-
-        checkDeploymentPropertyValue(client, "querytimeout", Integer.toString(TIMEOUT_NORMAL));
-
-        // decrease the individual timeout value in order to timeout the running this long procedure
-        if (sync) {
-            try {
-                client.callProcedureWithTimeout(TIMEOUT_SHORT, procName, params);
-                fail(procName + PROMPTMSG);
-            }
-            catch (Exception ex) {
-                assertTrue(ex.toString() + " did not contain " + ERRORMSG,
-                           ex.getMessage().contains(ERRORMSG));
-            }
-        }
-        else {
-            client.callProcedureWithTimeout(m_callback, TIMEOUT_SHORT, procName, params);
-            client.drain();
-            checkCallbackTimeoutError(ERRORMSG);;
-        }
-
-        // check the global timeout value again
-        checkDeploymentPropertyValue(client, "querytimeout", Integer.toString(TIMEOUT_NORMAL));
-
-        // run the same procedure again to verify the global timeout value still applies
-        try {
-            client.callProcedure(procName, params);
-        }
-        catch (Exception ex) {
-            fail(procName
-                    + " is supposed to succeed, but failed with message "
-                    + ex.getMessage()
-                    + "\n");
         }
 
         checkDeploymentPropertyValue(client, "querytimeout", Integer.toString(TIMEOUT_NORMAL));
@@ -384,7 +291,7 @@ public class TestQueryTimeout extends RegressionSuite {
             // Disable the memcheck/debug for this test, it takes too long
             return;
         }
-        m_username = "userWithAllProc";
+        m_username = "adminUser";
         m_password = "password";
         Client client = getClient();
         checkIndividualProcTimeout(client);
