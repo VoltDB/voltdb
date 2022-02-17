@@ -978,7 +978,7 @@ public abstract class CatalogUtil {
             // should return an error, and let the caller decide what to do (crash or not, for
             // example)
             errmsg = "Error validating deployment configuration: " + e.getMessage();
-            hostLog.error(errmsg, e);
+            hostLog.error(errmsg);
             return errmsg;
         }
 
