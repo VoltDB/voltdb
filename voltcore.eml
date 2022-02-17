@@ -37,9 +37,6 @@
 	<lib name="servlet-api-3.1.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/servlet-api-3.1.jar!/"/>
 	</lib>
-	<lib name="slf4j-api-1.6.2.jar" scope="COMPILE">
-		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/slf4j-api-1.6.2.jar!/"/>
-	</lib>
 	<lib name="jna.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/jna.jar!/"/>
 	</lib>
@@ -245,6 +242,9 @@
 	</lib>
 	<lib name="javax.annotation-api-1.3.2.jar" scope="COMPILE">
 		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../lib/javax.annotation-api-1.3.2.jar!/"/>
+	</lib>
+	<lib name="awaitility-4.1.1.jar" scope="COMPILE">
+		<relative-module-cls project-related="jar://$PROJECT_DIR$/../../third_party/java/jars/awaitility-4.1.1.jar!/"/>
 	</lib>
 	<levels>
 		<level name="voltcore_deps" value="project"/>
