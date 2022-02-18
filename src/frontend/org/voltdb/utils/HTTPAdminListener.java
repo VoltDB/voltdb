@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -177,7 +177,7 @@ public class HTTPAdminListener {
         /*
          * Don't force us to look at a huge pile of threads
          */
-        final QueuedThreadPool qtp = new QueuedThreadPool(
+        final HTTPQueuedThreadPool qtp = new HTTPQueuedThreadPool(
                 poolsize,
                 1, // minimum threads
                 timeout * 1000,
