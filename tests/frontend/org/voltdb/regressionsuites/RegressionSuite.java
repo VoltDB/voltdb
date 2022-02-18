@@ -94,7 +94,7 @@ public class RegressionSuite extends TestCase {
     protected VoltServerConfig m_config;
     protected String m_username = "default";
     protected String m_password = "password";
-    private final ArrayList<Client> m_clients = new ArrayList<>();
+    protected final ArrayList<Client> m_clients = new ArrayList<>();
     private final ArrayList<SocketChannel> m_clientChannels = new ArrayList<>();
     final String m_methodName;
     // If the current RegressionSuite instance is the last one in the current VoltServerConfig,

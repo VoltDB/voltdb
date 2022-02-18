@@ -24,7 +24,6 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
-
 import org.voltdb.BackendTarget;
 import org.voltdb.ProcedurePartitionData;
 import org.voltdb.client.Client;
@@ -291,7 +290,7 @@ public class TestQueryTimeout extends RegressionSuite {
             // Disable the memcheck/debug for this test, it takes too long
             return;
         }
-        m_username = "adminUser";
+        m_username = "userWithAllProc";
         m_password = "password";
         Client client = getClient();
         checkIndividualProcTimeout(client);
@@ -418,4 +417,16 @@ public class TestQueryTimeout extends RegressionSuite {
 
         return builder;
     }
+    public void tearDown() throws Exception {
+        if (m_fatalFailure) {
+            System.exit(0);
+        } else if (m_completeShutdown) {
+            m_config.shutDown();
+        }
+        for (final Client c : m_clients) {
+            c.close();
+        }
+        m_clients.clear();
+    }
+
 }
