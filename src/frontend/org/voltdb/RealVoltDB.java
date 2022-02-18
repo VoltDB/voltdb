@@ -40,6 +40,7 @@ import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -141,6 +142,8 @@ import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
+import org.voltdb.dr2.conflicts.DRConflictsStats;
+import org.voltdb.dr2.conflicts.DRConflictsTracker;
 import org.voltdb.dr2.DRConsumerStatsBase;
 import org.voltdb.dtxn.InitiatorStats;
 import org.voltdb.dtxn.LatencyHistogramStats;
@@ -344,6 +347,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private ConsumerDRGateway m_consumerDRGateway = null;
     // Separate class to manage dr catalog commands, which are needed during recovery
     private final DrProducerCatalogCommands m_drCatalogCommands = new DrProducerCatalogCommands();
+    private final DRConflictsTracker m_drConflictsTracker = new DRConflictsTracker(Clock.systemUTC());
 
     //Only restrict recovery completion during test
     static Semaphore m_testBlockRecoveryCompletion = new Semaphore(Integer.MAX_VALUE);
@@ -1467,6 +1471,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             // Dummy DRCONSUMER stats
             replaceDRConsumerStatsWithDummy();
 
+            statsAgent.registerStatsSource(StatsSelector.DRCONFLICTS, 0, new DRConflictsStats(m_drConflictsTracker, m_catalogContext.cluster.getDrclusterid()));
+
             // Operator function helpers
             m_operatorSupport.registerStatistics(statsAgent);
 
@@ -1546,6 +1552,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                                                 : ProducerDRGateway.Mode.NEW,
                         m_replicationActive.get(), m_configuredNumberOfPartitions,
                         (m_catalogContext.getClusterSettings().hostcount() - m_config.m_missingHostCount));
+
+
+                DRConflictReporter.init(m_drConflictsTracker);
             }
             else {
                 // set up empty stats for the DR Producer

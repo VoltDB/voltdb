@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -718,6 +718,35 @@ public class TestStatisticsSuite extends StatisticsTestSuiteBase {
         // nine aggregate tables returned.  Assume that we have selected the right
         // subset of stats internally, just check that we get stuff.
         assertEquals(9, results.length);
+    }
+
+    public void testDRConflictsStats() throws Exception {
+        System.out.println("\n\nTESTING DRCONFLICTS STATS\n\n\n");
+        Client client  = getFullyConnectedClient();
+
+        ColumnInfo[] expectedSchema = new ColumnInfo[12];
+        expectedSchema[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
+        expectedSchema[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
+        expectedSchema[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
+        expectedSchema[3] = new ColumnInfo("CLUSTER_ID", VoltType.INTEGER);
+        expectedSchema[4] = new ColumnInfo("REMOTE_CLUSTER_ID", VoltType.INTEGER);
+        expectedSchema[5] = new ColumnInfo("PARTITION_ID", VoltType.INTEGER);
+        expectedSchema[6] = new ColumnInfo("TABLE_NAME", VoltType.STRING);
+        expectedSchema[7] = new ColumnInfo("TOTAL_CONFLICT_COUNT", VoltType.BIGINT);
+        expectedSchema[8] = new ColumnInfo("MISSING_ROW_COUNT", VoltType.BIGINT);
+        expectedSchema[9] = new ColumnInfo("TIMESTAMP_MISMATCH_COUNT", VoltType.BIGINT);
+        expectedSchema[10] = new ColumnInfo("CONSTRAINT_VIOLATION_COUNT", VoltType.BIGINT);
+        expectedSchema[11] = new ColumnInfo("LAST_CONFLICT_TIMESTAMP", VoltType.TIMESTAMP);
+        VoltTable expectedTable = new VoltTable(expectedSchema);
+        VoltTable[] results = null;
+
+        results = client.callProcedure("@Statistics", "DRCONFLICTS", 0).getResults();
+        // Only one table returned
+        assertEquals(1, results.length);
+        validateSchema(results[0], expectedTable);
+
+        // Should get zero rows - it is only incremented in case of DR conflicts
+        assertEquals(0, results[0].getRowCount());
     }
 
     /*

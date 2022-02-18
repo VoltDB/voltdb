@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2021 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -153,7 +153,8 @@ public:
     int64_t getQueuedExportBytes(int32_t partitionId, std::string signature);
     void pushExportBuffer(int32_t partitionId, std::string signature, voltdb::ExportStreamBlock *block);
 
-    int reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, voltdb::DRRecordType action,
+    int reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp,
+            std::string tableName, bool isReplicatedTable, voltdb::DRRecordType action,
             voltdb::DRConflictType deleteConflict, voltdb::Table *existingMetaTableForDelete, voltdb::Table *existingTupleTableForDelete,
             voltdb::Table *expectedMetaTableForDelete, voltdb::Table *expectedTupleTableForDelete,
             voltdb::DRConflictType insertConflict, voltdb::Table *existingMetaTableForInsert, voltdb::Table *existingTupleTableForInsert,
@@ -1998,7 +1999,8 @@ void VoltDBIPC::pushPoisonPill(int32_t partitionId, std::string& reason, voltdb:
     }
 }
 
-int VoltDBIPC::reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, voltdb::DRRecordType action,
+int VoltDBIPC::reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp,
+            std::string tableName, bool isReplicatedTable, voltdb::DRRecordType action,
             voltdb::DRConflictType deleteConflict, voltdb::Table *existingMetaTableForDelete, voltdb::Table *existingTupleTableForDelete,
             voltdb::Table *expectedMetaTableForDelete, voltdb::Table *expectedTupleTableForDelete,
             voltdb::DRConflictType insertConflict, voltdb::Table *existingMetaTableForInsert, voltdb::Table *existingTupleTableForInsert,

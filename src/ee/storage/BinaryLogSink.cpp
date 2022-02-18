@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2021 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -403,6 +403,7 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
                                                                         remoteClusterId,
                                                                         UniqueId::timestampSinceUnixEpoch(uniqueId),
                                                                         drTable->name(),
+                                                                        drTable->isReplicatedTable(),
                                                                         actionType,
                                                                         deleteConflict,
                                                                         existingMetaTableForDelete.get(),

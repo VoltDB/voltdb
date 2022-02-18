@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -24,6 +24,7 @@ public interface DRConflictManager {
                                int remoteClusterId,
                                long remoteTimestamp,
                                String tableName,
+                               boolean isReplicatedTable,
                                PartitionDRGateway.DRRecordType action,
                                PartitionDRGateway.DRConflictType deleteConflictType,
                                ByteBuffer existingMetaTableForDelete,

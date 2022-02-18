@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2021 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -213,10 +213,25 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
         throw std::exception();
     }
 
+
+    m_drConflictReporterClass = m_jniEnv->FindClass("org/voltdb/DRConflictReporter");
+    if (m_drConflictReporterClass == NULL) {
+        m_jniEnv->ExceptionDescribe();
+        vassert(m_drConflictReporterClass != NULL);
+        throw std::exception();
+    }
+
+    m_drConflictReporterClass = static_cast<jclass>(m_jniEnv->NewGlobalRef(m_drConflictReporterClass));
+    if (m_drConflictReporterClass == NULL) {
+        m_jniEnv->ExceptionDescribe();
+        vassert(m_drConflictReporterClass != NULL);
+        throw std::exception();
+    }
+
     m_reportDRConflictMID = m_jniEnv->GetStaticMethodID(
-            m_partitionDRGatewayClass,
+            m_drConflictReporterClass,
             "reportDRConflict",
-            "(IIJLjava/lang/String;IILjava/nio/ByteBuffer;Ljava/nio/ByteBuffer;Ljava/nio/ByteBuffer;Ljava/nio/ByteBuffer;ILjava/nio/ByteBuffer;Ljava/nio/ByteBuffer;Ljava/nio/ByteBuffer;Ljava/nio/ByteBuffer;)I");
+            "(IIJLjava/lang/String;ZIILjava/nio/ByteBuffer;Ljava/nio/ByteBuffer;Ljava/nio/ByteBuffer;Ljava/nio/ByteBuffer;ILjava/nio/ByteBuffer;Ljava/nio/ByteBuffer;Ljava/nio/ByteBuffer;Ljava/nio/ByteBuffer;)I");
     if (m_reportDRConflictMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         vassert(m_reportDRConflictMID != NULL);
@@ -586,6 +601,7 @@ JNITopend::~JNITopend() {
     m_jniEnv->DeleteGlobalRef(m_javaExecutionEngine);
     m_jniEnv->DeleteGlobalRef(m_exportManagerClass);
     m_jniEnv->DeleteGlobalRef(m_partitionDRGatewayClass);
+    m_jniEnv->DeleteGlobalRef(m_drConflictReporterClass);
     m_jniEnv->DeleteGlobalRef(m_decompressionClass);
     m_jniEnv->DeleteGlobalRef(m_NDBBWClass);
 }
@@ -710,7 +726,8 @@ static boost::shared_array<char> serializeToDirectByteBuffer(JNIEnv *jniEngine, 
     return boost::shared_array<char>();
 }
 
-int JNITopend::reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, DRRecordType action,
+int JNITopend::reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp,
+        std::string tableName, bool isReplicatedTable, DRRecordType action,
         DRConflictType deleteConflict, Table *existingMetaTableForDelete, Table *existingTupleTableForDelete,
         Table *expectedMetaTableForDelete, Table *expectedTupleTableForDelete,
         DRConflictType insertConflict, Table *existingMetaTableForInsert, Table *existingTupleTableForInsert,
@@ -760,12 +777,13 @@ int JNITopend::reportDRConflict(int32_t partitionId, int32_t remoteClusterId, in
                                                                                    newTupleTableForInsert,
                                                                                    newTupleRowsBufferForInsert);
 
-    int32_t retval = m_jniEnv->CallStaticIntMethod(m_partitionDRGatewayClass,
+    int32_t retval = m_jniEnv->CallStaticIntMethod(m_drConflictReporterClass,
                                             m_reportDRConflictMID,
                                             partitionId,
                                             remoteClusterId,
                                             remoteTimestamp,
                                             tableNameString,
+                                            isReplicatedTable,
                                             action,
                                             deleteConflict,
                                             existingMetaRowsBufferForDelete,

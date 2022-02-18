@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2021 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -56,7 +56,7 @@ public:
 
     void pushPoisonPill(int32_t partitionId, std::string& reason, DrStreamBlock *block);
 
-    int reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, DRRecordType action,
+    int reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, bool isReplicatedTable, DRRecordType action,
             DRConflictType deleteConflict, Table *existingMetaTableForDelete, Table *existingTupleTableForDelete,
             Table *expectedMetaTableForDelete, Table *expectedTupleTableForDelete,
             DRConflictType insertConflict, Table *existingMetaTableForInsert, Table *existingTupleTableForInsert,
@@ -114,6 +114,7 @@ private:
     jmethodID m_NDBBWConstructorMID;
     jclass m_exportManagerClass;
     jclass m_partitionDRGatewayClass;
+    jclass m_drConflictReporterClass;
     jclass m_decompressionClass;
     jclass m_NDBBWClass;
     jmethodID initJavaUserDefinedMethod(const char* name);
