@@ -26,8 +26,16 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
-import java.io.File;
+import org.junit.After;
+import org.junit.AfterClass;
+import org.junit.Before;
+import org.junit.BeforeClass;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.TestName;
+
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
 
@@ -36,47 +44,61 @@ import org.voltdb.VoltTable;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 
-import org.apache.commons.io.FileUtils;
-import junit.framework.TestCase;
-
 /**
  *  Test client all-partition calls
  *  for Client2 implementation
  */
-public class TestClient2AllPartitionCall extends TestCase {
+public class TestClient2AllPartitionCall {
 
     static final int ROWS = 1000;
-    private LocalCluster cluster;
-    private Client2 client;
+    static private LocalCluster cluster;
+    static private Client2 client;
 
-    @Override
-    public void setUp() throws Exception
-    {
-        System.out.printf("=-=-=-=-=-=-= Starting test %s =-=-=-=-=-=-=\n", getName());
+    @Rule
+    public final TestName testname = new TestName();
 
-        FileUtils.deleteDirectory(new File("/tmp/" + System.getProperty("user.name")));
-        File f = new File("/tmp/" + System.getProperty("user.name"));
-        f.mkdirs();
+    @BeforeClass
+    public static void prologue() throws Exception {
+        try {
+            System.out.println("=-=-=-= Prologue =-=-=-=");
 
-        cluster = new LocalCluster("client-all-partitions.jar", 4, 2, 0, BackendTarget.NATIVE_EE_JNI);
-        cluster.overrideAnyRequestForValgrind();
-        cluster.setHasLocalServer(false);
+            cluster = new LocalCluster("client-all-partitions.jar", 4, 2, 0, BackendTarget.NATIVE_EE_JNI);
+            cluster.overrideAnyRequestForValgrind();
+            cluster.setHasLocalServer(false);
 
-        VoltProjectBuilder project = new VoltProjectBuilder();
-        project.setUseDDLSchema(true);
-        project.addSchema(getClass().getResource("allpartitioncall.sql"));
+            VoltProjectBuilder project = new VoltProjectBuilder();
+            project.setUseDDLSchema(true);
+            project.addSchema(TestClient2AllPartitionCall.class.getResource("allpartitioncall.sql"));
 
-        boolean success = cluster.compile(project);
-        assertTrue(success);
-        cluster.startUp();
+            boolean success = cluster.compile(project);
+            assertTrue(success);
+            cluster.startUp();
 
-        client = ClientFactory.createClient(new Client2Config());
-        client.connectSync("localhost", cluster.port(0));
-        load("TABLE_INT_PARTITION");
-        load("TABLE_STRING_PARTITION");
+            client = ClientFactory.createClient(new Client2Config());
+            client.connectSync("localhost", cluster.port(0));
+            load("TABLE_INT_PARTITION");
+            load("TABLE_STRING_PARTITION");
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+            fail();
+        }
     }
 
-    private void load(String tableName) throws NoConnectionsException, IOException, ProcCallException {
+    @AfterClass
+    public static void epilogue() throws Exception {
+        System.out.println("=-=-=-= Epilogue =-=-=-=");
+        if (client != null){
+            client.close();
+            client = null;
+        }
+        if (cluster != null) {
+            cluster.shutDown();
+            cluster = null;
+        }
+     }
+
+    private static void load(String tableName) throws NoConnectionsException, IOException, ProcCallException {
         for (int i=0; i<ROWS; i++) {
             StringBuilder builder = new StringBuilder();
             builder.append("insert into " + tableName + " values (" + i);
@@ -88,47 +110,53 @@ public class TestClient2AllPartitionCall extends TestCase {
         assertEquals(ROWS, vt.fetchRow(0).getLong(0));
     }
 
-    @Override
-    public void tearDown() throws Exception {
-        if (client != null){
-            client.close();
-        }
-        if (cluster != null) {
-            cluster.shutDown();
-        }
-        System.out.printf("=-=-=-=-=-=-= End of test %s =-=-=-=-=-=-=\n", getName());
+    @Before
+    public void setup() {
+        System.out.printf("=-=-=-=-=-=-= Starting test %s =-=-=-=-=-=-=\n", testname.getMethodName());
+
+   }
+
+    @After
+    public void teardown() {
+        System.out.printf("=-=-=-=-=-=-= End of test %s =-=-=-=-=-=-=\n", testname.getMethodName());
     }
 
     /*
      * Test simple success cases
      */
+    @Test
     public void testSyncCallInt() throws Exception {
         ClientResponseWithPartitionKey[] responses = client.callAllPartitionProcedureSync(null, "PartitionIntegerTestProc");
         validateResults(responses, 8);
      }
 
+    @Test
     public void testAsyncCallInt() throws Exception {
         CompletableFuture<ClientResponseWithPartitionKey[]> future = client.callAllPartitionProcedureAsync(null, "PartitionIntegerTestProc");
         ClientResponseWithPartitionKey[] responses = future.get();
         validateResults(responses, 8);
      }
 
+    @Test
     public void testSyncCallString() throws Exception {
         ClientResponseWithPartitionKey[] responses = client.callAllPartitionProcedureSync(null, "PartitionStringTestProc");
         validateResults(responses, 8);
     }
 
+    @Test
     public void testAsyncCallString() throws Exception{
         CompletableFuture<ClientResponseWithPartitionKey[]> future = client.callAllPartitionProcedureAsync(null, "PartitionStringTestProc");
         ClientResponseWithPartitionKey[] responses = future.get();
         validateResults(responses, 8);
     }
 
+    @Test
     public void testNoPartitionKey() throws Exception {
         ClientResponseWithPartitionKey[] responses = client.callAllPartitionProcedureSync(null, "PartitionedTestProc");
         validateResults(responses, 8);
     }
 
+    @Test
     public void testSQLProcNoPartitionKey() throws Exception {
         ClientResponseWithPartitionKey[] responses = client.callAllPartitionProcedureSync(null, "PartitionedSQLTestProc");
         validateResults(responses, 8);
@@ -137,6 +165,7 @@ public class TestClient2AllPartitionCall extends TestCase {
     /*
      * Test some procs that are not all-partition
      */
+    @Test
     public void testInvalidPartition() throws Exception {
         ClientResponseWithPartitionKey[] responses;
 
@@ -168,6 +197,7 @@ public class TestClient2AllPartitionCall extends TestCase {
     /*
      * Some but not all instances of procedure fail
      */
+    @Test
     public void testFailureProc() throws Exception {
         ClientResponseWithPartitionKey[] responses = client.callAllPartitionProcedureSync(null, "PartitionFailureTestProc");
         for (ClientResponseWithPartitionKey resp: responses) {

@@ -23,6 +23,19 @@
 
 package org.voltdb.client;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
+import org.junit.After;
+import org.junit.AfterClass;
+import org.junit.Before;
+import org.junit.BeforeClass;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.TestName;
+
 import java.util.concurrent.TimeUnit;
 import java.util.Random;
 
@@ -32,7 +45,6 @@ import org.voltdb.VoltDB.Configuration;
 import org.voltdb.compiler.CatalogBuilder;
 import org.voltdb.compiler.DeploymentBuilder;
 
-import junit.framework.TestCase;
 
 /**
  * These sync tests implictly test async calls, since
@@ -41,42 +53,63 @@ import junit.framework.TestCase;
  *
  * Specifically-async features are tested elsewhere.
  */
-public class TestClient2SyncCall extends TestCase {
+public class TestClient2SyncCall {
 
-    ServerThread localServer;
-    DeploymentBuilder depBuilder;
+    static VoltDB.Configuration serverConfig;
 
-    @Override
-    public void setUp() {
+    @Rule
+    public final TestName testname = new TestName();
+
+    @BeforeClass
+    public static void prologue() {
         try {
-            System.out.printf("=-=-=-=-=-=-= Starting test %s =-=-=-=-=-=-=\n", getName());
+            System.out.println("=-=-=-= Prologue =-=-=-=");
 
             CatalogBuilder catBuilder = new CatalogBuilder();
             catBuilder.addProcedures(ArbitraryDurationProc.class);
 
             boolean success = catBuilder.compile(Configuration.getPathToCatalogForTest("timeouts.jar"));
-            if (!success) throw new RuntimeException("bad catalog");
+            assertTrue("bad catalog", success);
 
-            depBuilder = new DeploymentBuilder(1, 1, 0);
+            DeploymentBuilder depBuilder = new DeploymentBuilder(1, 1, 0);
             depBuilder.writeXML(Configuration.getPathToCatalogForTest("timeouts.xml"));
 
             VoltDB.Configuration config = new VoltDB.Configuration();
             config.m_pathToCatalog = Configuration.getPathToCatalogForTest("timeouts.jar");
             config.m_pathToDeployment = Configuration.getPathToCatalogForTest("timeouts.xml");
-            localServer = new ServerThread(config);
-            localServer.start();
-            localServer.waitForInitialization();
+            serverConfig = config;
         }
         catch (Exception e) {
             e.printStackTrace();
             fail();
         }
+
+        // Note: we have a new server for each test because otherwise
+        // timeout testing causes cross-talk between tests, because
+        // tests remain queued in the server after test completion.
     }
 
-    @Override
-    public void tearDown() throws Exception {
+    @AfterClass
+    public static void epilogue() {
+        System.out.println("=-=-=-= Epilogue =-=-=-=");
+    }
+
+    ServerThread localServer;
+
+    @Before
+    public void setup() {
+        System.out.printf("=-=-=-=-=-=-= Starting test %s =-=-=-=-=-=-=\n", testname.getMethodName());
+        localServer = new ServerThread(serverConfig);
+        localServer.start();
+        localServer.waitForInitialization();
+    }
+
+    @After
+    public void teardown() throws Exception {
         localServer.shutdown();
-        System.out.printf("=-=-=-=-=-=-= End of test %s =-=-=-=-=-=-=\n", getName());
+        localServer.join();
+        localServer = null;
+        System.out.printf("=-=-=-=-=-=-= End of test %s =-=-=-=-=-=-=\n", testname.getMethodName());
     }
 
     volatile boolean gotLateResp = false;
@@ -98,11 +131,11 @@ public class TestClient2SyncCall extends TestCase {
     /**
      * Simple call testing with timeout
      */
+    @Test
     public void testSimpleTimeout() throws Exception {
         Client2Config config = new Client2Config()
             .procedureCallTimeout(1100, TimeUnit.MILLISECONDS)
             .lateResponseHandler(this::lateResponse);
-
         Client2 client = ClientFactory.createClient(config);
         client.connectSync("localhost");
 
@@ -129,6 +162,7 @@ public class TestClient2SyncCall extends TestCase {
     /**
      * Zero timeout = a very long timeout.
      */
+    @Test
     public void testMaxTimeout() throws Exception {
         Client2Config config = new Client2Config()
             .procedureCallTimeout(0, TimeUnit.MILLISECONDS);
@@ -146,6 +180,7 @@ public class TestClient2SyncCall extends TestCase {
     /**
      * Per-call override of timeout
      */
+    @Test
     public void testClientTimeoutOverride() throws Exception {
         Client2Config config = new Client2Config()
             .procedureCallTimeout(0, TimeUnit.MILLISECONDS);
@@ -175,7 +210,7 @@ public class TestClient2SyncCall extends TestCase {
         response = null;
         exceptionCalled = false;
         try {
-            // proc runs for 1.5 sec, short timeout after 0.5 sec (sub-second timeouta handled separately)
+            // proc runs for 1.5 sec, short timeout after 0.5 sec (sub-second timeouts handled separately)
             Client2CallOptions opts = new Client2CallOptions().clientTimeout(500, TimeUnit.MILLISECONDS);
             response = client.callProcedureSync(opts, "ArbitraryDurationProc", 1500);
         }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2021 VoltDB Inc.
+ * Copyright (C) 2021-2022 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,6 +23,18 @@
 
 package org.voltdb.client;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.TestName;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -39,27 +51,27 @@ import org.voltdb.VoltDB.Configuration;
 import org.voltdb.compiler.CatalogBuilder;
 import org.voltdb.compiler.DeploymentBuilder;
 
-import junit.framework.TestCase;
-
 /**
  * Test for priority queue handling in Client2 API.
  */
-public class TestClient2Priority extends TestCase {
+public class TestClient2Priority {
 
     ServerThread localServer;
-    DeploymentBuilder depBuilder;
 
-    @Override
-    public void setUp() {
+    @Rule
+    public final TestName testname = new TestName();
+
+    @Before
+    public void setup() {
         try {
-            System.out.printf("=-=-=-=-=-=-= Starting test %s =-=-=-=-=-=-=\n", getName());
+            System.out.printf("=-=-=-=-=-=-= Starting test %s =-=-=-=-=-=-=\n", testname.getMethodName());
 
             CatalogBuilder catBuilder = new CatalogBuilder();
             catBuilder.addProcedures(ArbitraryDurationProc.class);
             boolean success = catBuilder.compile(Configuration.getPathToCatalogForTest("priority.jar"));
-            if (!success) throw new RuntimeException("bad catalog");
+            assertTrue("bad catalog", success);
 
-            depBuilder = new DeploymentBuilder(1, 1, 0);
+            DeploymentBuilder depBuilder = new DeploymentBuilder(1, 1, 0);
             depBuilder.writeXML(Configuration.getPathToCatalogForTest("priority.xml"));
 
             VoltDB.Configuration config = new VoltDB.Configuration();
@@ -75,10 +87,12 @@ public class TestClient2Priority extends TestCase {
         }
     }
 
-    @Override
-    public void tearDown() throws Exception {
+    @After
+    public void teardown() throws Exception {
         localServer.shutdown();
-        System.out.printf("=-=-=-=-=-=-= End of test %s =-=-=-=-=-=-=\n", getName());
+        localServer.join();
+        localServer = null;
+        System.out.printf("=-=-=-=-=-=-= End of test %s =-=-=-=-=-=-=\n", testname.getMethodName());
     }
 
     volatile boolean threw = false;
@@ -114,6 +128,7 @@ public class TestClient2Priority extends TestCase {
      * priority order, and that within equal priorities, we
      * operate FIFO.
      */
+    @Test
     public void testPriority() throws Exception {
         final int OUTLIMIT = 4; // high enough to get past initial flurry
         final int QUEUEDCNT = 8; // number of queued requests to make

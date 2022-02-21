@@ -23,6 +23,19 @@
 
 package org.voltdb.client;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
+import org.junit.After;
+import org.junit.AfterClass;
+import org.junit.Before;
+import org.junit.BeforeClass;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.TestName;
+
 import java.util.concurrent.TimeUnit;
 import java.util.Random;
 
@@ -34,30 +47,31 @@ import org.voltdb.VoltTable;
 import org.voltdb.compiler.CatalogBuilder;
 import org.voltdb.compiler.DeploymentBuilder;
 
-import junit.framework.TestCase;
-
 /**
  * This test exercises the strange case, inherited from
  * the older client implementation, that known long-running
  * procedure calls are exempted from the usual timeout
  * consideration.
  */
-public class TestClient2LongCall extends TestCase {
+public class TestClient2LongCall {
 
-    ServerThread localServer;
-    DeploymentBuilder depBuilder;
+    static VoltDB.Configuration serverConfig;
+    static DeploymentBuilder depBuilder;
 
-    @Override
-    public void setUp() {
+    @Rule
+    public final TestName testname = new TestName();
+
+    @BeforeClass
+    public static void prologue() {
         try {
-            System.out.printf("=-=-=-=-=-=-= Starting test %s =-=-=-=-=-=-=\n", getName());
+            System.out.println("=-=-=-= Prologue =-=-=-=");
 
             CatalogBuilder catBuilder = new CatalogBuilder();
-            catBuilder.addSchema(getClass().getResource("clientfeatures.sql"));
+            catBuilder.addSchema(TestClient2LongCall.class.getResource("clientfeatures.sql"));
             catBuilder.addProcedures(ArbitraryDurationProc.class);
 
             boolean success = catBuilder.compile(Configuration.getPathToCatalogForTest("timeouts.jar"));
-            if (!success) throw new RuntimeException("bad catalog");
+            assertTrue("bad catalog", success);
 
             depBuilder = new DeploymentBuilder(1, 1, 0);
             depBuilder.writeXML(Configuration.getPathToCatalogForTest("timeouts.xml"));
@@ -65,33 +79,54 @@ public class TestClient2LongCall extends TestCase {
             VoltDB.Configuration config = new VoltDB.Configuration();
             config.m_pathToCatalog = Configuration.getPathToCatalogForTest("timeouts.jar");
             config.m_pathToDeployment = Configuration.getPathToCatalogForTest("timeouts.xml");
-            localServer = new ServerThread(config);
-            localServer.start();
-            localServer.waitForInitialization();
+            serverConfig = config;
         }
         catch (Exception e) {
             e.printStackTrace();
             fail();
         }
+
+        // Note: we have a new server for each test because otherwise
+        // timeout testing causes cross-talk between tests, because
+        // tests remain queued in the server after test completion.
+        // Although currently there's only one test, so this is moot.
     }
 
-    @Override
-    public void tearDown() throws Exception {
+    @AfterClass
+    public static void epilogue() {
+        System.out.println("=-=-=-= Epilogue =-=-=-=");
+    }
+
+    ServerThread localServer;
+
+    @Before
+    public void setup() {
+        System.out.printf("=-=-=-=-=-=-= Starting test %s =-=-=-=-=-=-=\n", testname.getMethodName());
+        localServer = new ServerThread(serverConfig);
+        localServer.start();
+        localServer.waitForInitialization();
+    }
+
+    @After
+    public void teardown() throws Exception {
         localServer.shutdown();
-        System.out.printf("=-=-=-=-=-=-= End of test %s =-=-=-=-=-=-=\n", getName());
+        localServer.join();
+        localServer = null;
+        System.out.printf("=-=-=-=-=-=-= End of test %s =-=-=-=-=-=-=\n", testname.getMethodName());
     }
 
     /**
      * Test special exception for slow snapshots or catalogs updates
      * Both features are pro only
      */
+    @Test
     public void testLongCallNoTimeout() throws Exception {
 
         // build a catalog with a ton of indexes so catalog update will be slow
         CatalogBuilder builder = new CatalogBuilder();
         builder.addSchema(getClass().getResource("clientfeatures-wellindexed.sql"));
         byte[] catalogToUpdate = builder.compileToBytes();
-        assert(catalogToUpdate != null);
+        assertNotNull(catalogToUpdate);
 
         // make a copy of the table from ddl for loading
         // (shouldn't have to do this, but for now, the table loader requires

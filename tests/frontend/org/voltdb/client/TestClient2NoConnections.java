@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2021 VoltDB Inc.
+ * Copyright (C) 2021-2022 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,30 +23,40 @@
 
 package org.voltdb.client;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
+
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.TestName;
+
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.Configuration;
 
-import junit.framework.TestCase;
-
 /**
  * Test handling of no-connections condition
  */
-public class TestClient2NoConnections extends TestCase {
+public class TestClient2NoConnections {
 
     ServerThread localServer;
 
-    @Override
-    public void setUp() {
-        System.out.printf("=-=-=-=-=-=-= Starting test %s =-=-=-=-=-=-=\n", getName());
+    @Rule
+    public final TestName testname = new TestName();
+
+    @Before
+    public void setup() {
+        System.out.printf("=-=-=-=-=-=-= Starting test %s =-=-=-=-=-=-=\n", testname.getMethodName());
     }
 
-    @Override
-    public void tearDown() throws Exception {
+    @After
+    public void teardown() throws Exception {
         stopServer();
-        System.out.printf("=-=-=-=-=-=-= End of test %s =-=-=-=-=-=-=\n", getName());
+        System.out.printf("=-=-=-=-=-=-= End of test %s =-=-=-=-=-=-=\n", testname.getMethodName());
     }
 
     private void startServer() {
@@ -66,6 +76,7 @@ public class TestClient2NoConnections extends TestCase {
         try {
             if (localServer != null) {
                 localServer.shutdown();
+                localServer.join();
                 localServer = null;
             }
         }
@@ -133,6 +144,7 @@ public class TestClient2NoConnections extends TestCase {
      * Verify 'no connection' exception when we do not
      * initially create any connections
      */
+    @Test
     public void testNoConnect() throws Exception {
         state.set(DOWN);
 
@@ -151,6 +163,7 @@ public class TestClient2NoConnections extends TestCase {
      * Verify 'no connection' exception after all
      * connections gone.
      */
+    @Test
     public void testDisconnected() throws Exception {
         System.out.println("Starting server");
         startServer();

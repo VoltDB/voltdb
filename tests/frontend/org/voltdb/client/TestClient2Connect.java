@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2021 VoltDB Inc.
+ * Copyright (C) 2021-2022 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,25 +23,38 @@
 
 package org.voltdb.client;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
+import org.junit.After;
+import org.junit.AfterClass;
+import org.junit.Before;
+import org.junit.BeforeClass;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.TestName;
+
 import java.util.concurrent.TimeUnit;
 
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.Configuration;
 
-import junit.framework.TestCase;
-
 /**
  * Tests a few variations on the connect call
  */
-public class TestClient2Connect extends TestCase {
+public class TestClient2Connect {
 
-    ServerThread localServer;
+    static ServerThread localServer;
 
-    @Override
-    public void setUp() {
+    @Rule
+    public final TestName testname = new TestName();
+
+    @BeforeClass
+    public static void prologue() {
         try {
-            System.out.printf("=-=-=-=-=-=-= Starting test %s =-=-=-=-=-=-=\n", getName());
+            System.out.println("=-=-=-=-=-=-= Prologue =-=-=-=-=-=-=");
             localServer = new ServerThread(new VoltDB.Configuration());
             localServer.start();
             localServer.waitForInitialization();
@@ -52,10 +65,22 @@ public class TestClient2Connect extends TestCase {
         }
     }
 
-    @Override
-    public void tearDown() throws Exception {
+    @AfterClass
+    public static void epilogue() throws Exception {
+        System.out.println("=-=-=-=-=-=-= Epilogue =-=-=-=-=-=-=");
         localServer.shutdown();
-        System.out.printf("=-=-=-=-=-=-= End of test %s =-=-=-=-=-=-=\n", getName());
+        localServer.join();
+        localServer = null;
+    }
+
+    @Before
+    public void setup() {
+        System.out.printf("=-=-=-=-=-=-= Starting test %s =-=-=-=-=-=-=\n", testname.getMethodName());
+    }
+
+    @After
+    public void teardown() throws Exception {
+        System.out.printf("=-=-=-=-=-=-= End of test %s =-=-=-=-=-=-=\n", testname.getMethodName());
     }
 
     private volatile long startTime, elapsedTime;
@@ -99,18 +124,21 @@ public class TestClient2Connect extends TestCase {
         }
     }
 
+    @Test
     public void testConnectSuccess() throws Exception {
         boolean b = connect("nxnode1:12345, localhost, nxnode2", 0);
         assertEquals("expected success", true, b);
         assertEquals("error count wrong", 1, errorCount);
     }
 
+    @Test
     public void testConnectFail() throws Exception {
         boolean b = connect("nxnode1:12345, nxnode2", 0);
         assertEquals("expected failure", false, b);
         assertEquals("error count wrong", 2, errorCount);
     }
 
+    @Test
     public void testConnectTimeout() throws Exception {
         // huge timeout values, junits run in the lab
         // fail with anything reasonable. i suppose the

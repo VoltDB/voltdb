@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2021 VoltDB Inc.
+ * Copyright (C) 2021-2022 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,6 +23,20 @@
 
 package org.voltdb.client;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
+import org.junit.After;
+import org.junit.AfterClass;
+import org.junit.Before;
+import org.junit.BeforeClass;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.TestName;
+
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.CompletableFuture;
@@ -36,8 +50,6 @@ import org.voltdb.VoltDB.Configuration;
 import org.voltdb.compiler.CatalogBuilder;
 import org.voltdb.compiler.DeploymentBuilder;
 
-import junit.framework.TestCase;
-
 /**
  * These tests cover explicit async Client2 operations.
  *
@@ -46,41 +58,63 @@ import junit.framework.TestCase;
  * async call and waits for it to complete. We do not repeat
  * such tests here.
  */
-public class TestClient2AsyncCall extends TestCase {
+public class TestClient2AsyncCall {
 
-    ServerThread localServer;
-    DeploymentBuilder depBuilder;
+    static VoltDB.Configuration serverConfig;
 
-    @Override
-    public void setUp() {
+    @Rule
+    public final TestName testname = new TestName();
+
+    @BeforeClass
+    public static void prologue() {
         try {
-            System.out.printf("=-=-=-=-=-=-= Starting test %s =-=-=-=-=-=-=\n", getName());
+            System.out.println("=-=-=-= Prologue =-=-=-=");
 
             CatalogBuilder catBuilder = new CatalogBuilder();
             catBuilder.addProcedures(ArbitraryDurationProc.class);
-            boolean success = catBuilder.compile(Configuration.getPathToCatalogForTest("timeouts.jar"));
-            if (!success) throw new RuntimeException("bad catalog");
 
-            depBuilder = new DeploymentBuilder(1, 1, 0);
+            boolean success = catBuilder.compile(Configuration.getPathToCatalogForTest("timeouts.jar"));
+            assertTrue("bad catalog", success);
+
+            DeploymentBuilder depBuilder = new DeploymentBuilder(1, 1, 0);
             depBuilder.writeXML(Configuration.getPathToCatalogForTest("timeouts.xml"));
 
             VoltDB.Configuration config = new VoltDB.Configuration();
             config.m_pathToCatalog = Configuration.getPathToCatalogForTest("timeouts.jar");
             config.m_pathToDeployment = Configuration.getPathToCatalogForTest("timeouts.xml");
-            localServer = new ServerThread(config);
-            localServer.start();
-            localServer.waitForInitialization();
+            serverConfig = config;
         }
         catch (Exception e) {
             e.printStackTrace();
             fail();
         }
+
+        // Note: we have a new server for each test because otherwise
+        // timeout testing causes cross-talk between tests, because
+        // tests remain queued in the server after test completion.
     }
 
-    @Override
-    public void tearDown() throws Exception {
+    @AfterClass
+    public static void epilogue() {
+        System.out.println("=-=-=-= Epilogue =-=-=-=");
+    }
+
+    ServerThread localServer;
+
+    @Before
+    public void setup() {
+        System.out.printf("=-=-=-=-=-=-= Starting test %s =-=-=-=-=-=-=\n", testname.getMethodName());
+        localServer = new ServerThread(serverConfig);
+        localServer.start();
+        localServer.waitForInitialization();
+    }
+
+    @After
+    public void teardown() throws Exception {
         localServer.shutdown();
-        System.out.printf("=-=-=-=-=-=-= End of test %s =-=-=-=-=-=-=\n", getName());
+        localServer.join();
+        localServer = null;
+        System.out.printf("=-=-=-=-=-=-= End of test %s =-=-=-=-=-=-=\n", testname.getMethodName());
     }
 
     volatile boolean goodResponse = false;
@@ -125,6 +159,7 @@ public class TestClient2AsyncCall extends TestCase {
     /**
      * Basics, including timeouts
      */
+    @Test
     public void testSingleAsyncCalls() throws Exception {
         Client2Config config = new Client2Config()
             .procedureCallTimeout(1200, TimeUnit.MILLISECONDS);
@@ -171,6 +206,7 @@ public class TestClient2AsyncCall extends TestCase {
     /**
      * Short timeouts
      */
+    @Test
     public void testShortTimeouts() throws Exception {
         Client2Config config = new Client2Config()
             .procedureCallTimeout(1200, TimeUnit.MILLISECONDS);
@@ -212,6 +248,7 @@ public class TestClient2AsyncCall extends TestCase {
     /**
      * Test some overlapped calls
      */
+    @Test
     public void testSimultaneousCalls() throws Exception {
         Client2Config config = new Client2Config()
             .procedureCallTimeout(1200, TimeUnit.MILLISECONDS);
@@ -276,6 +313,7 @@ public class TestClient2AsyncCall extends TestCase {
         }
     }
 
+    @Test
     public void testBackpressure() throws Exception {
         final int PROCTIME = 2000; // execution time for one proc call
         final int TOTALREQ = 20; // total calls to be made
@@ -345,6 +383,7 @@ public class TestClient2AsyncCall extends TestCase {
         return null;
     }
 
+    @Test
     public void testRedline() throws Exception {
         final int PROCTIME = 2000; // execution time for one proc call
         final int REQLIM = 10;

@@ -23,7 +23,16 @@
 
 package org.voltdb.client;
 
-import java.io.File;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.TestName;
+
 import java.net.InetSocketAddress;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -35,29 +44,29 @@ import org.voltdb.VoltDB.Configuration;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 
-import org.apache.commons.io.FileUtils;
-import junit.framework.TestCase;
-
 /**
  * This whole thing is riddled with arbitrary timeouts
  * and wild guesses as to how long it takes for some
  * unobservable server change to occur. Sorry.
  */
-public class TestClient2AutoConnect extends TestCase {
+public class TestClient2AutoConnect {
 
     ServerThread localServer;
     LocalCluster cluster;
 
-    @Override
-    public void setUp() {
-        System.out.printf("=-=-=-=-=-=-= Starting test %s =-=-=-=-=-=-=\n", getName());
+    @Rule
+    public final TestName testname = new TestName();
+
+    @Before
+    public void setup() {
+        System.out.printf("=-=-=-=-=-=-= Starting test %s =-=-=-=-=-=-=\n", testname.getMethodName());
     }
 
-    @Override
-    public void tearDown() throws Exception {
+    @After
+    public void teardown() {
         stopServer();
         stopCluster();
-        System.out.printf("=-=-=-=-=-=-= End of test %s =-=-=-=-=-=-=\n", getName());
+        System.out.printf("=-=-=-=-=-=-= End of test %s =-=-=-=-=-=-=\n", testname.getMethodName());
     }
 
     private void startServer() {
@@ -77,6 +86,7 @@ public class TestClient2AutoConnect extends TestCase {
         try {
             if (localServer != null) {
                 localServer.shutdown();
+                localServer.join();
                 localServer = null;
             }
         }
@@ -88,9 +98,6 @@ public class TestClient2AutoConnect extends TestCase {
 
     private void startCluster() {
         try {
-            File f = new File("/tmp/" + System.getProperty("user.name"));
-            FileUtils.deleteDirectory(f);
-            f.mkdirs();
             cluster = new LocalCluster("client-all-partitions.jar", nsites, nhosts, kfactor, BackendTarget.NATIVE_EE_JNI);
             cluster.overrideAnyRequestForValgrind();
             cluster.setHasLocalServer(false);
@@ -177,6 +184,7 @@ public class TestClient2AutoConnect extends TestCase {
      * been restarted; this tests both the "reconnect with no existing
      * connections" case and the cluster id-change case.
      */
+    @Test
     public void testAutoReconnect() throws Exception {
         startServer();
         state.set(DOWN);
@@ -216,6 +224,7 @@ public class TestClient2AutoConnect extends TestCase {
     /**
      * Verify a client can discover cluster topology.
      */
+    @Test
     public void testTopoDiscovery() throws Exception {
         startCluster();
         state.set(DOWN);

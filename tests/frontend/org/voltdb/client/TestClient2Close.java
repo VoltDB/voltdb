@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2021 VoltDB Inc.
+ * Copyright (C) 2021-2022 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,6 +23,18 @@
 
 package org.voltdb.client;
 
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
+import org.junit.After;
+import org.junit.AfterClass;
+import org.junit.Before;
+import org.junit.BeforeClass;
+import org.junit.Ignore;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.TestName;
+
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 
@@ -32,15 +44,13 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable;
 
-import junit.framework.TestCase;
-
 /**
  * Validates that threads are terminated when Client2
  * instances are closed.
  */
-public class TestClient2Close extends TestCase {
+public class TestClient2Close {
 
-    ServerThread localServer;
+    static ServerThread localServer;
 
     static final String[] standardThreads = {
         // created by Client2Impl
@@ -53,30 +63,34 @@ public class TestClient2Close extends TestCase {
         "Estimated Time Updater"
     };
 
-    @Override
-    public void setUp() {
-        System.out.printf("=-=-=-=-=-=-= Starting test %s =-=-=-=-=-=-=\n", getName());
+    @Rule
+    public final TestName testname = new TestName();
 
+    @BeforeClass
+    public static void prologue() {
         try {
+            System.out.println("=-=-=-=-=-=-= Prologue =-=-=-=-=-=-=");
             localServer = new ServerThread(new VoltDB.Configuration());
             localServer.start();
             localServer.waitForInitialization();
             ClientFactory.m_preserveResources = false;
             resetActive();
         }
-        catch (Exception ex) {
-            ex.printStackTrace();
+        catch (Exception e) {
+            e.printStackTrace();
             fail();
         }
     }
 
-    @Override
-    public void tearDown() throws Exception {
+    @AfterClass
+    public static void epilogue() throws Exception {
+        System.out.println("=-=-=-=-=-=-= Epilogue =-=-=-=-=-=-=");
         localServer.shutdown();
-        System.out.printf("=-=-=-=-=-=-= End of test %s =-=-=-=-=-=-=\n", getName());
+        localServer.join();
+        localServer = null;
     }
 
-    private void resetActive() {
+    private static void resetActive() {
         while (ClientFactory.m_activeClientCount > 0) {
             try {
                 ClientFactory.decreaseClientNum();
@@ -88,10 +102,21 @@ public class TestClient2Close extends TestCase {
         ReverseDNSCache.start();
     }
 
+    @Before
+    public void setup() {
+        System.out.printf("=-=-=-=-=-=-= Starting test %s =-=-=-=-=-=-=\n", testname.getMethodName());
+    }
+
+    @After
+    public void teardown() {
+        System.out.printf("=-=-=-=-=-=-= End of test %s =-=-=-=-=-=-=\n", testname.getMethodName());
+    }
+
     /*
      * Creates two clients, closes one client, then executes a call
      * on the second client to make sure it is still viable.
      */
+    @Test
     public void testClientIndependence() throws Exception {
         Client2Config config = new Client2Config();
         Client2 client1 = ClientFactory.createClient(config);
@@ -115,6 +140,7 @@ public class TestClient2Close extends TestCase {
     /*
      * Creates and closes one client, then checks all threads gone
      */
+    @Test
     public void testThreadsKilledOnClose() throws Exception {
         Client2 client = ClientFactory.createClient(new Client2Config());
         client.connectSync("localhost");
@@ -129,6 +155,7 @@ public class TestClient2Close extends TestCase {
      * Creates many clients, sequentially and in parallel, closes them
      * all, and ensures all threads are cleaned up.
      */
+    @Test
     public void testAllClosed() throws Exception{
         createAndCloseClients(50, 3);
         assertTrue("some threads still running", checkThreadsAllDead(2000));
@@ -138,6 +165,7 @@ public class TestClient2Close extends TestCase {
      * Creates many clients, sequentially and in parallel, closes them
      * all except one, and ensures all necessary threads remain
      */
+    @Test
     public void testAllButOneClosed() throws Exception {
         Client2 remainingClient = ClientFactory.createClient(new Client2Config());
         remainingClient.connectSync("localhost");
@@ -153,6 +181,7 @@ public class TestClient2Close extends TestCase {
      * Creates many clients, sequentially and in parallel, closes them
      * all, then starts a new client, and ensures threads are created.
      */
+    @Test
     public void testAllClosedThenStartOne() throws Exception {
         createAndCloseClients(50, 3);
 
@@ -238,9 +267,10 @@ public class TestClient2Close extends TestCase {
         latch.await();
     }
 
+    @Ignore
     private static class CreateAndCloseThread extends Thread {
-        private final int clientCount;
-        private final CountDownLatch latch;
+        private int clientCount;
+        private CountDownLatch latch;
 
         public CreateAndCloseThread(int clientCount, CountDownLatch latch) {
             this.clientCount = clientCount;

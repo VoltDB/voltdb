@@ -23,7 +23,18 @@
 
 package org.voltdb.client;
 
-import java.io.File;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.TestName;
+
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.CountDownLatch;
@@ -34,27 +45,23 @@ import org.voltdb.VoltTable;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 
-import junit.framework.TestCase;
-import org.apache.commons.io.FileUtils;
-
 /**
  * These tests are for server-side timeouts, using
  * the Client2 API.
  */
-public class TestServerTimeout extends TestCase {
+public class TestServerTimeout {
 
     private LocalCluster cluster;
     private int port;
 
-    @Override
-    public void setUp() {
+    @Rule
+    public final TestName testname = new TestName();
+
+    @Before
+    public void setup() {
         Client2 client = null;
         try {
-            System.out.printf("=-=-=-=-=-=-= Starting test %s =-=-=-=-=-=-=\n", getName());
-
-            FileUtils.deleteDirectory(new File("/tmp/" + System.getProperty("user.name")));
-            File f = new File("/tmp/" + System.getProperty("user.name"));
-            f.mkdirs();
+            System.out.printf("=-=-=-=-=-=-= Starting test %s =-=-=-=-=-=-=\n", testname.getMethodName());
 
             cluster = new LocalCluster("server-timeout.jar", 1/*sph*/, 1/*hosts*/, 0/*k-factor*/, BackendTarget.NATIVE_EE_JNI);
             cluster.overrideAnyRequestForValgrind();
@@ -62,7 +69,7 @@ public class TestServerTimeout extends TestCase {
 
             VoltProjectBuilder project = new VoltProjectBuilder();
             project.setUseDDLSchema(true);
-            project.addSchema(getClass().getResource("server-timeout.sql"));
+            project.addSchema(TestServerTimeout.class.getResource("server-timeout.sql"));
 
             boolean success = cluster.compile(project);
             assertTrue("compile", success);
@@ -107,12 +114,12 @@ public class TestServerTimeout extends TestCase {
         assertEquals("wrong row count", ROWS, vt.fetchRow(0).getLong(0));
     }
 
-    @Override
-    public void tearDown() throws Exception {
+    @After
+    public void teardown() throws Exception {
         if (cluster != null) {
             cluster.shutDown();
         }
-        System.out.printf("=-=-=-=-=-=-= End of test %s =-=-=-=-=-=-=\n", getName());
+        System.out.printf("=-=-=-=-=-=-= End of test %s =-=-=-=-=-=-=\n", testname.getMethodName());
     }
 
     volatile boolean goodResponse = false;
@@ -183,6 +190,7 @@ public class TestServerTimeout extends TestCase {
      * The server detects timeout when it dequeues an invocation that
      * has been queued for too long.
      */
+    @Test
     public void testSpProcTimeout() throws Exception {
         Client2Config config = new Client2Config()
             .procedureCallTimeout(1000, TimeUnit.MILLISECONDS)

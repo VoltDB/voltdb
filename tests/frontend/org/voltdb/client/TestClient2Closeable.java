@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2021 VoltDB Inc.
+ * Copyright (C) 2021-2022 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,6 +23,15 @@
 
 package org.voltdb.client;
 
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.TestName;
+
 import java.util.concurrent.TimeUnit;
 
 import org.voltdb.ServerThread;
@@ -30,30 +39,30 @@ import org.voltdb.VoltDB;
 import org.voltdb.compiler.CatalogBuilder;
 import org.voltdb.compiler.DeploymentBuilder;
 
-import junit.framework.TestCase;
-
 /**
  * Tests closing via the 'Closeable' interface.
  *
  * This is separate from TestClient2Close because the
  * setup is somewhat different.
  */
-public class TestClient2Closeable extends TestCase {
+public class TestClient2Closeable {
 
     ServerThread localServer;
-    DeploymentBuilder depBuilder;
 
-    @Override
-    public void setUp() {
+    @Rule
+    public final TestName testname = new TestName();
+
+    @Before
+    public void setup() {
         try {
-            System.out.printf("=-=-=-=-=-=-= Starting test %s =-=-=-=-=-=-=\n", getName());
+            System.out.printf("=-=-=-=-=-=-= Starting test %s =-=-=-=-=-=-=\n", testname.getMethodName());
 
             CatalogBuilder catBuilder = new CatalogBuilder();
             catBuilder.addProcedures(ArbitraryDurationProc.class);
             boolean success = catBuilder.compile(VoltDB.Configuration.getPathToCatalogForTest("closetest.jar"));
-            if (!success) throw new RuntimeException("bad catalog");
+            assertTrue("bad catalog", success);
 
-            depBuilder = new DeploymentBuilder(1, 1, 0);
+            DeploymentBuilder depBuilder = new DeploymentBuilder(1, 1, 0);
             depBuilder.writeXML(VoltDB.Configuration.getPathToCatalogForTest("closetest.xml"));
 
             VoltDB.Configuration config = new VoltDB.Configuration();
@@ -69,18 +78,20 @@ public class TestClient2Closeable extends TestCase {
         }
     }
 
-    @Override
-    public void tearDown() throws Exception {
+    @After
+    public void teardown() throws Exception {
         localServer.shutdown();
-        System.out.printf("=-=-=-=-=-=-= End of test %s =-=-=-=-=-=-=\n", getName());
+        localServer.join();
+        localServer = null;
+        System.out.printf("=-=-=-=-=-=-= End of test %s =-=-=-=-=-=-=\n", testname.getMethodName());
     }
-
 
     /*
      * Test handling of 'Closeable' interface, which just calls the
      * close method on the client. But we try to do that when the
      * client is not quiescent.
      */
+    @Test
     public void testBailout() throws Exception {
         final int PROCTIME = 1000; // execution time for one proc call
         final int TIMEOUT = 60_000; // relatively long so does not time out
