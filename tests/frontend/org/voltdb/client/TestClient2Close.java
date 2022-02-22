@@ -70,6 +70,7 @@ public class TestClient2Close {
     public static void prologue() {
         try {
             System.out.println("=-=-=-=-=-=-= Prologue =-=-=-=-=-=-=");
+            ServerThread.resetUserTempDir();
             localServer = new ServerThread(new VoltDB.Configuration());
             localServer.start();
             localServer.waitForInitialization();

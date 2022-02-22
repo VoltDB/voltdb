@@ -68,6 +68,8 @@ public class TestClient2Closeable {
             VoltDB.Configuration config = new VoltDB.Configuration();
             config.m_pathToCatalog = VoltDB.Configuration.getPathToCatalogForTest("closetest.jar");
             config.m_pathToDeployment = VoltDB.Configuration.getPathToCatalogForTest("closetest.xml");
+
+            ServerThread.resetUserTempDir();
             localServer = new ServerThread(config);
             localServer.start();
             localServer.waitForInitialization();

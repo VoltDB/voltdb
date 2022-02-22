@@ -77,6 +77,8 @@ public class TestClient2Priority {
             VoltDB.Configuration config = new VoltDB.Configuration();
             config.m_pathToCatalog = Configuration.getPathToCatalogForTest("priority.jar");
             config.m_pathToDeployment = Configuration.getPathToCatalogForTest("priority.xml");
+
+            ServerThread.resetUserTempDir();
             localServer = new ServerThread(config);
             localServer.start();
             localServer.waitForInitialization();

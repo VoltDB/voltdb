@@ -55,6 +55,7 @@ public class TestClient2Connect {
     public static void prologue() {
         try {
             System.out.println("=-=-=-=-=-=-= Prologue =-=-=-=-=-=-=");
+            ServerThread.resetUserTempDir();
             localServer = new ServerThread(new VoltDB.Configuration());
             localServer.start();
             localServer.waitForInitialization();

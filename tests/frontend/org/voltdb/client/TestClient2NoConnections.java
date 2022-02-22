@@ -51,6 +51,7 @@ public class TestClient2NoConnections {
     @Before
     public void setup() {
         System.out.printf("=-=-=-=-=-=-= Starting test %s =-=-=-=-=-=-=\n", testname.getMethodName());
+        ServerThread.resetUserTempDir();
     }
 
     @After

@@ -99,6 +99,7 @@ public class TestClient2SyncCall {
     @Before
     public void setup() {
         System.out.printf("=-=-=-=-=-=-= Starting test %s =-=-=-=-=-=-=\n", testname.getMethodName());
+        ServerThread.resetUserTempDir();
         localServer = new ServerThread(serverConfig);
         localServer.start();
         localServer.waitForInitialization();

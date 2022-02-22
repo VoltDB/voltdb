@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2021 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,6 +18,7 @@
 package org.voltdb;
 
 import java.io.File;
+import java.io.IOException;
 import java.net.URL;
 
 import org.voltcore.common.Constants;
@@ -25,6 +26,8 @@ import org.voltcore.network.LoopbackAddress;
 import org.voltcore.utils.InstanceId;
 import org.voltdb.probe.MeshProber;
 import org.voltdb.utils.MiscUtils;
+
+import org.apache.commons.io.FileUtils;
 
 /**
  * Wraps VoltDB in a Thread
@@ -224,5 +227,20 @@ public class ServerThread extends Thread {
     public InstanceId getInstanceId()
     {
         return VoltDB.instance().getHostMessenger().getInstanceId();
+    }
+
+    /**
+     * Convenient cleanup code for tests.
+     * A very big hammer.
+     */
+    public static void resetUserTempDir() {
+        try {
+            File dir = new File("/tmp/" + System.getProperty("user.name"));
+            FileUtils.deleteDirectory(dir);
+            dir.mkdirs();
+        }
+        catch (IOException ex) {
+            // ignored
+        }
     }
 }
