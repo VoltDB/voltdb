@@ -49,6 +49,11 @@
     <equals arg1="${voltdb_editiontype}" arg2="developer" />
 </condition>
 
+<!-- IF BUILDING WHITELABEL BUILD  -->
+<condition property="final.build" value="WHITELABEL" else="voltdb" >
+    <equals arg1="${voltdb_whitelabeltype}" arg2="true" />
+</condition>
+
 <!-- make environment var foo available as env.foo -->
 <property environment="env"/>
 
@@ -122,7 +127,6 @@
 <property name='cmake.verbose.build'         value='no' />
 <property name='cmake.verbose.config'        value='no' />
 <property name='cmake.build.maxcores'        value='-1' />
-
 
 <!-- os.mac is set when build is running on Mac OSX -->
 <condition property="os.mac">
@@ -783,12 +787,13 @@ DISTRIBUTION
     </exec>
     <delete file="${raw.dist.dir}/voltdb-${voltdb_editiontype}-${dist.version}/LICENSE" failonerror="false" if:set='editiontypeMatch' />
     <copy file="LICENSE-DEV.txt" tofile="${raw.dist.dir}/voltdb-${voltdb_editiontype}-${dist.version}/LICENSE" overwrite="true" if:set='editiontypeMatch' />
+    <echo message="Content of final.build = ${final.build}"/>
     <exec executable="tar" failonerror="true">
         <arg value="-cz"/>
         <arg value="-C"/>
         <arg value="${raw.dist.dir}"/>
         <arg value="-f"/>
-        <arg value="${raw.dist.dir}/voltdb-${voltdb_editiontype}-${dist.version}.tar.gz"/>
+        <arg value="${raw.dist.dir}/${final.build}-${voltdb_editiontype}-${dist.version}.tar.gz"/>
         <arg value="voltdb-${voltdb_editiontype}-${dist.version}"/>
     </exec>
     <!-- move it back to dist directory for downstream dependencies -->

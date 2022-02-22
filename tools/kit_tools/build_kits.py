@@ -91,6 +91,31 @@ def makeReleaseDir(releaseDir):
 
 
 ################################################
+# CHANGES FOR A WHITELABEL BUILD
+################################################
+
+def changesWhitelabel(builddir, package_mac):
+    uifile = (builddir + "/pro/tools/whitelabel-logo.png")
+    uifinalfile = (builddir + "/internal/src/frontend/org/voltdb/dbmonitor/images/whitelabel-logo.png")
+    indexfile = (builddir + "/internal/src/frontend/org/voltdb/dbmonitor/index.htm")
+    asciifile = (builddir + "/internal/src/frontend/org/voltdb/utils/voltdb_logstrings.properties")
+    buildpro = (builddir + "/pro/tools/jenkins-pipelines/buildupdate.sh")
+    antcommunity = (builddir + "/internal/build.xml")
+    antpro = (builddir + "/pro/mmt.xml")
+    run("cp -rf %s %s" % (uifile, uifinalfile))
+    #Replace values in index.htm for UI changes
+    run("chmod 775 %s" %(buildpro))
+    run("sh %s %s %s %s" % (buildpro, indexfile, antcommunity, antpro))
+    #Replace ascii start logo
+    if package_mac:
+        f="-i ''"
+    else:
+        f="-i"
+    run("sed %s '/^\host_VoltDB_StartupString = /s/=.*$/= REPLACE HERE/g' %s" % (f, asciifile)) 
+#    run(r"sed -E %s 's#REPLACE HERE# Initializing VoltDB...\\\\n\\\\n   _____ __    _          ______          __  \\\\n  / ___// /_  \(_\)___  ___/_  __/__  _____/ /_ \\\\n  \\\\__ \\\\/ __ \\\\/ / __ \\\\/ _ \\\\/ / / _ \\\\/ ___/ __ \\\\ \\\\n ___/ / / / / / / / /  __/ / /  __/ /__/ / / /\\\\n/____/_/ /_/_/_/ /_/\\\___/_/  \\\___/\\\___/_/ /_/ \\\\n\\\\n------------------------------------------------#g'  %s" % (f, asciifile))
+    run(r"sed -E %s 's#REPLACE HERE# Initializing VoltDB...\\\\n\\\\n   _____ __    _          ______          __  \\\\n  / ___// /_  \(_\)___  ___/_  __/__  _____/ /_ \\\\n  \\\\\\\\\\__ \\\\\\\\\\/ __ \\\\\\\\\\/ / __ \\\\\\\\\\/ _ \\\\\\\\\\/ / / _ \\\\\\\\\\/ ___/ __ \\\\\\\\\\ \\\\n ___/ / / / / / / / /  __/ / /  __/ /__/ / / /\\\\n/____/_/ /_/_/_/ /_/\\\\\\\\\\___/_/  \\\\\\\\\\___/\\\\\\\\\\___/_/ /_/ \\\\n\\\\n------------------------------------------------#g'  %s" % (f, asciifile))
+
+################################################
 # BUILD THE COMMUNITY VERSION
 ################################################
 
@@ -99,13 +124,17 @@ def buildCommunity(edition_type, ee_only=False):
         packageMacLib="true"
     else:
         packageMacLib="false"
+    if build_whitelabel:
+        whitelabel_type="true"
+    else:
+        whitelabel_type="false"
     with cd(builddir + "/internal"):
         run("pwd")
         run("git status")
         if ee_only:
-            run("ant -Dvoltdb_editiontype=%s -Djmemcheck=NO_MEMCHECK -Dkitbuild=%s %s clean ee" % (edition_type, packageMacLib, build_args))
+            run("ant -Dvoltdb_editiontype=%s -Djmemcheck=NO_MEMCHECK -Dkitbuild=%s -Dvoltdb_whitelabeltype=%s %s clean ee" % (edition_type, packageMacLib, whitelabel_type, build_args))
         else:
-            run("ant -Dvoltdb_editiontype=%s -Djmemcheck=NO_MEMCHECK -Dkitbuild=%s %s clean default dist" % (edition_type, packageMacLib, build_args))
+            run("ant -Dvoltdb_editiontype=%s -Djmemcheck=NO_MEMCHECK -Dkitbuild=%s -Dvoltdb_whitelabeltype=%s %s clean default dist" % (edition_type, packageMacLib, whitelabel_type, build_args))
 
 
 ################################################
@@ -118,6 +147,10 @@ def buildEnterprise(version):
         packageMacLib="true"
     else:
         packageMacLib="false"
+    if build_whitelabel:
+        whitelabel_type="true"
+    else:
+        whitelabel_type="false"
     with cd(builddir + "/pro"):
         run("pwd")
         run("git status")
@@ -125,9 +158,9 @@ def buildEnterprise(version):
         -Djmemcheck=NO_MEMCHECK \
         -DallowDrReplication=true -DallowDrActiveActive=true \
         -Dlicensedays=%d -Dlicensee='%s' \
-        -Dkitbuild=%s %s \
+        -Dkitbuild=%s -Dvoltdb_whitelabeltype=%s %s \
         clean dist.pro" \
-            % (defaultlicensedays, licensee, packageMacLib, build_args))
+            % (defaultlicensedays, licensee, packageMacLib, whitelabel_type, build_args))
 
 
 ################################################
@@ -154,8 +187,12 @@ def makeTrialLicense(licensee, days=30, dr_and_xdcr="true", nodes=12):
 ################################################
 
 def makeSHA256SUM(version, type):
+    if build_whitelabel:
+        dir_base="shinetech"
+    else:
+        dir_base="voltdb"
     with cd(builddir + "/pro/obj/pro"):
-        kitname="voltdb-" +  type + "-" + version
+        kitname= dir_base + "-" +  type + "-" + version
         run("sha256sum -b %s.tar.gz > %s.SHA256SUM" % (kitname, kitname))
 
 ################################################
@@ -177,17 +214,27 @@ def copyFilesToReleaseDir(releaseDir, version, type=None):
         typeString="-" + type
     else:
         typeString=""
-    get("%s/pro/obj/pro/voltdb%s-%s.tar.gz" % (builddir, typeString, version),
-        "%s/voltdb%s-%s.tar.gz" % (releaseDir, typeString, version))
-    get("%s/pro/obj/pro/voltdb%s-%s.SHA256SUM" % (builddir, typeString, version),
-        "%s/voltdb%s-%s.SHA256SUM" % (releaseDir, typeString, version))
+
+    if build_whitelabel:
+        dir_base="shinetech"
+    else:
+        dir_base="voltdb"
+
+    get("%s/pro/obj/pro/%s%s-%s.tar.gz" % (builddir, dir_base, typeString, version),
+        "%s/%s%s-%s.tar.gz" % (releaseDir, dir_base, typeString, version))
+    get("%s/pro/obj/pro/%s%s-%s.SHA256SUM" % (builddir, dir_base, typeString, version),
+        "%s/%s%s-%s.SHA256SUM" % (releaseDir, dir_base, typeString, version))
     # make don't allow group memebers to delete the directory, the default
     # permissions are 664
     local("chmod 755 %s" % releaseDir)
 
 def copyCommunityFilesToReleaseDir(releaseDir, version, edition_type, operatingsys):
-    get("%s/internal/obj/release/voltdb-%s-%s.tar.gz" % (builddir, edition_type, version),
-        "%s/voltdb-%s-%s.tar.gz" % (releaseDir, edition_type, version))
+    if build_whitelabel:
+        dir_base="shinetech"
+    else:
+        dir_base="voltdb"
+    get("%s/internal/obj/release/%s-%s-%s.tar.gz" % (builddir, dir_base, edition_type, version),
+        "%s/%s-%s-%s.tar.gz" % (releaseDir, dir_base, edition_type, version))
 
     # add stripped symbols
     if operatingsys == "LINUX":
@@ -270,6 +317,7 @@ if __name__ == "__main__":
     parser.add_argument('-g','--gitloc', default="git@github.com:VoltDB", help="Repository location. For example: /home/github-mirror")
     parser.add_argument('--nomac', action='store_true', help="Don't build Mac OSX")
     parser.add_argument('--nocommunity', action='store_true', help="Don't build community")
+    parser.add_argument('--whitelabel', action='store_true', help="Do a whitelabel build")
     parser.add_argument('-l','--includelicense', action='store_true', help="Include a trial license in the Enterprise kit")
     args = parser.parse_args()
 
@@ -281,6 +329,7 @@ if __name__ == "__main__":
 
     build_community = not args.nocommunity
     build_mac = not args.nomac
+    build_whitelabel = args.whitelabel
 
     #If anything is missing we're going to dump this in oneoffs dir.
     build_all = build_community and build_mac
@@ -319,7 +368,17 @@ if __name__ == "__main__":
     if build_mac or build_community:
         try:
             with settings(user=username,host_string=MacSSHInfo[1],disable_known_hosts=True,key_filename=MacSSHInfo[0]):
-                versionMac = checkoutCode(voltdbTreeish, None, args.gitloc)
+                if build_whitelabel:
+                    try:
+                       package_mac = True
+                       versionMac = checkoutCode(voltdbTreeish, proTreeish, args.gitloc)
+                       changesWhitelabel(builddir, package_mac)
+                    except Exception as e:
+                        print traceback.format_exc()
+                        print "Could not do changes for a whitelabel build"
+                        build_errors=True
+                else:
+                    versionMac = checkoutCode(voltdbTreeish, None, args.gitloc)
                 buildCommunity(editionType, ee_only=True)
         except Exception as e:
             print traceback.format_exc()
@@ -340,6 +399,14 @@ if __name__ == "__main__":
                 releaseDir = os.getenv('HOME') + "/releases/" + voltdbTreeish
             makeReleaseDir(releaseDir)
             #print "VERSION: " + versionCentos
+            if build_whitelabel:
+                try:
+                    package_mac = False
+                    changesWhitelabel(builddir, package_mac)
+                except Exception as e:
+                    print traceback.format_exc()
+                    print "Could not do changes for a whitelabel build"
+                    build_errors=True
             if build_community:
                 buildCommunity(editionType)
                 copyCommunityFilesToReleaseDir(releaseDir, versionCentos, editionType, "LINUX")                
