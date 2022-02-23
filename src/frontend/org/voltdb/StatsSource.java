@@ -20,6 +20,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 
 import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.stats.StatsColumn;
 
 /**
  * Abstract superclass of all sources of statistical information inside the Java frontend.
@@ -123,6 +124,16 @@ public abstract class StatsSource {
             }
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Failed to populate column schema for statistics " + extraColumns.getName(), true, e);
+        }
+    }
+
+    protected void populateColumnSchema(ArrayList<ColumnInfo> columns, StatsColumn... extraColumns) {
+        for (StatsCommon col : StatsCommon.values()) {
+            columns.add(new VoltTable.ColumnInfo(col.name(), col.m_type));
+        }
+
+        for (StatsColumn col : extraColumns) {
+            columns.add(new VoltTable.ColumnInfo(col.name(), col.getType()));
         }
     }
 

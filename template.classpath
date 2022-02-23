@@ -28,6 +28,7 @@
 	<classpathentry kind="lib" path="lib/snmp4j-2.5.2.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/byte-buddy-1.9.10.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/awaitility-4.1.1.jar"/>
+	<classpathentry kind="lib" path="third_party/java/jars/assertj-core-3.22.0.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/mockito-core-2.24.5.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/powermock-core-2.0.0.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/powermock-api-mockito2-2.0.0.jar"/>

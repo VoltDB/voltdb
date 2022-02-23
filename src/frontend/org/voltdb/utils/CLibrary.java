@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -16,14 +16,13 @@
  */
 package org.voltdb.utils;
 
-import org.voltcore.logging.VoltLogger;
 import com.sun.jna.Native;
-
-import java.util.Arrays;
-import java.util.List;
+import org.voltcore.logging.VoltLogger;
 
 public class CLibrary {
+
     private static final VoltLogger hostLog = new VoltLogger("HOST");
+
     static {
         try {
             Native.register("c");
@@ -32,46 +31,5 @@ public class CLibrary {
         }
     }
 
-    public static final class Rlimit extends  com.sun.jna.Structure {
-        public long rlim_cur = 0;
-        public long rlim_max = 0;
-
-        @Override
-        protected List getFieldOrder() {
-            return Arrays.asList("rlim_cur", "rlim_max");
-        }
-    }
-
-    public static final int RLIMIT_NOFILE_LINUX = 7;
-    public static final int RLIMIT_NOFILE_MAC_OS_X = 8;
-
-    public static native final int getrlimit(int resource, Rlimit rlimit);
-
-    /*
-     * Returns the limit on the number of open files or null
-     * on failure
-     */
-    public static Integer getOpenFileLimit() {
-        try {
-            Rlimit rlimit = new Rlimit();
-            int retval =
-                getrlimit(
-                    System.getProperty("os.name").equals("Linux") ? RLIMIT_NOFILE_LINUX : RLIMIT_NOFILE_MAC_OS_X,
-                            rlimit);
-            if (retval != 0) {
-                return null;
-            } else if (rlimit.rlim_cur >= 1024) {
-                //Seems to be a sensible value that is the default or greater
-                return (int)rlimit.rlim_cur;
-            } else {
-                return null;
-            }
-        } catch (Exception e) {
-            hostLog.warn("Failed to retrieve open file limit via JNA", e);
-        }
-        return null;
-    }
-
-    public static native final int getpid();
-
+    public static native int getpid();
 }

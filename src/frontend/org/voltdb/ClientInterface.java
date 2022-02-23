@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -46,7 +46,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import javax.net.ssl.SSLEngine;
@@ -103,6 +102,8 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.messaging.MigratePartitionLeaderMessage;
 import org.voltdb.security.AuthenticationRequest;
+import org.voltdb.stats.ClientConnectionsTracker;
+import org.voltdb.stats.FileDescriptorsTracker;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltTrace;
 
@@ -202,11 +203,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private final AtomicReference<CatalogContext> m_catalogContext = new AtomicReference<CatalogContext>(null);
 
     /**
-     * Counter of the number of client connections. Used to enforce a limit on the maximum number of connections
-     */
-    private final AtomicInteger m_numConnections = new AtomicInteger(0);
-
-    /**
      * ZooKeeper is used for @Promote to trigger a truncation snapshot.
      */
     ZooKeeper m_zk;
@@ -257,9 +253,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     final long m_siteId;
     final Mailbox m_mailbox;
 
-    // MAX_CONNECTIONS is updated to be (FD LIMIT - 300) after startup
-    private final AtomicInteger MAX_CONNECTIONS = new AtomicInteger(800);
-    private ScheduledFuture<?> m_maxConnectionUpdater;
+    private final FileDescriptorsTracker m_fileDescriptorTracker = new FileDescriptorsTracker();
+    private final ClientConnectionsTracker m_clientConnectionsTracker = new ClientConnectionsTracker(m_fileDescriptorTracker);
 
     private final AtomicBoolean m_isAcceptingConnections = new AtomicBoolean(false);
 
@@ -420,9 +415,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         /*
                          * Enforce a limit on the maximum number of connections
                          */
-                        if (m_numConnections.get() >= MAX_CONNECTIONS.get()) {
-                            networkLog.warn(String.format("Rejected connection from %s because the connection limit of %s has been reached",
-                                                          remoteAddr, MAX_CONNECTIONS));
+                        if (m_clientConnectionsTracker.isConnectionsLimitReached()) {
+                            networkLog.warnFmt(
+                                            "Rejected connection from %s because the connection limit of %s has been reached",
+                                            remoteAddr,
+                                            m_clientConnectionsTracker.getMaxNumberOfAllowedConnections()
+                            );
                             try {
                             /*
                              * Send rejection message with reason code
@@ -446,7 +444,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                          * so that a flood of connection attempts (with many doomed) will not result in
                          * successful authentication of connections that would put us over the limit.
                          */
-                        m_numConnections.incrementAndGet();
+                        m_clientConnectionsTracker.connectionOpened();
 
                         //Populated on timeout
                         timeoutRef = new AtomicReference<String>();
@@ -484,7 +482,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     } finally {
                         messagingChannel.cleanUp();
                         if (!success) {
-                            m_numConnections.decrementAndGet();
+                            m_clientConnectionsTracker.connectionClosed();
                         }
                     }
                 }
@@ -849,7 +847,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         @Override
         public void stopped(Connection c) {
-            m_numConnections.decrementAndGet();
+            m_clientConnectionsTracker.connectionClosed();
+
             /*
              * It's necessary to free all the resources held by the IV2 ACG tracking.
              * Outstanding requests may actually still be at large
@@ -1436,7 +1435,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     public void unbindAdapter(final Connection adapter) {
         ClientInterfaceHandleManager cihm = m_cihm.remove(adapter.connectionId());
         if (cihm != null) {
-            m_numConnections.decrementAndGet();
+            m_clientConnectionsTracker.connectionClosed();
+
             /*
              * It's necessary to free all the resources held
              * Outstanding requests may actually still be at large
@@ -1744,9 +1744,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             m_topologyCheckFuture.cancel(false);
             try {m_topologyCheckFuture.get();} catch (Throwable t) {}
         }
-        if (m_maxConnectionUpdater != null) {
-            m_maxConnectionUpdater.cancel(false);
-        }
         if (m_acceptor != null) {
             m_acceptor.shutdown();
         }
@@ -1772,18 +1769,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         Future<?> replicaFuture = m_dispatcher.asynchronouslyDetermineLocalReplicas();
 
         /*
-         * Periodically check the limit on the number of open files
+         * Periodically check the limit on the number of open files as well as number of open files itself.
          */
-        m_maxConnectionUpdater = VoltDB.instance().scheduleWork(new Runnable() {
-            @Override
-            public void run() {
-                Integer limit = org.voltdb.utils.CLibrary.getOpenFileLimit();
-                if (limit != null) {
-                    //Leave 300 files open for "stuff"
-                    MAX_CONNECTIONS.set(limit - 300);
-                }
-            }
-        }, 0, 10, TimeUnit.MINUTES);
+        m_fileDescriptorTracker.start();
+
         m_acceptor.start();
         if (m_adminAcceptor != null)
         {
@@ -2059,6 +2048,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             statsIterators.add(acg.getInitiationStatsIterator());
         }
         return statsIterators;
+    }
+
+    public FileDescriptorsTracker getFileDescriptorTracker() {
+        return m_fileDescriptorTracker;
+    }
+
+    public ClientConnectionsTracker getClientConnectionsTracker() {
+        return m_clientConnectionsTracker;
     }
 
     public List<AbstractHistogram> getLatencyStats() {

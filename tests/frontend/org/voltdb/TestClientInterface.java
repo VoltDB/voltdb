@@ -93,7 +93,7 @@ public class TestClientInterface {
     private StatsAgent m_statsAgent = new StatsAgent() {
         @Override
         public void performOpsAction(final Connection c, final long clientHandle, final OpsSelector selector,
-                                     final ParameterSet params) throws Exception {
+                                     final ParameterSet params) {
             final String stat = (String)params.toArray()[0];
             if (stat.equals("TOPO") && !statsAnswers.isEmpty()) {
                 c.writeStream().enqueue(statsAnswers.poll());

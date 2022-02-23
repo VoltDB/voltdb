@@ -207,6 +207,8 @@ import org.voltdb.snmp.DummySnmpTrapSender;
 import org.voltdb.snmp.FaultFacility;
 import org.voltdb.snmp.FaultLevel;
 import org.voltdb.snmp.SnmpTrapSender;
+import org.voltdb.stats.LimitsStats;
+import org.voltdb.stats.LiveClientsStats;
 import org.voltdb.sysprocs.AdHocNTBase;
 import org.voltdb.sysprocs.VerifyCatalogAndWriteJar;
 import org.voltdb.sysprocs.saverestore.SnapshotPathType;
@@ -1449,7 +1451,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             statsAgent.registerStatsSource(StatsSelector.PARTITIONCOUNT, 0, m_partitionCountStats);
             m_initiatorStats = new InitiatorStats(m_myHostId);
             m_liveClientsStats = new LiveClientsStats();
-            statsAgent.registerStatsSource(StatsSelector.LIVECLIENTS, 0, m_liveClientsStats);
+            statsAgent.registerStatsSource(StatsSelector.LIVECLIENTS_CONNECTIONS, 0, m_liveClientsStats);
 
             m_latencyStats = new LatencyStats();
             statsAgent.registerStatsSource(StatsSelector.LATENCY, 0, m_latencyStats);
@@ -1538,6 +1540,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
             }
+
+            LimitsStats limitsStats = new LimitsStats(
+                    m_clientInterface.getFileDescriptorTracker(),
+                    m_clientInterface.getClientConnectionsTracker()
+            );
+            statsAgent.registerStatsSource(StatsSelector.LIMITS, 0, limitsStats);
 
             VoltDB.getExportManager().startListeners(m_clientInterface);
             m_taskManager = new TaskManager(m_clientInterface, statsAgent, m_myHostId,

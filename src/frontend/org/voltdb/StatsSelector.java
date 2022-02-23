@@ -34,7 +34,9 @@ public enum StatsSelector {
     PARTITIONCOUNT,
     IOSTATS,
     MEMORY,           // info about node's memory usage
-    LIVECLIENTS,      // info about the currently connected clients
+    LIVECLIENTS_CONNECTIONS,      // info about the currently connected clients
+    LIMITS,
+    LIVECLIENTS(LIVECLIENTS_CONNECTIONS, LIMITS),
     PLANNER,          // info about planner and EE performance and cache usage
     CPU,            // return CPU Stats
     MANAGEMENT(MEMORY, INITIATOR, PROCEDURE, IOSTATS, TABLE, INDEX, STARVATION, QUEUE, CPU), // Returns pretty much everything
