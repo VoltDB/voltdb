@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -54,16 +54,7 @@ public abstract class SiteStatsSource extends StatsSource {
     @Override
     protected <E extends Enum<E>> void populateColumnSchema(ArrayList<ColumnInfo> columns, Class<E> extraColumns) {
         super.populateColumnSchema(columns, SiteStats.class);
-        try {
-            for (E col : extraColumns.getEnumConstants()) {
-                java.lang.reflect.Field f = col.getClass().getDeclaredField("m_type");
-                f.setAccessible(true);
-                VoltType type = (VoltType) f.get(col);
-                columns.add(new VoltTable.ColumnInfo(col.name(), type));
-            }
-        } catch (Exception e) {
-            VoltDB.crashLocalVoltDB("Failed to populate column schema for statistics " + extraColumns.getName(), true, e);
-        }
+        populateExtraColumns(columns, extraColumns);
     }
 
     @Override

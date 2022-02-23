@@ -3,6 +3,7 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/IntelliJ.iml" filepath="$PROJECT_DIR$/IntelliJ.iml" />
+      <module fileurl="file://$PROJECT_DIR$/volt-operator/volt-operator.iml" filepath="$PROJECT_DIR$/volt-operator/volt-operator.iml" />
       <module fileurl="file://$PROJECT_DIR$/../../voltcore.iml" filepath="$PROJECT_DIR$/../../voltcore.iml" />
       <module fileurl="file://$PROJECT_DIR$/../../examples/adperformance/voltcore.examples.adperformance.iml" filepath="$PROJECT_DIR$/../../examples/adperformance/voltcore.examples.adperformance.iml" />
       <module fileurl="file://$PROJECT_DIR$/../../examples/bank-offers/voltcore.examples.bank-offers.iml" filepath="$PROJECT_DIR$/../../examples/bank-offers/voltcore.examples.bank-offers.iml" />

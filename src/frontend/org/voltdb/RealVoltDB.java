@@ -17,6 +17,7 @@
 
 package org.voltdb;
 
+import static java.util.Objects.requireNonNull;
 import static org.voltdb.VoltDB.exitAfterMessage;
 
 import java.io.BufferedReader;
@@ -41,6 +42,7 @@ import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.time.Clock;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -77,7 +79,22 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
+import com.google_voltpatches.common.base.Charsets;
+import com.google_voltpatches.common.base.Joiner;
+import com.google_voltpatches.common.base.Supplier;
+import com.google_voltpatches.common.base.Suppliers;
+import com.google_voltpatches.common.collect.ImmutableList;
+import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.Lists;
+import com.google_voltpatches.common.collect.Maps;
+import com.google_voltpatches.common.collect.Ordering;
+import com.google_voltpatches.common.collect.Sets;
+import com.google_voltpatches.common.hash.Hashing;
+import com.google_voltpatches.common.net.HostAndPort;
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
+import com.google_voltpatches.common.util.concurrent.SettableFuture;
+import io.netty.handler.ssl.OpenSsl;
 import org.aeonbits.owner.ConfigFactory;
 import org.apache.cassandra_voltpatches.GCInspector;
 import org.apache.commons.lang3.StringUtils;
@@ -142,9 +159,9 @@ import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
+import org.voltdb.dr2.DRConsumerStatsBase;
 import org.voltdb.dr2.conflicts.DRConflictsStats;
 import org.voltdb.dr2.conflicts.DRConflictsTracker;
-import org.voltdb.dr2.DRConsumerStatsBase;
 import org.voltdb.dtxn.InitiatorStats;
 import org.voltdb.dtxn.LatencyHistogramStats;
 import org.voltdb.dtxn.LatencyStats;
@@ -196,6 +213,9 @@ import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.Snapshot;
 import org.voltdb.task.TaskManager;
+import org.voltdb.task.TaskScope;
+import org.voltdb.tasks.clockskew.ClockSkewCollectorScheduler;
+import org.voltdb.tasks.clockskew.ClockSkewStats;
 import org.voltdb.utils.CLibrary;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.CatalogAndDeployment;
@@ -212,24 +232,6 @@ import org.voltdb.utils.SystemStatsCollector;
 import org.voltdb.utils.TopologyZKUtils;
 import org.voltdb.utils.VoltSampler;
 
-import com.google_voltpatches.common.base.Charsets;
-import com.google_voltpatches.common.base.Joiner;
-import com.google_voltpatches.common.base.Supplier;
-import com.google_voltpatches.common.base.Suppliers;
-import com.google_voltpatches.common.collect.ImmutableList;
-import com.google_voltpatches.common.collect.ImmutableMap;
-import com.google_voltpatches.common.collect.Lists;
-import com.google_voltpatches.common.collect.Maps;
-import com.google_voltpatches.common.collect.Ordering;
-import com.google_voltpatches.common.collect.Sets;
-import com.google_voltpatches.common.hash.Hashing;
-import com.google_voltpatches.common.net.HostAndPort;
-import com.google_voltpatches.common.util.concurrent.ListenableFuture;
-import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
-import com.google_voltpatches.common.util.concurrent.SettableFuture;
-
-import io.netty.handler.ssl.OpenSsl;
-
 /**
  * RealVoltDB initializes global server components, like the messaging
  * layer, ExecutionSite(s), and ClientInterface. It provides accessors
@@ -239,7 +241,7 @@ import io.netty.handler.ssl.OpenSsl;
  */
 public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostMessenger.HostWatcher {
 
-    private static final boolean DISABLE_JMX = Boolean.valueOf(System.getProperty("DISABLE_JMX", "true"));
+    private static final boolean DISABLE_JMX = Boolean.parseBoolean(System.getProperty("DISABLE_JMX", "true"));
 
     /** Default deployment file contents if path to deployment is null */
     private static final String[] defaultDeploymentXML = {
@@ -275,7 +277,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private ClientInterface m_clientInterface = null;
     HTTPAdminListener m_adminListener;
     private OpsRegistrar m_opsRegistrar = new OpsRegistrar();
-    private AtomicReference<MeshProber> m_meshProbe = new AtomicReference<MeshProber>();
+    private final AtomicReference<MeshProber> m_meshProbe = new AtomicReference<>();
 
     private PartitionCountStats m_partitionCountStats = null;
     private IOStats m_ioStats = null;
@@ -284,6 +286,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private GcStats m_gcStats = null;
     private CommandLogStats m_commandLogStats = null;
     private DRRoleStats m_drRoleStats = null;
+    private ClockSkewStats skewStats = null;
     private StatsManager m_statsManager = null;
     private SnapshotCompletionMonitor m_snapshotCompletionMonitor;
     // These are unused locally, but they need to be registered with the StatsAgent so they're
@@ -493,7 +496,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private ScheduledThreadPoolExecutor m_periodicPriorityWorkThread;
 
     // Interface to all things license-related
-    private Licensing m_licensing = new CommunityLicensing();
+    private final Licensing m_licensing = new CommunityLicensing();
 
     private void connectLicensing() {
         ProClass.newInstanceOf("org.voltdb.licensing.Initializer",
@@ -735,7 +738,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return nonEmptyPaths.build();
     }
 
-    private final List<String> pathsWithRecoverableArtifacts(DeploymentType deployment) {
+    private List<String> pathsWithRecoverableArtifacts(DeploymentType deployment) {
         ImmutableList.Builder<String> nonEmptyPaths = ImmutableList.builder();
         PathsType paths = deployment.getPaths();
         String voltDbRoot = getVoltDBRootPath(paths.getVoltdbroot());
@@ -1468,6 +1471,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_commandLogStats = new CommandLogStats(m_commandLog);
             statsAgent.registerStatsSource(StatsSelector.COMMANDLOG, 0, m_commandLogStats);
 
+            skewStats = new ClockSkewStats(Clock.systemUTC(), VoltDB.instance(), hostLog);
+            getStatsAgent().registerStatsSource(StatsSelector.CLOCK_SKEW, 0, skewStats);
+
             // Dummy DRCONSUMER stats
             replaceDRConsumerStatsWithDummy();
 
@@ -1552,7 +1558,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                                                 : ProducerDRGateway.Mode.NEW,
                         m_replicationActive.get(), m_configuredNumberOfPartitions,
                         (m_catalogContext.getClusterSettings().hostcount() - m_config.m_missingHostCount));
-
 
                 DRConflictReporter.init(m_drConflictsTracker);
             }
@@ -4679,6 +4684,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (allDone) {
             m_statusTracker.setStartupComplete();
         }
+        Duration interval = Duration.parse(System.getProperty("CLOCK_SKEW_SCHEDULER_INTERVAL", "PT1H"));
+        requireNonNull(getTaskManager(), "task manager after initialization is null")
+                .addSystemTask("ClockSkewCollector", TaskScope.HOSTS,
+                        helper -> new ClockSkewCollectorScheduler(this, helper, skewStats, interval));
     }
 
     private void databaseIsRunning() {

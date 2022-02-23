@@ -193,7 +193,7 @@ public final class InvocationDispatcher {
         }
     }
 
-    public static final Builder builder() {
+    public static Builder builder() {
         return new Builder();
     }
 
@@ -258,30 +258,25 @@ public final class InvocationDispatcher {
      * requests to local replicas once the info is available
      */
     public Future<?> asynchronouslyDetermineLocalReplicas() {
-        return VoltDB.instance().getSES(false).submit(new Runnable() {
-
-            @Override
-            public void run() {
-                /*
-                 * Assemble a map of all local replicas that will be used to determine
-                 * if single part reads can be delivered and executed at local replicas
-                 */
-                final int thisHostId = CoreUtils.getHostIdFromHSId(m_mailbox.getHSId());
-                ImmutableMap.Builder<Integer, Long> localReplicas = ImmutableMap.builder();
-                for (int partition : m_cartographer.getPartitions()) {
-                    for (Long replica : m_cartographer.getReplicasForPartition(partition)) {
-                        if (CoreUtils.getHostIdFromHSId(replica) == thisHostId) {
-                            localReplicas.put(partition, replica);
-                        }
+        return VoltDB.instance().getSES(false).submit(() -> {
+            /*
+             * Assemble a map of all local replicas that will be used to determine
+             * if single part reads can be delivered and executed at local replicas
+             */
+            final int thisHostId = CoreUtils.getHostIdFromHSId(m_mailbox.getHSId());
+            ImmutableMap.Builder<Integer, Long> localReplicas = ImmutableMap.builder();
+            for (int partition : m_cartographer.getPartitions()) {
+                for (Long replica : m_cartographer.getReplicasForPartition(partition)) {
+                    if (CoreUtils.getHostIdFromHSId(replica) == thisHostId) {
+                        localReplicas.put(partition, replica);
                     }
                 }
-                m_localReplicas.set(localReplicas.build());
             }
-
+            m_localReplicas.set(localReplicas.build());
         });
     }
 
-    public final ClientResponseImpl dispatch(
+    public ClientResponseImpl dispatch(
             StoredProcedureInvocation task,
             InvocationClientHandler handler,
             Connection ccxn,
@@ -319,7 +314,7 @@ public final class InvocationDispatcher {
             return unexpectedFailureResponse(errorMessage, task.clientHandle);
         }
 
-        ClientResponseImpl error = null;
+        ClientResponseImpl error;
 
         // Check for pause mode restrictions before proceeding any further
         if ((error = allowPauseModeExecution(handler, catProc, task)) != null) {
@@ -362,7 +357,7 @@ public final class InvocationDispatcher {
         // handle non-transactional procedures (INCLUDING NT SYSPROCS)
         // note that we also need to check for java for now as transactional flag is
         // only 100% when we're talking Java
-        if ((catProc.getTransactional() == false) && catProc.getHasjava()) {
+        if ((!catProc.getTransactional()) && catProc.getHasjava()) {
             return dispatchNTProcedure(handler, task, user, ccxn, nowNanos, ntPriority);
         }
 
@@ -424,6 +419,9 @@ public final class InvocationDispatcher {
             }
             else if ("@Statistics".equals(procName)) {
                 return dispatchStatistics(OpsSelector.STATISTICS, task, ccxn);
+            }
+            else if ("@SystemClockSkew".equals(procName)) {
+                return dispatchStatistics(OpsSelector.SYSTEM_CLOCK_SKEW, task, ccxn);
             }
             else if ("@SystemCatalog".equals(procName)) {
                 return dispatchStatistics(OpsSelector.SYSTEMCATALOG, task, ccxn);
@@ -507,7 +505,7 @@ public final class InvocationDispatcher {
                  || "@PrepareShutdown".equals(procName)
                  || "@CancelShutdown".equals(procName))
             {
-                if (handler.isAdmin() == false) {
+                if (!handler.isAdmin()) {
                     return unexpectedFailureResponse(
                             procName + " is not available to this client",
                             task.clientHandle);
@@ -935,7 +933,6 @@ public final class InvocationDispatcher {
 
    /**
      * Send a command log replay sentinel to the given partition.
-     * @param txnId
      * @param partitionId
      */
     public final void sendSentinel(long uniqueId, int partitionId) {

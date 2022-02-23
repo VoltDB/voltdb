@@ -17,10 +17,7 @@
 
 package org.voltdb;
 
-import java.util.Map;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.Predicate;
-
+import com.google_voltpatches.common.collect.ImmutableMap;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.AuthSystem.AuthUser;
@@ -32,7 +29,10 @@ import org.voltdb.client.ProcedureCallback;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.utils.MiscUtils;
 
-import com.google_voltpatches.common.collect.ImmutableMap;
+import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Predicate;
 
 /**
  * This class packs the parameters and dispatches the transactions.
@@ -196,8 +196,7 @@ public class InternalConnectionHandler {
             return false;
         }
 
-        boolean mp = (partitions[0] == MpInitiator.MP_INIT_PID) || (partitions.length > 1);
-        final InternalClientResponseAdapter adapter = mp ? m_adapters.get(MpInitiator.MP_INIT_PID) : m_adapters.get(partitions[0]);
+        final InternalClientResponseAdapter adapter = getInternalClientResponseAdapter(partitions);
         String adapterName = (hostname == null ? DEFAULT_INTERNAL_ADAPTER_NAME : hostname);
         InternalAdapterTaskAttributes kattrs = new InternalAdapterTaskAttributes(
                 adapterName, isAdmin, adapter.connectionId());
@@ -211,7 +210,28 @@ public class InternalConnectionHandler {
         return true;
     }
 
-    // Use null backPressurePredicate for no back pressure
+    private InternalClientResponseAdapter getInternalClientResponseAdapter(int[] partitions) {
+        boolean mp = (partitions[0] == MpInitiator.MP_INIT_PID) || (partitions.length > 1);
+        final InternalClientResponseAdapter adapter = mp ? m_adapters.get(MpInitiator.MP_INIT_PID) : m_adapters.get(partitions[0]);
+        return Objects.requireNonNull(adapter, "Adapter cannot be null");
+    }
+
+    /**
+     * use this version for no back pressure
+     *
+     * @param caller connection context
+     * @param statsCollector for procedure results
+     * @param procCallback
+     * @param proc name
+     * @param fieldList proc param names
+     * @return success
+     */
+    public boolean callProcedure(InternalConnectionContext caller,
+                                 InternalConnectionStatsCollector statsCollector,
+                                 ProcedureCallback procCallback, String proc, Object... fieldList) {
+        return callProcedure(caller, null, statsCollector, procCallback, proc, fieldList);
+    }
+
     public boolean callProcedure(InternalConnectionContext caller,
                                  Predicate<Integer> backPressurePredicate,
                                  InternalConnectionStatsCollector statsCollector,
@@ -251,8 +271,7 @@ public class InternalConnectionHandler {
             return false;
         }
 
-        boolean mp = (partitions[0] == MpInitiator.MP_INIT_PID) || (partitions.length > 1);
-        final InternalClientResponseAdapter adapter = mp ? m_adapters.get(MpInitiator.MP_INIT_PID) : m_adapters.get(partitions[0]);
+        final InternalClientResponseAdapter adapter = getInternalClientResponseAdapter(partitions);
         InternalAdapterTaskAttributes kattrs = new InternalAdapterTaskAttributes(caller,  adapter.connectionId());
 
         final AuthUser user = getCatalogContext().authSystem.getImporterUser();

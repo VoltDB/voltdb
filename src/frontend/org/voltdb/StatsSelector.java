@@ -83,27 +83,28 @@ public enum StatsSelector {
     SHUTDOWN_CHECK,
     STOP_CHECK,
     PAUSE_CHECK,
-    XDCR_READINESS;
+    XDCR_READINESS,
+    CLOCK_SKEW;
 
     /** Whether or not this stat supports interval collection */
     private final boolean m_supportsInterval;
     /** Mapping to actual stat(s) to collect which are registered in the system */
     private final StatsSelector[] m_subSelctors;
 
-    private StatsSelector(boolean supportsInterval, StatsSelector... subSelectors) {
+    StatsSelector(boolean supportsInterval, StatsSelector... subSelectors) {
         m_supportsInterval = supportsInterval;
         m_subSelctors = subSelectors == null ? new StatsSelector[] { this } : subSelectors;
     }
 
-    private StatsSelector(boolean supportsInterval) {
+    StatsSelector(boolean supportsInterval) {
         this(supportsInterval, (StatsSelector[]) null);
     }
 
-    private StatsSelector(StatsSelector... subSelectors) {
+    StatsSelector(StatsSelector... subSelectors) {
         this(true, subSelectors);
     }
 
-    private StatsSelector() {
+    StatsSelector() {
         this(true);
     }
 

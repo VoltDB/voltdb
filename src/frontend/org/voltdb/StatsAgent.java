@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -345,6 +345,7 @@ public class StatsAgent extends OpsAgent
         }
     }
 
+    // TODO pk please refactor this
     // Parse the provided parameter set object and fill in subselector and interval into
     // the provided JSONObject.  If there's an error, return that in the String, otherwise
     // return null.  Yes, ugly.  Bang it out, then refactor later.

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,12 +17,14 @@
 
 package org.voltdb;
 
+import org.voltdb.VoltTable.ColumnInfo;
+
 import java.lang.management.ManagementFactory;
 import java.lang.management.OperatingSystemMXBean;
 import java.util.ArrayList;
 import java.util.Iterator;
 
-import org.voltdb.VoltTable.ColumnInfo;
+import static com.google_voltpatches.common.collect.Iterators.singletonIterator;
 
 public class CpuStats extends StatsSource {
 
@@ -38,34 +40,12 @@ public class CpuStats extends StatsSource {
 
     public CpuStats() {
         super(false);
-        m_osBean = (com.sun.management.OperatingSystemMXBean )ManagementFactory.getPlatformMXBean(OperatingSystemMXBean.class);
+        m_osBean = (com.sun.management.OperatingSystemMXBean)ManagementFactory.getPlatformMXBean(OperatingSystemMXBean.class);
     }
 
     @Override
     protected Iterator<Object> getStatsRowKeyIterator(boolean interval) {
-        return new Iterator<Object>() {
-            boolean returnRow = true;
-
-            @Override
-            public boolean hasNext() {
-                return returnRow;
-            }
-
-            @Override
-            public Object next() {
-                if (returnRow) {
-                    returnRow = false;
-                    return new Object();
-                } else {
-                    return null;
-                }
-            }
-
-            @Override
-            public void remove() {
-                throw new UnsupportedOperationException();
-            }
-        };
+        return singletonIterator(new Object());
     }
 
     @Override
@@ -79,5 +59,4 @@ public class CpuStats extends StatsSource {
         rowValues[offset + CPU.PERCENT_USED.ordinal()] = Math.round(m_osBean.getProcessCpuLoad() * 100);
         return offset + CPU.values().length;
     }
-
 }

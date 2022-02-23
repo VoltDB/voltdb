@@ -23,17 +23,17 @@
 
 package org.voltdb.regressionsuites.statistics;
 
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
-
 import junit.framework.Test;
-
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.regressionsuites.StatisticsTestSuiteBase;
+
+import java.io.IOException;
+import java.time.Duration;
+import java.util.HashMap;
+import java.util.Map;
 
 public class TestStatisticsSuiteCpuStats extends StatisticsTestSuiteBase {
     public TestStatisticsSuiteCpuStats(String name) {
@@ -57,7 +57,7 @@ public class TestStatisticsSuiteCpuStats extends StatisticsTestSuiteBase {
         // cpu
         //
         // give time to seed the stats cache?
-        Thread.sleep(1000);
+        Thread.sleep(Duration.ofSeconds(1).toMillis());
         results = client.callProcedure("@Statistics", "cpu", 0).getResults();
         System.out.println("Node cpu statistics table: " + results[0].toString());
         // one aggregate table returned

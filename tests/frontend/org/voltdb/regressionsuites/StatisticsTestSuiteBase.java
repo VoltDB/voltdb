@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2022 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -22,21 +22,26 @@
  */
 package org.voltdb.regressionsuites;
 
-import java.io.IOException;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
-
+import com.google_voltpatches.common.collect.ImmutableMap;
+import junit.framework.AssertionFailedError;
+import junit.framework.Test;
 import org.voltdb.BackendTarget;
 import org.voltdb.ProcedurePartitionData;
 import org.voltdb.VoltTable;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.iv2.MpInitiator;
+import org.voltdb.regressionsuites.MultiConfigSuiteBuilder.ReuseServer;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb_testprocs.regressionsuites.malicious.GoSleep;
 
-import junit.framework.Test;
+import java.io.IOException;
+import java.time.Duration;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.function.Consumer;
 
 public class StatisticsTestSuiteBase extends SaveRestoreBase {
 
@@ -194,12 +199,20 @@ public class StatisticsTestSuiteBase extends SaveRestoreBase {
     //
     static public Test suite(Class<? extends StatisticsTestSuiteBase> classzz, boolean isCommandLogTest,
             int replicationPort) throws IOException {
-        return suite(classzz, isCommandLogTest, replicationPort, MultiConfigSuiteBuilder.ReuseServer.DEFAULT);
+        return suite(classzz, isCommandLogTest, replicationPort, ReuseServer.DEFAULT, ImmutableMap.of());
+    }
+
+    static public Test suite(Class<? extends StatisticsTestSuiteBase> classzz, Map<String, String> envs) throws IOException {
+        return suite(classzz, false, -1, ReuseServer.DEFAULT, envs);
     }
 
     static public Test suite(Class<? extends StatisticsTestSuiteBase> classzz, boolean isCommandLogTest,
-            int replicationPort,
-            MultiConfigSuiteBuilder.ReuseServer reuseServer) throws IOException {
+                             int replicationPort, ReuseServer reuseServer) throws IOException {
+        return suite(classzz, isCommandLogTest, replicationPort, reuseServer, ImmutableMap.of());
+    }
+
+    static public Test suite(Class<? extends StatisticsTestSuiteBase> classzz, boolean isCommandLogTest,
+            int replicationPort, ReuseServer reuseServer, Map<String, String> envs) throws IOException {
         LocalCluster config = null;
 
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(classzz);
@@ -252,7 +265,7 @@ public class StatisticsTestSuiteBase extends SaveRestoreBase {
                 StatisticsTestSuiteBase.HOSTS, StatisticsTestSuiteBase.KFACTOR,
                 BackendTarget.NATIVE_EE_JNI);
         config.setHasLocalServer(hasLocalServer);
-
+        config.getAdditionalProcessEnv().putAll(envs);
         if (MiscUtils.isPro() && isCommandLogTest) {
             config.setJavaProperty("LOG_SEGMENT_SIZE", "1");
             config.setJavaProperty("LOG_SEGMENTS", "1");

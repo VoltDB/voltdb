@@ -19,6 +19,8 @@ package org.voltdb;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
 
+import static org.voltcore.messaging.HostMessenger.CLOCK_SKEW_COLLECTOR_ID;
+
 /**
  * Conveniently encapsulate some of the data required for each OPS selector.
  */
@@ -28,7 +30,8 @@ public enum OpsSelector {
     STATISTICS(StatsAgent.class, HostMessenger.STATS_SITE_ID),
     SYSTEMCATALOG(SystemCatalogAgent.class, HostMessenger.SYSCATALOG_SITE_ID),
     SYSTEMINFORMATION(SystemInformationAgent.class, HostMessenger.SYSINFO_SITE_ID),
-    TRACE(TraceAgent.class, HostMessenger.TRACE_SITE_ID);
+    TRACE(TraceAgent.class, HostMessenger.TRACE_SITE_ID),
+    SYSTEM_CLOCK_SKEW(ClockSkewCollectorAgent.class, CLOCK_SKEW_COLLECTOR_ID);
 
     // OpsAgent subclass providing the implementation for this OPS selector
     private final Class<? extends OpsAgent> m_agentClass;

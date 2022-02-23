@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2021 VoltDB Inc.
+ * Copyright (C) 2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -395,6 +395,11 @@ public class SystemProcedureCatalog {
         builder.put("@SystemCatalog",
                 new Config("org.voltdb.sysprocs.SystemCatalog",
                         Initiator.SINGLE_PARTITION, Mutable.READ_ONLY, 0, VoltType.STRING,
+                        false, false, true, Durability.NOT_APPLICABLE,
+                        false, true, Restartability.NOT_APPLICABLE));
+        builder.put(ClockSkewCollectorAgent.PROCEDURE,
+                new Config(null,
+                        Initiator.MULTI_PARTITION, Mutable.READ_ONLY, 0, VoltType.INVALID,
                         false, false, true, Durability.NOT_APPLICABLE,
                         false, true, Restartability.NOT_APPLICABLE));
         builder.put("@SystemInformation",
