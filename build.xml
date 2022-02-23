@@ -787,7 +787,6 @@ DISTRIBUTION
     </exec>
     <delete file="${raw.dist.dir}/voltdb-${voltdb_editiontype}-${dist.version}/LICENSE" failonerror="false" if:set='editiontypeMatch' />
     <copy file="LICENSE-DEV.txt" tofile="${raw.dist.dir}/voltdb-${voltdb_editiontype}-${dist.version}/LICENSE" overwrite="true" if:set='editiontypeMatch' />
-    <echo message="Content of final.build = ${final.build}"/>
     <exec executable="tar" failonerror="true">
         <arg value="-cz"/>
         <arg value="-C"/>
