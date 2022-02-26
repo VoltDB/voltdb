@@ -121,20 +121,33 @@ public class ExecuteTask extends VoltSystemProcedure
             case RESET_DR_APPLIED_TRACKER:
             {
                 result = new VoltTable(STATUS_SCHEMA);
-                result.addRow(STATUS_OK);
-                context.resetDrAppliedTracker();
+                int producerClusterId = -1;
+                try {
+                    producerClusterId = buffer.getInt();
+                    if (producerClusterId == -1) {
+                        context.resetAllDrAppliedTracker();
+                    } else {
+                        context.resetDrAppliedTracker(producerClusterId);
+                    }
+                    result.addRow(STATUS_OK);
+                } catch (Exception e) {
+                    log.error("Failed to reset DR tracker information for " + producerClusterId, e);
+                    result.addRow(STATUS_FAILURE);
+                }
                 break;
             }
             case SET_MERGED_DRID_TRACKER:
             {
                 result = new VoltTable(STATUS_SCHEMA);
+                int clusterId = -1;
                 try {
+                    clusterId = buffer.getInt();
                     byte[] paramBuf = new byte[buffer.remaining()];
                     buffer.get(paramBuf);
-                    DRIDTrackerHelper.setDRIDTrackerFromBytes(context, paramBuf);
+                    DRIDTrackerHelper.setDRIDTrackerFromBytes(context, clusterId, paramBuf);
                     result.addRow(STATUS_OK);
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    log.error("Failed to set DR tracker information for " + clusterId, e);
                     result.addRow(STATUS_FAILURE);
                 }
                 break;
@@ -152,7 +165,7 @@ public class ExecuteTask extends VoltSystemProcedure
                     context.initDRAppliedTracker(clusterIdToPartitionCountMap);
                     result.addRow(STATUS_OK);
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    log.error("Failed to initialize DR tracker information", e);
                     result.addRow(STATUS_FAILURE);
                 }
                 break;

@@ -342,7 +342,8 @@ public class UpdateCore extends VoltSystemProcedure {
                 // The producer would have been turned off by the code above already.
                 if (VoltDB.instance().getReplicationRole() == ReplicationRole.NONE &&
                     !VoltDB.instance().getReplicationActive()) {
-                    context.resetDrAppliedTracker();
+                    // We are not in XDCR so clear all
+                    context.resetAllDrAppliedTracker();
                 }
 
                 // update the local catalog.  Safe to do this thanks to the check to get into here.

@@ -1339,8 +1339,9 @@ SnapshotCompletionInterest, Promotable
             VoltDBInterface instance = VoltDB.instance();
             CatalogContext context = instance.getCatalogContext();
             if (context != null && DrRoleType.MASTER.value().equals(context.getCluster().getDrrole())) {
-                ByteBuffer params = ByteBuffer.allocate(4);
+                ByteBuffer params = ByteBuffer.allocate(4+4);
                 params.putInt(ExecutionEngine.TaskType.RESET_DR_APPLIED_TRACKER.ordinal());
+                params.putInt(-1);
                 try {
                     ClientResponse cr = instance.getClientInterface()
                             .callExecuteTask(MAX_RESET_DR_APPLIED_TRACKER_TIMEOUT_MILLIS, params.array());

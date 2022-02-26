@@ -640,9 +640,14 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         int32_t setReplicableTables(int32_t clusterId, const std::vector<std::string>* replicableTables);
 
         /**
+         * Clear replicable tables for a cluster
+         */
+        void clearReplicableTables(int clusterId);
+
+        /**
          * Clear all replicable tables
          */
-        void clearReplicableTables();
+        void clearAllReplicableTables();
 
     private:
         /*

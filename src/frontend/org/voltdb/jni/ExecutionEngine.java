@@ -1007,7 +1007,12 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /**
      * Clear all clusters replicable tables
      */
-    public abstract void clearReplicableTables();
+    public abstract void clearAllReplicableTables();
+
+    /**
+     * Clear replicable tables for cluster
+     */
+    public abstract void clearReplicableTables(int clusterId);
 
     /*
      * Declare the native interface. Structurally, in Java, it would be cleaner to
@@ -1470,7 +1475,14 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      *
      * @param pointer to execution engine
      */
-    native static protected int nativeClearReplicableTables(long pointer);
+    native static protected int nativeClearAllReplicableTables(long pointer);
+
+    /**
+     * Clear the map of replicable tables for a clusters
+     *
+     * @param pointer to execution engine
+     */
+    native static protected int nativeClearReplicableTables(long pointer, int clusterId);
 
     public static byte[] getTestDRBuffer(int partitionId,
                                          int partitionKeyValues[], int flags[],

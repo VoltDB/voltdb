@@ -319,7 +319,12 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public void clearReplicableTables() {
+    public void clearAllReplicableTables() {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void clearReplicableTables(int clusterId) {
         throw new UnsupportedOperationException();
     }
 }

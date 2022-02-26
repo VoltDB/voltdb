@@ -577,21 +577,21 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         @Override
-        public void recoverDrState(Map<Integer, Map<Integer, DRSiteDrIdTracker>> trackers,
+        public void recoverDrState(int clusterId, Map<Integer, Map<Integer, DRSiteDrIdTracker>> trackers,
                 Map<Byte, String[]> replicableTables)
         {
             if (trackers != null) {
                 m_maxSeenDrLogsBySrcPartition = trackers;
             }
             if (replicableTables != null) {
-                Site.this.setReplicableTables(replicableTables);
+                Site.this.setReplicableTables(clusterId, replicableTables);
             }
         }
 
         @Override
-        public void resetDrAppliedTracker() {
+        public void resetAllDrAppliedTracker() {
             m_maxSeenDrLogsBySrcPartition.clear();
-            m_ee.clearReplicableTables();
+            m_ee.clearAllReplicableTables();
             if (drLog.isDebugEnabled()) {
                 drLog.debug("Cleared DR Applied trackers and cleared replicable tables");
             }
@@ -600,9 +600,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         @Override
-        public void resetDrAppliedTracker(byte clusterId) {
+        public void resetDrAppliedTracker(int clusterId) {
             m_maxSeenDrLogsBySrcPartition.remove((int) clusterId);
-            setReplicableTables(clusterId, null);
+            setReplicableTables(clusterId, null, true);
             if (drLog.isDebugEnabled()) {
                 drLog.debug("Reset DR Applied trackers and replicable tables for " + clusterId);
             }
@@ -1662,7 +1662,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             VoltDB.instance().getDrCatalogCommands().setAll(drCatalogCommands);
         }
 
-        setReplicableTables(replicableTables);
+        setReplicableTables(-1, replicableTables);
 
         m_runningState = RunningState.REPLAYING;
         m_replayCompletionAction = replayComplete;
@@ -2105,12 +2105,25 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public void setReplicableTables(byte clusterId, String[] tables) {
+    public void setReplicableTables(int clusterId, String[] tables, boolean clear) {
+        if (clear) {
+            m_ee.clearReplicableTables(clusterId);
+        }
         m_ee.setReplicableTables(clusterId, tables);
     }
 
-    void setReplicableTables(Map<Byte, String[]> replicableTables) {
-        m_ee.clearReplicableTables();
-        replicableTables.forEach(this::setReplicableTables);
+    /**
+     * When we are recovering or rejoining we want to set all cluster tables in EE
+     * @param clusterId clsuterId or -1 if all cluster's recovered information needs to be updated.
+     * @param replicableTables replicable tables list
+     */
+    void setReplicableTables(int clusterId, Map<Byte, String[]> replicableTables) {
+        if (clusterId == -1) {
+            for (byte cid : replicableTables.keySet()) {
+                setReplicableTables(cid, replicableTables.get(cid), true);
+            }
+        } else {
+            setReplicableTables(clusterId, replicableTables.get(clusterId), false);
+        }
     }
 }

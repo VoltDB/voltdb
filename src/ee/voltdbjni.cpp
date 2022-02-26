@@ -1859,15 +1859,33 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSetRe
 
 /*
  * Class:     org_voltdb_jni_ExecutionEngine
- * Method:    nativeClearReplicableTables
+ * Method:    nativeClearAllReplicableTables
  * Signature: (J)I
  */
-SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeClearReplicableTables
+SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeClearAllReplicableTables
   (JNIEnv *env, jclass clazz, jlong pointer) {
     auto engine = castToEngine(pointer);
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
     try {
-        engine->clearReplicableTables();
+        engine->clearAllReplicableTables();
+        return 0;
+    } catch (const FatalException &e) {
+        topend->crashVoltDB(e);
+    }
+    return 1;
+}
+
+/*
+ * Class:     org_voltdb_jni_ExecutionEngine
+ * Method:    nativeClearReplicableTables
+ * Signature: (J)I
+ */
+SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeClearReplicableTables
+        (JNIEnv *env, jclass clazz, jlong pointer, jint clusterId) {
+    auto engine = castToEngine(pointer);
+    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
+    try {
+        engine->clearReplicableTables(clusterId);
         return 0;
     } catch (const FatalException &e) {
         topend->crashVoltDB(e);

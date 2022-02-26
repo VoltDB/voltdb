@@ -1202,8 +1202,13 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
-    public void clearReplicableTables() {
-        checkErrorCode(nativeClearReplicableTables(pointer));
+    public void clearAllReplicableTables() {
+        checkErrorCode(nativeClearAllReplicableTables(pointer));
+    }
+
+    @Override
+    public void clearReplicableTables(int clusterId) {
+        checkErrorCode(nativeClearReplicableTables(pointer, clusterId));
     }
 
     private byte[] readVarbinary(FastDeserializer defaultDeserializer) throws IOException {

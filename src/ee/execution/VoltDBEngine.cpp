@@ -3190,7 +3190,19 @@ int32_t VoltDBEngine::setReplicableTables(int32_t clusterId, const std::vector<s
     return 1;
 }
 
-void VoltDBEngine::clearReplicableTables() {
+void VoltDBEngine::clearReplicableTables(int clusterId) {
+    if (clusterId < 0) {
+        return;
+    }
+    auto clusterEntry = m_replicableTables.find(clusterId);
+    if (clusterEntry == m_replicableTables.end()) {
+        return;
+    }
+    clusterEntry->second.clear();
+    m_replicableTables.erase(clusterEntry);
+}
+
+void VoltDBEngine::clearAllReplicableTables() {
     m_replicableTables.clear();
 }
 
