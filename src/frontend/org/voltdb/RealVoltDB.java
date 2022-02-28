@@ -1474,7 +1474,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             statsAgent.registerStatsSource(StatsSelector.COMMANDLOG, 0, m_commandLogStats);
 
             skewStats = new ClockSkewStats(Clock.systemUTC(), VoltDB.instance(), hostLog);
-            getStatsAgent().registerStatsSource(StatsSelector.CLOCK_SKEW, 0, skewStats);
+            getStatsAgent().registerStatsSource(StatsSelector.CLOCKSKEW, 0, skewStats);
 
             // Dummy DRCONSUMER stats
             replaceDRConsumerStatsWithDummy();
@@ -4101,6 +4101,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         (getLocalPartitionCount()), m_configuredReplicationFactor);
 
         checkThreadsSanity();
+
+        registerClockSkewTask();
     }
 
     Map<Integer, Integer> getPartitionToSiteMap() {
@@ -4692,9 +4694,18 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (allDone) {
             m_statusTracker.setStartupComplete();
         }
-        Duration interval = Duration.parse(System.getProperty("CLOCK_SKEW_SCHEDULER_INTERVAL", "PT1H"));
-        requireNonNull(getTaskManager(), "task manager after initialization is null")
-                .addSystemTask("ClockSkewCollector", TaskScope.HOSTS,
+        registerClockSkewTask();
+    }
+
+    private void registerClockSkewTask() {
+        int minutes = m_catalogContext.getDeployment().getSystemsettings()
+                               .getClockskew()
+                               .getInterval();
+        Duration interval = Duration.ofMinutes(minutes);
+        String taskName = "ClockSkewCollector";
+        TaskManager taskManager = requireNonNull(getTaskManager(), "task manager is null");
+        taskManager.removeSystemTask(taskName);
+        taskManager.addSystemTask(taskName, TaskScope.HOSTS,
                         helper -> new ClockSkewCollectorScheduler(this, helper, skewStats, interval));
     }
 
