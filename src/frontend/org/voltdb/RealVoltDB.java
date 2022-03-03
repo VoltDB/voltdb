@@ -207,6 +207,7 @@ import org.voltdb.snmp.DummySnmpTrapSender;
 import org.voltdb.snmp.FaultFacility;
 import org.voltdb.snmp.FaultLevel;
 import org.voltdb.snmp.SnmpTrapSender;
+import org.voltdb.stats.GcStats;
 import org.voltdb.stats.LimitsStats;
 import org.voltdb.stats.LiveClientsStats;
 import org.voltdb.sysprocs.AdHocNTBase;

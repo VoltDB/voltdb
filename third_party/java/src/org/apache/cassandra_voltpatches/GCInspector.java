@@ -24,7 +24,6 @@ import java.lang.management.MemoryUsage;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Random;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
@@ -32,7 +31,7 @@ import javax.management.MBeanServer;
 import javax.management.ObjectName;
 
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.GcStats;
+import org.voltdb.stats.GcStats;
 
 import com.google_voltpatches.common.collect.ImmutableSet;
 
