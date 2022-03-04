@@ -30,4 +30,4 @@ Administration:
  * [Configure Logging](ConfigureLogging.md)
  * [Configure Kafka Importer and Exporter for Kerberos](kafka_kerberos/README.md)
 --------------------------------------------------------------------------------------
-If there's something you'd like to see here, please let us know at support@voltdb.com.
+If there's something you'd like to see here, please let us know at support@voltactivedata.com.

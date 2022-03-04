@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -635,7 +635,7 @@ public class ProcedureRunner {
             if (!m_catProc.getEverysite() && m_site.getCorrespondingPartitionId() != MpInitiator.MP_INIT_PID) {
                 log.warn("Detected MP transaction misrouted to SPI. This can happen during a schema update. " +
                         "Otherwise, it is unexpected behavior. " +
-                        "Please report the following information to support@voltdb.com");
+                        "Please report the following information to support@voltactivedata.com");
                 log.warn("procedure name: " + m_catProc.getTypeName() +
                         ", site partition id: " + m_site.getCorrespondingPartitionId() +
                         ", site HSId: " + m_site.getCorrespondingHostId() + ":" + m_site.getCorrespondingSiteId() +
