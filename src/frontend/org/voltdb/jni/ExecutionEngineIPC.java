@@ -151,7 +151,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         , FetchTopicsGroupOffsets(39)
         , DeleteExpiredTopicsOffsets(40)
         , SetReplicableTables(41)
-        , ClearReplicableTables(42);
+        , ClearAllReplicableTables(42)
+        , ClearReplicableTables(43);
 
         Commands(final int id) {
             m_id = id;
@@ -2168,11 +2169,28 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public void clearReplicableTables() {
+    public void clearAllReplicableTables() {
+        verifyDataCapacity(Byte.BYTES);
+
+        m_data.clear();
+        m_data.putInt(Commands.ClearAllReplicableTables.m_id);
+
+        try {
+            m_connection.write();
+            m_connection.readStatusByte();
+        } catch (final IOException e) {
+            e.printStackTrace();
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public void clearReplicableTables(int clusterId) {
         verifyDataCapacity(Byte.BYTES);
 
         m_data.clear();
         m_data.putInt(Commands.ClearReplicableTables.m_id);
+        m_data.putInt(clusterId);
 
         try {
             m_connection.write();

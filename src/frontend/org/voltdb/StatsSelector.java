@@ -86,7 +86,7 @@ public enum StatsSelector {
     STOP_CHECK,
     PAUSE_CHECK,
     XDCR_READINESS,
-    CLOCK_SKEW;
+    CLOCKSKEW;
 
     /** Whether or not this stat supports interval collection */
     private final boolean m_supportsInterval;

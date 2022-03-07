@@ -25,7 +25,7 @@ public class ClockSkewCollectorAgent extends OpsAgent {
 
     public static final String PROCEDURE = "@SystemClockSkew";
     public static final String COLLECT = "COLLECT";
-    public static final String CLOCK_SKEW = "CLOCK_SKEW";
+    public static final String CLOCK_SKEW = "CLOCKSKEW";
     public static final String NODE_CURRENT_TIME = "NODE_CURRENT_TIME";
     public static final String HOST_ID = "HOST_ID";
 

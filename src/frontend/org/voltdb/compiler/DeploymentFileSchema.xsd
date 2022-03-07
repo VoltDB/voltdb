@@ -263,6 +263,20 @@
         <xs:element name="resourcemonitor" minOccurs="0" maxOccurs="1" type="resourceMonitorType"/>
         <xs:element name="flushinterval" minOccurs="0" maxOccurs="1" type="flushIntervalType"/>
         <xs:element name="priorities" minOccurs="0" maxOccurs="1" type="priorityPolicyType"/>
+        <xs:element name="clockskew" minOccurs="0" maxOccurs="1" >
+            <xs:complexType>
+                <xs:attribute name="interval" type="xs:int" default="60">
+                    <xs:annotation>
+                        <xs:documentation source="description">
+                            Interval of the scheduled clock skew collection.
+                            The unit is minutes. Default is 60 minutes.
+                            0 is allowed and it disables collection.
+                            Interval cannot be less than 0 and if set below such value it will be reset to default.
+                        </xs:documentation>
+                    </xs:annotation>
+                </xs:attribute>
+            </xs:complexType>
+        </xs:element>
     </xs:all>
   </xs:complexType>
 

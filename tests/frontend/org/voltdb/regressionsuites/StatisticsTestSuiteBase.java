@@ -250,6 +250,8 @@ public class StatisticsTestSuiteBase extends SaveRestoreBase {
         project.addPartitionInfo("NEW_ORDER", "NO_W_ID");
         project.addProcedure(GoSleep.class, new ProcedurePartitionData("NEW_ORDER", "NO_W_ID"));
 
+        project.setClockSkewInterval(getClockSkewInterval(envs));
+
         // Enable asynchronous logging for test of commandlog test
         if (MiscUtils.isPro() && isCommandLogTest) {
             project.configureLogging(null, null, false, true, FSYNC_INTERVAL_GOLD, null, null);
@@ -284,5 +286,14 @@ public class StatisticsTestSuiteBase extends SaveRestoreBase {
         builder.addServerConfig(config, reuseServer);
 
         return builder;
+    }
+
+    private static Duration getClockSkewInterval(Map<String, String> envs) {
+        String intervalString = envs.get("CLOCK_SKEW_SCHEDULER_INTERVAL");
+        if (intervalString != null) {
+            return Duration.parse(intervalString);
+        } else {
+            return null;
+        }
     }
 }

@@ -258,6 +258,7 @@ private:
     // Used to set which tables can be used for DR
     void setReplicableTables(struct ipc_command *cmd);
     void clearReplicableTables(struct ipc_command *cmd);
+    void clearAllReplicableTables(struct ipc_command *cmd);
 
     void signalHandler(int signum, siginfo_t *info, void *context);
     static void signalDispatcher(int signum, siginfo_t *info, void *context);
@@ -694,8 +695,11 @@ bool VoltDBIPC::execute(struct ipc_command *cmd) {
            setReplicableTables(cmd);
            break;
        case 42:
-           clearReplicableTables(cmd);
+           clearAllReplicableTables(cmd);
            break;
+        case 43:
+            clearReplicableTables(cmd);
+            break;
       default:
         result = stub(cmd);
     }
@@ -1971,9 +1975,19 @@ void VoltDBIPC::setReplicableTables(struct ipc_command *cmd) {
     }
 }
 
+void VoltDBIPC::clearAllReplicableTables(struct ipc_command *cmd) {
+    try {
+        m_engine->clearAllReplicableTables();
+        sendResponseOrException(0);
+    } catch (const FatalException& e) {
+        crashVoltDB(e);
+    }
+}
+
 void VoltDBIPC::clearReplicableTables(struct ipc_command *cmd) {
     try {
-        m_engine->clearReplicableTables();
+        int clusterId = *((int*)&cmd->data[0]);
+        m_engine->clearReplicableTables(clusterId);
         sendResponseOrException(0);
     } catch (const FatalException& e) {
         crashVoltDB(e);

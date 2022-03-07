@@ -17,6 +17,10 @@
 
 package org.voltdb.compiler;
 
+import javax.xml.bind.JAXBContext;
+import javax.xml.bind.JAXBElement;
+import javax.xml.bind.JAXBException;
+import javax.xml.bind.Marshaller;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -25,6 +29,7 @@ import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -33,12 +38,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-
-import javax.xml.bind.JAXBContext;
-import javax.xml.bind.JAXBElement;
-import javax.xml.bind.JAXBException;
-import javax.xml.bind.Marshaller;
-
+import com.google_voltpatches.common.collect.ImmutableMap;
 import org.apache.commons.lang3.StringUtils;
 import org.voltdb.BackendTarget;
 import org.voltdb.ProcedurePartitionData;
@@ -91,8 +91,6 @@ import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportManagerInterface;
 import org.voltdb.export.ExportManagerInterface.ExportMode;
 import org.voltdb.utils.NotImplementedException;
-
-import com.google_voltpatches.common.collect.ImmutableMap;
 
 /**
  * Alternate (programmatic) interface to VoltCompiler. Give the class all of
@@ -301,6 +299,8 @@ public class VoltProjectBuilder {
 
     private Integer m_heartbeatTimeout = null;
 
+    private Duration clockSkewInterval = null;
+
     private String m_internalSnapshotPath;
     private String m_commandLogPath;
     private Boolean m_commandLogSync;
@@ -349,6 +349,11 @@ public class VoltProjectBuilder {
     private FeaturesType m_featureOptions;
     private TopicsType m_topicsConfiguration;
     private ThreadPoolsType m_threadPoolsConfiguration;
+
+    public VoltProjectBuilder setClockSkewInterval(Duration interval) {
+        clockSkewInterval = interval;
+        return this;
+    }
 
     public VoltProjectBuilder setQueryTimeout(int target) {
         m_queryTimeout = target;
@@ -1549,6 +1554,12 @@ public class VoltProjectBuilder {
             ResourceMonitorType monitorType = initializeResourceMonitorType(systemSettingType, factory);
             monitorType.setFrequency(m_resourceCheckInterval);
         }
+
+        SystemSettingsType.Clockskew clockSkewType = factory.createSystemSettingsTypeClockskew();
+        if (clockSkewInterval != null) {
+            clockSkewType.setInterval((int) clockSkewInterval.toMinutes());
+        }
+        systemSettingType.setClockskew(clockSkewType);
 
         setupDiskLimitType(systemSettingType, factory);
 

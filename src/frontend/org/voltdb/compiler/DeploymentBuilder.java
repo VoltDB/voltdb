@@ -277,8 +277,6 @@ public class DeploymentBuilder {
      * Writes deployment.xml file to a temporary file. It is constructed from the passed parameters and the m_users
      * field.
      *
-     * @param voltRoot
-     * @param dinfo an instance {@link DeploymentInfo}
      * @return deployment path
      * @throws IOException
      * @throws JAXBException

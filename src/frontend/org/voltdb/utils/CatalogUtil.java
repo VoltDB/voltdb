@@ -1230,6 +1230,9 @@ public abstract class CatalogUtil {
             tt = new SystemSettingsType.Temptables();
             ss.setTemptables(tt);
         }
+        if (ss.getClockskew() == null) {
+            ss.setClockskew(new SystemSettingsType.Clockskew());
+        }
         ResourceMonitorType rm = ss.getResourcemonitor();
         if (rm == null) {
             rm = new ResourceMonitorType();

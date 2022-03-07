@@ -183,9 +183,9 @@ public class DRIDTrackerHelper {
         return (Map<Integer, Map<Integer, DRSiteDrIdTracker>>)ois.readObject();
     }
 
-    public static void setDRIDTrackerFromBytes(SystemProcedureExecutionContext context, byte[] trackerBytes) throws IOException, ClassNotFoundException
+    public static void setDRIDTrackerFromBytes(SystemProcedureExecutionContext context, int clusterId, byte[] trackerBytes) throws IOException, ClassNotFoundException
     {
         Map<Integer, Map<Integer, DRSiteDrIdTracker>> clusterToPartitionMap = bytesToClusterTrackers(trackerBytes);
-        context.recoverDrState(clusterToPartitionMap, null);
+        context.recoverDrState(clusterId, clusterToPartitionMap, null);
     }
 }

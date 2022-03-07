@@ -2,9 +2,9 @@
 
 VoltDB provides a number of examples to help people learn what is possible with VoltDB as well as how to use certain features. Some of these examples show specific patterns and individual features, while others are based on real-world applications. Many examples are simplified in the interest of making them better learning tools.
 
-All of the examples in the download kit are written in Java. There are some examples that have JDBC client code in addition to VoltDB native client code, notably `voter` and `voltkv`. For examples in additional languages, download a client kit for a specific language.  There is a list of client kits with examples on our [Developers](https://www.voltdb.com/developers) page.
+All of the examples in the download kit are written in Java. There are some examples that have JDBC client code in addition to VoltDB native client code, notably `voter` and `voltkv`. For examples in additional languages, download a client kit for a specific language.  There is a list of client kits with examples on our [Developers](https://www.voltactivedata.com/developers) page.
 
-These examples do not cover the complete set of VoltDB features or use cases; they are just a sample of what is possible with VoltDB. We do, however, expect to add additional examples and refinements over time. If you have feedback or suggestions related to examples, or any of the HOWTOs, send email to askanengineer@voltdb.com, we welcome your input.
+These examples do not cover the complete set of VoltDB features or use cases; they are just a sample of what is possible with VoltDB. We do, however, expect to add additional examples and refinements over time. If you have feedback or suggestions related to examples, or any of the HOWTOs, please use our public Slack forum at http://chat.voltactivedata.com; we welcome your input.
 
 
 HOWTOs

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -168,7 +168,7 @@ public class NonDdlBatchPlanner {
                     "Try reducing the number of predicate expressions in the query.");
         } catch (AssertionError ae) {
             String msg = "An unexpected internal error occurred when planning a statement issued via @AdHoc. "
-                    + "Please contact VoltDB at support@voltdb.com with your log files.";
+                    + "Please contact VoltDB at support@voltactivedata.com with your log files.";
             StringWriter stringWriter = new StringWriter();
             PrintWriter writer = new PrintWriter(stringWriter);
             ae.printStackTrace(writer);

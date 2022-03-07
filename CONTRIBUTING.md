@@ -10,7 +10,7 @@ VoltDB uses the standard github workflow, meaning we make use of forking and pul
 
 ## Contributor License Agreement
 
-In order to contribute code to VoltDB, you must first sign the [VoltDB Contributor License Agreement (CLA)](https://www.voltdb.com/contributor-license-agreement/) and email an image or PDF of the document including your hand-written signature to [support@voltdb.com](mailto:support@voltdb.com). VoltDB will sign and return the final copy of the agreement for your records.
+In order to contribute code to VoltDB, you must first sign the [VoltDB Contributor License Agreement (CLA)](https://www.voltdb.com/contributor-license-agreement/) and email an image or PDF of the document including your hand-written signature to [support@voltactivedata.com](mailto:support@voltactivedata.com). VoltDB will sign and return the final copy of the agreement for your records.
 
 ## How to submit code
 

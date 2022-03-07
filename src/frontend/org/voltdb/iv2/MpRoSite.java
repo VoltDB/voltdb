@@ -307,19 +307,19 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         }
 
         @Override
-        public void recoverDrState(Map<Integer, Map<Integer, DRSiteDrIdTracker>> trackers,
+        public void recoverDrState(int clusterId, Map<Integer, Map<Integer, DRSiteDrIdTracker>> trackers,
                 Map<Byte, String[]> replicableTables)
         {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
 
         @Override
-        public void resetDrAppliedTracker() {
+        public void resetAllDrAppliedTracker() {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
 
         @Override
-        public void resetDrAppliedTracker(byte clusterId) {
+        public void resetDrAppliedTracker(int clusterId) {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
 
@@ -805,7 +805,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public void setReplicableTables(byte clusterId, String[] tables) {
+    public void setReplicableTables(int clusterId, String[] tables, boolean clear) {
         throw new UnsupportedOperationException();
     }
 }

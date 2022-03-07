@@ -15,4 +15,4 @@ https://docs.voltdb.com/UsingVoltDB/ConfigStructure.php
 
 ## Feedback
 
-We plan to add to this folder in future releases. If there are specific deployment examples that would be useful, please let us know at askanengineer@voltdb.com.
+We plan to add to this folder in future releases. If there are specific deployment examples that would be useful, please contact us through our public Slack forum at http://chat.voltactivedata.com.

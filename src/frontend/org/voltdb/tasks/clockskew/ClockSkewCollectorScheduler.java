@@ -59,7 +59,7 @@ public class ClockSkewCollectorScheduler implements ActionScheduler {
         this.voltDb = voltDb;
         this.skewStats = skewStats;
 
-        taskHelper.logInfo("Initializing Clock Skew Collector");
+        taskHelper.logInfo("Initializing Clock Skew Collector with interval of " + interval);
 
         if (DISABLED.equals(interval)){
             action = exit("Scheduler is disabled");

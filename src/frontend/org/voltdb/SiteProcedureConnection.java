@@ -291,5 +291,5 @@ public interface SiteProcedureConnection {
      * @param clusterId of producer cluster
      * @param tables    which match in both schemas and can be the target of replication
      */
-    public void setReplicableTables(byte clusterId, String[] tables);
+    public void setReplicableTables(int clusterId, String[] tables, boolean clear);
 }

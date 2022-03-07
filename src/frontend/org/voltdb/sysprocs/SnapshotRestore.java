@@ -1432,7 +1432,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
         //Last seen unique ids from remote data centers, load each local site
         Map<Integer, Map<Integer, DRSiteDrIdTracker>> drMixedClusterSizeConsumerStateForSite =
                 drMixedClusterSizeConsumerState.get(context.getPartitionId());
-        context.recoverDrState(drMixedClusterSizeConsumerStateForSite, replicableTables);
+        context.recoverDrState(-1, drMixedClusterSizeConsumerStateForSite, replicableTables);
 
         Integer myPartitionId = context.getPartitionId();
 

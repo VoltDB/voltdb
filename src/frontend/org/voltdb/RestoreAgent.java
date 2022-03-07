@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -172,7 +172,7 @@ SnapshotCompletionInterest, Promotable
                               + "snapshot that is paired with the command log. "
                               + "All identified errors are listed next."
                               + "This is an unexpected condition. "
-                              + "Please contact support@voltdb.com\n");
+                              + "Please contact support@voltactivedata.com\n");
 
     private CommandLogReinitiator m_replayAgent = new DefaultCommandLogReinitiator();
 
@@ -1339,8 +1339,9 @@ SnapshotCompletionInterest, Promotable
             VoltDBInterface instance = VoltDB.instance();
             CatalogContext context = instance.getCatalogContext();
             if (context != null && DrRoleType.MASTER.value().equals(context.getCluster().getDrrole())) {
-                ByteBuffer params = ByteBuffer.allocate(4);
+                ByteBuffer params = ByteBuffer.allocate(4+4);
                 params.putInt(ExecutionEngine.TaskType.RESET_DR_APPLIED_TRACKER.ordinal());
+                params.putInt(-1);
                 try {
                     ClientResponse cr = instance.getClientInterface()
                             .callExecuteTask(MAX_RESET_DR_APPLIED_TRACKER_TIMEOUT_MILLIS, params.array());
