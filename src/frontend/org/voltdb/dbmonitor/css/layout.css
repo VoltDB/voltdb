@@ -283,7 +283,7 @@ body {
 }
 .headLeft .logo img {
     width: 140px;
-    height: 56px;
+    height: 60px;
 }
 .headLeft .menu {
     float: left;
@@ -4667,6 +4667,9 @@ ul#shutdownMsg li {
     .headLeft .logo {
         width: 60px;
         margin-right: 85px;
+    }
+    .headLeft .logo img {
+        height: auto;
     }
     .menuHome ul li a {
         padding-right: 5px;
