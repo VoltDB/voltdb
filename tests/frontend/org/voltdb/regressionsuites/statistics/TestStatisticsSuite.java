@@ -618,7 +618,7 @@ public class TestStatisticsSuite extends StatisticsTestSuiteBase {
         expectedSchema[8] = new ColumnInfo("OUTSTANDING_TRANSACTIONS", VoltType.BIGINT);
         VoltTable expectedTable = new VoltTable(expectedSchema);
 
-        ColumnInfo[] expectedLimitsSchema = new ColumnInfo[7];
+        ColumnInfo[] expectedLimitsSchema = new ColumnInfo[9];
         expectedLimitsSchema[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
         expectedLimitsSchema[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
         expectedLimitsSchema[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
@@ -626,6 +626,8 @@ public class TestStatisticsSuite extends StatisticsTestSuiteBase {
         expectedLimitsSchema[4] = new ColumnInfo("FILE_DESCRIPTORS_OPEN", VoltType.INTEGER);
         expectedLimitsSchema[5] = new ColumnInfo("CLIENT_CONNECTIONS_LIMIT", VoltType.INTEGER);
         expectedLimitsSchema[6] = new ColumnInfo("CLIENT_CONNECTIONS_OPEN", VoltType.INTEGER);
+        expectedLimitsSchema[7] = new ColumnInfo("ACCEPTED_CONNECTIONS", VoltType.INTEGER);
+        expectedLimitsSchema[8] = new ColumnInfo("DROPPED_CONNECTIONS", VoltType.INTEGER);
         VoltTable expectedLimitsTable = new VoltTable(expectedLimitsSchema);
 
         await()

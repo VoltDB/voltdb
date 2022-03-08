@@ -29,11 +29,16 @@ public class LimitsStats extends StatsSource {
     private final FileDescriptorsTracker fileDescriptorsTracker;
     private final ClientConnectionsTracker clientConnectionsTracker;
 
+    private int acceptedConnectionsCountLastValue;
+    private int droppedConnectionsCountLastValue;
+
     public enum Column implements StatsColumn {
         FILE_DESCRIPTORS_LIMIT(VoltType.INTEGER),
         FILE_DESCRIPTORS_OPEN(VoltType.INTEGER),
         CLIENT_CONNECTIONS_LIMIT(VoltType.INTEGER),
-        CLIENT_CONNECTIONS_OPEN(VoltType.INTEGER);
+        CLIENT_CONNECTIONS_OPEN(VoltType.INTEGER),
+        ACCEPTED_CONNECTIONS(VoltType.INTEGER),
+        DROPPED_CONNECTIONS(VoltType.INTEGER);
 
         private static final Column[] values = Column.values();
 
@@ -65,7 +70,7 @@ public class LimitsStats extends StatsSource {
 
     @Override
     protected Iterator<Object> getStatsRowKeyIterator(boolean interval) {
-        return Iterators.singletonIterator(this);
+        return Iterators.singletonIterator(interval);
     }
 
     @Override
@@ -76,6 +81,20 @@ public class LimitsStats extends StatsSource {
     @Override
     protected int updateStatsRow(Object rowKey, Object[] rowValues) {
         int offset = super.updateStatsRow(rowKey, rowValues);
+        boolean intervalCollection = (boolean) rowKey;
+
+        int acceptedConnectionsCount = clientConnectionsTracker.getAcceptedConnectionsCount();
+        int droppedConnectionsCount = clientConnectionsTracker.getDroppedConnectionsCount();
+        if (intervalCollection) {
+            rowValues[offset + Column.ACCEPTED_CONNECTIONS.ordinal()] = acceptedConnectionsCount - acceptedConnectionsCountLastValue;
+            rowValues[offset + Column.DROPPED_CONNECTIONS.ordinal()] = droppedConnectionsCount - droppedConnectionsCountLastValue;
+
+            droppedConnectionsCountLastValue = droppedConnectionsCount;
+            acceptedConnectionsCountLastValue = acceptedConnectionsCount;
+        } else {
+            rowValues[offset + Column.ACCEPTED_CONNECTIONS.ordinal()] = acceptedConnectionsCount;
+            rowValues[offset + Column.DROPPED_CONNECTIONS.ordinal()] = droppedConnectionsCount;
+        }
 
         rowValues[offset + Column.FILE_DESCRIPTORS_LIMIT.ordinal()] = fileDescriptorsTracker.getOpenFileDescriptorLimit();
         rowValues[offset + Column.FILE_DESCRIPTORS_OPEN.ordinal()] = fileDescriptorsTracker.getOpenFileDescriptorCount();

@@ -20,32 +20,49 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Counter of the number of client connections. Used to enforce a limit on the maximum number of connections
+ * and count rejected ones.
  */
 public class ClientConnectionsTracker {
 
     static final int FILE_DESCRIPTOR_HEADROOM = 300;
 
     private final FileDescriptorsTracker m_maxFileDescriptorTracker;
-    private final AtomicInteger m_numConnections = new AtomicInteger(0);
+
+    private final AtomicInteger m_connectionsCount = new AtomicInteger(0);
+    private final AtomicInteger m_droppedConnectionsCount = new AtomicInteger(0);
+    private final AtomicInteger m_acceptedConnectionsCount = new AtomicInteger(0);
 
     public ClientConnectionsTracker(FileDescriptorsTracker maxFileDescriptorTracker) {
         this.m_maxFileDescriptorTracker = maxFileDescriptorTracker;
     }
 
     public boolean isConnectionsLimitReached() {
-        return m_numConnections.get() >= getMaxNumberOfAllowedConnections();
+        return m_connectionsCount.get() >= getMaxNumberOfAllowedConnections();
     }
 
     public void connectionClosed() {
-        m_numConnections.decrementAndGet();
+        m_connectionsCount.decrementAndGet();
     }
 
     public void connectionOpened() {
-        m_numConnections.incrementAndGet();
+        m_connectionsCount.incrementAndGet();
+        m_acceptedConnectionsCount.incrementAndGet();
+    }
+
+    public void connectionDropped() {
+        m_droppedConnectionsCount.incrementAndGet();
     }
 
     public int getConnectionsCount() {
-        return m_numConnections.get();
+        return m_connectionsCount.get();
+    }
+
+    public int getAcceptedConnectionsCount() {
+        return m_acceptedConnectionsCount.get();
+    }
+
+    public int getDroppedConnectionsCount() {
+        return m_droppedConnectionsCount.get();
     }
 
     public int getMaxNumberOfAllowedConnections() {

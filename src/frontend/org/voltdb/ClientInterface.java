@@ -416,6 +416,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                          * Enforce a limit on the maximum number of connections
                          */
                         if (m_clientConnectionsTracker.isConnectionsLimitReached()) {
+                            m_clientConnectionsTracker.connectionDropped();
                             networkLog.warnFmt(
                                             "Rejected connection from %s because the connection limit of %s has been reached",
                                             remoteAddr,
