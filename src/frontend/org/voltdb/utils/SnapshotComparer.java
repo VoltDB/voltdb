@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -75,6 +75,7 @@ public class SnapshotComparer {
     public static int STATUS_INCONSISTENCY = -2;
     public static int STATUS_UNKNOWN_ERROR = -3;
 
+    public static int MAX_SNAPSHOT_DIFF_ROWS = Integer.getInteger("MAX_SNAPSHOT_DIFF_ROWS", 200);
     public static final VoltLogger CONSOLE_LOG = new VoltLogger("CONSOLE");
     public static final VoltLogger SNAPSHOT_LOG = new VoltLogger("SNAPSHOT");
     // A string builder to hold all snapshot validation errors, gets printed when no viable snapshot is found
@@ -644,15 +645,10 @@ class SnapshotLoader {
                                                     + " : " + tc);
                                         }
 
-                                        int trSize = tr.getRowCount(), tcSize = tc.getRowCount();
-                                        int[][] lookup = new int[trSize + 1][tcSize + 1];
-                                        // fill lookup table
-                                        lcsLength(tr, tc, trSize, tcSize, lookup);
-                                        // find difference
-                                        StringBuilder output = new StringBuilder().append("Diffs between file ")
-                                                .append(partitionToFiles.get(p).get(0)).append(" and file ")
+                                        StringBuilder output = new StringBuilder().append("Diffs between file 1:")
+                                                .append(partitionToFiles.get(p).get(0)).append(" and file 2: ")
                                                 .append(partitionToFiles.get(p).get(target)).append(" \n");
-                                        diff(tr, tc, trSize, tcSize, lookup, output);
+                                        diff(tr, tc, output);
                                         CONSOLE_LOG.info(output.toString());
                                         isConsistent = false;
                                         break;
@@ -795,62 +791,22 @@ class SnapshotLoader {
         return false;
     }
 
-    // Function to display the differences between two voltTables
-    public static void diff(VoltTable X, VoltTable Y, int m, int n, int[][] lookup, StringBuilder sb) {
-        // if last character of X and Y matches
-        // TODO: optimize by useing bottom up dp, need traverse volttable backward
-        X.resetRowPosition();
-        X.advanceRow();
-        X.advanceToRow(m-1);
-        Y.resetRowPosition();
-        Y.advanceRow();
-        Y.advanceToRow(n-1);
-        if (m > 0 && n > 0 && X.getRawRow().equals(Y.getRawRow())) {
-            String curRow = "  " + X.getRow();
-            diff(X, Y, m - 1, n - 1, lookup, sb);
-            sb.append(curRow);
+    private static void diff(VoltTable t1, VoltTable t2, StringBuilder sb) {
+        if (t1.getRowCount() != t2.getRowCount()) {
+            sb.append("The number of rows differs. File 1:" + t1.getRowCount() + " File 2:" + t2.getRowCount());
+            return;
         }
-        // current row of Y is not present in X
-        else if (n > 0 && (m == 0 || lookup[m][n - 1] >= lookup[m - 1][n])) {
-            String curRow = " +" + Y.getRow();
-            diff(X, Y, m, n - 1, lookup, sb);
-            sb.append(curRow);
-        }
-
-        // current row of X is not present in Y
-        else if (m > 0 && (n == 0 || lookup[m][n - 1] < lookup[m - 1][n])) {
-            String curRow = " -" + X.getRow();
-            diff(X, Y, m - 1, n, lookup, sb);
-            sb.append(curRow);
-        }
-    }
-
-    // Function to fill lookup table by finding the length of LCS
-    private static void lcsLength(VoltTable X, VoltTable Y, int m, int n,
-                                 int[][] lookup) {
-        // first column of the lookup table will be all 0
-        for (int i = 0; i <= m; i++) {
-            lookup[i][0] = 0;
-        }
-
-        // first row of the lookup table will be all 0
-        for (int j = 0; j <= n; j++) {
-            lookup[0][j] = 0;
-        }
-
-        // fill the lookup table in bottom-up manner
-        for (int i = 1; i <= m; i++) {
-            X.advanceRow();
-            Y.resetRowPosition();
-            for (int j = 1; j <= n; j++) {
-                Y.advanceRow();
-                // if current row of X and Y matches
-                if (X.getRawRow().equals(Y.getRawRow())) {
-                    lookup[i][j] = lookup[i - 1][j - 1] + 1;
-                } // else if current row of X and Y don't match
-                else {
-                    lookup[i][j] = Integer.max(lookup[i - 1][j],
-                            lookup[i][j - 1]);
+        t1.resetRowPosition();
+        t2.resetRowPosition();
+        long maxCount = SnapshotComparer.MAX_SNAPSHOT_DIFF_ROWS;
+        while (t1.advanceRow() && t2.advanceRow()) {
+            if (!t1.getRawRow().equals(t2.getRawRow())) {
+                sb.append("\n");
+                sb.append("File 1:" + t1.getRow());
+                sb.append("File 2:" + t2.getRow());
+                maxCount--;
+                if (maxCount == 0) {
+                    break;
                 }
             }
         }
