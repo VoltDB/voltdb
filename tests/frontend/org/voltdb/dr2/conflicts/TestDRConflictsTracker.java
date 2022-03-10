@@ -173,6 +173,41 @@ public class TestDRConflictsTracker {
     }
 
     @Test
+    public void shouldGetCorrectValuesFromLastSnapshot() {
+        // Given
+        DRConflictsTracker tracker = new DRConflictsTracker(CLOCK);
+
+        // When
+        tracker.markConflict(PartitionDRGateway.DRConflictType.EXPECTED_ROW_MISSING, REMOTE_CLUSTER_ID, PARTITION_ID, TABLE_NAME, false);
+
+        // Then
+        Map<DRConflictsMetricKey, DRConflictsMetricValue> snapshot = tracker.getLastMetricsSnapshot();
+        assertEquals(1, snapshot.size());
+        assertEquals(
+                new DRConflictsMetricValue(1, 0, 0, 1, NOW_MICRO),
+                snapshot.get(new DRConflictsMetricKey(REMOTE_CLUSTER_ID, PARTITION_ID, TABLE_NAME))
+        );
+    }
+
+    @Test
+    public void shouldNotResetTotalMetricsSnapshotAfterGettingLastMetricsSnapshot() {
+        // Given
+        DRConflictsTracker tracker = new DRConflictsTracker(CLOCK);
+
+        // When
+        tracker.markConflict(PartitionDRGateway.DRConflictType.EXPECTED_ROW_MISSING, REMOTE_CLUSTER_ID, PARTITION_ID, TABLE_NAME, false);
+        tracker.getLastMetricsSnapshot();
+
+        // Then
+        Map<DRConflictsMetricKey, DRConflictsMetricValue> snapshot = tracker.getTotalMetricsSnapshot();
+        assertEquals(1, snapshot.size());
+        assertEquals(
+                new DRConflictsMetricValue(1, 0, 0, 1, NOW_MICRO),
+                snapshot.get(new DRConflictsMetricKey(REMOTE_CLUSTER_ID, PARTITION_ID, TABLE_NAME))
+        );
+    }
+
+    @Test
     public void shouldResetLatestSnapshot() {
         // Given
         DRConflictsTracker tracker = new DRConflictsTracker(CLOCK);

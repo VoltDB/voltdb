@@ -284,6 +284,39 @@ public class DRConflictsStatsWithTrackerTest {
         );
     }
 
+    @Test
+    public void shouldReturnCorrectTotalStatsAfterCallingIntervalStats() {
+        // Given
+        DRConflictsTracker drConflictsTracker = new DRConflictsTracker(CLOCK);
+        DRConflictsStats drConflictsStats = new DRConflictsStats(drConflictsTracker, CLUSTER_ID);
+
+        // When
+        drConflictsTracker.markConflict(
+                PartitionDRGateway.DRConflictType.EXPECTED_ROW_MISSING,
+                REMOTE_CLUSTER_ID,
+                PARTITION_ID,
+                "TABLE",
+                false
+        );
+        Object[][] actual = drConflictsStats.getStatsRows(true, NOW_MILLIS);
+
+        // Then
+        assertArrayEquals(
+                createStatsWithSingleMetricsRow(1, 1, 0, 0),
+                actual
+        );
+
+        // When
+        actual = drConflictsStats.getStatsRows(false, NOW_MILLIS);
+
+
+        // Then
+        assertArrayEquals(
+                createStatsWithSingleMetricsRow(1, 1, 0, 0),
+                actual
+        );
+    }
+
 
     private Object[][] createStatsWithSingleMetricsRow(long totalConflictCount,
                                                        long missingRowCount,

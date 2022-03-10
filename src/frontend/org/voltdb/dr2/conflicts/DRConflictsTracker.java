@@ -61,8 +61,8 @@ public class DRConflictsTracker {
         Map<DRConflictsMetricKey, DRConflictsMetricValue> snapshot = new HashMap<>();
         m_counters.forEach((key, value) -> {
             if (value.lastConflictsCount > 0) {
+                snapshot.put(key, value.toLastDRConflictsMetricValue());
                 value.reset();
-                snapshot.put(key, value.toTotalDRConflictsMetricValue());
             }
         });
         return snapshot;
@@ -71,7 +71,7 @@ public class DRConflictsTracker {
     public Map<DRConflictsMetricKey, DRConflictsMetricValue> getTotalMetricsSnapshot() {
         Map<DRConflictsMetricKey, DRConflictsMetricValue> snapshot = new HashMap<>();
         m_counters.forEach((key, value) -> {
-            snapshot.put(key, value.toLastDRConflictsMetricValue());
+            snapshot.put(key, value.toTotalDRConflictsMetricValue());
         });
         return snapshot;
     }
