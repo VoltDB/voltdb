@@ -62,13 +62,13 @@ public class DRConflictsStatsWithTrackerTest {
                 REMOTE_CLUSTER_ID,
                 PARTITION_ID,
                 "TABLE",
-                false
-        );
+                false,
+                false);
         Object[][] actual = drConflictsStats.getStatsRows(false, NOW_MILLIS);
 
         // Then
         assertArrayEquals(
-                createStatsWithSingleMetricsRow(1, 1, 0, 0),
+                createStatsWithSingleMetricsRow(1, 0, 1, 0, 0),
                 actual
         );
     }
@@ -85,13 +85,13 @@ public class DRConflictsStatsWithTrackerTest {
                 REMOTE_CLUSTER_ID,
                 PARTITION_ID,
                 "TABLE",
-                false
-        );
+                false,
+                false);
         Object[][] actual = drConflictsStats.getStatsRows(false, NOW_MILLIS);
 
         // Then
         assertArrayEquals(
-                createStatsWithSingleMetricsRow(1, 0, 1, 0),
+                createStatsWithSingleMetricsRow(1, 0, 0, 1, 0),
                 actual
         );
     }
@@ -108,13 +108,36 @@ public class DRConflictsStatsWithTrackerTest {
                 REMOTE_CLUSTER_ID,
                 PARTITION_ID,
                 "TABLE",
-                false
-        );
+                false,
+                false);
         Object[][] actual = drConflictsStats.getStatsRows(false, NOW_MILLIS);
 
         // Then
         assertArrayEquals(
-                createStatsWithSingleMetricsRow(1, 0, 1, 0),
+                createStatsWithSingleMetricsRow(1, 0, 0, 1, 0),
+                actual
+        );
+    }
+
+    @Test
+    public void shouldMarkConflictThatIsDivergent() {
+        // Given
+        DRConflictsTracker drConflictsTracker = new DRConflictsTracker(CLOCK);
+        DRConflictsStats drConflictsStats = new DRConflictsStats(drConflictsTracker, CLUSTER_ID);
+
+        // When
+        drConflictsTracker.markConflict(
+                PartitionDRGateway.DRConflictType.EXPECTED_ROW_MISSING,
+                REMOTE_CLUSTER_ID,
+                PARTITION_ID,
+                "TABLE",
+                true,
+                false);
+        Object[][] actual = drConflictsStats.getStatsRows(false, NOW_MILLIS);
+
+        // Then
+        assertArrayEquals(
+                createStatsWithSingleMetricsRow(1, 1, 1, 0, 0),
                 actual
         );
     }
@@ -131,20 +154,20 @@ public class DRConflictsStatsWithTrackerTest {
                 REMOTE_CLUSTER_ID,
                 PARTITION_ID,
                 "TABLE",
-                false
-        );
+                false,
+                false);
         drConflictsTracker.markConflict(
                 PartitionDRGateway.DRConflictType.EXPECTED_ROW_MISSING,
                 REMOTE_CLUSTER_ID,
                 PARTITION_ID,
                 "TABLE",
-                false
-        );
+                false,
+                false);
         Object[][] actual = drConflictsStats.getStatsRows(false, NOW_MILLIS);
 
         // Then
         assertArrayEquals(
-                createStatsWithSingleMetricsRow(2, 2, 0, 0),
+                createStatsWithSingleMetricsRow(2, 0, 2, 0, 0),
                 actual
         );
     }
@@ -161,27 +184,27 @@ public class DRConflictsStatsWithTrackerTest {
                 REMOTE_CLUSTER_ID,
                 PARTITION_ID,
                 "TABLE",
-                false
-        );
+                false,
+                false);
         drConflictsTracker.markConflict(
                 PartitionDRGateway.DRConflictType.EXPECTED_ROW_TIMESTAMP_MISMATCH,
                 REMOTE_CLUSTER_ID,
                 PARTITION_ID,
                 "TABLE",
-                false
-        );
+                false,
+                false);
         drConflictsTracker.markConflict(
                 PartitionDRGateway.DRConflictType.CONSTRAINT_VIOLATION,
                 REMOTE_CLUSTER_ID,
                 PARTITION_ID,
                 "TABLE",
-                false
-        );
+                false,
+                false);
         Object[][] actual = drConflictsStats.getStatsRows(false, NOW_MILLIS);
 
         // Then
         assertArrayEquals(
-                createStatsWithSingleMetricsRow(3, 1, 1, 1),
+                createStatsWithSingleMetricsRow(3, 0, 1, 1, 1),
                 actual
         );
     }
@@ -198,15 +221,15 @@ public class DRConflictsStatsWithTrackerTest {
                 1,
                 10,
                 "TABLE_1",
-                false
-        );
+                false,
+                false);
         drConflictsTracker.markConflict(
                 PartitionDRGateway.DRConflictType.EXPECTED_ROW_MISSING,
                 2,
                 20,
                 "TABLE_2",
-                false
-        );
+                false,
+                false);
         Object[][] actual = drConflictsStats.getStatsRows(false, NOW_MILLIS);
 
         // Then
@@ -214,12 +237,11 @@ public class DRConflictsStatsWithTrackerTest {
         assertThat(
                 Lists.newArrayList(actual),
                 containsInAnyOrder(
-                        createMetricsRow(CLUSTER_ID, 1, 10, "TABLE_1", 1, 1, 0, 0),
-                        createMetricsRow(CLUSTER_ID, 2, 20, "TABLE_2", 1, 1, 0, 0)
+                        createMetricsRow(CLUSTER_ID, 1, 10, "TABLE_1", 1, 0, 1, 0, 0),
+                        createMetricsRow(CLUSTER_ID, 2, 20, "TABLE_2", 1, 0, 1, 0, 0)
                 )
         );
     }
-
 
     @Test
     public void shouldResetIntervalStats() {
@@ -233,13 +255,13 @@ public class DRConflictsStatsWithTrackerTest {
                 REMOTE_CLUSTER_ID,
                 PARTITION_ID,
                 "TABLE",
-                false
-        );
+                false,
+                false);
         Object[][] actual = drConflictsStats.getStatsRows(true, NOW_MILLIS);
 
         // Then
         assertArrayEquals(
-                createStatsWithSingleMetricsRow(1, 1, 0, 0),
+                createStatsWithSingleMetricsRow(1, 0, 1, 0, 0),
                 actual
         );
 
@@ -263,13 +285,13 @@ public class DRConflictsStatsWithTrackerTest {
                 REMOTE_CLUSTER_ID,
                 PARTITION_ID,
                 "TABLE",
-                false
-        );
+                false,
+                false);
         Object[][] actual = drConflictsStats.getStatsRows(false, NOW_MILLIS);
 
         // Then
         assertArrayEquals(
-                createStatsWithSingleMetricsRow(1, 1, 0, 0),
+                createStatsWithSingleMetricsRow(1, 0, 1, 0, 0),
                 actual
         );
 
@@ -279,7 +301,7 @@ public class DRConflictsStatsWithTrackerTest {
 
         // Then
         assertArrayEquals(
-                createStatsWithSingleMetricsRow(1, 1, 0, 0),
+                createStatsWithSingleMetricsRow(1, 0, 1, 0, 0),
                 actual
         );
     }
@@ -296,13 +318,13 @@ public class DRConflictsStatsWithTrackerTest {
                 REMOTE_CLUSTER_ID,
                 PARTITION_ID,
                 "TABLE",
-                false
-        );
+                false,
+                false);
         Object[][] actual = drConflictsStats.getStatsRows(true, NOW_MILLIS);
 
         // Then
         assertArrayEquals(
-                createStatsWithSingleMetricsRow(1, 1, 0, 0),
+                createStatsWithSingleMetricsRow(1, 0, 1, 0, 0),
                 actual
         );
 
@@ -312,18 +334,24 @@ public class DRConflictsStatsWithTrackerTest {
 
         // Then
         assertArrayEquals(
-                createStatsWithSingleMetricsRow(1, 1, 0, 0),
+                createStatsWithSingleMetricsRow(1, 0, 1, 0, 0),
                 actual
         );
     }
 
-
     private Object[][] createStatsWithSingleMetricsRow(long totalConflictCount,
+                                                       long divergenceCount,
                                                        long missingRowCount,
                                                        long timestampMismatchCount,
                                                        long constraintViolationCount) {
-        return new Object[][] {
-                createMetricsRow(totalConflictCount, missingRowCount, timestampMismatchCount, constraintViolationCount)
+        return new Object[][]{
+                createMetricsRow(
+                        totalConflictCount,
+                        divergenceCount,
+                        missingRowCount,
+                        timestampMismatchCount,
+                        constraintViolationCount
+                )
         };
     }
 
@@ -332,6 +360,7 @@ public class DRConflictsStatsWithTrackerTest {
                                       int partitionId,
                                       String tableName,
                                       long totalConflictCount,
+                                      long divergenceCount,
                                       long missingRowCount,
                                       long timestampMismatchCount,
                                       long constraintViolationCount) {
@@ -343,15 +372,17 @@ public class DRConflictsStatsWithTrackerTest {
                 remoteClusterId,
                 partitionId,
                 tableName,
+                NOW_MICROS,
                 totalConflictCount,
+                divergenceCount,
                 missingRowCount,
                 timestampMismatchCount,
-                constraintViolationCount,
-                NOW_MICROS
+                constraintViolationCount
         };
     }
 
     private Object[] createMetricsRow(long totalConflictCount,
+                                      long divergenceCount,
                                       long missingRowCount,
                                       long timestampMismatchCount,
                                       long constraintViolationCount) {
@@ -361,6 +392,7 @@ public class DRConflictsStatsWithTrackerTest {
                 PARTITION_ID,
                 TABLE_NAME,
                 totalConflictCount,
+                divergenceCount,
                 missingRowCount,
                 timestampMismatchCount,
                 constraintViolationCount

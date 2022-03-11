@@ -739,7 +739,7 @@ public class TestStatisticsSuite extends StatisticsTestSuiteBase {
         System.out.println("\n\nTESTING DRCONFLICTS STATS\n\n\n");
         Client client = getFullyConnectedClient();
 
-        ColumnInfo[] expectedSchema = new ColumnInfo[12];
+        ColumnInfo[] expectedSchema = new ColumnInfo[13];
         expectedSchema[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
         expectedSchema[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
         expectedSchema[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
@@ -747,11 +747,12 @@ public class TestStatisticsSuite extends StatisticsTestSuiteBase {
         expectedSchema[4] = new ColumnInfo("REMOTE_CLUSTER_ID", VoltType.INTEGER);
         expectedSchema[5] = new ColumnInfo("PARTITION_ID", VoltType.INTEGER);
         expectedSchema[6] = new ColumnInfo("TABLE_NAME", VoltType.STRING);
-        expectedSchema[7] = new ColumnInfo("TOTAL_CONFLICT_COUNT", VoltType.BIGINT);
-        expectedSchema[8] = new ColumnInfo("MISSING_ROW_COUNT", VoltType.BIGINT);
-        expectedSchema[9] = new ColumnInfo("TIMESTAMP_MISMATCH_COUNT", VoltType.BIGINT);
-        expectedSchema[10] = new ColumnInfo("CONSTRAINT_VIOLATION_COUNT", VoltType.BIGINT);
-        expectedSchema[11] = new ColumnInfo("LAST_CONFLICT_TIMESTAMP", VoltType.TIMESTAMP);
+        expectedSchema[7] = new ColumnInfo("LAST_CONFLICT_TIMESTAMP", VoltType.TIMESTAMP);
+        expectedSchema[8] = new ColumnInfo("TOTAL_CONFLICT_COUNT", VoltType.BIGINT);
+        expectedSchema[9] = new ColumnInfo("DIVERGENCE_COUNT", VoltType.BIGINT);
+        expectedSchema[10] = new ColumnInfo("MISSING_ROW_COUNT", VoltType.BIGINT);
+        expectedSchema[11] = new ColumnInfo("TIMESTAMP_MISMATCH_COUNT", VoltType.BIGINT);
+        expectedSchema[12] = new ColumnInfo("CONSTRAINT_VIOLATION_COUNT", VoltType.BIGINT);
         VoltTable expectedTable = new VoltTable(expectedSchema);
         VoltTable[] results = null;
 

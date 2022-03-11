@@ -36,11 +36,12 @@ public class DRConflictsStats extends StatsSource {
         REMOTE_CLUSTER_ID(VoltType.INTEGER),
         PARTITION_ID(VoltType.INTEGER),
         TABLE_NAME(VoltType.STRING),
+        LAST_CONFLICT_TIMESTAMP(VoltType.TIMESTAMP),
         TOTAL_CONFLICT_COUNT(VoltType.BIGINT),
+        DIVERGENCE_COUNT(VoltType.BIGINT),
         MISSING_ROW_COUNT(VoltType.BIGINT),
         TIMESTAMP_MISMATCH_COUNT(VoltType.BIGINT),
-        CONSTRAINT_VIOLATION_COUNT(VoltType.BIGINT),
-        LAST_CONFLICT_TIMESTAMP(VoltType.TIMESTAMP);
+        CONSTRAINT_VIOLATION_COUNT(VoltType.BIGINT);
 
         public final VoltType m_type;
 
@@ -70,11 +71,12 @@ public class DRConflictsStats extends StatsSource {
         rowValues[offset + DRConflicts.REMOTE_CLUSTER_ID.ordinal()] = key.getRemoteClusterId();
         rowValues[offset + DRConflicts.PARTITION_ID.ordinal()] = key.getPartitionId();
         rowValues[offset + DRConflicts.TABLE_NAME.ordinal()] = key.getTableName();
+        rowValues[offset + DRConflicts.LAST_CONFLICT_TIMESTAMP.ordinal()] = value.getLastConflictTimestamp();
+        rowValues[offset + DRConflicts.DIVERGENCE_COUNT.ordinal()] = value.getDivergenceCount();
         rowValues[offset + DRConflicts.TOTAL_CONFLICT_COUNT.ordinal()] = value.getConflictsCount();
         rowValues[offset + DRConflicts.MISSING_ROW_COUNT.ordinal()] = value.getMissingRowCount();
         rowValues[offset + DRConflicts.TIMESTAMP_MISMATCH_COUNT.ordinal()] = value.getRowTimestampMismatchCount();
         rowValues[offset + DRConflicts.CONSTRAINT_VIOLATION_COUNT.ordinal()] = value.getConstraintViolationCount();
-        rowValues[offset + DRConflicts.LAST_CONFLICT_TIMESTAMP.ordinal()] = value.getLastConflictTimestamp();
         return offset + DRConflicts.values().length;
     }
 

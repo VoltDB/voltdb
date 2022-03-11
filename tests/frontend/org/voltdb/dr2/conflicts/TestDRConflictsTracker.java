@@ -49,7 +49,7 @@ public class TestDRConflictsTracker {
         DRConflictsTracker tracker = new DRConflictsTracker(CLOCK);
 
         // When
-        tracker.markConflict(PartitionDRGateway.DRConflictType.NO_CONFLICT, REMOTE_CLUSTER_ID, PARTITION_ID, TABLE_NAME, false);
+        tracker.markConflict(PartitionDRGateway.DRConflictType.NO_CONFLICT, REMOTE_CLUSTER_ID, PARTITION_ID, TABLE_NAME, false, false);
 
         // Then
         assertEquals(0, tracker.getTotalMetricsSnapshot().size());
@@ -61,7 +61,7 @@ public class TestDRConflictsTracker {
         DRConflictsTracker tracker = new DRConflictsTracker(CLOCK);
 
         // When
-        tracker.markConflict(PartitionDRGateway.DRConflictType.NO_CONFLICT, REMOTE_CLUSTER_ID, 1, TABLE_NAME, true);
+        tracker.markConflict(PartitionDRGateway.DRConflictType.NO_CONFLICT, REMOTE_CLUSTER_ID, 1, TABLE_NAME, true, false);
 
         // Then
         assertEquals(0, tracker.getTotalMetricsSnapshot().size());
@@ -73,7 +73,7 @@ public class TestDRConflictsTracker {
         DRConflictsTracker tracker = new DRConflictsTracker(CLOCK);
 
         // When
-        tracker.markConflict(PartitionDRGateway.DRConflictType.EXPECTED_ROW_MISSING, REMOTE_CLUSTER_ID, 0, TABLE_NAME, true);
+        tracker.markConflict(PartitionDRGateway.DRConflictType.EXPECTED_ROW_MISSING, REMOTE_CLUSTER_ID, 0, TABLE_NAME, true, false);
 
         // Then
         Map<DRConflictsMetricKey, DRConflictsMetricValue> snapshot = tracker.getTotalMetricsSnapshot();
@@ -86,13 +86,13 @@ public class TestDRConflictsTracker {
         DRConflictsTracker tracker = new DRConflictsTracker(CLOCK);
 
         // When
-        tracker.markConflict(PartitionDRGateway.DRConflictType.EXPECTED_ROW_MISSING, REMOTE_CLUSTER_ID, PARTITION_ID, TABLE_NAME, false);
+        tracker.markConflict(PartitionDRGateway.DRConflictType.EXPECTED_ROW_MISSING, REMOTE_CLUSTER_ID, PARTITION_ID, TABLE_NAME, false, false);
 
         // Then
         Map<DRConflictsMetricKey, DRConflictsMetricValue> snapshot = tracker.getTotalMetricsSnapshot();
         assertEquals(1, snapshot.size());
         assertEquals(
-                new DRConflictsMetricValue(1, 0, 0, 1, NOW_MICRO),
+                new DRConflictsMetricValue(NOW_MICRO, 1, 0, 1, 0, 0),
                 snapshot.get(new DRConflictsMetricKey(REMOTE_CLUSTER_ID, PARTITION_ID, TABLE_NAME))
         );
     }
@@ -103,13 +103,13 @@ public class TestDRConflictsTracker {
         DRConflictsTracker tracker = new DRConflictsTracker(CLOCK);
 
         // When
-        tracker.markConflict(PartitionDRGateway.DRConflictType.CONSTRAINT_VIOLATION, REMOTE_CLUSTER_ID, PARTITION_ID, TABLE_NAME, false);
+        tracker.markConflict(PartitionDRGateway.DRConflictType.CONSTRAINT_VIOLATION, REMOTE_CLUSTER_ID, PARTITION_ID, TABLE_NAME, false, false);
 
         // Then
         Map<DRConflictsMetricKey, DRConflictsMetricValue> snapshot = tracker.getTotalMetricsSnapshot();
         assertEquals(1, snapshot.size());
         assertEquals(
-                new DRConflictsMetricValue(0, 0, 1, 1, NOW_MICRO),
+                new DRConflictsMetricValue(NOW_MICRO, 1, 0, 0, 0, 1),
                 snapshot.get(new DRConflictsMetricKey(REMOTE_CLUSTER_ID, PARTITION_ID, TABLE_NAME))
         );
     }
@@ -120,13 +120,30 @@ public class TestDRConflictsTracker {
         DRConflictsTracker tracker = new DRConflictsTracker(CLOCK);
 
         // When
-        tracker.markConflict(PartitionDRGateway.DRConflictType.EXPECTED_ROW_TIMESTAMP_MISMATCH, REMOTE_CLUSTER_ID, PARTITION_ID, TABLE_NAME, false);
+        tracker.markConflict(PartitionDRGateway.DRConflictType.EXPECTED_ROW_TIMESTAMP_MISMATCH, REMOTE_CLUSTER_ID, PARTITION_ID, TABLE_NAME, false, false);
 
         // Then
         Map<DRConflictsMetricKey, DRConflictsMetricValue> snapshot = tracker.getTotalMetricsSnapshot();
         assertEquals(1, snapshot.size());
         assertEquals(
-                new DRConflictsMetricValue(0, 1, 0, 1, NOW_MICRO),
+                new DRConflictsMetricValue(NOW_MICRO, 1, 0, 0, 1, 0),
+                snapshot.get(new DRConflictsMetricKey(REMOTE_CLUSTER_ID, PARTITION_ID, TABLE_NAME))
+        );
+    }
+
+    @Test
+    public void shouldCountConflictThatIsDivergent() {
+        // Given
+        DRConflictsTracker tracker = new DRConflictsTracker(CLOCK);
+
+        // When
+        tracker.markConflict(PartitionDRGateway.DRConflictType.EXPECTED_ROW_MISSING, REMOTE_CLUSTER_ID, PARTITION_ID, TABLE_NAME, true, false);
+
+        // Then
+        Map<DRConflictsMetricKey, DRConflictsMetricValue> snapshot = tracker.getTotalMetricsSnapshot();
+        assertEquals(1, snapshot.size());
+        assertEquals(
+                new DRConflictsMetricValue(NOW_MICRO, 1, 1, 1, 0, 0),
                 snapshot.get(new DRConflictsMetricKey(REMOTE_CLUSTER_ID, PARTITION_ID, TABLE_NAME))
         );
     }
@@ -137,15 +154,15 @@ public class TestDRConflictsTracker {
         DRConflictsTracker tracker = new DRConflictsTracker(CLOCK);
 
         // When
-        tracker.markConflict(PartitionDRGateway.DRConflictType.EXPECTED_ROW_MISSING, REMOTE_CLUSTER_ID, PARTITION_ID, TABLE_NAME, false);
-        tracker.markConflict(PartitionDRGateway.DRConflictType.CONSTRAINT_VIOLATION, REMOTE_CLUSTER_ID, PARTITION_ID, TABLE_NAME, false);
-        tracker.markConflict(PartitionDRGateway.DRConflictType.EXPECTED_ROW_TIMESTAMP_MISMATCH, REMOTE_CLUSTER_ID, PARTITION_ID, TABLE_NAME, false);
+        tracker.markConflict(PartitionDRGateway.DRConflictType.EXPECTED_ROW_MISSING, REMOTE_CLUSTER_ID, PARTITION_ID, TABLE_NAME, false, false);
+        tracker.markConflict(PartitionDRGateway.DRConflictType.CONSTRAINT_VIOLATION, REMOTE_CLUSTER_ID, PARTITION_ID, TABLE_NAME, false, false);
+        tracker.markConflict(PartitionDRGateway.DRConflictType.EXPECTED_ROW_TIMESTAMP_MISMATCH, REMOTE_CLUSTER_ID, PARTITION_ID, TABLE_NAME, false, false);
 
         // Then
         Map<DRConflictsMetricKey, DRConflictsMetricValue> snapshot = tracker.getTotalMetricsSnapshot();
         assertEquals(1, snapshot.size());
         assertEquals(
-                new DRConflictsMetricValue(1, 1, 1, 3, NOW_MICRO),
+                new DRConflictsMetricValue(NOW_MICRO, 3, 0, 1, 1, 1),
                 snapshot.get(new DRConflictsMetricKey(REMOTE_CLUSTER_ID, PARTITION_ID, TABLE_NAME))
         );
     }
@@ -156,18 +173,18 @@ public class TestDRConflictsTracker {
         DRConflictsTracker tracker = new DRConflictsTracker(CLOCK);
 
         // When
-        tracker.markConflict(PartitionDRGateway.DRConflictType.EXPECTED_ROW_MISSING, 0, 0, "TABLE_0", false);
-        tracker.markConflict(PartitionDRGateway.DRConflictType.CONSTRAINT_VIOLATION, 1, 1, "TABLE_1", false);
+        tracker.markConflict(PartitionDRGateway.DRConflictType.EXPECTED_ROW_MISSING, 0, 0, "TABLE_0", false, false);
+        tracker.markConflict(PartitionDRGateway.DRConflictType.CONSTRAINT_VIOLATION, 1, 1, "TABLE_1", false, false);
 
         // Then
         Map<DRConflictsMetricKey, DRConflictsMetricValue> snapshot = tracker.getTotalMetricsSnapshot();
         assertEquals(2, snapshot.size());
         assertEquals(
-                new DRConflictsMetricValue(1, 0, 0, 1, NOW_MICRO),
+                new DRConflictsMetricValue(NOW_MICRO, 1, 0, 1, 0, 0),
                 snapshot.get(new DRConflictsMetricKey(0, 0, "TABLE_0"))
         );
         assertEquals(
-                new DRConflictsMetricValue(0, 0, 1, 1, NOW_MICRO),
+                new DRConflictsMetricValue(NOW_MICRO, 1, 0, 0, 0, 1),
                 snapshot.get(new DRConflictsMetricKey(1 , 1, "TABLE_1"))
         );
     }
@@ -178,13 +195,13 @@ public class TestDRConflictsTracker {
         DRConflictsTracker tracker = new DRConflictsTracker(CLOCK);
 
         // When
-        tracker.markConflict(PartitionDRGateway.DRConflictType.EXPECTED_ROW_MISSING, REMOTE_CLUSTER_ID, PARTITION_ID, TABLE_NAME, false);
+        tracker.markConflict(PartitionDRGateway.DRConflictType.EXPECTED_ROW_MISSING, REMOTE_CLUSTER_ID, PARTITION_ID, TABLE_NAME, false, false);
 
         // Then
         Map<DRConflictsMetricKey, DRConflictsMetricValue> snapshot = tracker.getLastMetricsSnapshot();
         assertEquals(1, snapshot.size());
         assertEquals(
-                new DRConflictsMetricValue(1, 0, 0, 1, NOW_MICRO),
+                new DRConflictsMetricValue(NOW_MICRO, 1, 0, 1, 0, 0),
                 snapshot.get(new DRConflictsMetricKey(REMOTE_CLUSTER_ID, PARTITION_ID, TABLE_NAME))
         );
     }
@@ -195,14 +212,14 @@ public class TestDRConflictsTracker {
         DRConflictsTracker tracker = new DRConflictsTracker(CLOCK);
 
         // When
-        tracker.markConflict(PartitionDRGateway.DRConflictType.EXPECTED_ROW_MISSING, REMOTE_CLUSTER_ID, PARTITION_ID, TABLE_NAME, false);
+        tracker.markConflict(PartitionDRGateway.DRConflictType.EXPECTED_ROW_MISSING, REMOTE_CLUSTER_ID, PARTITION_ID, TABLE_NAME, false, false);
         tracker.getLastMetricsSnapshot();
 
         // Then
         Map<DRConflictsMetricKey, DRConflictsMetricValue> snapshot = tracker.getTotalMetricsSnapshot();
         assertEquals(1, snapshot.size());
         assertEquals(
-                new DRConflictsMetricValue(1, 0, 0, 1, NOW_MICRO),
+                new DRConflictsMetricValue(NOW_MICRO, 1, 0, 1, 0, 0),
                 snapshot.get(new DRConflictsMetricKey(REMOTE_CLUSTER_ID, PARTITION_ID, TABLE_NAME))
         );
     }
@@ -211,7 +228,7 @@ public class TestDRConflictsTracker {
     public void shouldResetLatestSnapshot() {
         // Given
         DRConflictsTracker tracker = new DRConflictsTracker(CLOCK);
-        tracker.markConflict(PartitionDRGateway.DRConflictType.EXPECTED_ROW_TIMESTAMP_MISMATCH, REMOTE_CLUSTER_ID, PARTITION_ID, TABLE_NAME, false);
+        tracker.markConflict(PartitionDRGateway.DRConflictType.EXPECTED_ROW_TIMESTAMP_MISMATCH, REMOTE_CLUSTER_ID, PARTITION_ID, TABLE_NAME, false, false);
 
         // When & Then
         assertEquals(1, tracker.getLastMetricsSnapshot().size());

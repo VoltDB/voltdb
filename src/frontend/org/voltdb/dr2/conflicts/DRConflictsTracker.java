@@ -40,6 +40,7 @@ public class DRConflictsTracker {
                              int remoteClusterId,
                              int partitionId,
                              String tableName,
+                             boolean isResolutionDivergent,
                              boolean isReplicatedTable) {
         // Replicated tables save conflict log files only on a node with partition 0.
         // We mimic that behavior, so conflict log files and metrics are consistent.
@@ -53,7 +54,7 @@ public class DRConflictsTracker {
 
         m_counters.compute(
                 new DRConflictsMetricKey(remoteClusterId, partitionId, tableName),
-                (key, value) -> updateConflictsCount(conflictType, value)
+                (key, value) -> updateConflictsCount(conflictType, value, isResolutionDivergent)
         );
     }
 
@@ -77,27 +78,34 @@ public class DRConflictsTracker {
     }
 
     private DRConflictsMetricInternalValue updateConflictsCount(PartitionDRGateway.DRConflictType conflictType,
-                                                                DRConflictsMetricInternalValue value) {
+                                                                DRConflictsMetricInternalValue value,
+                                                                boolean isResolutionDivergent) {
         if (value == null) {
             value = new DRConflictsMetricInternalValue();
         }
-        value.updateConflictCounts(conflictType, m_clock.millis());
+        value.updateConflictCounts(conflictType, m_clock.millis(), isResolutionDivergent);
         return value;
     }
 
     private static class DRConflictsMetricInternalValue {
+        private long totalLastConflictTimestamp;
+        private long lastLastConflictTimestamp;
+
+        private long totalConflictsCount;
+        private long lastConflictsCount;
+        private long totalDivergenceCount;
+        private long lastDivergenceCount;
+
         private long totalMissingRowCount;
         private long lastMissingRowCount;
         private long totalRowTimestampMismatchCount;
         private long lastRowTimestampMismatchCount;
         private long totalConstraintViolationCount;
         private long lastConstraintViolationCount;
-        private long totalConflictsCount;
-        private long lastConflictsCount;
-        private long totalLastConflictTimestamp;
-        private long lastLastConflictTimestamp;
 
-        public void updateConflictCounts(PartitionDRGateway.DRConflictType conflictType, long currentMillis) {
+        public void updateConflictCounts(PartitionDRGateway.DRConflictType conflictType,
+                                         long currentMillis,
+                                         boolean isResolutionDivergent) {
             switch (conflictType) {
                 case EXPECTED_ROW_MISSING:
                     lastMissingRowCount++;
@@ -111,6 +119,10 @@ public class DRConflictsTracker {
                     lastRowTimestampMismatchCount++;
                     totalRowTimestampMismatchCount++;
             }
+            if (isResolutionDivergent) {
+                lastDivergenceCount++;
+                totalDivergenceCount++;
+            }
             lastConflictsCount++;
             totalConflictsCount++;
             lastLastConflictTimestamp = MILLISECONDS.toMicros(currentMillis);
@@ -119,28 +131,33 @@ public class DRConflictsTracker {
 
         public DRConflictsMetricValue toLastDRConflictsMetricValue() {
             return new DRConflictsMetricValue(
+                    lastLastConflictTimestamp,
+                    lastConflictsCount,
+                    lastDivergenceCount,
                     lastMissingRowCount,
                     lastRowTimestampMismatchCount,
-                    lastConstraintViolationCount,
-                    lastConflictsCount,
-                    lastLastConflictTimestamp);
+                    lastConstraintViolationCount
+            );
         }
 
         public DRConflictsMetricValue toTotalDRConflictsMetricValue() {
             return new DRConflictsMetricValue(
+                    totalLastConflictTimestamp,
+                    totalConflictsCount,
+                    totalDivergenceCount,
                     totalMissingRowCount,
                     totalRowTimestampMismatchCount,
-                    totalConstraintViolationCount,
-                    totalConflictsCount,
-                    totalLastConflictTimestamp);
+                    totalConstraintViolationCount
+            );
         }
 
         public void reset() {
+            lastLastConflictTimestamp = 0;
+            lastConflictsCount = 0;
+            lastDivergenceCount = 0;
             lastMissingRowCount = 0;
             lastRowTimestampMismatchCount = 0;
             lastConstraintViolationCount = 0;
-            lastConflictsCount = 0;
-            lastLastConflictTimestamp = 0;
         }
     }
 }
