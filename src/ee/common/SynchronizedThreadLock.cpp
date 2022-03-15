@@ -276,7 +276,7 @@ void SynchronizedThreadLock::addUndoAction(bool synchronized, UndoQuantum *uq,
                 currUQ->registerSynchronizedUndoAction(dummyUndoAction, dummyReleaseInterest);
             }
         }
-        unlockReplicatedResourceForInit()
+        unlockReplicatedResourceForInit();
     } else {
         vassert(!table || !table->isReplicatedTable());
         uq->registerUndoAction(action, table);
