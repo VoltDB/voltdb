@@ -267,6 +267,7 @@ void SynchronizedThreadLock::addUndoAction(bool synchronized, UndoQuantum *uq,
             realReleaseInterest = nullptr;
         }
         uq->registerSynchronizedUndoAction(realUndoAction, realReleaseInterest);
+        lockReplicatedResourceForInit();
         for (const SharedEngineLocalsType::value_type& enginePair : s_activeEnginesByPartitionId) {
             UndoQuantum* currUQ = enginePair.second.context->getCurrentUndoQuantum();
             VOLT_DEBUG("Local undo quantum is %p; Other undo quantum is %p", uq, currUQ);
@@ -275,6 +276,7 @@ void SynchronizedThreadLock::addUndoAction(bool synchronized, UndoQuantum *uq,
                 currUQ->registerSynchronizedUndoAction(dummyUndoAction, dummyReleaseInterest);
             }
         }
+        unlockReplicatedResourceForInit()
     } else {
         vassert(!table || !table->isReplicatedTable());
         uq->registerUndoAction(action, table);
