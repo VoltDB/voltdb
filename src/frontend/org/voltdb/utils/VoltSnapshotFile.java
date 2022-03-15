@@ -102,7 +102,7 @@ public class VoltSnapshotFile extends File {
                 }
             }
             if (clearLocalDataDirectories) {
-                FileUtils.deleteDirectory(tempUserDir);
+                FileUtils.cleanDirectory(tempUserDir);
             }
             return tempUserDir;
         } catch (Exception ioe) {

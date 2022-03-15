@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -27,12 +27,17 @@ import com.google_voltpatches.common.collect.ImmutableMap;
 
 public enum StartAction {
 
+    // Actions that can be produced by the mesh prober, but
+    // which are no longer permitted as VoltDB command options.
     CREATE("create", false, null),
     RECOVER("recover", false, "Command Log Recovery"),
     SAFE_RECOVER("recover safemode", true, "Command Log Recovery"),
     REJOIN("rejoin", false, "K-Safety / Node Rejoin"),
     LIVE_REJOIN("live rejoin", false, "K-Safety / Node Rejoin"),
     JOIN("add", true, "Elastic Cluster Sizing"),
+
+    // Actions that can be given as command options to VoltDB.
+    // See also commandOptionSet below
     INITIALIZE("initialize", false, "Layout and prime voltdbroot"),
     PROBE("probe", false, "Determine start action"),
     GET("get", false, "Get Configuration");
@@ -53,8 +58,8 @@ public enum StartAction {
     final static EnumSet<StartAction> requireEmptyDirsSet =
             EnumSet.of(CREATE);
 
-    final static EnumSet<StartAction> legacySet =
-            EnumSet.complementOf(EnumSet.of(INITIALIZE,PROBE,GET));
+    final static EnumSet<StartAction> commandOptionSet =
+            EnumSet.of(INITIALIZE, PROBE, GET);
 
     final String m_verb;
     final boolean m_enterpriseOnly;
@@ -79,7 +84,7 @@ public enum StartAction {
             return null;
         }
         verb = spaces.matcher(verb.trim().toLowerCase()).replaceAll(" ");
-        return verbMoniker.get(verb);
+        return verbMoniker.get(verb); // TODO: used only for validity check on verb, remove?
     }
 
     public Collection<String> verbs() {
@@ -87,11 +92,15 @@ public enum StartAction {
     }
 
     public boolean isEnterpriseOnly() {
-        return m_enterpriseOnly;
+        return m_enterpriseOnly; // TODO: will eventually be unnecessary
     }
 
     public String featureNameForErrorString() {
-        return m_featureNameForErrorString;
+        return m_featureNameForErrorString; // TODO: unused, remove?
+    }
+
+    public boolean isAllowedCommandOption() {
+        return commandOptionSet.contains(this);
     }
 
     public boolean doesRecover() {
@@ -107,7 +116,7 @@ public enum StartAction {
     }
 
     public boolean isLegacy() {
-        return legacySet.contains(this);
+        return !commandOptionSet.contains(this);
     }
 
     public boolean doesRequireEmptyDirectories() {

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -33,11 +33,14 @@ import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.junit.After;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import org.junit.rules.TestName;
+
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
@@ -48,6 +51,9 @@ import org.voltdb.utils.MiscUtils;
 
 final public class TestVoltDB {
 
+    @Rule
+    public TestName testName = new TestName();
+
     @BeforeClass
     public static void setupClass() throws Exception {
         System.setProperty("VOLT_JUSTATEST", "YESYESYES");
@@ -55,7 +61,13 @@ final public class TestVoltDB {
 
     @Before
     public void setup() {
+        System.out.printf("=-=-=-= Start %s =-=-=-=\n", testName.getMethodName());
         VoltDB.ignoreCrash = true;
+    }
+
+    @After
+    public void teardown() {
+        System.out.printf("=-=-=-= End %s =-=-=-=\n", testName.getMethodName());
     }
 
     @Rule
@@ -275,7 +287,7 @@ final public class TestVoltDB {
         catalog.execute(serializedCatalog);
 
         // this should succeed even though group "bar" does not exist
-        assertTrue("Deployment file should have been able to validate",
-                CatalogUtil.compileDeployment(catalog, project.getPathToDeployment(), true) == null);
+        String err = CatalogUtil.compileDeployment(catalog, project.getPathToDeployment(), true);
+        assertNull("Deployment file should have been able to validate: ", err);
     }
 }

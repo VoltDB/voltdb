@@ -315,12 +315,6 @@ public class VoltDB {
             exit(-1);
         }
 
-        public Configuration() {
-            // Set start action create.  The cmd line validates that an action is specified, however,
-            // defaulting it to create for local cluster test scripts
-            m_startAction = StartAction.CREATE;
-        }
-
         /** Behavior-less arg used to differentiate command lines from "ps" */
         public String m_tag;
 
@@ -394,6 +388,14 @@ public class VoltDB {
             return m_zkPort;
         }
 
+        // Constructor used by unit tests. Attributes are
+        // filled in one by one.
+        public Configuration() {
+            m_startAction = StartAction.CREATE; // TODO: remove legacy ops
+        }
+
+        // Constructor used by unit tests, mostly for
+        // LocalCluster testing.
         public Configuration(PortGenerator ports) {
             // Default iv2 configuration to the environment settings.
             // Let explicit command line override the environment.
@@ -402,12 +404,13 @@ public class VoltDB {
             m_internalPort = ports.next();
             m_zkInterface = LoopbackAddress.get();
             m_zkPort = ports.next();
-            // Set start action create.  The cmd line validates that an action is specified, however,
-            // defaulting it to create for local cluster test scripts
-            m_startAction = StartAction.CREATE;
             m_coordinators = MeshProber.hosts(m_internalPort);
+            m_startAction = StartAction.CREATE; // TODO: remove legacy ops
         }
 
+        // The standard constructor: parses options from
+        // a command line.
+        // TODO: remove obsolete start actions, marked OBSOLETE
         public Configuration(String args[]) {
             /*
              *  !!! D O  N O T  U S E  hostLog  T O  L O G ,  U S E  System.[out|err]  I N S T E A D
@@ -429,11 +432,11 @@ public class VoltDB {
                 case "--help":
                     referToDocAndExit();
                     break;
-                case "add":
+                case "add": // OBSOLETE
                     m_startAction = StartAction.JOIN;
                     m_enableAdd = true;
                     break;
-                case "create":
+                case "create": // OBSOLETE
                     m_startAction = StartAction.CREATE;
                     break;
                 case "drssl":
@@ -500,13 +503,13 @@ public class VoltDB {
                 case "quietadhoc":
                     m_quietAdhoc = true;
                     break;
-                case "recover":
+                case "recover": // OBSOLETE
                     m_startAction = StartAction.RECOVER;
                     break;
-                case "rejoin":
+                case "rejoin": // OBSOLETE
                     m_startAction = StartAction.REJOIN;
                     break;
-                case "replica":
+                case "replica": // OBSOLETE
                     referToDocAndExit("The \"replica\" command line argument is deprecated. Please use " +
                                       "role=\"replica\" in the deployment file.");
                     break;
@@ -632,7 +635,7 @@ public class VoltDB {
                 case "license":
                     m_pathToLicense = val;
                     break;
-                case "live": // special case, modifier as prefix
+                case "live": // special case, modifier as prefix // OBSOLETE
                     if (val.equalsIgnoreCase("rejoin")) {
                         m_startAction = StartAction.LIVE_REJOIN;
                     } else {
@@ -665,7 +668,7 @@ public class VoltDB {
                 case "publicinterface":
                     m_publicInterface = MiscUtils.getAddressOfInterface(val);
                     break;
-                case "rejoinhost": // synonym for "rejoin host" for backward compatibility
+                case "rejoinhost": // synonym for "rejoin host" for backward compatibility // OBSOLETE
                     m_startAction = StartAction.REJOIN;
                     m_leader = val;
                     break;
@@ -707,7 +710,7 @@ public class VoltDB {
                     if (!DBROOT.equals(m_voltdbRoot.getName())) {
                         m_voltdbRoot = new File(m_voltdbRoot, DBROOT);
                     }
-                    if (!m_voltdbRoot.exists() && !m_voltdbRoot.mkdirs()) {
+                    if (!m_voltdbRoot.exists() && !m_voltdbRoot.mkdirs()) {  // TODO: really create this here?
                         referToDocAndExit("Could not create directory \"%s\"", m_voltdbRoot.getPath());
                     }
                     try {
@@ -735,9 +738,14 @@ public class VoltDB {
                 referToDocAndExit("Unrecognized option to VoltDB: %s", arg);
             }
 
-            // Get command
+            // If no action is specified, issue an error. This can only happen with
+            // test code, since the supported CLI will always supply a valid action.
+            if (m_startAction == null) {
+                referToDocAndExit("You must specify a startup action, one of initialize, probe, get");
+            }
+
+            // The 'get' command gets out of the way early
             if (m_startAction == StartAction.GET) {
-                // We dont want crash file created.
                 VoltDB.exitAfterMessage = true;
                 inspectGetCommand();
                 return;
@@ -749,7 +757,7 @@ public class VoltDB {
             }
 
             // set file logger root file directory. From this point on you can use loggers
-            if (m_startAction != null && !m_startAction.isLegacy()) {
+            if (!m_startAction.isLegacy()) {
                 VoltLog4jLogger.setFileLoggerRoot(m_voltdbRoot);
             }
 
@@ -760,10 +768,6 @@ public class VoltDB {
                 hostLog.info("Forced catalog upgrade will occur due to command line option.");
             }
 
-            // If no action is specified, issue an error.
-            if (m_startAction == null) {
-                referToDocAndExit("You must specify a startup action, either init, start, create, recover, rejoin, collect, or compile.");
-            }
 
             // ENG-3035 Warn if 'recover' action has a catalog since we won't
             // be using it. Only cover the 'recover' action since 'start' sometimes
@@ -773,8 +777,8 @@ public class VoltDB {
             }
 
             /*
-             * ENG-2815 If deployment is null (the user wants the default) and
-             * the start action is not rejoin and leader is null, supply the
+             * ENG-2815 If the leader is null, the deployment is null (the user
+             * wants the default), and the start action is not rejoin, supply the
              * only valid leader value ("localhost").
              */
             if (m_leader == null && m_pathToDeployment == null && !m_startAction.doesRejoin()) {
@@ -1040,58 +1044,68 @@ public class VoltDB {
          * Validates configuration settings and logs errors to the host log.
          * You typically want to have the system exit when this fails, but
          * this functionality is left outside of the method so that it is testable.
+         *
+         * Validation is partial. Mostly we just ignore options that make
+         * no sense with the specified startup action.
+         *
+         * May be called from test code without having executed the command-
+         * line parser, so there are some duplicated checks.
+         *
+         * Where the official CLI (the 'voltdb' program) has been used, the only
+         * possible start actions are INITIALIZE, PROBE, and GET.
+         *
          * @return Returns true if all required configuration settings are present.
          */
         public boolean validate() {
-            m_validateSuccess = true;
+            m_validateSuccess = true; // this must be set before calling generateFatalLog
 
-            EnumSet<StartAction> hostNotRequired = EnumSet.of(StartAction.INITIALIZE,StartAction.GET);
             if (m_startAction == null) {
-                generateFatalLog("The startup action is missing (either create, recover or rejoin).");
-            }
-            if (m_leader == null && !hostNotRequired.contains(m_startAction)) {
-                generateFatalLog("The hostname is missing.");
+                generateFatalLog("The startup action is missing (one of INITIALIZE, PROBE, GET)");
             }
 
-            // check if start action is not valid in community
-            if ((!m_isEnterprise) && (m_startAction.isEnterpriseOnly())) {
-                StringBuilder sb = new StringBuilder().append(
-                        "VoltDB Community Edition only supports the \"create\" start action.");
-                sb.append(m_startAction.featureNameForErrorString());
-                sb.append(" is an Enterprise Edition feature. An evaluation edition is available at http://voltdb.com.");
-                generateFatalLog(sb.toString());
+            if (!m_isEnterprise && m_startAction.isEnterpriseOnly()) {
+                generateFatalLog("VoltDB Community Edition does not support startup action" + m_startAction);
             }
-            EnumSet<StartAction> requiresDeployment = EnumSet.complementOf(
-                    EnumSet.of(StartAction.REJOIN,StartAction.LIVE_REJOIN,StartAction.JOIN,StartAction.INITIALIZE, StartAction.PROBE));
-            // require deployment file location
-            if (requiresDeployment.contains(m_startAction)) {
-                // require deployment file location (null is allowed to receive default deployment)
-                if (m_pathToDeployment != null && m_pathToDeployment.trim().isEmpty()) {
-                    generateFatalLog("The deployment file location is empty.");
+
+            EnumSet<StartAction> hostNotRequired = EnumSet.of(StartAction.INITIALIZE, StartAction.GET);
+            if (!hostNotRequired.contains(m_startAction)) {
+                if (m_leader == null) {
+                    generateFatalLog("The hostname is missing.");
+                }
+                if (m_coordinators.isEmpty()) {
+                    generateFatalLog("List of hosts is missing");
                 }
             }
 
-            //--paused only allowed in CREATE/RECOVER/SAFE_RECOVER
-            EnumSet<StartAction> pauseNotAllowed = EnumSet.of(StartAction.JOIN,StartAction.LIVE_REJOIN,StartAction.REJOIN);
-            if (m_isPaused && pauseNotAllowed.contains(m_startAction)) {
-                generateFatalLog("Starting in admin mode is only allowed when using start, create or recover.");
-            }
-            if (!hostNotRequired.contains(m_startAction) && m_coordinators.isEmpty()) {
-                generateFatalLog("List of hosts is missing");
+            EnumSet<StartAction> requiresDeployment = EnumSet.complementOf(
+                    EnumSet.of(StartAction.REJOIN,StartAction.LIVE_REJOIN,StartAction.JOIN,StartAction.INITIALIZE, StartAction.PROBE));
+            if (requiresDeployment.contains(m_startAction) && m_pathToDeployment != null && m_pathToDeployment.trim().isEmpty()) {
+                generateFatalLog("The deployment file location is empty.");
             }
 
-            if (m_startAction != StartAction.PROBE && m_hostCount != UNDEFINED) {
-                generateFatalLog("Option \"--count\" may only be specified when using start");
+            EnumSet<StartAction> pauseNotAllowed = EnumSet.of(StartAction.JOIN,StartAction.LIVE_REJOIN,StartAction.REJOIN);
+            if (m_isPaused && pauseNotAllowed.contains(m_startAction)) {
+                generateFatalLog("Starting in paused mode is not allowed with startup action " + m_startAction);
             }
-            if (m_startAction == StartAction.PROBE && m_hostCount != UNDEFINED && m_hostCount < m_coordinators.size()) {
-                generateFatalLog("List of hosts is greater than option \"--count\"");
+
+            if (m_hostCount != UNDEFINED) {
+                if (m_startAction == StartAction.PROBE) {
+                    if (m_hostCount < 0) {
+                        generateFatalLog("\"--count\" may not be specified with negative values");
+                    }
+                    if (m_hostCount < m_coordinators.size()) {
+                        generateFatalLog("List of hosts is greater than option \"--count\"");
+                    }
+                }
+                else {
+                    generateFatalLog("Option \"--count\" may only be specified when using the \"start\" command");
+                }
             }
-            if (m_startAction == StartAction.PROBE && m_hostCount != UNDEFINED && m_hostCount < 0) {
-                generateFatalLog("\"--count\" may not be specified with negative values");
-            }
+
             if (m_startAction == StartAction.JOIN && !m_enableAdd) {
                 generateFatalLog("\"add\" and \"noadd\" options cannot be specified at the same time");
             }
+
             return m_validateSuccess;
         }
 
@@ -1529,14 +1543,16 @@ public class VoltDB {
     }
 
     /**
-     * Entry point for the VoltDB server process.
+     * Entry point for the VoltDB server process. Command line
+     * specifies a startup action (like 'initialize' or 'probe')
+     * and numerous parameters for the server.
+     *
      * @param args Requires catalog and deployment file locations.
      */
     public static void main(String[] args) {
-        //Thread.setDefaultUncaughtExceptionHandler(new VoltUncaughtExceptionHandler());
-        Configuration config = new Configuration(args);
 
         try {
+            Configuration config = new Configuration(args);
             if (!config.validate()) {
                 System.exit(-1);
             } else if (config.m_startAction == StartAction.GET) {
