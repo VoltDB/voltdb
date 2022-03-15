@@ -28,7 +28,6 @@ import org.junit.Test;
 import org.mockito.Mockito;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
-import org.voltdb.ClockSkewCollectorAgent;
 import org.voltdb.VoltDBInterface;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -38,8 +37,8 @@ import java.time.Clock;
 import java.util.Arrays;
 import java.util.Map;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.assertEquals;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.voltdb.ClockSkewCollectorAgent.HOST_ID;
@@ -51,12 +50,17 @@ public class TestClockSkewStats {
     private final Clock clock = Mockito.mock(Clock.class);
     private final VoltDBInterface voltDb = Mockito.mock(VoltDBInterface.class);
     private final HostMessenger hostMessenger = Mockito.mock(HostMessenger.class);
-    private final ClockSkewStats collector = new ClockSkewStats(clock, voltDb, logger);
+
+    private ClockSkewStats collector;
 
     @Before
     public void setUp() throws Exception {
         when(voltDb.getMyHostId()).thenReturn(0);
         when(voltDb.getHostMessenger()).thenReturn(hostMessenger);
+        when(hostMessenger.getHostname()).thenReturn("localhost");
+        when(hostMessenger.getHostId()).thenReturn(0);
+
+        collector = new ClockSkewStats(clock, voltDb, logger);
     }
 
     @Test
@@ -92,6 +96,25 @@ public class TestClockSkewStats {
     }
 
     @Test
+    public void shouldSkipOnEmptyResult() {
+        ClientResponse response = Mockito.mock(ClientResponse.class, "Empty response");
+
+        when(clock.millis()).thenReturn(0L);
+        when(response.getResults()).thenReturn(new VoltTable[0]);
+
+        assertEquals(ImmutableMap.of(), collector.cachedSkews);
+
+        // when
+        collector.reportCompletion(null, null, response);
+
+        // when
+        collector.reportCompletion(null, null, null);
+
+        // then
+        assertEquals(ImmutableMap.of(), collector.cachedSkews);
+    }
+
+    @Test
     public void shouldCollectSkewsFromAggregatedResponse() {
         int localTime = 1000;
         int expectedSkewForHostOne = 100;
@@ -112,7 +135,7 @@ public class TestClockSkewStats {
         assertEquals(expectedStats, collector.cachedSkews);
     }
 
-    //@Test   temporarily disabled - dp
+    @Test
     public void shouldAlertOnBigSkews() {
         ClientResponse response = createTimeReplayForHost(
                 1, 100,
@@ -127,10 +150,10 @@ public class TestClockSkewStats {
         collector.reportCompletion(null, null, response);
 
         // then
-        verify(logger).warn("Clock skew between node 0 and 1 is 100ms");
-        verify(logger).warn("Clock skew between node 0 and 4 is 199ms");
-        verify(logger).error("Clock skew between node 0 and 2 is 200ms");
-        verify(logger).error("Clock skew between node 0 and 3 is 211ms");
+        verify(logger).info("Clock skew between node 0 and 1 is 100ms. Clock skew is collected on a best-effort basis - a large value may include anomalies, such as JVM GC or network latency.");
+        verify(logger).info("Clock skew between node 0 and 4 is 199ms. Clock skew is collected on a best-effort basis - a large value may include anomalies, such as JVM GC or network latency.");
+        verify(logger).info("Clock skew between node 0 and 2 is 200ms. Clock skew is collected on a best-effort basis - a large value may include anomalies, such as JVM GC or network latency.");
+        verify(logger).info("Clock skew between node 0 and 3 is 211ms. Clock skew is collected on a best-effort basis - a large value may include anomalies, such as JVM GC or network latency.");
     }
 
     @Test
@@ -146,6 +169,33 @@ public class TestClockSkewStats {
         // then
         Map<Integer, Long> expectedStats = ImmutableMap.of();
         assertEquals(expectedStats, collector.cachedSkews);
+    }
+
+    @Test
+    public void shouldCreateStatisticResponse() {
+        ClientResponse response = createTimeReplayForHost(
+                1, 10,
+                2, 200,
+                3, 30);
+
+        when(clock.millis()).thenReturn(0L);
+        collector.reportCompletion(null, null, response);
+
+        when(hostMessenger.getHostnameForHostID(1)).thenReturn("192.168.66.62");
+        when(hostMessenger.getHostnameForHostID(2)).thenReturn("/192.168.66.63:64349");
+        when(hostMessenger.getHostnameForHostID(3)).thenReturn("pk-voltdb-cluster-0.pk-voltdb-cluster-internal.pkaminski.svc.cluster.local/10.104.0.218:3021");
+
+        // when
+        Object[][] statsRows = collector.getStatsRows(true, 0L);
+
+        // then
+        assertThat(statsRows)
+                .isNotNull()
+                .isEqualTo(new Object[] {
+                        new Object[] {0L, 0, "localhost", 10L, 1, "192.168.66.62"},
+                        new Object[] {0L, 0, "localhost", 200L, 2, "/192.168.66.63"},
+                        new Object[] {0L, 0, "localhost", 30L, 3, "pk-voltdb-cluster-0.pk-voltdb-cluster-internal.pkaminski.svc.cluster.local/10.104.0.218"}
+                });
     }
 
     private ClientResponse createTimeReplayForHost(int hostId, int time, int... pairs) {

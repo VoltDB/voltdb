@@ -101,8 +101,8 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
     protected final NetworkDBBPool m_pool = new NetworkDBBPool(64);
     protected final NIOReadStream m_readStream = new NIOReadStream();
     protected PicoNIOWriteStream m_writeStream;
-    protected final ConcurrentLinkedQueue<Runnable> m_tasks = new ConcurrentLinkedQueue<Runnable>();
-    protected volatile boolean m_shouldStop = false;//volatile boolean is sufficient
+    protected final ConcurrentLinkedQueue<Runnable> m_tasks = new ConcurrentLinkedQueue<>();
+    protected volatile boolean m_shouldStop = false;
     protected long m_messagesRead;
     protected int m_interestOps = 0;
     protected final SocketChannel m_sc;
@@ -110,11 +110,11 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
     protected InputHandler m_ih;
 
     private final Thread m_thread;
-    volatile String m_remoteHostname = null;
-    final InetSocketAddress m_remoteSocketAddress;
-    final String m_remoteSocketAddressString;
-    private volatile String m_remoteHostAndAddressAndPort;
-    private String m_threadName;
+    private final String m_remoteHostname;
+    private final InetSocketAddress m_remoteSocketAddress;
+    private final String m_remoteSocketAddressString;
+    private final String m_remoteHostAndAddressAndPort;
+    private final String m_threadName;
     private Set<Long> m_verbotenThreads;
 
     /**
@@ -141,12 +141,17 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
         InetSocketAddress remoteAddress = (InetSocketAddress)sc.socket().getRemoteSocketAddress();
         m_remoteSocketAddress = remoteAddress;
         m_remoteSocketAddressString = remoteAddress.getAddress().getHostAddress();
-        m_remoteHostAndAddressAndPort = "/" + m_remoteSocketAddressString + ":" + m_remoteSocketAddress.getPort();
+        String remoteHostAndAddressAndPort = "/" + m_remoteSocketAddressString + ":" + m_remoteSocketAddress.getPort();
         String remoteHost = ReverseDNSCache.hostnameOrAddress(m_remoteSocketAddress.getAddress());
+
+        String remoteHostname = null;
         if (!remoteHost.equals(m_remoteSocketAddress.getAddress().getHostAddress())) {
-            m_remoteHostname = remoteHost;
-            m_remoteHostAndAddressAndPort = remoteHost + m_remoteHostAndAddressAndPort;
+            remoteHostname = remoteHost;
+            remoteHostAndAddressAndPort = remoteHost + remoteHostAndAddressAndPort;
         }
+
+        m_remoteHostname = remoteHostname;
+        m_remoteHostAndAddressAndPort = remoteHostAndAddressAndPort;
         m_threadName = remoteHost;
 
         m_thread = new Thread(this, "Pico Network - " + m_threadName);
@@ -465,16 +470,16 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
 
     @Override
     public String getHostnameAndIPAndPort() {
+        return m_remoteHostAndAddressAndPort;
+    }
+
+    @Override
+    public String getHostnameOrIP() {
         if (m_remoteHostname != null) {
             return m_remoteHostname;
         } else {
             return m_remoteSocketAddressString;
         }
-    }
-
-    @Override
-    public String getHostnameOrIP() {
-        return m_remoteHostAndAddressAndPort;
     }
 
     @Override

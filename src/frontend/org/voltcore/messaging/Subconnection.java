@@ -122,7 +122,7 @@ public class Subconnection {
             in.get(messageBytes);
             String message = new String(messageBytes, "UTF-8");
             message = String.format("Fatal error from id,hostname(%d,%s): %s",
-                    m_hostId, getHostnameAndIPAndPort(), message);
+                    m_hostId, getHostnameOrIP(), message);
             //if poison pill with particular cause handle it.
             int cause = in.getInt();
             if (cause == ForeignHost.CRASH_ME) {
@@ -223,7 +223,6 @@ public class Subconnection {
         m_isUp = true;
     }
 
-
     public void enableRead(Set<Long> verbotenThreads) {
         m_network.start(m_handler, verbotenThreads);
     }
@@ -269,7 +268,7 @@ public class Subconnection {
 
                     @Override
                     public int getSerializedSize() {
-                        final int len = 4            /* length prefix */
+                        final int len = 4      /* length prefix */
                                 + 8            /* source hsid */
                                 + 4            /* destinationCount */
                                 + 8 * destinations.length  /* destination list */

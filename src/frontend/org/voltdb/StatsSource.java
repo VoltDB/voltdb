@@ -29,6 +29,7 @@ public abstract class StatsSource {
 
     private final Integer m_hostId;
     private final String m_hostname;
+    protected final VoltDBInterface voltDb;
 
     /**
      * Statistics from ee are already formatted in VoltTable
@@ -67,6 +68,11 @@ public abstract class StatsSource {
      * @param isEE If this source represents statistics from EE
      */
     public StatsSource(boolean isEE) {
+        this(isEE, VoltDB.instance());
+    }
+
+    public StatsSource(boolean isEE, VoltDBInterface voltDb) {
+        this.voltDb = voltDb;
         populateColumnSchema(columns);
 
         for (int ii = 0; ii < columns.size(); ii++) {
@@ -75,10 +81,10 @@ public abstract class StatsSource {
 
         String hostname = "";
         int hostId = 0;
-        if (VoltDB.instance() != null) {
-            if (VoltDB.instance().getHostMessenger() != null) {
-                hostname = VoltDB.instance().getHostMessenger().getHostname();
-                hostId = VoltDB.instance().getHostMessenger().getHostId();
+        if (voltDb != null) {
+            if (voltDb.getHostMessenger() != null) {
+                hostname = voltDb.getHostMessenger().getHostname();
+                hostId = voltDb.getHostMessenger().getHostId();
             }
         }
         m_hostname = hostname;

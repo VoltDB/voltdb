@@ -555,7 +555,7 @@ class Distributer {
             // expiration already handled the callback
             if (m_callbacks.remove(handle) != null) {
                 String msg = String.format("Connection to database host (%s) was lost before a response was received",
-                                           m_connection.getHostnameAndIPAndPort());
+                                           m_connection.getHostnameOrIP());
                 ClientResponse resp = new ClientResponseImpl(ClientResponse.CONNECTION_LOST, new VoltTable[0], msg);
                 try {
                     callback.clientCallback(resp);
@@ -916,8 +916,7 @@ class Distributer {
             final ClientResponse r =
                 new ClientResponseImpl(
                         ClientResponse.CONNECTION_LOST, new VoltTable[0],
-                        "Connection to database host (" + m_connection.getHostnameAndIPAndPort() +
-                ") was lost before a response was received");
+                        "Connection to database host (" + m_connection.getHostnameOrIP() + ") was lost before a response was received");
             for (Map.Entry<Long, CallbackBookkeeping> e : m_callbacks.entrySet()) {
                 //Check for race with other threads
                 if (m_callbacks.remove(e.getKey()) == null) {

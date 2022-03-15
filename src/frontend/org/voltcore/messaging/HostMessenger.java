@@ -607,7 +607,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             for (int hostId: failedHosts) {
                 ForeignHost fh = m_foreignHosts.get(hostId);
 
-                String hostname = fh != null ? fh.hostnameAndIPAndPort() : "UNKNOWN";
+                String hostname = fh != null ? fh.hostname() : "UNKNOWN";
                 bldr.put(hostId, hostname);
             }
             m_knownFailedHosts = bldr.build();
@@ -620,7 +620,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 ImmutableMap.Builder<Integer, String> bldr = ImmutableMap.<Integer,String>builder()
                         .putAll(Maps.filterKeys(m_knownFailedHosts, not(equalTo(hostId))));
                 ForeignHost fhs = m_foreignHosts.get(hostId);
-                String hostname = fhs != null ? fhs.hostnameAndIPAndPort() : "UNKNOWN";
+                String hostname = fhs != null ? fhs.hostname() : "UNKNOWN";
                 bldr.put(hostId, hostname);
                 m_knownFailedHosts = bldr.build();
             }
@@ -1318,10 +1318,13 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         }
         ForeignHost fh = m_foreignHosts.get(hostId);
         if (fh == null) {
-            return m_knownFailedHosts.get(hostId) != null ?
-                        m_knownFailedHosts.get(hostId) : "UNKNOWN";
+            String failedHost = m_knownFailedHosts.get(hostId);
+            return failedHost != null
+                    ? failedHost
+                    : "UNKNOWN";
+        } else {
+            return fh.hostname();
         }
-        return fh.hostname();
     }
 
     /**

@@ -288,7 +288,7 @@ public final class InvocationDispatcher {
                 // Deserialize the client's request and map to a catalog stored procedure
         final CatalogContext catalogContext = m_catalogContext.get();
 
-        String clientInfo = ccxn.getHostnameAndIPAndPort();  // Storing the client's ip information
+        final String clientInfo = ccxn.getHostnameOrIP();  // Storing the client's ip information
 
         final String procName = task.getProcName();
         final String threadName = Thread.currentThread().getName(); // Thread name has to be materialized here

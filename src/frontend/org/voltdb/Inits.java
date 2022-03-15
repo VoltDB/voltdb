@@ -637,9 +637,11 @@ public class Inits {
                 if (m_config.m_sslContextFactory != null) {
                     sslEnabled = true;
                 }
-                httpPort = (m_deployment.getHttpd().getPort()==null) ?
-                        (sslEnabled ? VoltDB.DEFAULT_HTTPS_PORT : VoltDB.DEFAULT_HTTP_PORT) :
-                        m_deployment.getHttpd().getPort();
+                httpPort = m_deployment.getHttpd().getPort() == null
+                        ? sslEnabled
+                            ? VoltDB.DEFAULT_HTTPS_PORT
+                            : VoltDB.DEFAULT_HTTP_PORT
+                        : m_deployment.getHttpd().getPort();
                 if (m_deployment.getHttpd().getJsonapi() != null) {
                     m_rvdb.m_jsonEnabled = m_deployment.getHttpd().getJsonapi().isEnabled();
                 }

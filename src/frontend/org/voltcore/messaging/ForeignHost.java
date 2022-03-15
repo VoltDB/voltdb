@@ -255,12 +255,12 @@ public class ForeignHost {
         long current_delta = current_time - last_time;
         if (m_isUp && current_delta > m_deadHostTimeout) {
             if (m_deadReportsCount.getAndIncrement() == 0) {
-                hostLog.error("DEAD HOST DETECTED, hostname: " + hostnameAndIPAndPort());
+                hostLog.error("DEAD HOST DETECTED, hostname: " + hostname());
                 hostLog.info("\tcurrent time: " + current_time);
                 hostLog.info("\tlast message: " + last_time);
                 hostLog.info("\tdelta (millis): " + current_delta);
                 hostLog.info("\ttimeout value (millis): " + m_deadHostTimeout);
-                VoltDB.dropStackTrace("Timed out foreign host " + hostnameAndIPAndPort());
+                VoltDB.dropStackTrace("Timed out foreign host " + hostname());
             }
             m_hostMessenger.reportForeignHostFailed(m_hostId);
         }
@@ -288,7 +288,7 @@ public class ForeignHost {
         if (m_connectionStoppingCount.getAndIncrement() == 0) {
             // Log the remote host's action
             if (!m_hostMessenger.isShuttingDown()) {
-                String msg = "Received remote hangup from foreign host " + conn.getHostnameAndIPAndPort();
+                String msg = "Received remote hangup from foreign host " + conn.getHostnameOrIP();
                 VoltDB.dropStackTrace(msg);
                 CoreUtils.logWithEmphasis(hostLog, msg, Level.INFO);
             }
