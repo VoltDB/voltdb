@@ -68,7 +68,6 @@ VOLTDB_ADD_COMPILE_OPTIONS(
   -DBOOST_SP_DISABLE_THREADS -DBOOST_DISABLE_THREADS -DBOOST_ALL_NO_LIB
   -Wno-deprecated-declarations  -Wno-unknown-pragmas
   -Wno-ignored-qualifiers
-  -Wno-deprecated-copy -Wno-unused-but-set-variable
   -fno-strict-aliasing
   -DVOLT_LOG_LEVEL=${VOLT_LOG_LEVEL}
   -D_USE_MATH_DEFINES
@@ -118,7 +117,7 @@ SET (VOLTDB_COMPILER_U14p04 "4.8.4")
 #
 #
 #
-MESSAGE("Using compiler ${CMAKE_CXX_COMPILER_ID}")
+MESSAGE("Using compiler ${CMAKE_CXX_COMPILER_ID} version ${CMAKE_CXX_COMPILER_VERSION}")
 IF (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   SET (VOLTDB_LINK_FLAGS ${VOLTDB_LINK_FLAGS} -pthread)
   SET (VOLTDB_IPC_LINK_FLAGS ${VOLTDB_LIB_LINK_FLAGS} -rdynamic)
@@ -143,6 +142,10 @@ IF (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
           MESSAGE ("GCC Version ${CMAKE_CXX_COMPILER_VERSION} is not verified for building VoltDB.")
           VOLTDB_ADD_COMPILE_OPTIONS(-Wno-error=class-memaccess)
 
+          # Only need to ignore deprecated-copy in a debug build
+          IF (NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS "9" AND (VOLTDB_BUILD_TYPE STREQUAL "DEBUG" OR VOLTDB_BUILD_TYPE STREQUAL "MEMCHECK"))
+             VOLTDB_ADD_COMPILE_OPTIONS(-Wno-deprecated-copy)
+          ENDIF()
         ENDIF()
       ENDIF()
     ENDIF()
@@ -162,6 +165,10 @@ ELSEIF (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL
   ENDIF()
   IF ( "9.0.0" VERSION_LESS ${CMAKE_CXX_COMPILER_VERSION} )
     VOLTDB_ADD_COMPILE_OPTIONS(-Wno-user-defined-warnings)
+  ENDIF()
+  IF ("13.1.5" VERSION_LESS ${CMAKE_CXX_COMPILER_VERSION} )
+    # Later updates require this flag
+    VOLTDB_ADD_COMPILE_OPTIONS(-Wno-deprecated-copy -Wno-unused-but-set-variable)
   ENDIF()
 ELSE()
   MESSAGE (FATAL_ERROR "Unknown compiler family ${CMAKE_CXX_COMPILER_ID}.  We only support GNU and Clang.")
