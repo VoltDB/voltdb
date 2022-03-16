@@ -67,7 +67,9 @@ VOLTDB_ADD_COMPILE_OPTIONS(
   -fvisibility=default
   -DBOOST_SP_DISABLE_THREADS -DBOOST_DISABLE_THREADS -DBOOST_ALL_NO_LIB
   -Wno-deprecated-declarations  -Wno-unknown-pragmas
-  -Wno-ignored-qualifiers -fno-strict-aliasing
+  -Wno-ignored-qualifiers
+  -Wno-deprecated-copy -Wno-unused-but-set-variable
+  -fno-strict-aliasing
   -DVOLT_LOG_LEVEL=${VOLT_LOG_LEVEL}
   -D_USE_MATH_DEFINES
 )
@@ -141,10 +143,6 @@ IF (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
           MESSAGE ("GCC Version ${CMAKE_CXX_COMPILER_VERSION} is not verified for building VoltDB.")
           VOLTDB_ADD_COMPILE_OPTIONS(-Wno-error=class-memaccess)
 
-          # Only need to ignore deprecated-copy in a debug build
-          IF (NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS "9" AND (VOLTDB_BUILD_TYPE STREQUAL "DEBUG" OR VOLTDB_BUILD_TYPE STREQUAL "MEMCHECK"))
-             VOLTDB_ADD_COMPILE_OPTIONS(-Wno-deprecated-copy)
-          ENDIF()
         ENDIF()
       ENDIF()
     ENDIF()
