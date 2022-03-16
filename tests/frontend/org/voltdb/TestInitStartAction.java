@@ -38,6 +38,7 @@ import java.io.InputStreamReader;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Files;
+import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.Map.Entry;
 import java.util.concurrent.atomic.AtomicReference;
@@ -212,40 +213,66 @@ final public class TestInitStartAction {
         VoltDB.wasCrashCalled = false;
         VoltDB.crashMessage = null;
         serverException.set(null);
+    }
 
-        c1 = new Configuration(new String[]{"create", "deployment", legacyDeploymentFH.getPath(), "host", "localhost"});
-        server = new ServerThread(c1);
-        server.setUncaughtExceptionHandler(handleUncaught);
+    @Test
+    public void testObsoleteStartActions() throws Exception {
 
-        server.start();
-        server.join();
+        // This tests which actions should be considered legal on command line
+        // though it's got a whiff of testing that the code we wrote is the code we wrote
+        EnumSet<StartAction> currentOnes = EnumSet.of(StartAction.INITIALIZE, StartAction.PROBE, StartAction.GET);
+        System.out.println("Current command options: " + currentOnes);
+        EnumSet<StartAction> obsoleteOnes = EnumSet.of(StartAction.CREATE, StartAction.RECOVER, StartAction.SAFE_RECOVER,
+                                                       StartAction.REJOIN, StartAction.LIVE_REJOIN, StartAction.JOIN);
+        System.out.println("Obsolete command options: " + obsoleteOnes);
 
-        assertNotNull(serverException.get());
-        assertTrue(serverException.get() instanceof AssertionError);
-        assertTrue(VoltDB.wasCrashCalled);
-        assertTrue(VoltDB.crashMessage.contains("Cannot use legacy start action"));
+        // Check for completeness
+        assertEquals(currentOnes, EnumSet.complementOf(obsoleteOnes));
+        assertEquals(obsoleteOnes, EnumSet.complementOf(currentOnes));
 
-        if (!c1.m_isEnterprise) {
-            return;
+        // Check our definitions match StartAction filter
+        assertTrue(currentOnes.stream().allMatch(StartAction::isAllowedCommandOption));
+        assertTrue(obsoleteOnes.stream().noneMatch(StartAction::isAllowedCommandOption));
+
+        // Obsolete actions and matching command-line strings
+        StartAction[] obsAct = new StartAction[] { StartAction.CREATE, StartAction.RECOVER, StartAction.SAFE_RECOVER,
+                                                   StartAction.REJOIN, StartAction.LIVE_REJOIN, StartAction.JOIN };
+        String[] obsCmd = new String[] { "create", "recover", "recover safemode",
+                                         "rejoin", "live rejoin", "add" };
+        assertEquals(obsAct.length, obsCmd.length);
+
+        // Some obsolete options are still accepted... for now
+        EnumSet<StartAction> okForNow = EnumSet.of(StartAction.CREATE, StartAction.RECOVER, StartAction.SAFE_RECOVER);
+
+        // Make sure obsolete options are rejected on command line
+        System.out.println("Testing options:");
+        String[] stdOpts = new String[] { "deployment", legacyDeploymentFH.getPath(), "host", "localhost" };
+        for (int i=0; i<obsAct.length; i++) {
+            String[] tmp = obsCmd[i].split("\\s+");
+            String[] args = Arrays.copyOf(stdOpts, stdOpts.length + tmp.length);
+            for (int j=0; j<tmp.length; j++) args[stdOpts.length+j] = tmp[j];
+
+            boolean accepted = false;  int status = 0;
+            try {
+                Configuration cf = new Configuration(args);
+                accepted = true;
+            } catch (VoltDB.SimulatedExitException e) {
+                status = e.getStatus();
+                accepted = false;
+            }
+
+            boolean expected = okForNow.contains(obsAct[i]);
+            System.out.printf("*** %s (%s)  accepted=%b  expected=%b  status=%d%n",
+                              obsCmd[i], obsAct[i], accepted, expected, status);
+            if (expected) {
+                assertEquals("failed to accept " + obsCmd[i], true, accepted);
+            }
+            else {
+                assertEquals("failed to reject " + obsCmd[i], false, accepted);
+                assertEquals("rejected, but bad status " + status, -1, status);
+            }
         }
-
-        clearCrash();
-
-        c1 = new Configuration(new String[]{"recover", "deployment", legacyDeploymentFH.getPath(), "host", "localhost"});
-        server = new ServerThread(c1);
-        server.setUncaughtExceptionHandler(handleUncaught);
-
-        server.start();
-        server.join();
-
-        assertNotNull(serverException.get());
-        assertTrue(serverException.get() instanceof AssertionError);
-        assertTrue(VoltDB.wasCrashCalled);
-        assertTrue(VoltDB.crashMessage.contains("Cannot use legacy start action"));
-
-        // this test which action should be considered legacy
-        EnumSet<StartAction> legacyOnes = EnumSet.complementOf(EnumSet.of(StartAction.INITIALIZE,StartAction.PROBE, StartAction.GET));
-        assertTrue(legacyOnes.stream().allMatch(StartAction::isLegacy));
+        System.out.println("Done");
     }
 
     /*

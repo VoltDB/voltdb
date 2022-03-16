@@ -29,18 +29,18 @@ public enum StartAction {
 
     // Actions that can be produced by the mesh prober, but
     // which are no longer permitted as VoltDB command options.
-    CREATE("create", false, null),
-    RECOVER("recover", false, "Command Log Recovery"),
-    SAFE_RECOVER("recover safemode", true, "Command Log Recovery"),
-    REJOIN("rejoin", false, "K-Safety / Node Rejoin"),
-    LIVE_REJOIN("live rejoin", false, "K-Safety / Node Rejoin"),
-    JOIN("add", true, "Elastic Cluster Sizing"),
+    CREATE("create", false),
+    RECOVER("recover", false),
+    SAFE_RECOVER("recover safemode", true),
+    REJOIN("rejoin", false),
+    LIVE_REJOIN("live rejoin", false),
+    JOIN("add", true),
 
     // Actions that can be given as command options to VoltDB.
     // See also commandOptionSet below
-    INITIALIZE("initialize", false, "Layout and prime voltdbroot"),
-    PROBE("probe", false, "Determine start action"),
-    GET("get", false, "Get Configuration");
+    INITIALIZE("initialize", false),
+    PROBE("probe", false),
+    GET("get", false);
 
     final static Pattern spaces = Pattern.compile("\\s+");
 
@@ -63,7 +63,6 @@ public enum StartAction {
 
     final String m_verb;
     final boolean m_enterpriseOnly;
-    final String m_featureNameForErrorString;
 
     static {
         ImmutableMap.Builder<String, StartAction> mb = ImmutableMap.builder();
@@ -73,10 +72,9 @@ public enum StartAction {
         verbMoniker = mb.build();
     }
 
-    StartAction(String verb, boolean enterpriseOnly, String featureNameForErrorString) {
+    StartAction(String verb, boolean enterpriseOnly) {
         m_verb = verb;
         m_enterpriseOnly = enterpriseOnly;
-        m_featureNameForErrorString = featureNameForErrorString;
     }
 
     public static StartAction monickerFor(String verb) {
@@ -93,10 +91,6 @@ public enum StartAction {
 
     public boolean isEnterpriseOnly() {
         return m_enterpriseOnly; // TODO: will eventually be unnecessary
-    }
-
-    public String featureNameForErrorString() {
-        return m_featureNameForErrorString; // TODO: unused, remove?
     }
 
     public boolean isAllowedCommandOption() {

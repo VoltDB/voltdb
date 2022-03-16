@@ -744,6 +744,18 @@ public class VoltDB {
                 referToDocAndExit("You must specify a startup action, one of initialize, probe, get");
             }
 
+            // Check for valid start action. As a temporary measure, we allow a couple
+            // of legacy options for testing.
+            if (!m_startAction.isAllowedCommandOption()) {
+                String testing = CoreUtils.isJunitTest() ? "unit test" : "not unit test";
+                if (m_startAction == StartAction.CREATE || m_startAction == StartAction.RECOVER) {
+                    System.out.printf("Using legacy start action %s, %s\n", m_startAction, testing);
+                }
+                else {
+                    referToDocAndExit("Unsupported legacy start action %s, %s", m_startAction, testing);
+                }
+            }
+
             // The 'get' command gets out of the way early
             if (m_startAction == StartAction.GET) {
                 VoltDB.exitAfterMessage = true;

@@ -601,15 +601,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     @Override
     public String getVoltDBRootPath() {
+        File root = null;
         try {
-            return m_nodeSettings.getVoltDBRoot().getCanonicalPath();
+            root = m_nodeSettings.getVoltDBRoot();
+            return root.getCanonicalPath();
         } catch (IOException e) {
-            throw new SettingsException(
-                    "Failed to canonicalize: " +
-                    m_nodeSettings.getVoltDBRoot() +
-                    ". Reason: " +
-                    e.getMessage()
-            );
+            throw new SettingsException(String.format("Failed to canonicalize: %s. Reason: %s",
+                                                      root, e.getMessage()));
         }
     }
 
@@ -903,15 +901,58 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     /**
-     * Initialize all the global components, then initialize all the m_sites.
-     * @param config configuration that gets passed in from command line.
+     * VoltDB initialization (not to be confused with the 'voltdb init' command).
+     *
+     * Handles global initialization of the process, and is used for the 'init'
+     * and 'start' commands, which are INITIALIZE and PROBE in the StartAction
+     * enumeration.
+     *
+     * You can't get here with any other start action using the supported
+     * CLI ('voltdb' program). However, legacy actions can for the moment
+     * still be set by starting VoltDB directly, as is done in many tests.
+     * As a temporary sop to testing, we allow CREATE and RECOVER start
+     * actions. Other legacy actions are rejected, there's no known test
+     * using them.
+     *
+     * Note that this routine exits the process on successful completion of
+     * INITIALIZE without PROBE, and may exit on certain errors.
+     * TODO: clean up that mess and get some consistency.
+     *
+     * @param config VoltDB configuration
      */
     @Override
     public void initialize(Configuration config) {
+        if (!System.getProperty("java.vm.name").contains("64")) {
+            hostLog.fatal("You are running on an unsupported (probably 32 bit) JVM. Exiting.");
+            VoltDB.exit(-1);
+        }
+
+        if (config.m_startAction == null) {
+            hostLog.fatal("RealVoltDB: start action not set");
+            VoltDB.exit(-1);
+        }
+
+        m_isRunningWithOldVerb = config.m_startAction.isLegacy();
+        if (m_isRunningWithOldVerb) {
+            String testing = CoreUtils.isJunitTest() ? "unit test" : "not unit test";
+            switch (config.m_startAction) {
+            case CREATE:
+            case RECOVER:
+            case SAFE_RECOVER:
+                hostLog.warnFmt("RealvoltDB: running with legacy start action %s, %s", config.m_startAction, testing);
+                break;
+            default:
+                hostLog.fatalFmt("RealVoltDB: unsupported legacy start action %s, %s", config.m_startAction, testing);
+                VoltDB.exit(-1);
+            }
+        }
+
         int myPid = CLibrary.getpid();
         ShutdownHooks.enableServerStopLogging();
+
         synchronized(m_startAndStopLock) {
             exitAfterMessage = false;
+
             // Handle multiple invocations of server thread in the same JVM.
             // by clearing static variables/properties which ModuleManager,
             // and Settings depend on
@@ -919,14 +960,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             ModuleManager.resetCacheRoot();
             CipherExecutor.SERVER.shutdown();
             CipherExecutor.CLIENT.shutdown();
-
-            m_isRunningWithOldVerb = config.m_startAction.isLegacy();
-
-            // check that this is a 64 bit VM
-            if (! System.getProperty("java.vm.name").contains("64")) {
-                hostLog.fatal("You are running on an unsupported (probably 32 bit) JVM. Exiting.");
-                System.exit(-1);
-            }
 
             // Node state is INITIALIZING
             m_statusTracker = new NodeStateTracker();
@@ -970,7 +1003,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 hostLog.info(sb.toString());
 
                 List<String> iargs = ManagementFactory.getRuntimeMXBean().getInputArguments();
-                sb.delete(0, sb.length()).append("Command line JVM arguments:");
+                sb.delete(0, sb.length());
+                sb.append("Command line JVM arguments:");
                 for (String iarg : iargs) {
                     sb.append(" ").append(iarg);
                 }
@@ -980,7 +1014,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     hostLog.info("No JVM command line args known.");
                 }
 
-                sb.delete(0, sb.length());sb.append("Command line JVM classpath: ");
+                // And the classpath
+                sb.delete(0, sb.length());
+                sb.append("Command line JVM classpath: ");
                 sb.append(System.getProperty("java.class.path", "[not available]"));
                 hostLog.info(sb.toString());
             }
@@ -1035,17 +1071,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 hostLog.info("Initialized VoltDB root directory " + config.m_voltdbRoot.getPath());
                 consoleLog.info("Initialized VoltDB root directory " + config.m_voltdbRoot.getPath());
                 VoltDB.exit(0);
-            } else {
-                m_licensing.stageLicenseFile();
             }
+
+            // Command is not INITIALIZE
+            m_licensing.stageLicenseFile();
 
             final File stagedCatalogLocation = new File(
                     RealVoltDB.getStagedCatalogPath(config.m_voltdbRoot.getAbsolutePath()));
 
             if (config.m_startAction.isLegacy()) {
-                consoleLog.warn("The \"" + config.m_startAction.m_verb +
-                        "\" command is deprecated, please use \"init\" and \"start\" for your cluster operations.");
-
                 File rootFH = CatalogUtil.getVoltDbRoot(readDepl.deployment.getPaths());
                 File inzFH = new File(rootFH, VoltDB.INITIALIZED_MARKER);
                 if (inzFH.exists()) {
@@ -1121,7 +1155,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_replicationActive = new AtomicBoolean(false);
             m_configLogger = null;
             ActivePlanRepository.clear();
-
             updateMaxThreadsLimit();
 
             // set up site structure
