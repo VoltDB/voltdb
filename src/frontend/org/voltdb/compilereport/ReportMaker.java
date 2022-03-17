@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.SortedSet;
 
 import org.apache.commons.lang3.StringUtils;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
@@ -67,7 +68,7 @@ import com.google_voltpatches.common.io.Resources;
 public class ReportMaker {
 
     static Date m_timestamp = new Date();
-
+    private static VoltLogger compilerLog = new VoltLogger("COMPILER");
     /**
      * Make an html bootstrap tag with our custom css class.
      */
@@ -462,7 +463,10 @@ public class ReportMaker {
             Table t = tables.get(tableName);
             assert(t != null);
             Index i = t.getIndexes().get(indexName);
-            assert(i != null);
+            if (i == null) {
+                compilerLog.warn("The index, " + indexName + ", found from statement " + statement.getIndexesused() + " but not from table " + tableName);
+                continue;
+            }
             IndexAnnotation ia = (IndexAnnotation) i.getAnnotation();
             if (ia == null) {
                 ia = new IndexAnnotation();
