@@ -422,7 +422,7 @@ public class LocalCluster extends VoltServerConfig {
             addTestOptions(true).
             leader("").
             target(m_target).
-            startCommand("probe").
+            startCommand(StartAction.PROBE).
             jarFileName(VoltDB.Configuration.getPathToCatalogForTest(m_jarFileName)).
             buildDir(buildDir).
             classPath(classPath).

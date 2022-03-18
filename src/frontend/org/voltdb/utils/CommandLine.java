@@ -199,19 +199,6 @@ public class CommandLine extends VoltDB.Configuration
         return this;
     }
 
-    public CommandLine startCommand(String command)
-    {
-        StartAction action = StartAction.monickerFor(command);
-        if (action == null) {
-            // command wasn't a valid enum type, throw an exception.
-            String msg = "Unknown action: " + command + ". ";
-            hostLog.warn(msg);
-            throw new IllegalArgumentException(msg);
-        }
-        m_startAction = action;
-        return this;
-    }
-
     public CommandLine startCommand(StartAction action) {
         m_startAction = action;
         return this;

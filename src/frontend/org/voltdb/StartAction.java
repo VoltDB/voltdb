@@ -20,81 +20,62 @@ package org.voltdb;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.EnumSet;
-import java.util.Map;
-import java.util.regex.Pattern;
-
-import com.google_voltpatches.common.collect.ImmutableMap;
 
 public enum StartAction {
 
     // Actions that can be produced by the mesh prober, but
     // which are no longer permitted as VoltDB command options.
-    CREATE("create", false),
-    RECOVER("recover", false),
-    SAFE_RECOVER("recover safemode", true),
-    REJOIN("rejoin", false),
-    LIVE_REJOIN("live rejoin", false),
-    JOIN("add", true),
+    CREATE("create"),
+    RECOVER("recover"),
+    SAFE_RECOVER("recover safemode"),
+    REJOIN("rejoin"),
+    LIVE_REJOIN("live rejoin"),
+    JOIN("add"),
 
     // Actions that can be given as command options to VoltDB.
     // See also commandOptionSet below
-    INITIALIZE("initialize", false),
-    PROBE("probe", false),
-    GET("get", false);
-
-    final static Pattern spaces = Pattern.compile("\\s+");
-
-    final static Map<String, StartAction> verbMoniker;
-
-    final static EnumSet<StartAction> recoverSet =
-            EnumSet.of(RECOVER,SAFE_RECOVER);
-
-    final static EnumSet<StartAction> rejoinSet =
-            EnumSet.of(REJOIN,LIVE_REJOIN);
-
-    final static EnumSet<StartAction> joinSet =
-            EnumSet.of(REJOIN,LIVE_REJOIN,JOIN);
-
-    final static EnumSet<StartAction> requireEmptyDirsSet =
-            EnumSet.of(CREATE);
+    INITIALIZE("initialize"),
+    PROBE("probe"),
+    GET("get");
 
     final static EnumSet<StartAction> commandOptionSet =
             EnumSet.of(INITIALIZE, PROBE, GET);
 
+    final static EnumSet<StartAction> enterpriseOnlySet =
+            EnumSet.of(JOIN, SAFE_RECOVER);
+
+    final static EnumSet<StartAction> recoverSet =
+            EnumSet.of(RECOVER, SAFE_RECOVER);
+
+    final static EnumSet<StartAction> rejoinSet =
+            EnumSet.of(REJOIN, LIVE_REJOIN);
+
+    final static EnumSet<StartAction> joinSet =
+            EnumSet.of(REJOIN, LIVE_REJOIN, JOIN);
+
+    final static EnumSet<StartAction> requireEmptyDirsSet =
+            EnumSet.of(CREATE);
+
     final String m_verb;
-    final boolean m_enterpriseOnly;
 
-    static {
-        ImmutableMap.Builder<String, StartAction> mb = ImmutableMap.builder();
-        for (StartAction action: StartAction.values()) {
-            mb.put(action.m_verb, action);
-        }
-        verbMoniker = mb.build();
-    }
-
-    StartAction(String verb, boolean enterpriseOnly) {
+    StartAction(String verb) {
         m_verb = verb;
-        m_enterpriseOnly = enterpriseOnly;
-    }
-
-    public static StartAction monickerFor(String verb) {
-        if (verb == null) {
-            return null;
-        }
-        verb = spaces.matcher(verb.trim().toLowerCase()).replaceAll(" ");
-        return verbMoniker.get(verb); // TODO: used only for validity check on verb, remove?
     }
 
     public Collection<String> verbs() {
         return Arrays.asList(m_verb.split("\\s+"));
     }
 
-    public boolean isEnterpriseOnly() {
-        return m_enterpriseOnly; // TODO: will eventually be unnecessary
-    }
-
     public boolean isAllowedCommandOption() {
         return commandOptionSet.contains(this);
+    }
+
+    public boolean isLegacy() { // inverse of isAllowedCommandOption
+        return !commandOptionSet.contains(this);
+    }
+
+    public boolean isEnterpriseOnly() {
+        return enterpriseOnlySet.contains(this); // TODO: will eventually be unnecessary
     }
 
     public boolean doesRecover() {
@@ -107,10 +88,6 @@ public enum StartAction {
 
     public boolean doesJoin() {
         return joinSet.contains(this);
-    }
-
-    public boolean isLegacy() {
-        return !commandOptionSet.contains(this);
     }
 
     public boolean doesRequireEmptyDirectories() {
