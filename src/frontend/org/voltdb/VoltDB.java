@@ -410,7 +410,6 @@ public class VoltDB {
 
         // The standard constructor: parses options from
         // a command line.
-        // TODO: remove obsolete start actions, marked OBSOLETE
         public Configuration(String args[]) {
             /*
              *  !!! D O  N O T  U S E  hostLog  T O  L O G ,  U S E  System.[out|err]  I N S T E A D
@@ -424,6 +423,32 @@ public class VoltDB {
                     continue;
                 }
 
+                // Obsolete commands. We dispose of these first so as to be able to give
+                // a better error message. These are never used by the 'voltdb' CLI.
+                int obsolete = 0;
+                switch (arg.toLowerCase()) {
+                case "create": // still used by some unit tests
+                    obsolete = CoreUtils.isJunitTest() ? -1 : 1;
+                    break;
+                case "add":
+                case "live": // live rejoin
+                case "recover":
+                case "rejoin":
+                case "rejoinhost":
+                case "replica":
+                    obsolete = 1;
+                    break;
+                }
+                if (obsolete != 0) {
+                    String msg = String.format("Obsolete command option '%s', %s a unit test%n", arg,
+                                               CoreUtils.isJunitTest() ? "in" : "not in");
+                    if (obsolete > 0) {
+                        System.err.println("FATAL: " + msg);
+                        exit(-1);
+                    }
+                    System.out.println(msg);
+                }
+
                 // Options without values.
                 // Alphabetical order please!
                 boolean handled = true; // assumed
@@ -432,11 +457,7 @@ public class VoltDB {
                 case "--help":
                     referToDocAndExit();
                     break;
-                case "add": // OBSOLETE
-                    m_startAction = StartAction.JOIN;
-                    m_enableAdd = true;
-                    break;
-                case "create": // OBSOLETE
+                case "create": // obsolete but used in some unit tests
                     m_startAction = StartAction.CREATE;
                     break;
                 case "drssl":
@@ -461,7 +482,6 @@ public class VoltDB {
                     m_forceVoltdbCreate = true;
                     break;
                 case "forcecatalogupgrade":
-                    System.out.println("Forced catalog upgrade will occur due to command line option.");
                     m_forceCatalogUpgrade = true;
                     break;
                 case "forceget":
@@ -503,18 +523,8 @@ public class VoltDB {
                 case "quietadhoc":
                     m_quietAdhoc = true;
                     break;
-                case "recover": // OBSOLETE
-                    m_startAction = StartAction.RECOVER;
-                    break;
-                case "rejoin": // OBSOLETE
-                    m_startAction = StartAction.REJOIN;
-                    break;
-                case "replica": // OBSOLETE
-                    referToDocAndExit("The \"replica\" command line argument is deprecated. Please use " +
-                                      "role=\"replica\" in the deployment file.");
-                    break;
                 case "safemode":
-                    m_safeMode = true; // only meaningful for probe and recover
+                    m_safeMode = true;
                     break;
                 case "valgrind":
                     m_backend = BackendTarget.NATIVE_EE_VALGRIND_IPC;
@@ -635,13 +645,6 @@ public class VoltDB {
                 case "license":
                     m_pathToLicense = val;
                     break;
-                case "live": // special case, modifier as prefix // OBSOLETE
-                    if (val.equalsIgnoreCase("rejoin")) {
-                        m_startAction = StartAction.LIVE_REJOIN;
-                    } else {
-                        referToDocAndExit("The \"live\" option may only appear immediately before \"rejoin\".");
-                    }
-                    break;
                 case "mesh":
                     StringBuilder sbld = new StringBuilder(64);
                     sbld.append(val); // may be empty
@@ -667,10 +670,6 @@ public class VoltDB {
                     break;
                 case "publicinterface":
                     m_publicInterface = MiscUtils.getAddressOfInterface(val);
-                    break;
-                case "rejoinhost": // synonym for "rejoin host" for backward compatibility // OBSOLETE
-                    m_startAction = StartAction.REJOIN;
-                    m_leader = val;
                     break;
                 case "replicationport":
                     hap = MiscUtils.getHostAndPortFromInterfaceSpec(val, m_drInterface, DEFAULT_DR_PORT);
@@ -744,18 +743,6 @@ public class VoltDB {
                 referToDocAndExit("You must specify a startup action, one of initialize, probe, get");
             }
 
-            // Check for valid start action. As a temporary measure, we allow a couple
-            // of legacy options for testing.
-            if (!m_startAction.isAllowedCommandOption()) {
-                String testing = CoreUtils.isJunitTest() ? "unit test" : "not unit test";
-                if (m_startAction == StartAction.CREATE || m_startAction == StartAction.RECOVER) {
-                    System.out.printf("Using legacy start action %s, %s\n", m_startAction, testing);
-                }
-                else {
-                    referToDocAndExit("Unsupported legacy start action %s, %s", m_startAction, testing);
-                }
-            }
-
             // The 'get' command gets out of the way early
             if (m_startAction == StartAction.GET) {
                 VoltDB.exitAfterMessage = true;
@@ -768,18 +755,15 @@ public class VoltDB {
                 m_startAction = StartAction.SAFE_RECOVER;
             }
 
-            // set file logger root file directory. From this point on you can use loggers
-            if (!m_startAction.isLegacy()) {
-                VoltLog4jLogger.setFileLoggerRoot(m_voltdbRoot);
-            }
-
             /*
              *  !!! F R O M  T H I S  P O I N T  O N  Y O U  M A Y  U S E  hostLog  T O  L O G
              */
+            VoltLog4jLogger.setFileLoggerRoot(m_voltdbRoot);
             if (m_forceCatalogUpgrade) {
-                hostLog.info("Forced catalog upgrade will occur due to command line option.");
+                String msg = "Forced catalog upgrade will occur due to command line option.";
+                System.out.println(msg);
+                hostLog.info(msg);
             }
-
 
             // ENG-3035 Warn if 'recover' action has a catalog since we won't
             // be using it. Only cover the 'recover' action since 'start' sometimes
@@ -1076,13 +1060,13 @@ public class VoltDB {
             }
 
             if (!m_isEnterprise && m_startAction.isEnterpriseOnly()) {
-                generateFatalLog("VoltDB Community Edition does not support startup action" + m_startAction);
+                generateFatalLog("VoltDB Community Edition does not support startup action " + m_startAction);
             }
 
             EnumSet<StartAction> hostNotRequired = EnumSet.of(StartAction.INITIALIZE, StartAction.GET);
             if (!hostNotRequired.contains(m_startAction)) {
                 if (m_leader == null) {
-                    generateFatalLog("The hostname is missing.");
+                    generateFatalLog("The hostname is missing");
                 }
                 if (m_coordinators.isEmpty()) {
                     generateFatalLog("List of hosts is missing");
@@ -1092,7 +1076,7 @@ public class VoltDB {
             EnumSet<StartAction> requiresDeployment = EnumSet.complementOf(
                     EnumSet.of(StartAction.REJOIN,StartAction.LIVE_REJOIN,StartAction.JOIN,StartAction.INITIALIZE, StartAction.PROBE));
             if (requiresDeployment.contains(m_startAction) && m_pathToDeployment != null && m_pathToDeployment.trim().isEmpty()) {
-                generateFatalLog("The deployment file location is empty.");
+                generateFatalLog("The deployment file location is empty");
             }
 
             EnumSet<StartAction> pauseNotAllowed = EnumSet.of(StartAction.JOIN,StartAction.LIVE_REJOIN,StartAction.REJOIN);

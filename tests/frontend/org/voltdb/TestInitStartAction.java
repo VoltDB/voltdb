@@ -234,21 +234,16 @@ final public class TestInitStartAction {
         assertTrue(currentOnes.stream().allMatch(StartAction::isAllowedCommandOption));
         assertTrue(obsoleteOnes.stream().noneMatch(StartAction::isAllowedCommandOption));
 
-        // Obsolete actions and matching command-line strings
-        StartAction[] obsAct = new StartAction[] { StartAction.CREATE, StartAction.RECOVER, StartAction.SAFE_RECOVER,
-                                                   StartAction.REJOIN, StartAction.LIVE_REJOIN, StartAction.JOIN };
-        String[] obsCmd = new String[] { "create", "recover", "recover safemode",
-                                         "rejoin", "live rejoin", "add" };
-        assertEquals(obsAct.length, obsCmd.length);
-
-        // Some obsolete options are still accepted... for now
-        EnumSet<StartAction> okForNow = EnumSet.of(StartAction.CREATE, StartAction.RECOVER, StartAction.SAFE_RECOVER);
+        // Obsolete command-line strings equivalent to obsolete start actions
+        // NOTE: obsolete command "create" is still permitted for now.
+        String[] obsCmdList = new String[] { /*"create",*/ "recover", "recover safemode",
+                                             "rejoin", "live rejoin", "add" };
 
         // Make sure obsolete options are rejected on command line
         System.out.println("Testing options:");
         String[] stdOpts = new String[] { "deployment", legacyDeploymentFH.getPath(), "host", "localhost" };
-        for (int i=0; i<obsAct.length; i++) {
-            String[] tmp = obsCmd[i].split("\\s+");
+        for (String cmd : obsCmdList) {
+            String[] tmp = cmd.split("\\s+");
             String[] args = Arrays.copyOf(stdOpts, stdOpts.length + tmp.length);
             for (int j=0; j<tmp.length; j++) args[stdOpts.length+j] = tmp[j];
 
@@ -261,16 +256,10 @@ final public class TestInitStartAction {
                 accepted = false;
             }
 
-            boolean expected = okForNow.contains(obsAct[i]);
-            System.out.printf("*** %s (%s)  accepted=%b  expected=%b  status=%d%n",
-                              obsCmd[i], obsAct[i], accepted, expected, status);
-            if (expected) {
-                assertEquals("failed to accept " + obsCmd[i], true, accepted);
-            }
-            else {
-                assertEquals("failed to reject " + obsCmd[i], false, accepted);
-                assertEquals("rejected, but bad status " + status, -1, status);
-            }
+            System.out.printf("*** '%s'  accepted=%b  status=%d%n",
+                              cmd, accepted, status);
+            assertEquals("failed to reject '" + cmd + "'  ", false, accepted);
+            assertEquals("rejected, but bad status " + status, -1, status);
         }
         System.out.println("Done");
     }
