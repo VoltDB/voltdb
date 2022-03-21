@@ -1202,7 +1202,7 @@ public class VoltDB {
         try {
             PrintWriter writer = new PrintWriter(root + "host" + hostId + "-" + dateString + "-log.txt");
             writer.println(message);
-            printStackTraces(writer);
+            printStackTraces(writer, null);
             writer.flush();
             writer.close();
         } catch (Exception e) {
@@ -1216,33 +1216,20 @@ public class VoltDB {
     }
 
     /*
-     * Print stack traces for all java threads in the current process to the supplied writer
-     */
-    public static void printStackTraces(PrintWriter writer) {
-        printStackTraces(writer, null);
-    }
-
-    /*
      * Print stack traces for all threads in the process to the supplied writer.
-     * If a List is supplied then the stack frames for the current thread will be placed in it
+     * If a List is supplied then the stack frames for the current thread will be placed
+     * in it, as well as written to the writer.
      */
-    public static void printStackTraces(PrintWriter writer, List<String> currentStacktrace) {
-        if (currentStacktrace == null) {
-            currentStacktrace = new ArrayList<>();
-        }
-
-        Map<Thread, StackTraceElement[]> traces = Thread.getAllStackTraces();
-        StackTraceElement[] myTrace = traces.get(Thread.currentThread());
-        for (StackTraceElement ste : myTrace) {
-            currentStacktrace.add(ste.toString());
-        }
+    private static void printStackTraces(PrintWriter writer, List<String> currentStackTrace) {
+        getStackTraceAsList(currentStackTrace);
 
         writer.println();
         writer.println("****** Current Thread ****** ");
-        for (String currentStackElem : currentStacktrace) {
+        for (String currentStackElem : currentStackTrace) {
             writer.println(currentStackElem);
         }
 
+        writer.println();
         writer.println("****** All Threads ******");
         ThreadMXBean threadMXBean = ManagementFactory.getThreadMXBean();
         ThreadInfo[] threadInfos = threadMXBean.dumpAllThreads(true, true);
@@ -1251,7 +1238,21 @@ public class VoltDB {
         }
     }
 
-    /**
+    /*
+     * Collect stack trace for current thread and append to supplied list
+     */
+    private static void getStackTraceAsList(List<String> currentStackTrace) {
+        if (currentStackTrace == null) {
+            currentStackTrace = new ArrayList<>();
+        }
+
+        StackTraceElement[] myTrace = Thread.currentThread().getStackTrace();
+        for (StackTraceElement ste : myTrace) {
+            currentStackTrace.add(ste.toString());
+        }
+    }
+
+    /*
      * turn off client interface as fast as possible
      */
     private static boolean turnOffClientInterface() {
@@ -1268,9 +1269,8 @@ public class VoltDB {
         return true;
     }
 
-    /**
+    /*
      * send a SNMP trap crash notification
-     * @param msg
      */
     private static void sendCrashSNMPTrap(String msg) {
         if (msg == null || msg.trim().isEmpty()) {
@@ -1293,8 +1293,9 @@ public class VoltDB {
      *
      * See comments for exitAfterMessage and ignoreCrash for modifiers;
      * but these are not applicable to the majority of cases in VoltDB.
-     * Subject to those flags not being set, a crash file is always created
-     * by crashLocalVoltDB().
+     * Similarly, there is an implicit flag set when we are running a
+     * junit test. Subject to none of those flags being set, a crash
+     * file is always created by crashLocalVoltDB().
      *
      * At the time of writing, there is only one case (outside this file)
      * of calling the four-argument overload of this method.
@@ -1303,18 +1304,20 @@ public class VoltDB {
      * @param stackTrace if true, stack traces logged as well as in crash file
      * @param thrown optional cause of crash, details added to crash file
      * @param logFatal if true, errMsg written to host log as well as crash file
-     * @return nothing, despite the method signature: this routine does not return
      */
-    public static RuntimeException crashLocalVoltDB(String errMsg) {
-        return crashLocalVoltDB(errMsg, false/*no stack*/, null, true/*log fatal msg*/);
+    public static void crashLocalVoltDB(String errMsg) {
+        crashLocalVoltDB(errMsg, false/*no stack*/, null, true/*log fatal msg*/);
     }
 
-    public static RuntimeException crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable thrown) {
-        return crashLocalVoltDB(errMsg, stackTrace, thrown, true/*log fatal msg*/);
+    public static void crashLocalVoltDB(String errMsg, boolean stackTrace) {
+        crashLocalVoltDB(errMsg, stackTrace, null, true/*log fatal msg*/);
     }
 
-    public static RuntimeException crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable thrown,
-                                                    boolean logFatal) {
+    public static void crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable thrown) {
+        crashLocalVoltDB(errMsg, stackTrace, thrown, true/*log fatal msg*/);
+    }
+
+    public static void crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable thrown, boolean logFatal) {
 
         if (singleton != null) {
             singleton.s_voltdb.notifyOfShutdown();
@@ -1329,13 +1332,14 @@ public class VoltDB {
             OnDemandBinaryLogger.flush();
         } catch (Throwable ignored) {}
 
-        /*
-         * InvocationTargetException suppresses information about the cause, so unwrap until
-         * we get to the root cause
-         */
+        // InvocationTargetException suppresses information about the cause,
+        // so unwrap until we get to the root cause
         while (thrown instanceof InvocationTargetException) {
             thrown = thrown.getCause();
         }
+
+        // Set non-null (as reason) to decline crash file
+        String declineCrashFile = null;
 
         // for test code
         wasCrashCalled = true;
@@ -1343,10 +1347,8 @@ public class VoltDB {
         if (ignoreCrash) {
             throw new AssertionError("Faux crash of VoltDB successful.");
         }
-
         if (CoreUtils.isJunitTest()) {
-            VoltLogger log = new VoltLogger("HOST");
-            log.warn("Declining to drop a crash file during a junit test.");
+            declineCrashFile = "Declining to drop a crash file during a junit test.";
         }
         // end test code
 
@@ -1362,7 +1364,7 @@ public class VoltDB {
                 // turn off client interface as fast as possible
                 // we don't expect this to ever fail, but if it does, skip to dying immediately
                 if (!turnOffClientInterface()) {
-                    return null; // this will jump to the finally block and die faster
+                    return; // this will jump to the finally block and die faster
                 }
 
                 // Flush trace files
@@ -1371,43 +1373,27 @@ public class VoltDB {
                                                   TimeUnit.SECONDS.toMillis(10));
                 } catch (Exception ignored) {}
 
-                // Even if the logger is null, don't stop.  We want to log the stack trace and
-                // any other pertinent information to a .dmp file for crash diagnosis
-                List<String> currentStacktrace = new ArrayList<>();
-                currentStacktrace.add("Stack trace from crashLocalVoltDB() method:");
-
-                // Create a crash file to record crash details, including exception stack trace
-                // if 'thrown' was given to us as a cause, and stack traces for all threads.
-                // This is not affected by the 'stackTrace' flag input argument, which only
-                // controls what is written to the host log.
+                // Try for a logger; but we can live without it
+                VoltLogger log = null;
                 try {
-                    TimestampType ts = new TimestampType(new java.util.Date());
-                    CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
-                    String root = catalogContext != null ? VoltDB.instance().getVoltDBRootPath() + File.separator : "";
-                    PrintWriter writer = new PrintWriter(root + "voltdb_crash" + ts.toString().replace(' ', '-') + ".txt");
-                    writer.println("Time: " + ts);
-                    writer.println("Message: " + errMsg);
+                    log = new VoltLogger("HOST");
+                } catch (RuntimeException ignored) { }
 
-                    writer.println();
-                    writer.println("Platform Properties:");
-                    PlatformProperties pp = PlatformProperties.getPlatformProperties();
-                    String[] lines = pp.toLogLines(instance().getVersionString()).split("\n");
-                    for (String line : lines) {
-                        writer.println(line.trim());
+                // Write out a crash file (voltdb_crash_...txt)
+                // The content is not affected by the 'stackTrace' flag input argument to the
+                // crashLocalVoltDB() method. which only controls what is written to the host log.
+                List<String> currentStackTrace = new ArrayList<>();
+                if (declineCrashFile == null) {
+                    currentStackTrace.add("Stack trace from crashLocalVoltDB() method:");
+                    writeCrashFile(errMsg, thrown, currentStackTrace);
+                } else {
+                    if (stackTrace && thrown == null) {
+                        getStackTraceAsList(currentStackTrace);
                     }
-
-                    if (thrown != null) {
-                        writer.println();
-                        writer.println("****** Exception Thread ****** ");
-                        thrown.printStackTrace(writer);
+                    if (log != null) {
+                        log.warn(declineCrashFile);
                     }
-
-                    printStackTraces(writer, currentStacktrace);
-                    writer.close();
-                } catch (Throwable err) {
-                    // shouldn't fail, but..
-                    err.printStackTrace();
-                }
+               }
 
                 // Attempt writing to host log.
                 // - Logs fatal error message if requested via logFatal argument
@@ -1418,11 +1404,6 @@ public class VoltDB {
                 // - Logs only the exception cause if given
                 // If writing to host log is not possible, the same information
                 // will be written to standard error instead.
-                VoltLogger log = null;
-                try {
-                    log = new VoltLogger("HOST");
-                } catch (RuntimeException ignored) { }
-
                 if (log != null) {
                     if (logFatal) {
                         log.fatal(errMsg);
@@ -1433,11 +1414,9 @@ public class VoltDB {
                         } else {
                             log.fatal(thrown.toString());
                         }
-                    } else {
-                        if (stackTrace) {
-                            for (String currentStackElem : currentStacktrace) {
-                                log.fatal(currentStackElem);
-                            }
+                    } else if (stackTrace) {
+                        for (String currentStackElem : currentStackTrace) {
+                            log.fatal(currentStackElem);
                         }
                     }
                 } else {
@@ -1448,11 +1427,9 @@ public class VoltDB {
                         } else {
                             System.err.println(thrown.toString());
                         }
-                    } else {
-                        if (stackTrace) {
-                            for (String currentStackElem : currentStacktrace) {
-                                System.err.println(currentStackElem);
-                            }
+                    } else if (stackTrace) {
+                        for (String currentStackElem : currentStackTrace) {
+                            System.err.println(currentStackElem);
                         }
                     }
                 }
@@ -1464,7 +1441,44 @@ public class VoltDB {
             ShutdownHooks.useOnlyCrashHooks();
             System.exit(-1);
         }
-        return null;
+    }
+
+    /*
+     * Create a crash file to record crash details, including exception stack trace
+     * if 'thrown' was given to us as a cause, and stack traces for all threads.
+     *
+     * The current stack trace is appended to the 'currentStackTrace' argument
+     * by the call to printStackTraces().
+     */
+    private static void writeCrashFile(String errMsg, Throwable thrown, List<String> currentStackTrace) {
+        try {
+            TimestampType ts = new TimestampType(new java.util.Date());
+            CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
+            String root = catalogContext != null ? VoltDB.instance().getVoltDBRootPath() + File.separator : "";
+            PrintWriter writer = new PrintWriter(root + "voltdb_crash" + ts.toString().replace(' ', '-') + ".txt");
+            writer.println("Time: " + ts);
+            writer.println("Message: " + errMsg);
+
+            writer.println();
+            writer.println("Platform Properties:");
+            PlatformProperties pp = PlatformProperties.getPlatformProperties();
+            String[] lines = pp.toLogLines(instance().getVersionString()).split("\n");
+            for (String line : lines) {
+                writer.println(line.trim());
+            }
+
+            if (thrown != null) {
+                writer.println();
+                writer.println("****** Exception Thread ****** ");
+                thrown.printStackTrace(writer);
+            }
+
+            printStackTraces(writer, currentStackTrace);
+            writer.close();
+        } catch (Throwable err) {
+            // shouldn't fail, but..
+            err.printStackTrace();
+        }
     }
 
     /*
