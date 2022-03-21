@@ -614,7 +614,7 @@ def get_last_n_sql_statements(last_n_sql_stmnts, include_responses=True,
     return result
 
 
-def print_summary(error_message=''):
+def print_summary(error_message='\n\nCompleted successfully.'):
     """Prints various summary messages, to STDOUT, and to the sqlcmd summary
     file (if specified and not STDOUT); also, closes those output files, as
     well as the SQL statement output file (i.e., sqlcmd input file), and the
@@ -678,11 +678,15 @@ def print_summary(error_message=''):
     hanging_sql_message = ''
     try:
         if hanging_sql_commands:
-            hanging_sql_message  = '\n\n\nFATAL ERROR: sqlcmd hanging due to the following set(s) of ' \
+            hanging_sql_message  = '\n\n\nWARNING: sqlcmd hanging due to the following set(s) of ' \
                                  + 'SQL statement(s) (or other commands) with unrecognized responses:\n' \
                                  + '\n'.join(sql for sql in hanging_sql_commands)
-            summary_message += '\n\n\nFATAL ERROR: sqlcmd hanging due to the SQL statement(s) ' \
-                             + '(or other commands) listed above, with unrecognized responses.'
+            summary_message += '\n\n\nWARNING: sqlcmd hanging due to the SQL statement(s) ' \
+                             + '(or other commands) listed above, with unrecognized responses. ' \
+                             + 'If the responses are error messages, you might want to add them to ' \
+                             + "'known_error_messages'."
+            if 'Completed successfully' in error_message:
+                error_message = '\nOtherwise, completed successfully.'
     except Exception as e:
         print '\n\nCaught exception attempting to print HANGING sqlcmd message:'
         print_exc()
@@ -841,8 +845,8 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
     """
     global sql_output_file, sqlcmd_output_file, echo_output_file, sqlcmd_proc, \
         last_n_sql_statements, options, echo_substrings, symbol_depth, symbol_order, \
-        known_error_messages, known_valid_show_responses, hanging_sql_commands, \
-        find_in_log_output_files, debug
+        known_error_messages, hanging_sql_commands, find_in_log_output_files, debug
+
     # Used to test whether the new sql_partially_echoed_as_output code is useful
     global count_sql_partially_echoed
 
@@ -940,7 +944,7 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
             except TimeoutException:
                 hanging_sql_commands.append(get_last_n_sql_statements(last_n_sql_statements, include_current_time=True))
                 if debug > 1:
-                    print "\nERROR: timeout waiting for ('hanging') sqlcmd, after", \
+                    print "\nWARNING: timeout waiting for ('hanging') sqlcmd, after", \
                           str(max_seconds_to_wait_for_sqlcmd), "seconds,\n" + \
                           "(sql was partially/fully echoed: "+str(sql_partially_echoed_as_output) + \
                           ", "+str(sql_was_echoed_as_output)+"), with:\n" + \
@@ -964,6 +968,25 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
                 # Kludge for ENG-13416
                 elif '--' in sql and output == sql[:sql.index('--')]+';':
                     sql_was_echoed_as_output = True
+
+                # Special case for 'show ...' commands
+                elif 'show ' in sql:
+                    # The 'show' commands do not get echoed back by sqlcmd;
+                    # so pretend it was echoed, rather than wait for it
+                    sql_was_echoed_as_output = True
+
+                    # Invalid 'show' commands return a simple error message
+                    if 'The valid SHOW command completions are' in output:
+                        increment_sql_statement_types(sql, num_chars_in_sql_type, 'invalid',
+                                  sql_contains_echo_substring)
+                        break
+                    # Valid 'show' commands return one or more lines containing
+                    # lots of hyphen '-' characters
+                    elif '------------------------------' in output:
+                        # Normal 'show' command case
+                        increment_sql_statement_types(sql, num_chars_in_sql_type, 'valid',
+                                                      sql_contains_echo_substring)
+                        break
 
                 # Check if sqlcmd considered the SQL statement to be valid
                 elif (('(Returned ' in output and ' rows in ' in output and 's)' in output) or
@@ -1044,32 +1067,6 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
                                                   sql_contains_echo_substring)
                     if debug > 1:
                         print "\nWARNING: 'null' returned by CREATE VIEW statement (ENG-15587):\n    ", sql
-                    break
-
-                # Valid 'show' commands just return a list, with one of several valid headers;
-                # also, for some reason, these commands don't get echoed back by sqlcmd, so we
-                # don't check sql_was_echoed_as_output here
-                elif any(kvsr in output for kvsr in known_valid_show_responses):
-                    # Check for a special case: avoid double-counting 'show classes'
-                    # commands, which can return anywhere from 1 to 3 lists of
-                    # different types of classes (i.e., 'Potential Procedure Classes',
-                    # 'Active Procedure Classes', 'Non-Procedure Classes')
-                    if ('Procedure Classes' in output and sqlLen > 1
-                            and not ('show' in sql and 'classes' in sql)):
-                        previous_sql = last_n_sql_statements[sqlLen-2]['sql']
-                        if 'show' in previous_sql and 'classes' in previous_sql:
-                            continue
-
-                    # Normal 'show' command case
-                    increment_sql_statement_types(sql, num_chars_in_sql_type, 'valid',
-                                                  sql_contains_echo_substring)
-                    break
-
-                # Invalid 'show' commands return a simple error message; also, once again, these commands
-                # don't get echoed back by sqlcmd, so we don't check sql_was_echoed_as_output here
-                elif 'The valid SHOW command completions are' in output:
-                    increment_sql_statement_types(sql, num_chars_in_sql_type, 'invalid',
-                                                  sql_contains_echo_substring)
                     break
 
                 # Check if sqlcmd command not found, or if sqlcmd cannot, or
@@ -1482,14 +1479,6 @@ if __name__ == "__main__":
                             ['Illegal partition parameter. Value cannot be']
                            ]
 
-    # A list of headers found in responses to valid 'show' commands: one of
-    # these is always found, in response to a valid 'show' command
-    known_valid_show_responses = ['--- User Export Streams ---',
-                                  '--- System Procedures ---',
-                                  '--- User-defined Functions ---',
-                                  '--- Empty Class List ---',
-                                  'Procedure Classes ---']
-
     # Initialize a list of any SQL (or other) commands that may hang sqlcmd
     hanging_sql_commands = []
 
@@ -1524,6 +1513,3 @@ if __name__ == "__main__":
     # Exit sqlcmd, if it was opened
     if sqlcmd_proc:
         sqlcmd_proc.communicate('exit')
-
-    if hanging_sql_commands:
-        exit(97)
