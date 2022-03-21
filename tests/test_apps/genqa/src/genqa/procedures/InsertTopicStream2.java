@@ -28,11 +28,10 @@ import org.voltdb.DeprecatedProcedureAPIAccess;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 
-public class JiggleExportSinglePartition extends VoltProcedure {
+public class InsertTopicStream2 extends VoltProcedure {
     String template = "INSERT INTO export_partitioned_table_BASE (txnid, rowid, rowid_group, type_null_tinyint, type_not_null_tinyint, type_null_smallint, type_not_null_smallint, type_null_integer, type_not_null_integer, type_null_bigint, type_not_null_bigint, type_null_timestamp,  type_null_float, type_not_null_float, type_null_decimal, type_not_null_decimal, type_null_varchar25, type_not_null_varchar25, type_null_varchar128, type_not_null_varchar128, type_null_varchar1024, type_not_null_varchar1024) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,  ?)";
-    public final SQLStmt export_kafka = new SQLStmt(template.replace("BASE", "kafka"));
-    public final SQLStmt export_file = new SQLStmt(template.replace("BASE", "file"));
-    public final SQLStmt export_jdbc = new SQLStmt(template.replace("BASE", "jdbc"));
+
+    public final SQLStmt topic_stream = new SQLStmt(template.replace("export_partitioned_table_BASE", "TOPIC_STREAM"));
     public final SQLStmt insert = new SQLStmt(template.replace("export_partitioned_table_BASE", "export_mirror_partitioned_table"));
 
     public long run(long rowid, int reversed)
@@ -43,13 +42,12 @@ public class JiggleExportSinglePartition extends VoltProcedure {
         // Critical for proper determinism: get a cluster-wide consistent Random instance
         Random rand = new Random(txid);
 
-        // Insert a new record
         SampleRecord record = new SampleRecord(rowid, rand);
+        SQLStmt [] statements = {insert, topic_stream};
 
-        SQLStmt[] statements = {insert, export_kafka, export_file, export_jdbc};
         for (SQLStmt stmt: statements) {
             voltQueueSQL(
-                      stmt
+                    stmt
                     , DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this)
                     , rowid
                     , record.rowid_group
@@ -62,7 +60,7 @@ public class JiggleExportSinglePartition extends VoltProcedure {
                     , record.type_null_bigint
                     , record.type_not_null_bigint
                     , record.type_null_timestamp
-                    // , record.type_not_null_timestamp
+                    // , record.type_not_null_timestamp -- changed to "DEFAULT NOW" in ddl
                     , record.type_null_float
                     , record.type_not_null_float
                     , record.type_null_decimal
@@ -74,6 +72,7 @@ public class JiggleExportSinglePartition extends VoltProcedure {
                     , record.type_null_varchar1024
                     , record.type_not_null_varchar1024
                     );
+
         }
 
         // Execute last statement batch

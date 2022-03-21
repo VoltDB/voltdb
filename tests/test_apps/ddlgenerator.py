@@ -130,16 +130,18 @@ class DDLGenerator(object):
                   geocolumns=False,
                   export_target=None, export_cdc=None,
                   migrate_target=None,
-                  ttl_target=None, ttl_value=None,
+                  migrate_topic=None,
+                  export_topic=None,
+                  ttl_index=None, ttl_value=None,
                   ttl_batch_size=None,
                   ttl_max_frequency=None
     ):
         if export_target and migrate_target:
             raise AttributeError("export_target and migrate_target are mutually exclusive")
-        if ttl_target is not None and ttl_value is None:
-            raise AttributeError("when ttl_target is specified, ttl_value must be also be set")
-        if ttl_target is None and ttl_value is not None:
-            raise AttributeError("when ttl_value is specified, ttl_target must be also be set")
+        if ttl_index is not None and ttl_value is None:
+            raise AttributeError("when ttl_index is specified, ttl_value must be also be set")
+        if ttl_index is None and ttl_value is not None:
+            raise AttributeError("when ttl_value is specified, ttl_index must be also be set")
 
         sql = "CREATE TABLE " + name
 
@@ -147,10 +149,14 @@ class DDLGenerator(object):
             sql += " EXPORT TO TARGET " + export_target
         elif migrate_target:
             sql += " MIGRATE TO TARGET " + migrate_target
+        elif migrate_topic:
+            sql += " MIGRATE TO TOPIC " + migrate_topic
+        elif export_topic:
+            sql += " EXPORT TO TOPIC " + export_topic
 
         if export_cdc:
-            if not export_target:
-                raise ValueError("export_target argument required when export_cdc specified")
+            if not export_target and not export_topic:
+                raise ValueError("export_target or export_topic argument required when export_cdc specified")
             sql += " ON " + export_cdc
 
         sql += "\n(\n"
@@ -164,10 +170,10 @@ class DDLGenerator(object):
 
         sql += ")"
 
-        if ttl_target:
+        if ttl_index:
             # USING TTL value [time-unit] ON COLUMN column-name
             # [BATCH_SIZE number-of-rows] [MAX_FREQUENCY value]
-            sql += " USING TTL " + str(ttl_value) + " ON COLUMN " + ttl_target
+            sql += " USING TTL " + str(ttl_value) + " ON COLUMN " + ttl_index
             if ttl_batch_size:
                 sql += " BATCH_SIZE " + str(ttl_batch_size)
             if ttl_max_frequency:
@@ -353,35 +359,35 @@ class TestDDLGenerator(unittest.TestCase):
 
     def test_table_ttl_basic(self):
         tg = DDLGenerator()
-        sql = tg.gen_table("pembroke", ttl_target='type_not_null_timestamp', ttl_value="5" )
+        sql = tg.gen_table("pembroke", ttl_index='type_not_null_timestamp', ttl_value="5" )
         self.assertRegexpMatches(sql, '(?s)CREATE TABLE pembroke.*\) USING TTL 5 ON COLUMN type_not_null_timestamp;')
 
     def test_table_ttl_minutes(self):
         tg = DDLGenerator()
-        sql = tg.gen_table("kang", ttl_target='type_not_null_timestamp', ttl_value="15 MINUTES" )
+        sql = tg.gen_table("kang", ttl_index='type_not_null_timestamp', ttl_value="15 MINUTES" )
         self.assertRegexpMatches(sql, '(?s)CREATE TABLE kang.*\) USING TTL 15 MINUTES ON COLUMN type_not_null_timestamp;')
 
     def test_table_ttl_batch_size(self):
         tg = DDLGenerator()
-        sql = tg.gen_table("kang", ttl_target='type_not_null_timestamp', ttl_value="3", ttl_batch_size=27)
+        sql = tg.gen_table("kang", ttl_index='type_not_null_timestamp', ttl_value="3", ttl_batch_size=27)
         self.assertRegexpMatches(sql, '(?s)CREATE TABLE kang.*\\) USING TTL 3 ON COLUMN type_not_null_timestamp BATCH_SIZE 27;')
 
     def test_table_max_ttl_frequency(self):
         tg = DDLGenerator()
-        sql = tg.gen_table("hutch", ttl_target='type_not_null_timestamp', ttl_value="11", ttl_max_frequency=14)
+        sql = tg.gen_table("hutch", ttl_index='type_not_null_timestamp', ttl_value="11", ttl_max_frequency=14)
         self.assertRegexpMatches(sql, '(?s)CREATE TABLE hutch.*\\) USING TTL 11 ON COLUMN type_not_null_timestamp MAX_FREQUENCY 14;')
 
-    def test_table_neg_ttl_target_no_value(self):
+    def test_table_neg_ttl_index_no_value(self):
         tg = DDLGenerator()
         with self.assertRaises(AttributeError) as cm:
-            tg.gen_table("butch", ttl_target="meltdown")
-        self.assertEqual(str(cm.exception), "when ttl_target is specified, ttl_value must be also be set")
+            tg.gen_table("butch", ttl_index="meltdown")
+        self.assertEqual(str(cm.exception), "when ttl_index is specified, ttl_value must be also be set")
 
-    def test_table_neg_ttl_value_no_target(self):
+    def test_table_neg_ttl_value_no_index(self):
         tg = DDLGenerator()
         with self.assertRaises(AttributeError) as cm:
             tg.gen_table("sundance", ttl_value="freezeup")
-        self.assertEqual(str(cm.exception), "when ttl_value is specified, ttl_target must be also be set")
+        self.assertEqual(str(cm.exception), "when ttl_value is specified, ttl_index must be also be set")
 
 
     # ========================================================================

@@ -32,7 +32,6 @@ public class JiggleExportGroupSinglePartition extends VoltProcedure {
     String template = "INSERT INTO export_partitioned_table_BASE (txnid, rowid, rowid_group, type_null_tinyint, type_not_null_tinyint, type_null_smallint, type_not_null_smallint, type_null_integer, type_not_null_integer, type_null_bigint, type_not_null_bigint, type_null_timestamp,  type_null_float, type_not_null_float, type_null_decimal, type_not_null_decimal, type_null_varchar25, type_not_null_varchar25, type_null_varchar128, type_not_null_varchar128, type_null_varchar1024, type_not_null_varchar1024) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,  ?)";
 
     public final SQLStmt export_kafka = new SQLStmt(template.replace("BASE", "kafka"));
-    public final SQLStmt export_rabbit = new SQLStmt(template.replace("BASE", "rabbit"));
     public final SQLStmt export_file = new SQLStmt(template.replace("BASE", "file"));
     public final SQLStmt export_jdbc = new SQLStmt(template.replace("BASE", "jdbc"));
     public final SQLStmt insert = new SQLStmt(template.replace("export_partitioned_table_BASE", "export_mirror_partitioned_table"));
@@ -52,7 +51,7 @@ public class JiggleExportGroupSinglePartition extends VoltProcedure {
           Useful for debugging export data correctness, but not useful
           for not running out of memory....
         */
-        SQLStmt [] statements = {insert, export_kafka, export_rabbit, export_file, export_jdbc};
+        SQLStmt [] statements = {insert, export_kafka, export_file, export_jdbc};
         for (SQLStmt stmt: statements) {
             voltQueueSQL(
                     stmt

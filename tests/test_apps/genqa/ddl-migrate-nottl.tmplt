@@ -28,9 +28,6 @@ AS
 %%TABLE name=export_partitioned_table_kafka, migrate_target=kafka_target, partition_key=rowid
 CREATE INDEX export_partitioned_table_kafka_idx ON export_partitioned_table_kafka(type_not_null_timestamp) where not migrating;
 
-%%TABLE name=export_partitioned_table_rabbit, migrate_target=rabbit_target, partition_key=rowid
-CREATE INDEX export_partitioned_table_rabbit_idx ON export_partitioned_table_rabbit(type_not_null_timestamp) where not migrating;
-
 %%TABLE name=export_partitioned_table_file, migrate_target=file_target, partition_key=rowid
 CREATE INDEX export_partitioned_table_file_idx ON export_partitioned_table_file(type_not_null_timestamp) where not migrating;
 
@@ -42,11 +39,6 @@ CREATE INDEX export_partitioned_table_jdbc_idx ON export_partitioned_table_jdbc(
 %%TABLE name=export_mirror_replicated_table
 
 CREATE STREAM export_done_table_kafka EXPORT TO TARGET kafka_target
-(
-  txnid                     BIGINT        NOT NULL
-);
-
-CREATE STREAM export_done_table_rabbit EXPORT TO TARGET rabbit_target
 (
   txnid                     BIGINT        NOT NULL
 );
@@ -64,9 +56,6 @@ CREATE STREAM export_done_table_file EXPORT TO TARGET file_target
 -- Export Table for Replicated Data Table deletions
 %%TABLE name=export_replicated_table_kafka, migrate_target=kafka_target
 CREATE INDEX export_replicated_table_kafka_idx ON export_replicated_table_kafka(type_not_null_timestamp) where not migrating;
-
-%%TABLE name=export_replicated_table_rabbit, migrate_target=rabbit_target
-CREATE INDEX export_replicated_table_rabbit_idx ON  export_replicated_table_rabbit(type_not_null_timestamp) where not migrating;
 
 %%TABLE name=export_replicated_table_file, migrate_target=file_target
 CREATE INDEX export_replicated_table_file_idx ON  export_replicated_table_file(type_not_null_timestamp) where not migrating;

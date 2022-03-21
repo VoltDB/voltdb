@@ -125,6 +125,7 @@ public class AsyncExportClient {
         final int exportTimeout;
         final boolean migrateWithTTL;
         final boolean usetableexport;
+        final boolean usecdc;
         final boolean migrateWithoutTTL;
         final long migrateNoTTLInterval;
 
@@ -140,6 +141,7 @@ public class AsyncExportClient {
             exportTimeout        = apph.intValue("timeout");
             migrateWithTTL       = apph.booleanValue("migrate-ttl");
             usetableexport       = apph.booleanValue("usetableexport");
+            usecdc               = apph.booleanValue("usecdc");
             migrateWithoutTTL    = apph.booleanValue("migrate-nottl");
             migrateNoTTLInterval = apph.longValue("nottl-interval");
 
@@ -174,10 +176,11 @@ public class AsyncExportClient {
                 .add("poolsize", "pool_size", "Size of the record pool to operate on - larger sizes will cause a higher insert/update-delete rate.", 100000)
                 .add("procedure", "procedure_name", "Procedure to call.", "JiggleExportSinglePartition")
                 .add("ratelimit", "rate_limit", "Rate limit to start from (number of transactions per second).", 100000)
-                .add("timeout","export_timeout","max seconds to wait for export to complete",300)
-                .add("migrate-ttl","false","use DDL that includes TTL MIGRATE action","false")
+                .add("timeout","export_timeout", "max seconds to wait for export to complete",300)
+                .add("migrate-ttl","false", "use DDL that includes TTL MIGRATE action","false")
                 .add("usetableexport", "usetableexport","use DDL that includes CREATE TABLE with EXPORT ON ... action","false")
-                .add("migrate-nottl", "false","use DDL that includes MIGRATE without TTL","false")
+                .add("usecdc", "usecdc", "Report inserts, deletes, updates", "false")
+                .add("migrate-nottl", "false", "use DDL that includes MIGRATE without TTL","false")
                 .add("nottl-interval", "milliseconds", "approximate migrate command invocation interval (in milliseconds)", 2500)
                 .setArguments(args);
 
@@ -244,17 +247,19 @@ public class AsyncExportClient {
                 long currentRowId = rowId.incrementAndGet();
 
                 // Table with Export, do insert, update and delete
-                if (config.usetableexport) {
+                if (config.usetableexport || config.usecdc) {
+                    String sqlTable = config.usecdc ? config.procedure : "TableExport";
                     for (OperationType op : ops) {
                         try {
                             client.callProcedure(
                                     new ExportCallback(op, transactionCounts, committedCounts, failedCounts),
-                                    "TableExport",
+                                    sqlTable,
                                     currentRowId,
                                     op.get());
                             queuedCounts.incrementAndGet(op.get());
                         } catch (Exception e) {
                             log.info("Exception: " + e);
+                            e.printStackTrace();
                         }
                     }
                 } else {
@@ -303,12 +308,16 @@ public class AsyncExportClient {
             export_table_expected += committedCounts.get(OperationType.UPDATE.get());
 
             if (totalCount != totalQueued) {
-                log.info("The transaction count " + totalCount + " does not match with the quened count " + totalQueued);
+                log.info("The transaction count " + totalCount + " does not match with the queued count " + totalQueued);
             }
 
             //Write to export table to get count to be expected on other side.
             log.info("Writing export count as: " + export_table_expected + " final rowid:" + rowId);
-            client.callProcedure("InsertExportDoneDetails", export_table_expected);
+            if (config.migrateWithTTL) {
+                client.callProcedure("InsertMigrateDoneDetails", export_table_expected);
+            } else {
+                client.callProcedure("InsertExportDoneDetails", export_table_expected);
+            }
 
             // 1. Tracking statistics
             log.info(
@@ -321,7 +330,7 @@ public class AsyncExportClient {
                     ));
 
             // 2. Print TABLE EXPORT stats if that's configured
-            if (config.usetableexport) {
+            if (config.usetableexport || config.usecdc) {
                 String msg =  String.format(
                         "---------------------------------Export Committed and Queued Counts --------------------------------------\n"
                                 + "A total of %d calls were committed, a total of %d calls were queued\n"
@@ -347,8 +356,9 @@ public class AsyncExportClient {
                                 , queuedCounts.get(OperationType.UPDATE.get()));
                 log.info(msg);
 
-                long export_table_count = get_table_count("EXPORT_PARTITIONED_TABLE_CDC", client);
-                log.info("\nEXPORT_PARTITIONED_TABLE_CDC count: " + export_table_count);
+                String sqlTable = config.usecdc ? "EXPORT_PARTITIONED_TOPIC_CDC" : "EXPORT_PARTITIONED_TABLE_CDC";
+                long export_table_count = get_table_count(sqlTable, client);
+                log.info("\n" + sqlTable + " count: " + export_table_count);
                 if (export_table_count != export_table_expected) {
                     log.info("Insert and delete count " + export_table_expected +
                         " does not match export table count: " + export_table_count + "\n");
@@ -427,7 +437,6 @@ public class AsyncExportClient {
                         VoltTable res = resp.response.getResults()[0];
                         log.info("Partitioned Migrate - window: " + time_window + " seconds" +
                                 ", kafka: " + res.asScalarLong() +
-                                ", rabbit: " + res.asScalarLong() +
                                 ", file: " + res.asScalarLong() +
                                 ", jdbc: " + res.asScalarLong() +
                                 ", on partition " + resp.partitionKey
@@ -440,9 +449,8 @@ public class AsyncExportClient {
                 results = client.callProcedure("MigrateReplicatedExport", time_window).getResults();
                 log.info("Replicated Migrate - window: " + time_window + " seconds" +
                          ", kafka: " + results[0].asScalarLong() +
-                         ", rabbit: " + results[1].asScalarLong() +
-                         ", file: " + results[2].asScalarLong() +
-                         ", jdbc: " + results[3].asScalarLong()
+                         ", file: " + results[1].asScalarLong() +
+                         ", jdbc: " + results[2].asScalarLong()
                          );
             }
         }

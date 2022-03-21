@@ -31,17 +31,13 @@ import org.voltdb.VoltType;
 import org.voltdb.types.TimestampType;
 
 
-public class MigratePartitionedExport extends VoltProcedure {
-    public final SQLStmt migrate_kafka = new SQLStmt("MIGRATE FROM export_partitioned_table_kafka WHERE NOT MIGRATING AND type_not_null_timestamp < DATEADD(SECOND, ?, NOW)");
-    public final SQLStmt migrate_file = new SQLStmt("MIGRATE FROM export_partitioned_table_file WHERE NOT MIGRATING AND type_not_null_timestamp < DATEADD(SECOND, ?, NOW)");
-    public final SQLStmt migrate_jdbc = new SQLStmt("MIGRATE FROM export_partitioned_table_jdbc WHERE NOT MIGRATING AND type_not_null_timestamp < DATEADD(SECOND, ?, NOW)");
+public class MigratePartitionedTTLTopic extends VoltProcedure {
+    public final SQLStmt migrate_topic = new SQLStmt("MIGRATE FROM migrate_partitioned_table_topic WHERE NOT MIGRATING AND type_not_null_timestamp < DATEADD(SECOND, ?, NOW)");
 
     public VoltTable[] run(int key, int seconds)
     {
         // ad hoc kinda like "MIGRATE FROM export_partitioned_table where <records older than "seconds" ago>
-        voltQueueSQL(migrate_kafka, EXPECT_SCALAR_LONG, -seconds);
-        voltQueueSQL(migrate_file, EXPECT_SCALAR_LONG, -seconds);
-        voltQueueSQL(migrate_jdbc, EXPECT_SCALAR_LONG, -seconds);
+        voltQueueSQL(migrate_topic, EXPECT_SCALAR_LONG, -seconds);
         return voltExecuteSQL();
     }
 }

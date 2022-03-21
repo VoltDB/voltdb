@@ -1,0 +1,61 @@
+load classes sp.jar;
+
+file -inlinebatch END_OF_BATCH
+
+-- Partitioned Data Table
+%%TABLE name=partitioned_table, primary_key=rowid, partition_key=rowid
+
+-- Index over rowid_group on Partitioned Data Table
+CREATE INDEX IX_partitioned_table_rowid_group
+    ON partitioned_table ( rowid_group );
+
+-- Grouping view over Partitioned Data Table
+CREATE VIEW partitioned_table_group
+(
+  rowid_group
+, record_count
+)
+AS
+   SELECT rowid_group
+        , COUNT(*)
+     FROM partitioned_table
+ GROUP BY rowid_group;
+
+-- Export Table for Partitioned Data Table Migrations
+%%TABLE name=migrate_partitioned_table_topic, partition_key=rowid, migrate_topic=kafka_topic, ttl_index=type_not_null_timestamp, ttl_value="5 SECONDS"
+CREATE INDEX migrate_partitioned_table_topic_idx ON  migrate_partitioned_table_topic(type_not_null_timestamp) where not migrating;
+
+%%TABLE name=export_mirror_partitioned_table, partition_key=rowid, ttl_index=type_not_null_timestamp, ttl_value="5 SECONDS"
+
+-- %%TABLE name=export_mirror_replicated_table, ttl_index=type_not_null_timestamp, ttl_value="5 SECONDS"
+
+CREATE TABLE migrate_done_table_topic EXPORT TO TARGET kafka_topic_done
+(
+  txnid                     BIGINT        NOT NULL
+);
+
+-- Export Table for Replicated Data Table deletions
+%%TABLE name=migrate_replicated_table_topic, migrate_topic=kafka_topic_rep, ttl_index=type_not_null_timestamp, ttl_value="5 SECONDS"
+CREATE INDEX migrate_replicated_table_topic_idx ON migrate_replicated_table_topic(type_not_null_timestamp) where not migrating;
+
+CREATE PROCEDURE PARTITION ON TABLE partitioned_table COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleSinglePartition;
+CREATE PROCEDURE PARTITION ON TABLE migrate_partitioned_table_topic COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.MigratePartitionedTTLTopic;
+CREATE PROCEDURE FROM CLASS genqa.procedures.MigrateReplicatedTTLTopic;
+CREATE PROCEDURE FROM CLASS genqa.procedures.InsertMigrateDoneDetails;
+-- CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleExportMultiPartition;
+
+CREATE PROCEDURE SelectwithLimit as select * from export_mirror_partitioned_table where rowid between ? and ? order by rowid limit ?;
+
+
+CREATE VIEW MIGRATE_PARTITIONED_TABLE_VIEW_TOPIC
+(
+  rowid
+, record_count
+)
+AS
+   SELECT rowid
+        , COUNT(*)
+     FROM MIGRATE_PARTITIONED_TABLE_TOPIC
+ GROUP BY rowid;
+
+END_OF_BATCH

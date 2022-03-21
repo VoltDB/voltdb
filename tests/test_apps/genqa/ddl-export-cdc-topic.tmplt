@@ -1,0 +1,62 @@
+load classes sp.jar;
+
+file -inlinebatch END_OF_BATCH
+
+-- Partitioned Data Table
+%%TABLE name=partitioned_table, primary_key=rowid, partition_key=rowid
+
+-- Index over rowid_group on Partitioned Data Table
+CREATE INDEX IX_partitioned_table_rowid_group
+    ON partitioned_table ( rowid_group );
+
+-- Grouping view over Partitioned Data Table
+CREATE VIEW partitioned_table_group
+(
+  rowid_group
+, record_count
+)
+AS
+   SELECT rowid_group
+        , COUNT(*)
+     FROM partitioned_table
+ GROUP BY rowid_group;
+
+%%TABLE name=export_partitioned_topic_cdc, export_topic=kafka_topic, export_cdc="insert, update, delete", partition_key=rowid
+CREATE PROCEDURE PARTITION ON TABLE export_partitioned_topic_cdc COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.TablePartitionedExportCDCTopic;
+
+-- %%TABLE name=export_mirror_partitioned_table, partition_key=rowid, ttl_index=type_not_null_timestamp, ttl_value="5 SECONDS"
+
+-- %%TABLE name=export_mirror_replicated_table, ttl_index=type_not_null_timestamp, ttl_value="5 SECONDS"
+
+CREATE TABLE export_done_table_kafka EXPORT TO TOPIC kafka_topic_done
+(
+  txnid                     BIGINT        NOT NULL
+);
+
+-- Export Table for Replicated Data Table deletions
+%%TABLE name=export_replicated_topic_cdc, export_topic=kafka_topic_rep, export_cdc="insert, update, delete"
+-- CREATE INDEX export_replicated_topic_cdc_idx ON export_replicated_topic_cdc(type_not_null_timestamp) where not migrating;
+CREATE PROCEDURE from class genqa.procedures.TableReplicatedExportCDCTopic;
+
+-- CREATE PROCEDURE PARTITION ON TABLE export_partitioned_topic_cdc COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleExportGroupSinglePartition;
+-- CREATE PROCEDURE PARTITION ON TABLE partitioned_table COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleSinglePartition;
+-- CREATE PROCEDURE PARTITION ON TABLE export_partitioned_topic_cdc COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleExportSinglePartition;
+CREATE PROCEDURE FROM CLASS genqa.procedures.InsertExportDoneDetails;
+
+-- CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleExportMultiPartition;
+
+-- CREATE PROCEDURE SelectwithLimit as select * from export_mirror_partitioned_table where rowid between ? and ? order by rowid limit ?;
+
+
+CREATE VIEW EXPORT_PARTITIONED_TABLE_VIEW_TOPIC
+(
+  rowid
+, record_count
+)
+AS
+   SELECT rowid
+        , COUNT(*)
+     FROM EXPORT_PARTITIONED_TOPIC_CDC
+ GROUP BY rowid;
+
+END_OF_BATCH

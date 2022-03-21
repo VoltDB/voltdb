@@ -77,8 +77,10 @@ function srccompile() {
 function generateddl() {
     set -x
     ../ddlgen-tool.py ddl1.tmplt > ddl1.sql
-    ../ddlgen-tool.py ddl-migrate-ttl.tmplt > ddl-migrate-ttl.sql
+    ../ddlgen-tool.py ddl-export-cdc-topic.tmplt > ddl-export-cdc-topic.sql
     ../ddlgen-tool.py ddl-migrate-nottl.tmplt > ddl-migrate-nottl.sql
+    ../ddlgen-tool.py ddl-migrate-ttl.tmplt > ddl-migrate-ttl.sql
+    ../ddlgen-tool.py ddl-migrate-ttl-topic.tmplt > ddl-migrate-ttl-topic.sql
     set +x
 }
 

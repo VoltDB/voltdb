@@ -22,28 +22,25 @@ AS
  GROUP BY rowid_group;
 
 -- Export Table for Partitioned Data Table deletions
-%%TABLE name=export_partitioned_table_kafka, partition_key=rowid, migrate_target=kafka_target, ttl_target=type_not_null_timestamp, ttl_value="5 SECONDS"
+%%TABLE name=export_partitioned_table_kafka, partition_key=rowid, migrate_target=kafka_target, ttl_index=type_not_null_timestamp, ttl_value="5 SECONDS"
 CREATE INDEX export_partitioned_table_kafka_idx ON  export_partitioned_table_kafka(type_not_null_timestamp) where not migrating;
 
-%%TABLE name=export_partitioned_table_rabbit, partition_key=rowid, migrate_target=rabbit_target, ttl_target=type_not_null_timestamp, ttl_value="5 SECONDS"
-CREATE INDEX export_partitioned_table_rabbit_idx ON  export_partitioned_table_rabbit(type_not_null_timestamp) where not migrating;
-
-%%TABLE name=export_partitioned_table_file, partition_key=rowid, migrate_target=file_target, ttl_target=type_not_null_timestamp, ttl_value="5 SECONDS"
+%%TABLE name=export_partitioned_table_file, partition_key=rowid, migrate_target=file_target, ttl_index=type_not_null_timestamp, ttl_value="5 SECONDS"
 CREATE INDEX export_partitioned_table_file_idx ON  export_partitioned_table_file(type_not_null_timestamp) where not migrating;
 
-%%TABLE name=export_partitioned_table_jdbc, partition_key=rowid, migrate_target=jdbc_target, ttl_target=type_not_null_timestamp, ttl_value="5 SECONDS"
+%%TABLE name=export_partitioned_table_jdbc, partition_key=rowid, migrate_target=jdbc_target, ttl_index=type_not_null_timestamp, ttl_value="5 SECONDS"
 CREATE INDEX export_partitioned_table_jdbc_idx ON  export_partitioned_table_jdbc(type_not_null_timestamp)  where not migrating;
 
-%%TABLE name=export_mirror_partitioned_table, partition_key=rowid, ttl_target=type_not_null_timestamp, ttl_value="5 SECONDS"
+%%TABLE name=export_mirror_partitioned_table, partition_key=rowid, ttl_index=type_not_null_timestamp, ttl_value="5 SECONDS"
 
-%%TABLE name=export_mirror_replicated_table, ttl_target=type_not_null_timestamp, ttl_value="5 SECONDS"
+%%TABLE name=export_mirror_replicated_table, ttl_index=type_not_null_timestamp, ttl_value="5 SECONDS"
 
-CREATE STREAM export_done_table_kafka EXPORT TO TARGET kafka_target
+CREATE TABLE migrate_done_table_topic EXPORT TO TARGET kafka_topic_done
 (
-  txnid                     BIGINT        NOT NULL
+  txnid                     BIGINT        NOT NULL 
 );
 
-CREATE STREAM export_done_table_rabbit EXPORT TO TARGET rabbit_target
+CREATE STREAM export_done_table_kafka EXPORT TO TARGET kafka_target
 (
   txnid                     BIGINT        NOT NULL
 );
@@ -59,22 +56,20 @@ CREATE STREAM export_done_table_file EXPORT TO TARGET file_target
 );
 
 -- Export Table for Replicated Data Table deletions
-%%TABLE name=export_replicated_table_kafka, migrate_target=kafka_target, ttl_target=type_not_null_timestamp, ttl_value="5 SECONDS"
+%%TABLE name=export_replicated_table_kafka, migrate_target=kafka_target, ttl_index=type_not_null_timestamp, ttl_value="5 SECONDS"
 CREATE INDEX export_replicated_table_kafka_idx ON export_replicated_table_kafka(type_not_null_timestamp) where not migrating;
 
-%%TABLE name=export_replicated_table_rabbit, migrate_target=rabbit_target, ttl_target=type_not_null_timestamp, ttl_value="5 SECONDS"
-CREATE INDEX export_replicated_table_rabbit_idx ON export_replicated_table_rabbit(type_not_null_timestamp) where not migrating;
-
-%%TABLE name=export_replicated_table_file, migrate_target=file_target, ttl_target=type_not_null_timestamp, ttl_value="5 SECONDS"
+%%TABLE name=export_replicated_table_file, migrate_target=file_target, ttl_index=type_not_null_timestamp, ttl_value="5 SECONDS"
 CREATE INDEX export_replicated_table_file_idx ON export_replicated_table_file(type_not_null_timestamp) where not migrating;
 
-%%TABLE name=export_replicated_table_jdbc, migrate_target=jdbc_target, ttl_target=type_not_null_timestamp, ttl_value="5 SECONDS"
+%%TABLE name=export_replicated_table_jdbc, migrate_target=jdbc_target, ttl_index=type_not_null_timestamp, ttl_value="5 SECONDS"
 CREATE INDEX export_replicated_table_jdbc_idx ON export_replicated_table_jdbc(type_not_null_timestamp) where not migrating;
 
 CREATE PROCEDURE PARTITION ON TABLE export_partitioned_table_kafka COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleExportGroupSinglePartition;
 CREATE PROCEDURE PARTITION ON TABLE partitioned_table COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleSinglePartition;
 CREATE PROCEDURE PARTITION ON TABLE export_partitioned_table_kafka COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleExportSinglePartition;
 CREATE PROCEDURE FROM CLASS genqa.procedures.InsertExportDoneDetails;
+CREATE PROCEDURE FROM CLASS genqa.procedures.InsertMigrateDoneDetails;
 
 CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleExportMultiPartition;
 

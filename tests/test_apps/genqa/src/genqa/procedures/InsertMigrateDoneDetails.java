@@ -22,26 +22,21 @@
  */
 package genqa.procedures;
 
-import java.util.Random;
-
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
-import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
-import org.voltdb.types.TimestampType;
 
+public class InsertMigrateDoneDetails extends VoltProcedure {
+    String template = "INSERT INTO migrate_done_table_topic (txnid) VALUES (?)";
+    public final SQLStmt migrate_topic = new SQLStmt(template);
 
-public class MigratePartitionedExport extends VoltProcedure {
-    public final SQLStmt migrate_kafka = new SQLStmt("MIGRATE FROM export_partitioned_table_kafka WHERE NOT MIGRATING AND type_not_null_timestamp < DATEADD(SECOND, ?, NOW)");
-    public final SQLStmt migrate_file = new SQLStmt("MIGRATE FROM export_partitioned_table_file WHERE NOT MIGRATING AND type_not_null_timestamp < DATEADD(SECOND, ?, NOW)");
-    public final SQLStmt migrate_jdbc = new SQLStmt("MIGRATE FROM export_partitioned_table_jdbc WHERE NOT MIGRATING AND type_not_null_timestamp < DATEADD(SECOND, ?, NOW)");
-
-    public VoltTable[] run(int key, int seconds)
+    public long run(long txid)
     {
-        // ad hoc kinda like "MIGRATE FROM export_partitioned_table where <records older than "seconds" ago>
-        voltQueueSQL(migrate_kafka, EXPECT_SCALAR_LONG, -seconds);
-        voltQueueSQL(migrate_file, EXPECT_SCALAR_LONG, -seconds);
-        voltQueueSQL(migrate_jdbc, EXPECT_SCALAR_LONG, -seconds);
-        return voltExecuteSQL();
+        voltQueueSQL(migrate_topic, txid);
+
+        // Execute last statement batch
+        voltExecuteSQL(true);
+
+        // Return to caller
+        return txid;
     }
 }

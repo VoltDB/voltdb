@@ -27,8 +27,6 @@ AS
 -- Export Table for Partitioned Data Table deletions
 %%STREAM name=export_partitioned_table_kafka, export_target=kafka_target, partition_key=rowid
 
-%%STREAM name=export_partitioned_table_rabbit, export_target=rabbit_target, partition_key=rowid
-
 %%STREAM name=export_partitioned_table_file, export_target=file_target, partition_key=rowid
 
 %%STREAM name=export_partitioned_table_jdbc, export_target=jdbc_target, partition_key=rowid
@@ -46,11 +44,6 @@ CREATE STREAM export_done_table_kafka EXPORT TO TARGET kafka_target
   txnid                     BIGINT        NOT NULL
 );
 
-CREATE STREAM export_done_table_rabbit EXPORT TO TARGET rabbit_target
-(
-  txnid                     BIGINT        NOT NULL
-);
-
 CREATE STREAM export_done_table_jdbc EXPORT TO TARGET jdbc_target
 (
   txnid                     BIGINT        NOT NULL
@@ -64,8 +57,6 @@ CREATE STREAM export_done_table_file EXPORT TO TARGET file_target
 -- Export Table for Replicated Data Table deletions
 %%STREAM name=export_replicated_table_kafka, export_target=kafka_target
 
-%%STREAM name=export_replicated_table_rabbit, export_target=rabbit_target
-
 %%STREAM name=export_replicated_table_file, export_target=file_target
 
 %%STREAM name=export_replicated_table_jdbc, export_target=jdbc_target
@@ -74,6 +65,7 @@ CREATE STREAM export_done_table_file EXPORT TO TARGET file_target
 
 CREATE PROCEDURE PARTITION ON TABLE export_partitioned_table_kafka COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleExportGroupSinglePartition;
 CREATE PROCEDURE PARTITION ON TABLE TOPIC_STREAM COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.InsertTopicStream;
+CREATE PROCEDURE PARTITION ON TABLE TOPIC_STREAM COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.InsertTopicStream2;
 CREATE PROCEDURE PARTITION ON TABLE partitioned_table COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleSinglePartition;
 CREATE PROCEDURE PARTITION ON TABLE export_partitioned_table_kafka COLUMN rowid PARAMETER 0 FROM CLASS genqa.procedures.JiggleExportSinglePartition;
 CREATE PROCEDURE FROM CLASS genqa.procedures.InsertExportDoneDetails;
