@@ -1221,6 +1221,9 @@ public class VoltDB {
      * in it, as well as written to the writer.
      */
     private static void printStackTraces(PrintWriter writer, List<String> currentStackTrace) {
+        if (currentStackTrace == null) {
+            currentStackTrace = new ArrayList<>();
+        }
         getStackTraceAsList(currentStackTrace);
 
         writer.println();
@@ -1242,10 +1245,6 @@ public class VoltDB {
      * Collect stack trace for current thread and append to supplied list
      */
     private static void getStackTraceAsList(List<String> currentStackTrace) {
-        if (currentStackTrace == null) {
-            currentStackTrace = new ArrayList<>();
-        }
-
         StackTraceElement[] myTrace = Thread.currentThread().getStackTrace();
         for (StackTraceElement ste : myTrace) {
             currentStackTrace.add(ste.toString());
