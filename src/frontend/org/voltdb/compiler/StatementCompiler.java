@@ -22,7 +22,6 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Set;
 import java.util.TreeSet;
 
-import org.apache.commons.lang3.StringUtils;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltcore.logging.VoltLogger;
@@ -35,7 +34,6 @@ import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Function;
-import org.voltdb.catalog.Index;
 import org.voltdb.catalog.PlanFragment;
 import org.voltdb.catalog.ProcParameter;
 import org.voltdb.catalog.Procedure;
@@ -62,7 +60,6 @@ import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
 
 import com.google_voltpatches.common.base.Charsets;
-import com.google_voltpatches.common.collect.Sets;
 
 /**
  * Compiles individual SQL statements and updates the given catalog.
@@ -147,28 +144,7 @@ public abstract class StatementCompiler {
                 catalogStmt.setSqltext(previousStatement.getSqltext());
                 catalogStmt.setTablesread(previousStatement.getTablesread());
                 catalogStmt.setTablesupdated(previousStatement.getTablesupdated());
-                //update annotation
-                Set<String> tableDotIndexNames = new TreeSet<>();
-                Set<String> tableSeen = Sets.newHashSet();
-                for (String tableDotIndexPair : previousStatement.getIndexesused().split(",")) {
-                    if (tableDotIndexPair.isEmpty()) {
-                        continue;
-                    }
-                    String parts[] = tableDotIndexPair.split("\\.", 2);
-                    if (parts.length != 2) {
-                        continue;
-                    }
-                    String tableName = parts[0];
-                    if (!tableSeen.contains(tableName)) {
-                        Table t = db.getTables().get(tableName);
-                        for (Index idx : t.getIndexes()) {
-                            tableDotIndexNames.add(t.getTypeName() + "." + idx.getTypeName());
-                        }
-                        tableSeen.add(tableName);
-                    }
-                }
-                String indexString = StringUtils.join(tableDotIndexNames, ",");
-                catalogStmt.setIndexesused(indexString);
+                catalogStmt.setIndexesused(previousStatement.getIndexesused());
                 copyUDFDependees(compiler, catalogStmt, previousStatement, db.getFunctions());
                 for (StmtParameter oldSp : previousStatement.getParameters()) {
                     StmtParameter newSp = catalogStmt.getParameters().add(oldSp.getTypeName());
