@@ -2262,6 +2262,7 @@ TEST CASES
     <exec dir='tests/sqlcoverage' executable='python2' failonerror="${sqlcoverage.failonerror}">
         <env key="TEST_DIR" value="${build.testobjects.dir}" />
         <env key="VOLTDB_BUILD_DIR" value="${build.dir}"/>
+        <env key="VOLT_JUSTATEST" value="true" />
         <arg line='sql_coverage_test.py' />
         <arg line="${config_seed}" />
         <arg line="${config_config}" />
