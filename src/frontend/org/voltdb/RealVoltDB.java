@@ -965,9 +965,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_statusTracker = new NodeStateTracker();
             m_voltPid = myPid;
 
-            // Print the ascii art, but only on actual start
+            // Print the startup banner, but only on actual start
             if (config.m_startAction != StartAction.INITIALIZE) {
-                consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
+                consoleLog.l7dlog(Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
+                hostLog.info("Initializing VoltDB ...");
                 hostLog.infoFmt("PID of this Volt process is %d", myPid);
             }
 
