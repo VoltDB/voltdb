@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 from subprocess import Popen, PIPE
 import sys
 import re
@@ -14,13 +14,13 @@ def getGitInfo():
     # need to do a 'git diff' because 'describe --dirty' can get confused by timestamps
     (gitLocalVersion,stderr) = Popen("git diff --shortstat", shell=True, stdout=PIPE, stderr=PIPE).communicate()
     if stderr:
-        print "This is not a git working tree\n"
+        print("This is not a git working tree\n")
         return
     
     # git describe --dirty adds '-dirty' to the version string if uncommitted code is found
     (gitLocalVersion,stderr) = Popen("git describe --long --dirty", shell=True, stdout=PIPE, stderr=PIPE).communicate()
     if stderr:
-        print "This is not a git working tree\n"
+        print("This is not a git working tree\n")
         return
 
     # jenkins puts in local tags - look backwards until a non-jenkins tag is found
@@ -31,10 +31,10 @@ def getGitInfo():
         (gitLocalVersion,stderr) = Popen("git describe --long %s^1" % gitLocalVersion, 
                                          shell=True, stdout=PIPE, stderr=PIPE).communicate()
         if stderr:
-            print stderr
+            sys.stderr.write()
             break
 
-    gitLocalVersion = gitLocalVersion.strip()
+    gitLocalVersion = gitLocalVersion.decode("utf-8").strip()
 
     #check if local repository == remote repository
     (gitLocalBranch, stderr) = Popen("git name-rev --name-only HEAD", 
@@ -74,5 +74,5 @@ if __name__ == "__main__":
     bfile.close()
 
 
-    print "Version: ",version,buildstring
+    print("Version: %s %s" % (version, buildstring))
 

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # This file is part of VoltDB.
 # Copyright (C) 2008-2020 VoltDB Inc.
@@ -51,7 +51,7 @@ auto_gen_warning = \
             ALL CHANGES MUST BE MADE IN voltdb_logstrings.properties GENERATOR */
 """
 
-f = file( "LogKeys.java", 'w' )
+f = open( "LogKeys.java", 'w' )
 f.truncate(0)
 f.seek(0)
 if not f:

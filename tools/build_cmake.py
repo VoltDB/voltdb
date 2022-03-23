@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # This file is part of VoltDB.
 # Copyright (C) 2008-2017 VoltDB Inc.
 #
