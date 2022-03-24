@@ -410,33 +410,22 @@ StackTrace* ThreadLocalPool::getStackTraceFor(int32_t engineId, std::size_t sz, 
 void ThreadLocalPool::freeExactSizedObject(std::size_t sz, void* object) {
 #ifdef VOLT_POOL_CHECKING
     int32_t engineId = getEnginePartitionId();
-    VOLT_DEBUG("Deallocating %p of size %lu on engine %d, thread %d", object, sz,
-            engineId, getThreadPartitionId());
-    s_sharedMemoryMutex.lock();
-    SizeBucketMap_t& mapBySize = s_allocations[engineId];
-    s_sharedMemoryMutex.unlock();
-    auto const mapForAdd = mapBySize.find(sz);
-    if (mapForAdd == mapBySize.cend()) {
-        VOLT_ERROR("Deallocated data pointer %p in wrong context thread (partition %d)",
-                object, engineId);
-        VOLT_ERROR_STACK();
-        if (engineId == SynchronizedThreadLock::s_mpMemoryPartitionId) {
-            StackTrace* st = getStackTraceFor(0, sz, object);
-            if (st) {
-                VOLT_ERROR("Allocated data partition %d:", 0);
-                st->printLocalTrace();
-            }
-        } else {
-            StackTrace* st = getStackTraceFor(SynchronizedThreadLock::s_mpMemoryPartitionId, sz, object);
-            if (st) {
-                VOLT_ERROR("Allocated data partition %d:", SynchronizedThreadLock::s_mpMemoryPartitionId);
-                st->printLocalTrace();
-            }
+    // We Don't track allocations on the mp thread.
+    if (engineId != 16383) {
+        VOLT_DEBUG("Deallocating %p of size %lu on engine %d, thread %d", object, sz,
+                engineId, getThreadPartitionId());
+        s_sharedMemoryMutex.lock();
+        auto const it = s_allocations.find(engineId);
+        s_sharedMemoryMutex.unlock();
+        if (it == s_allocations.cend()) {
+            VOLT_ERROR("Deallocated data pointer %p in wrong context thread (partition %d)",
+                    object, engineId);
+            VOLT_ERROR_STACK();
+            throwFatalException("Attempt to deallocate exact-sized object of unknown size");
         }
-        throwFatalException("Attempt to deallocate exact-sized object of unknown size");
-    } else {
-        auto const alloc = mapForAdd->second.find(object);
-        if (alloc == mapForAdd->second.cend()) {
+        SizeBucketMap_t& mapBySize = it->second;
+        auto const mapForAdd = mapBySize.find(sz);
+        if (mapForAdd == mapBySize.cend()) {
             VOLT_ERROR("Deallocated data pointer %p in wrong context thread (partition %d)",
                     object, engineId);
             VOLT_ERROR_STACK();
@@ -453,13 +442,34 @@ void ThreadLocalPool::freeExactSizedObject(std::size_t sz, void* object) {
                     st->printLocalTrace();
                 }
             }
-            throwFatalException("Attempt to deallocate unknown exact-sized object");
-            return;
+            throwFatalException("Attempt to deallocate exact-sized object of unknown size");
         } else {
-#ifdef VOLT_TRACE_ALLOCATIONS
-           free(alloc->second);
-#endif
-            mapForAdd->second.erase(alloc);
+            auto const alloc = mapForAdd->second.find(object);
+            if (alloc == mapForAdd->second.cend()) {
+                VOLT_ERROR("Deallocated data pointer %p in wrong context thread (partition %d)",
+                        object, engineId);
+                VOLT_ERROR_STACK();
+                if (engineId == SynchronizedThreadLock::s_mpMemoryPartitionId) {
+                    StackTrace* st = getStackTraceFor(0, sz, object);
+                    if (st) {
+                        VOLT_ERROR("Allocated data partition %d:", 0);
+                        st->printLocalTrace();
+                    }
+                } else {
+                    StackTrace* st = getStackTraceFor(SynchronizedThreadLock::s_mpMemoryPartitionId, sz, object);
+                    if (st) {
+                        VOLT_ERROR("Allocated data partition %d:", SynchronizedThreadLock::s_mpMemoryPartitionId);
+                        st->printLocalTrace();
+                    }
+                }
+                throwFatalException("Attempt to deallocate unknown exact-sized object");
+                return;
+            } else {
+    #ifdef VOLT_TRACE_ALLOCATIONS
+               free(alloc->second);
+    #endif
+                mapForAdd->second.erase(alloc);
+            }
         }
     }
 #endif
