@@ -61,7 +61,7 @@ public class TestSnapshotComparer extends JUnit4LocalClusterTest {
 
     @BeforeClass
     public static void setUpBeforeClass() throws Exception {
-        m_server = new LocalCluster("testsnapshotcomparer.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
+        m_server = new LocalCluster("testsnapshotcomparer.jar", 8, 3, 1, BackendTarget.NATIVE_EE_JNI);
         m_server.setHasLocalServer(false);
         m_server.setEnableVoltSnapshotPrefix(true);
         VoltProjectBuilder project = new VoltProjectBuilder();
@@ -106,7 +106,7 @@ public class TestSnapshotComparer extends JUnit4LocalClusterTest {
     // simple functional negative test
     // wrong parameter yield failure result
     @Test
-    public void testSimpleFaiure() {
+    public void testSimpleFailure() {
         exit.expectSystemExitWithStatus(STATUS_INVALID_INPUT);
         String[] wrongArg = {"--self", "--unknow"};
         SnapshotComparer.main(wrongArg);
@@ -145,7 +145,7 @@ public class TestSnapshotComparer extends JUnit4LocalClusterTest {
         } catch (Exception ex) {
             fail();
         }
-        assertEquals(2, results[0].getRowCount());
+        assertEquals(3, results[0].getRowCount());
         List<String> subdirs = new ArrayList<>();
         for (int i = 0; i < m_server.getNodeCount(); i++) {
             subdirs.add(m_server.getServerSpecificScratchDir(String.valueOf(i)) + File.separator + TMPDIR);
@@ -153,6 +153,168 @@ public class TestSnapshotComparer extends JUnit4LocalClusterTest {
 
         // start convert to MP snapshot to csv
         String[] localSnapshots = {"--self", "--nonce", TESTNONCE, "--dirs", String.join(",", subdirs)};
+        SnapshotComparer.main(localSnapshots);
+    }
+
+    @Test
+    public void testSimpleRejoinSuccess() throws Exception {
+        if (LocalCluster.isMemcheckDefined()) {
+            return;
+        }
+        startCluster();
+        exit.expectSystemExitWithStatus(STATUS_OK);
+        int expectedLines = 10000;
+        Random r = new Random(Calendar.getInstance().getTimeInMillis());
+        ArrayList<Integer> idsToDelete = new ArrayList<>();
+        for (int i = 0; i < expectedLines; i++) {
+            int id = r.nextInt();
+            m_client.callProcedure("T_SP.insert", String.format("Test String %s:%d", "SP", i), id, "blab", "blab");
+            m_client.callProcedure("T_MP.insert", String.format("Test String %s:%d", "MP", i), id, "blab", "blab");
+            if (i % 10 == 0) {
+                idsToDelete.add(id);
+            }
+        }
+
+        for (int i : idsToDelete) {
+            m_client.callProcedure("@AdHoc", "DELETE FROM T_SP where A1=" + i);
+            m_client.callProcedure("@AdHoc", "DELETE FROM T_MP where A1=" + i);
+        }
+        idsToDelete.clear();
+
+        m_server.killSingleHost(2);
+        Thread.sleep(5000);
+        for (int i = 0; i < expectedLines; i++) {
+            int id = r.nextInt();
+            m_client.callProcedure("T_SP.insert", String.format("Test String %s:%d", "SP", i), id, "blab", "blab");
+            m_client.callProcedure("T_MP.insert", String.format("Test String %s:%d", "MP", i), id, "blab", "blab");
+            if (i % 10 == 0) {
+                idsToDelete.add(id);
+            }
+        }
+        for (int i : idsToDelete) {
+            m_client.callProcedure("@AdHoc", "DELETE FROM T_SP where A1=" + i);
+            m_client.callProcedure("@AdHoc", "DELETE FROM T_MP where A1=" + i);
+        }
+        idsToDelete.clear();
+
+        m_server.rejoinOne(2);
+
+        VoltTable[] results = null;
+        try {
+            results = m_client.callProcedure("@SnapshotSave", TMPDIR, TESTNONCE + "DRO", 1).getResults();
+        } catch(Exception ex) {
+            ex.printStackTrace();
+            fail();
+        }
+        System.out.println(results[0]);
+
+        try {
+            results = m_client.callProcedure("@SnapshotScan", TMPDIR).getResults();
+        } catch (NoConnectionsException e) {
+            e.printStackTrace();
+        } catch (Exception ex) {
+            fail();
+        }
+        List<String> subdirs = new ArrayList<>();
+        for (int i = 0; i < m_server.getNodeCount(); i++) {
+            subdirs.add(m_server.getServerSpecificScratchDir(String.valueOf(i)) + File.separator + TMPDIR);
+        }
+
+        // start convert to MP snapshot to csv
+        String[] localSnapshots = {"--self", "--nonce", TESTNONCE + "DRO", "--dirs", String.join(",", subdirs)};
+        SnapshotComparer.main(localSnapshots);
+    }
+
+    @Test
+    public void testRejoinAndSprinkledSnapshot() throws Exception {
+        if (LocalCluster.isMemcheckDefined()) {
+            return;
+        }
+        startCluster();
+        exit.expectSystemExitWithStatus(STATUS_OK);
+        int expectedLines = 10000;
+        Random r = new Random(Calendar.getInstance().getTimeInMillis());
+        ArrayList<Integer> idsToDelete = new ArrayList<>();
+        for (int i = 0; i < expectedLines; i++) {
+            int id = r.nextInt();
+            m_client.callProcedure("T_SP.insert", String.format("Test String %s:%d", "SP", i), id, "blab", "blab");
+            m_client.callProcedure("T_MP.insert", String.format("Test String %s:%d", "MP", i), id, "blab", "blab");
+            if (i % 10 == 0) {
+                idsToDelete.add(id);
+            }
+        }
+
+        int snapAt = idsToDelete.get(r.nextInt(idsToDelete.size()));
+        for (int i : idsToDelete) {
+            m_client.callProcedure("@AdHoc", "DELETE FROM T_SP where A1=" + i);
+            m_client.callProcedure("@AdHoc", "DELETE FROM T_MP where A1=" + i);
+            if (i == snapAt) {
+                VoltTable[] results = null;
+                try {
+                    // Autosnap
+                    results = m_client.callProcedure("@SnapshotSave").getResults();
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                    fail();
+                }
+                System.out.println(results[0]);
+            }
+        }
+        idsToDelete.clear();
+
+        m_server.killSingleHost(2);
+        Thread.sleep(5000);
+        for (int i = 0; i < expectedLines; i++) {
+            int id = r.nextInt();
+            m_client.callProcedure("T_SP.insert", String.format("Test String %s:%d", "SP", i), id, "blab", "blab");
+            m_client.callProcedure("T_MP.insert", String.format("Test String %s:%d", "MP", i), id, "blab", "blab");
+            if (i % 10 == 0) {
+                idsToDelete.add(id);
+            }
+        }
+        snapAt = idsToDelete.get(r.nextInt(idsToDelete.size()));
+        for (int i : idsToDelete) {
+            m_client.callProcedure("@AdHoc", "DELETE FROM T_SP where A1=" + i);
+            m_client.callProcedure("@AdHoc", "DELETE FROM T_MP where A1=" + i);
+            if (i == snapAt) {
+                VoltTable[] results = null;
+                try {
+                    // Autosnap
+                    results = m_client.callProcedure("@SnapshotSave").getResults();
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                    fail();
+                }
+                System.out.println(results[0]);
+            }
+        }
+        idsToDelete.clear();
+
+        m_server.rejoinOne(2);
+
+        VoltTable[] results = null;
+        try {
+            results = m_client.callProcedure("@SnapshotSave", TMPDIR, TESTNONCE + "DRO2", 1).getResults();
+        } catch(Exception ex) {
+            ex.printStackTrace();
+            fail();
+        }
+        System.out.println(results[0]);
+
+        try {
+            results = m_client.callProcedure("@SnapshotScan", TMPDIR).getResults();
+        } catch (NoConnectionsException e) {
+            e.printStackTrace();
+        } catch (Exception ex) {
+            fail();
+        }
+        List<String> subdirs = new ArrayList<>();
+        for (int i = 0; i < m_server.getNodeCount(); i++) {
+            subdirs.add(m_server.getServerSpecificScratchDir(String.valueOf(i)) + File.separator + TMPDIR);
+        }
+
+        // start convert to MP snapshot to csv
+        String[] localSnapshots = {"--self", "--nonce", TESTNONCE + "DRO2", "--dirs", String.join(",", subdirs)};
         SnapshotComparer.main(localSnapshots);
     }
 
