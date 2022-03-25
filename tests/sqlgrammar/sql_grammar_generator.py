@@ -970,7 +970,7 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
                     sql_was_echoed_as_output = True
 
                 # Special case for 'show ...' commands
-                elif 'show ' in sql:
+                elif sql and sql.strip().startswith('show '):
                     # The 'show' commands do not get echoed back by sqlcmd;
                     # so pretend it was echoed, rather than wait for it
                     sql_was_echoed_as_output = True
@@ -1476,7 +1476,9 @@ if __name__ == "__main__":
                             ['Object not found'],
                             ['View does not support COUNT(DISTINCT) expression'],
                             ['Table', 'cannot be swapped since it is used for exporting'],
-                            ['Illegal partition parameter. Value cannot be']
+                            ['Illegal partition parameter. Value cannot be'],
+                            ['ORDER BY cannot contain', 'not involved in the current select'],
+                            ['May not dynamically modify'],
                            ]
 
     # Initialize a list of any SQL (or other) commands that may hang sqlcmd
