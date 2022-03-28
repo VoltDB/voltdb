@@ -606,6 +606,7 @@ DISTRIBUTION
             <include name="src/frontend/org/voltdb/VoltTable.java" />
             <include name="src/frontend/org/voltdb/VoltTableRow.java" />
             <include name="src/frontend/org/voltdb/VoltProcedure.java" />
+            <include name="src/frontend/org/voltdb/VoltCompoundProcedure.java" />
             <include name="src/frontend/org/voltdb/SQLStmt.java" />
             <include name="src/frontend/org/voltdb/VoltType.java" />
             <include name="src/frontend/org/voltdb/InProcessVoltDBServer.java" />

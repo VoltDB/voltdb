@@ -156,7 +156,7 @@ public class SQLCommand {
             // Assert the current DDL AdHoc batch call behavior
             assert(response.getResults().length == 1);
             System.out.println("Batch command succeeded.");
-            loadStoredProcedures(Procedures, Classlist);
+            loadStoredProcedures();
         } catch (ProcCallException ex) {
             String fixedMessage = patchErrorMessageWithFile(batchFileName, ex.getMessage());
             stopOrContinue(new Exception(fixedMessage));
@@ -744,23 +744,35 @@ public class SQLCommand {
                 }
             }
             else {
+                if (CompoundProcedures.contains(procedure)) {
+                    continue;
+                }
                 if (firstUserProc) {
                     firstUserProc = false;
                     System.out.println();
                     printCatalogHeader("User Procedures");
                 }
             }
-            for (List<String> parameterSet : Procedures.get(procedure).values()) {
-                System.out.printf(format, procedure);
-                String sep = "\t";
-                for (String paramType : parameterSet) {
-                    System.out.print(sep + paramType);
-                    sep = ", ";
-                }
-                System.out.println();
-            }
+            printProcedure(format, procedure);
+        }
+        if (!CompoundProcedures.isEmpty()) {
+            System.out.println();
+            printCatalogHeader("User Compound Procedures");
+            CompoundProcedures.forEach(p -> printProcedure(format, p));
         }
         System.out.println();
+    }
+
+    private static void printProcedure(String format, String procedure) {
+        for (List<String> parameterSet : Procedures.get(procedure).values()) {
+            System.out.printf(format, procedure);
+            String sep = "\t";
+            for (String paramType : parameterSet) {
+                System.out.print(sep + paramType);
+                sep = ", ";
+            }
+            System.out.println();
+        }
     }
 
     private static void printConfig(VoltTable configData) {
@@ -1087,7 +1099,7 @@ public class SQLCommand {
                     printDdlResponse(UpdateApplicationCatalog.update(m_client, catfile, depfile));
 
                     // Need to update the stored procedures after a catalog change (could have added/removed SPs!).  ENG-3726
-                    loadStoredProcedures(Procedures, Classlist);
+                    loadStoredProcedures();
                 } else if (procName.equals("@UpdateClasses")) {
                     File jarfile = null;
                     if (objectParams[0] != null) {
@@ -1095,7 +1107,7 @@ public class SQLCommand {
                     }
                     printDdlResponse(m_client.updateClasses(jarfile, (String)objectParams[1]));
                     // Need to reload the procedures and classes
-                    loadStoredProcedures(Procedures, Classlist);
+                    loadStoredProcedures();
                 } else {
                     // @SnapshotDelete needs array parameters.
                     if (procName.equals("@SnapshotDelete")) {
@@ -1150,7 +1162,7 @@ public class SQLCommand {
             if (loadPath != null) {
                 File jarfile = new File(loadPath);
                 printDdlResponse(m_client.updateClasses(jarfile, null));
-                loadStoredProcedures(Procedures, Classlist);
+                loadStoredProcedures();
                 return;
             }
 
@@ -1158,7 +1170,7 @@ public class SQLCommand {
             String classSelector = SQLParser.parseRemoveClasses(statement);
             if (classSelector != null) {
                 printDdlResponse(m_client.updateClasses(null, classSelector));
-                loadStoredProcedures(Procedures, Classlist);
+                loadStoredProcedures();
                 return;
             }
 
@@ -1167,7 +1179,7 @@ public class SQLCommand {
             if (SQLParser.queryIsDDL(statement)) {
                 // if the query is DDL, reload the stored procedures.
                 printDdlResponse(m_client.callProcedure("@AdHoc", statement));
-                loadStoredProcedures(Procedures, Classlist);
+                loadStoredProcedures();
                 return;
             }
             // All other commands get forwarded to @AdHoc
@@ -1245,6 +1257,8 @@ public class SQLCommand {
     // Default visibility is for test purposes.
     static Map<String,Map<Integer, List<String>>> Procedures = Collections.synchronizedMap(new HashMap<>());
     private static Map<String, List<Boolean>> Classlist = Collections.synchronizedMap(new HashMap<>());
+    private static Set<String> CompoundProcedures = Collections.synchronizedSet(new HashSet<>());
+
     private static void loadSystemProcedures() {
         Procedures.put("@Pause",
                 ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<>()).build());
@@ -1461,8 +1475,8 @@ public class SQLCommand {
         return tables;
     }
 
-    private static void loadStoredProcedures(Map<String,Map<Integer, List<String>>> procedures,
-            Map<String, List<Boolean>> classlist) {
+    // Load stored procedures and update globals Procedures, Classlist, CompoundProcedures
+    private static void loadStoredProcedures() {
         VoltTable procs = null;
         VoltTable params = null;
         VoltTable classes = null;
@@ -1487,6 +1501,7 @@ public class SQLCommand {
         }
         params.resetRowPosition();
         Set<String> userProcs = new HashSet<>();
+        CompoundProcedures.clear();
         while (procs.advanceRow()) {
             String proc_name = procs.getString("PROCEDURE_NAME");
             userProcs.add(proc_name);
@@ -1502,23 +1517,28 @@ public class SQLCommand {
             }
             HashMap<Integer, List<String>> argLists = new HashMap<>();
             argLists.put(param_count, this_params);
-            procedures.put(proc_name, argLists);
-        }
-        for (String proc_name : new ArrayList<>(procedures.keySet())) {
-            if (!proc_name.startsWith("@") && !userProcs.contains(proc_name)) {
-                procedures.remove(proc_name);
+            Procedures.put(proc_name, argLists);
+            // Detect compound procedures
+            String remarks = procs.getString("REMARKS");
+            if (isCompound(remarks)) {
+                CompoundProcedures.add(proc_name);
             }
         }
-        classlist.clear();
+        for (String proc_name : new ArrayList<>(Procedures.keySet())) {
+            if (!proc_name.startsWith("@") && !userProcs.contains(proc_name)) {
+                Procedures.remove(proc_name);
+            }
+        }
+        Classlist.clear();
         while (classes.advanceRow()) {
             String classname = classes.getString("CLASS_NAME");
             boolean isProc = (classes.getLong("VOLT_PROCEDURE") == 1L);
             boolean isActive = (classes.getLong("ACTIVE_PROC") == 1L);
-            if (!classlist.containsKey(classname)) {
+            if (!Classlist.containsKey(classname)) {
                 List<Boolean> stuff = Collections.synchronizedList(new ArrayList<Boolean>());
                 stuff.add(isProc);
                 stuff.add(isActive);
-                classlist.put(classname, stuff);
+                Classlist.put(classname, stuff);
             }
         }
 
@@ -1526,7 +1546,7 @@ public class SQLCommand {
         // for array types.  ENG-3101
         params.resetRowPosition();
         while (params.advanceRow()) {
-            Map<Integer, List<String>> argLists = procedures.get(params.getString("PROCEDURE_NAME"));
+            Map<Integer, List<String>> argLists = Procedures.get(params.getString("PROCEDURE_NAME"));
             assert(argLists.size() == 1);
             List<String> this_params = argLists.values().iterator().next();
             int idx = (int)params.getLong("ORDINAL_POSITION") - 1;
@@ -1539,6 +1559,17 @@ public class SQLCommand {
             }
             this_params.set(idx, param_type);
         }
+    }
+
+    private static boolean isCompound(String remarks) {
+        boolean ret = false;
+        try {
+            JSONObject json = new JSONObject(remarks);
+            ret = json.optBoolean("compound");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return ret;
     }
 
     /// Parser unit test entry point
@@ -1781,7 +1812,7 @@ public class SQLCommand {
             loadSystemProcedures();
 
             // Load user stored procs
-            loadStoredProcedures(Procedures, Classlist);
+            loadStoredProcedures();
 
             // Removed code to prevent Ctrl-C from exiting. The original code is visible
             // in Git history hash 837df236c059b5b4362ffca7e7a5426fba1b7f20.

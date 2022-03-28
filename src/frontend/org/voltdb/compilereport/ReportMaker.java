@@ -589,6 +589,11 @@ public class ReportMaker {
         if (scanCount > 0) {
             tag(sb, "important", "Scans");
         }
+
+        if (CatalogUtil.isCompoundProcedure(procedure)) {
+            tag(sb,"inverse","Compound");
+        }
+
         sb.append("</td>");
 
         sb.append("</tr>\n");

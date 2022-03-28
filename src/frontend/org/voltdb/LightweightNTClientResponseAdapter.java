@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -52,10 +52,10 @@ import org.voltdb.utils.MiscUtils;
  */
 public class LightweightNTClientResponseAdapter implements Connection, WriteStream {
 
-    final static String DEFAULT_INTERNAL_ADAPTER_NAME = "+!_NTInternalAdapter_!+";
+    private final static String DEFAULT_INTERNAL_ADAPTER_NAME = "+!_NTInternalAdapter_!+";
 
-    private static final VoltLogger m_logger = new VoltLogger("HOST");
-    public final static long SUPPRESS_INTERVAL = 120;
+    private final static VoltLogger m_logger = new VoltLogger("HOST");
+    private final static long SUPPRESS_INTERVAL = 120;
 
     private final long m_connectionId;
     private final AtomicLong m_handles = new AtomicLong();
@@ -66,8 +66,7 @@ public class LightweightNTClientResponseAdapter implements Connection, WriteStre
     private void createTransaction(final InternalAdapterTaskAttributes kattrs,
             final ProcedureCallback cb,
             final StoredProcedureInvocation task,
-            final AuthSystem.AuthUser user)
-    {
+            final AuthSystem.AuthUser user) {
         assert(m_dispatcher != null);
 
         final long handle = nextHandle();
@@ -76,7 +75,8 @@ public class LightweightNTClientResponseAdapter implements Connection, WriteStre
         assert(m_callbacks.get(handle) == null);
         m_callbacks.put(handle, cb);
 
-        ClientResponseImpl r = m_dispatcher.dispatch(task, kattrs, LightweightNTClientResponseAdapter.this, user, null, true /* nt priority */);
+        // ntPriority (last dispatcher arg) is only significant if task is an NT procedure
+        ClientResponseImpl r = m_dispatcher.dispatch(task, kattrs, this, user, null, true);
         if (r != null) {
             try {
                 cb.clientCallback(r);

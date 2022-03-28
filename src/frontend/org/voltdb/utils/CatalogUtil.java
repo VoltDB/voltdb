@@ -3784,6 +3784,21 @@ public abstract class CatalogUtil {
         return proc.getSinglepartition() || proc.getPartitioncolumn2() != null;
     }
 
+    /**
+     * Return if this a compound procedure, i.e. a Java non-transactional, non-system, non-default procedure
+     * <p>
+     * See {@link org.voltdb.compiler.ProcedureCompiler.compileNTProcedure(VoltCompiler, Class<?>, Procedure, InMemoryJarfile)}
+     *
+     * @param proc {@link Procedure}
+     * @return {@code true} if procedure is a compound procedure
+     */
+    public static boolean isCompoundProcedure(Procedure proc) {
+        return !proc.getTransactional()
+                && !proc.getSystemproc()
+                && !proc.getDefaultproc()
+                && proc.getHasjava();
+    }
+
     public static Map<String, Table> getTimeToLiveTables(Database db) {
         Map<String, Table> ttls = Maps.newHashMap();
         for (Table t : db.getTables()) {

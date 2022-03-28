@@ -32,20 +32,21 @@ import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Function;
+import org.voltdb.catalog.Group;
+import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.ProcParameter;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
-import org.voltdb.catalog.User;
-import org.voltdb.catalog.Group;
-import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.Task;
 import org.voltdb.catalog.TaskParameter;
 import org.voltdb.catalog.Topic;
+import org.voltdb.catalog.User;
 import org.voltdb.task.TaskScope;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.IndexType;
 import org.voltdb.types.VoltDecimalHelper;
+import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.InMemoryJarfile;
 
 public class JdbcDatabaseMetaDataGenerator
@@ -56,6 +57,7 @@ public class JdbcDatabaseMetaDataGenerator
     public static final String JSON_PARTITION_PARAMETER_TYPE = "partitionParameterType";
     public static final String JSON_SINGLE_PARTITION = "singlePartition";
     public static final String JSON_READ_ONLY = "readOnly";
+    public static final String JSON_COMPOUND = "compound";
     public static final String JSON_PARTITION_COLUMN = "partitionColumn";
     public static final String JSON_SOURCE_TABLE = "sourceTable";
     public static final String JSON_LIMIT_PARTITION_ROWS_DELETE_STMT = "limitPartitionRowsDeleteStmt";
@@ -711,6 +713,7 @@ public class JdbcDatabaseMetaDataGenerator
                         jsObj.put(JSON_PARTITION_PARAMETER_TYPE, proc.getPartitioncolumn().getType());
                     }
                 }
+                jsObj.put(JSON_COMPOUND, CatalogUtil.isCompoundProcedure(proc));
                 remark = jsObj.toString();
             } catch (JSONException e) {
                 hostLog.warn("You have encountered an unexpected error while generating results for the " +
@@ -884,7 +887,8 @@ public class JdbcDatabaseMetaDataGenerator
         for (String classname : m_jarfile.getLoader().getClassNames()) {
             try {
                 Class<?> clazz = m_jarfile.getLoader().loadClass(classname);
-                boolean isProc = VoltProcedure.class.isAssignableFrom(clazz);
+                boolean isProc = VoltProcedure.class.isAssignableFrom(clazz)
+                        || VoltCompoundProcedure.class.isAssignableFrom(clazz);
                 boolean isActive = false;
                 if (isProc) {
                     for (Procedure proc : m_database.getProcedures()) {

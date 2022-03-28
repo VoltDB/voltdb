@@ -104,6 +104,7 @@ begin Group javaonly
   bool sql              "Can invoke the adhoc system procedures"
   bool sqlread          "Can invoke read-only adhoc system procedures"
   bool allproc          "Can invoke any user defined procedures"
+  bool compoundproc     "Can invoke compound procedures"
 end
 
 begin GroupRef javaonly

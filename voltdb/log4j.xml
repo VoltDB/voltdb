@@ -104,6 +104,10 @@
         <level value="INFO"/>
     </logger -->
 
+    <!-- logger name="NT">
+        <level value="INFO"/>
+    </logger -->
+
     <!-- logger name="REJOIN">
         <level value="INFO"/>
     </logger -->

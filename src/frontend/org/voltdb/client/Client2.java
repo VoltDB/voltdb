@@ -318,7 +318,7 @@ public interface Client2 extends Closeable {
      * <p>
      * The method uses system procedure <code>@GetPartitionKeys</code> to determine target
      * partitions, and then execute the specified procedure on each partition, returning
-     * an aggregated response. The call does not complete unil all procedure instances
+     * an aggregated response. The call does not complete until all procedure instances
      * have completed.
      * <p>
      * The set of partition values is cached for a short while (around 1 second) to avoid

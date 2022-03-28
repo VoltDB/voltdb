@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<deployment>
+    <cluster sitesperhost="8" />
+    <topics enabled="true">
+      <broker>
+        <!-- property name="producer.compound.procedure.timeout.ms">1000</property -->
+      </broker>
+      <topic name="topicnt" format= "csv" procedure="HandleHit" >
+        <!-- producer produces <key, value> == <cookieid, url>, so include key in parameters -->
+        <property name="producer.parameters.includeKey">true</property>
+      </topic>
+      <topic name="next_actions" format= "csv" retention="10 mn" />
+      <topic name="user_hits" format= "csv" retention="10 mn" />
+      <topic name="account_hits" format= "csv" retention="10 mn" />
+      <topic name="cookie_errors" format= "csv" retention="1 dy" />
+    </topics>
+</deployment>

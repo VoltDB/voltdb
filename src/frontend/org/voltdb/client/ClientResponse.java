@@ -137,6 +137,21 @@ public interface ClientResponse {
     public static final byte CLIENT_RESPONSE_TIMEOUT = -16;
 
     /**
+     * Status indicating that a compound procedure was aborted by explicit
+     * action of the stored procedure. No rollback was performed; transactions
+     * submitted by the procedure and successfully completed remain committed.
+     */
+    public static final byte COMPOUND_PROC_USER_ABORT = -17;
+
+    /**
+     * Status code indicating that a compound procedure is taking longer than a
+     * sufficiently large timeout. The procedure may either be slow, deadlocked, or looping
+     * infinitely. The timeout response is sent even if the procedure subsequently
+     * completes.
+     */
+    public static final byte COMPOUND_PROC_TIMEOUT = -18;
+
+    /**
      * Default value for the user specified app status code field
      */
     public static final byte UNINITIALIZED_APP_STATUS_CODE = Byte.MIN_VALUE;

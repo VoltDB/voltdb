@@ -1641,9 +1641,8 @@ public class Client2Impl implements Client2 {
 
                     // If outstanding ping and timed out, close the connection
                     if (cxn.outstandingPing && sinceLastResponse > connectionResponseTimeout) {
-                        logError("Connection to %s port %d timed out",
-                                cxn.connection.getHostnameOrIP(),
-                                cxn.connection.getRemotePort());
+                        logError("Connection to %s port %d timed out", cxn.connection.getHostnameOrIP(),
+                                 cxn.connection.getRemotePort());
                         cxn.connection.unregister();
                     }
 

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,6 +20,7 @@ package org.voltdb.common;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.EnumSet;
+
 import org.voltdb.catalog.Group;
 
 //If you add a permission here add a boolean in spec.txt and update getPermissionSetForGroup method
@@ -31,7 +32,8 @@ public enum Permission {
     DEFAULTPROC,
     DEFAULTPROCREAD,
     SQL,             // aliased by ADHOC
-    SQLREAD;
+    SQLREAD,
+    COMPOUNDPROC;
 
     public static final String toListString() {
         return Arrays.asList(values()).toString();
@@ -68,6 +70,7 @@ public enum Permission {
         if (catGroup.getDefaultproc()) addPermission(perms, Permission.DEFAULTPROC);
         if (catGroup.getDefaultprocread()) addPermission(perms, Permission.DEFAULTPROCREAD);
         if (catGroup.getAllproc()) addPermission(perms, Permission.ALLPROC);
+        if (catGroup.getCompoundproc()) addPermission(perms, Permission.COMPOUNDPROC);
         return perms;
     }
 
@@ -117,6 +120,11 @@ public enum Permission {
             case DEFAULTPROC:
                 permissions.add(DEFAULTPROC);
                 addPermission(permissions, DEFAULTPROCREAD);
+                break;
+            case COMPOUNDPROC:
+                permissions.add(COMPOUNDPROC);
+                addPermission(permissions, ALLPROC);
+                break;
             default:
                 permissions.add(onePerm);
             }
@@ -152,6 +160,9 @@ public enum Permission {
                 break;
             case ALLPROC:
                 group.setAllproc(true);
+                break;
+            case COMPOUNDPROC:
+                group.setCompoundproc(true);
                 break;
             }
         }

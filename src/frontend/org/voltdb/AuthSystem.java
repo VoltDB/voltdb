@@ -235,6 +235,18 @@ public class AuthSystem {
          */
         private Set<Connector> m_authorizedConnectors = new HashSet<Connector>();
 
+        @Override
+        public String toString() {
+            StringBuilder sb = new StringBuilder("AuthUser:")
+                    .append("\n\tname:\t").append(m_name)
+                    .append("\n\tgroups:\t").append(getGroupNames())
+                    .append("\n\tperms:\t").append(m_permissions)
+                    .append("\n\tprocs:\t").append(m_authorizedProcedures.stream().map(p -> p.getTypeName()).collect(Collectors.toList()))
+                    .append("\n\tconns:\t").append(m_authorizedConnectors.stream().map(c -> c.getTypeName()).collect(Collectors.toList()))
+                    .append("\n");
+            return sb.toString();
+        }
+
         /**
          * The constructor accepts the password as either sha1 or bcrypt. In practice
          * there will be only one passed in depending on the format of the password in the catalog.

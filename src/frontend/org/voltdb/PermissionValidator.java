@@ -19,6 +19,7 @@ package org.voltdb;
 
 import java.util.ArrayList;
 import java.util.List;
+
 import org.voltdb.catalog.Procedure;
 
 /**
@@ -36,6 +37,7 @@ public class PermissionValidator {
         m_permissionpolicies.add(new InvocationSqlPermissionPolicy());
         m_permissionpolicies.add(new InvocationDefaultProcPermissionPolicy());
         m_permissionpolicies.add(new InvocationUserDefinedProcedurePermissionPolicy());
+        m_permissionpolicies.add(new InvocationCompoundProcedurePermissionPolicy());
     }
 
     //Check permission policies first check all if any ALLOW go through DENY counts only if we didnt allow.

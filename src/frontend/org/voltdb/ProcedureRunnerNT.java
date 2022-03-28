@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2021 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,6 +17,8 @@
 
 package org.voltdb;
 
+import static org.voltdb.NTProcedureService.LOG;
+
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
@@ -24,13 +26,13 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.network.Connection;
@@ -54,22 +56,19 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
  */
 public class ProcedureRunnerNT {
 
-    private static final VoltLogger tmLog = new VoltLogger("TM");
-
-    // this is priority service for follow up work
-    protected final ExecutorService m_executorService;
-    protected final NTProcedureService m_ntProcService;
+    // m_responseService is used for handling ClientResponse callbacks
+    private final ExecutorService m_responseService;
+    // m_ntProcService is used for procedure calls from this runner
+    private final NTProcedureService m_ntProcService;
     // client interface mailbox
-    protected final Mailbox m_mailbox;
+    private final Mailbox m_mailbox;
     // shared between all concurrent calls to the same procedure
-    ProcedureStatsCollector m_statsCollector;
+    private ProcedureStatsCollector m_statsCollector;
     // generated for each call
-    StatementStats.SingleCallStatsToken m_perCallStats = null;
+    private StatementStats.SingleCallStatsToken m_perCallStats = null;
 
     // unique for each call
     protected final long m_id;
-    // gate to only allow one all-host call at a time
-    protected final AtomicBoolean m_outstandingAllHostProc = new AtomicBoolean(false);
 
     // regular call support stuff
     protected final AuthUser m_user;
@@ -81,11 +80,14 @@ public class ProcedureRunnerNT {
     protected final VoltNonTransactionalProcedure m_procedure;
     protected final Method m_procMethod;
     protected final Class<?>[] m_paramTypes;
+    protected final boolean m_isAdmin;
     protected byte m_statusCode = ClientResponse.SUCCESS;
     protected String m_statusString = null;
     protected byte m_appStatusCode = ClientResponse.UNINITIALIZED_APP_STATUS_CODE;
     protected String m_appStatusString = null;
-    protected final boolean m_isAdmin;
+
+    // gate to only allow one all-host call at a time
+    private final AtomicBoolean m_outstandingAllHostProc = new AtomicBoolean(false);
 
     // Track the outstanding all host procedures
     private final Object m_allHostCallbackLock = new Object();
@@ -96,7 +98,7 @@ public class ProcedureRunnerNT {
     ProcedureRunnerNT(
             long id, AuthUser user, Connection ccxn, boolean isAdmin, long ciHandle, long clientHandle, int timeout,
             VoltNonTransactionalProcedure procedure, String procName, Method procMethod, Class<?>[] paramTypes,
-            ExecutorService executorService, NTProcedureService procSet, Mailbox mailbox,
+            ExecutorService responseService, NTProcedureService procService, Mailbox mailbox,
             ProcedureStatsCollector statsCollector) {
         m_id = id;
         m_user = user;
@@ -109,14 +111,15 @@ public class ProcedureRunnerNT {
         m_procedureName = procName;
         m_procMethod = procMethod;
         m_paramTypes = paramTypes;
-        m_executorService = executorService;
-        m_ntProcService = procSet;
+        m_responseService = responseService;
+        m_ntProcService = procService;
         m_mailbox = mailbox;
         m_statsCollector = statsCollector;
     }
 
     /**
      * Complete the future when we get a traditional ProcedureCallback.
+     * (Package access for LightweightNTClientResponseAdapter)
      */
     class NTNestedProcedureCallback implements ProcedureCallback {
         final CompletableFuture<ClientResponse> m_fut = new CompletableFuture<>();
@@ -125,7 +128,7 @@ public class ProcedureRunnerNT {
         public void clientCallback(ClientResponse clientResponse) throws Exception {
             // the future needs to be completed in the right executor service
             // so any follow on work will be in the right executor service
-            m_executorService.submit(() -> {
+            m_responseService.submit(() -> {
                 m_fut.complete(clientResponse);
             });
         }
@@ -158,9 +161,8 @@ public class ProcedureRunnerNT {
             boolean removed = m_outstandingAllHostProcedureHostIds.remove(hostId);
             // log this for now... I don't expect it to ever happen, but will be interesting to see...
             if (!removed) {
-                tmLog.error(String.format(
-                          "ProcedureRunnerNT.allHostNTProcedureCallback for procedure %s received late or unexepected response from hostID %d.",
-                          m_procedureName, hostId));
+                LOG.errorFmt("ProcedureRunnerNT.allHostNTProcedureCallback for procedure %s received late or unexepected response from hostID %d.",
+                          m_procedureName, hostId);
                 return;
             }
 
@@ -181,7 +183,7 @@ public class ProcedureRunnerNT {
         return cb.fut();
     }
 
-    public CompletableFuture<ClientResponseWithPartitionKey[]> callAllPartitionProcedure(final String procedureName, final Object... params) {
+    protected CompletableFuture<ClientResponseWithPartitionKey[]> callAllPartitionProcedure(final String procedureName, final Object... params) {
         final Object[] args = new Object[params.length + 1];
         System.arraycopy(params, 0, args, 1, params.length);
 
@@ -285,10 +287,12 @@ public class ProcedureRunnerNT {
 
     /**
      * Synchronous call to NT procedure run(..) method.
+     * We are executing in the context of a task running
+     * from an executor service owned by the NTProcedureService.
      *
      * Wraps coreCall with statistics.
      *
-     * @return True if done and null if there is an
+     * @return True if done and false if there is an
      * async task still running.
      */
     protected boolean call(Object... paramListIn) {
@@ -330,15 +334,17 @@ public class ProcedureRunnerNT {
         // remove record of this procedure in NTPS
         // only done if procedure is really done
         m_ntProcService.handleNTProcEnd(this);
-
         return true;
     }
 
     /**
      * Send a response back to the proc caller. Refactored out of coreCall for both
      * regular and exceptional paths.
+     *
+     * TODO - why doesn't above call() method use this?
      */
     private void completeCall(ClientResponseImpl response) {
+
         // if we're keeping track, calculate result size
         if (m_perCallStats.samplingProcedure()) {
             m_perCallStats.setResultSize(response.getResults());
@@ -349,21 +355,39 @@ public class ProcedureRunnerNT {
                                       m_perCallStats);
         // allow the GC to collect per-call stats if this proc isn't called for a while
         m_perCallStats = null;
+        respond(response);
+    }
 
+    private void respond(ClientResponseImpl response) {
         // send the response to the caller
         // must be done as IRM to CI mailbox for backpressure accounting
         response.setClientHandle(m_clientHandle);
         InitiateResponseMessage irm = InitiateResponseMessage.messageForNTProcResponse(
                 m_ciHandle, m_ccxn.connectionId(), response);
-        m_mailbox.deliver(irm);
 
+        m_mailbox.deliver(irm);
         m_ntProcService.handleNTProcEnd(ProcedureRunnerNT.this);
     }
 
     /**
-     * Core Synchronous call to NT procedure run(..) method.
-     * @return ClientResponseImpl non-null if done and null if there is an
-     * async task still running.
+     * Send a timeout response and end the procedure call. Leave the stats around
+     * to handle a possible late completion.
+     *
+     * @param tos   timeout, in microseconds
+     */
+    public void timeoutCall(int tos) {
+        String statusString = String.format("Procedure %s timed out after taking more than %d milliseconds",
+                m_procedureName, tos / 1000);
+        LOG.warn(statusString);
+        respond(new ClientResponseImpl(ClientResponse.COMPOUND_PROC_TIMEOUT, ClientResponse.COMPOUND_PROC_TIMEOUT,
+                statusString, new VoltTable[0], statusString));
+    }
+
+    /**
+     * Core synchronous call to NT procedure run(..) method.
+     *
+     * @return ClientResponseImpl non-null if done and null
+     *         if there is an async task still running.
      */
     private ClientResponseImpl coreCall(Object... paramListIn) {
         final VoltTable[] results;
@@ -398,7 +422,7 @@ public class ProcedureRunnerNT {
 
             try {
                 m_procedure.m_runner = this;
-                Object rawResult = m_procMethod.invoke(m_procedure, paramList);
+                Object rawResult = invokeRunMethod(paramList);
 
                 if (rawResult instanceof CompletableFuture<?>) {
                     final CompletableFuture<?> fut = (CompletableFuture<?>) rawResult;
@@ -428,7 +452,7 @@ public class ProcedureRunnerNT {
                                 response = responseFromTableArray(r);
                             } catch (Exception e) {
                                 // this is a bad place to be, but it's hard to know if it's crash bad...
-                                response = new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                                response = new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE, // TODO: this status is unsuitable
                                         new VoltTable[0],
                                         "Type " + innerRawResult.getClass().getName() +
                                             " returned from NTProc \"" + m_procedureName +
@@ -441,6 +465,11 @@ public class ProcedureRunnerNT {
                         //
                         // Exception path. Some bit of async work threw something.
                         //
+                        if ((e instanceof ExecutionException || e instanceof CompletionException) &&
+                            e.getCause() != null) {
+                            e = e.getCause();
+                        }
+
                         SerializableException se = null;
                         if (e instanceof SerializableException) {
                             se = (SerializableException) e;
@@ -452,7 +481,7 @@ public class ProcedureRunnerNT {
                         } else {
                             msg += e.toString();
                         }
-                        m_statusCode = ClientResponse.GRACEFUL_FAILURE;
+                        m_statusCode = ClientResponse.GRACEFUL_FAILURE; // TODO: this seems like an overly-optimistic claim
                         completeCall(ProcedureRunner.getErrorResponse(m_statusCode, m_appStatusCode, m_appStatusString, msg, se));
                         return null;
                     });
@@ -480,14 +509,19 @@ public class ProcedureRunnerNT {
         return responseFromTableArray(results);
     }
 
-    ClientResponseImpl responseFromTableArray(VoltTable[] results) {
+    protected Object invokeRunMethod(Object[] paramList)
+            throws IllegalAccessException, InvocationTargetException {
+        return m_procMethod.invoke(m_procedure, paramList);
+    }
+
+    private ClientResponseImpl responseFromTableArray(VoltTable[] results) {
         // don't leave empty handed
         if (results == null) {
             results = new VoltTable[0];
         } else if (results.length > Short.MAX_VALUE) {
             String statusString = "Stored procedure returns too much data. Exceeded maximum number of VoltTables: " + Short.MAX_VALUE;
             return new ClientResponseImpl(
-                    ClientResponse.GRACEFUL_FAILURE, ClientResponse.GRACEFUL_FAILURE, statusString, new VoltTable[0],
+                    ClientResponse.GRACEFUL_FAILURE, ClientResponse.GRACEFUL_FAILURE, statusString, new VoltTable[0], // TODO: status
                     statusString);
         }
         return new ClientResponseImpl(
@@ -535,6 +569,14 @@ public class ProcedureRunnerNT {
         m_appStatusString = statusString;
     }
 
+    int getTimeout() {
+        return 0;
+    }
+
+    public String getProcedureName() {
+        return m_procedureName;
+    }
+
     // BELOW TO SUPPORT NT SYSPROCS
 
     protected String getHostname() {
@@ -571,5 +613,10 @@ public class ProcedureRunnerNT {
 
     public boolean isUserAuthEnabled() {
         return m_user.isAuthEnabled();
+    }
+
+    @Override
+    public String toString() {
+        return String.format("id:%d proc:%s sts:%d", m_id, m_procedureName, m_statusCode);
     }
 }

@@ -80,7 +80,7 @@ public class TestSystemCatalogSuite extends RegressionSuite {
 
         results.advanceRow();
         assertEquals("administrator", results.get("ROLE", VoltType.STRING));
-        assertEquals("admin,defaultproc,defaultprocread,sql,sqlread,allproc", results.get("PERMISSIONS", VoltType.STRING));
+        assertEquals("admin,defaultproc,defaultprocread,sql,sqlread,allproc,compoundproc", results.get("PERMISSIONS", VoltType.STRING));
 
         results.advanceRow();
         assertEquals("user", results.get("ROLE", VoltType.STRING));

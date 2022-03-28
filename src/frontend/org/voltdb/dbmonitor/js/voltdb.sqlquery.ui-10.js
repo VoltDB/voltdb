@@ -1196,241 +1196,12 @@ $(document).ready(function () {
       procedureColumnData,
       sysProcedure
     ) {
-      // Stored Procedures
-      var sysScr = "";
-      var src = "";
-      var defSrc = "";
-      sysScr += '<h3 class="systemHeader">System Stored Procedures</h3>';
-      sysScr += '<div id="systemProcedure" class="listView">';
-      for (var k in sysProcedure) {
-        for (var paramCount in sysProcedure[k]) {
-          sysScr += "<h3>" + k + "</h3>";
-          sysScr += '<div class="listView">';
-          sysScr += "<ul>";
-          for (var i = 0; i < sysProcedure[k][paramCount].length - 1; i++) {
-            sysScr +=
-              '<li class="parameterValue">' +
-              sysProcedure[k][paramCount][i] +
-              "</li>";
-          }
-          sysScr +=
-            '<li class="returnValue">' +
-            sysProcedure[k][paramCount][i] +
-            "</li>";
-          sysScr += "</ul>";
-          sysScr += "</div>";
-        }
-      }
-
-      sysScr += "</div>";
-      for (var i = 0; i < proceduresData.length; ++i) {
-        var connTypeParams = [];
-        var procParams = [];
-        var procName = proceduresData[i][2];
-        for (var p = 0; p < procedureColumnData.length; ++p) {
-          if (procedureColumnData[p][2] == procName) {
-            paramType = procedureColumnData[p][6];
-            paramName = procedureColumnData[p][3];
-            paramOrder = procedureColumnData[p][17] - 1;
-            if (procedureColumnData[p][12] == "ARRAY_PARAMETER") {
-              if (paramType.toLowerCase() == "tinyint")
-                // ENG-2040 and ENG-3101, identify it as an array (byte[])
-                paramType = "byte[]";
-              else paramType += "_array";
-            }
-            procParams[paramOrder] = {
-              name: paramName,
-              type: paramType.toLowerCase(),
-            };
-          }
-        }
-
-        var procArray = procName.split(".");
-        if (
-          procArray.length > 1 &&
-          jQuery.inArray(procArray[0], tablesArray) != -1
-        ) {
-          defSrc += "<h3>" + procName + "</h3>";
-          defSrc += '<div class="listView">';
-          defSrc += "<ul>";
-          for (var p = 0; p < procParams.length; ++p) {
-            defSrc +=
-              '<li class="parameterValue">Param' +
-              p +
-              " (" +
-              procParams[p].type +
-              ")</li>";
-          }
-          defSrc += '<li class="returnValue">Return Table[]</li>';
-          defSrc += "</ul>";
-          defSrc += "</div>";
-        } else {
-          src += "<h3>" + procName + "</h3>";
-          src += '<div class="listView">';
-          src += "<ul>";
-          for (var p = 0; p < procParams.length; ++p) {
-            src +=
-              '<li class="parameterValue">Param' +
-              p +
-              " (" +
-              procParams[p].type +
-              ")</li>";
-          }
-          src += '<li class="returnValue">Return Table[]</li>';
-          src += "</ul>";
-          src += "</div>";
-        }
-      }
-      var defSrcHeader = "";
-      defSrcHeader += '<h3 class="systemHeader">Default Stored Procedures</h3>';
-      defSrcHeader += '<div id="defaultProcedure" class="listView">';
-      var defSrcFooter = "</div>";
-      defSrc =
-        defSrcHeader +
-        (defSrc != ""
-          ? defSrc
-          : '<div style="font-size:12px">No default stored procedures found.</div>') +
-        defSrcFooter;
-
-      var userProcHeader = "";
-      userProcHeader +=
-        '<h3 id="userDefinedStoredProcs" class="systemHeader">User Defined Stored Procedures</h3>';
-      userProcHeader += '<div id="userProcedure" class="listView">';
-      var userProcFooter = "</div>";
-      var userSrc =
-        userProcHeader +
-        (src != ""
-          ? src
-          : '<div style="font-size:12px">No user defined stored procedures found.</div>') +
-        userProcFooter;
-      $("#accordionProcedures").html(sysScr + defSrc + userSrc);
-      $("#accordionProcedures").accordion("refresh");
-      $("#systemProcedure").accordion({
-        collapsible: true,
-        active: false,
-        beforeActivate: function (event, ui) {
-          // The accordion believes a panel is being opened
-          if (ui.newHeader[0]) {
-            var currHeader = ui.newHeader;
-            var currContent = currHeader.next(".ui-accordion-content");
-            // The accordion believes a panel is being closed
-          } else {
-            var currHeader = ui.oldHeader;
-            var currContent = currHeader.next(".ui-accordion-content");
-          }
-          // Since we've changed the default behavior, this detects the actual status
-          var isPanelSelected = currHeader.attr("aria-selected") == "true";
-
-          // Toggle the panel's header
-          currHeader
-            .toggleClass("ui-corner-all", isPanelSelected)
-            .toggleClass(
-              "accordion-header-active ui-state-active ui-corner-top",
-              !isPanelSelected
-            )
-            .attr("aria-selected", (!isPanelSelected).toString());
-
-          // Toggle the panel's icon
-          currHeader
-            .children(".ui-icon")
-            .toggleClass("ui-icon-triangle-1-e", isPanelSelected)
-            .toggleClass("ui-icon-triangle-1-s", !isPanelSelected);
-
-          // Toggle the panel's content
-          currContent.toggleClass("accordion-content-active", !isPanelSelected);
-          if (isPanelSelected) {
-            currContent.slideUp(50);
-          } else {
-            currContent.slideDown(50);
-          }
-
-          return false; // Cancels the default action
-        },
-      });
-      $("#defaultProcedure").accordion({
-        collapsible: true,
-        active: false,
-        beforeActivate: function (event, ui) {
-          // The accordion believes a panel is being opened
-          if (ui.newHeader[0]) {
-            var currHeader = ui.newHeader;
-            var currContent = currHeader.next(".ui-accordion-content");
-            // The accordion believes a panel is being closed
-          } else {
-            var currHeader = ui.oldHeader;
-            var currContent = currHeader.next(".ui-accordion-content");
-          }
-          // Since we've changed the default behavior, this detects the actual status
-          var isPanelSelected = currHeader.attr("aria-selected") == "true";
-
-          // Toggle the panel's header
-          currHeader
-            .toggleClass("ui-corner-all", isPanelSelected)
-            .toggleClass(
-              "accordion-header-active ui-state-active ui-corner-top",
-              !isPanelSelected
-            )
-            .attr("aria-selected", (!isPanelSelected).toString());
-
-          // Toggle the panel's icon
-          currHeader
-            .children(".ui-icon")
-            .toggleClass("ui-icon-triangle-1-e", isPanelSelected)
-            .toggleClass("ui-icon-triangle-1-s", !isPanelSelected);
-
-          // Toggle the panel's content
-          currContent.toggleClass("accordion-content-active", !isPanelSelected);
-          if (isPanelSelected) {
-            currContent.slideUp(50);
-          } else {
-            currContent.slideDown(50);
-          }
-
-          return false; // Cancels the default action
-        },
-      });
-      $("#userProcedure").accordion({
-        collapsible: true,
-        active: false,
-        beforeActivate: function (event, ui) {
-          // The accordion believes a panel is being opened
-          if (ui.newHeader[0]) {
-            var currHeader = ui.newHeader;
-            var currContent = currHeader.next(".ui-accordion-content");
-            // The accordion believes a panel is being closed
-          } else {
-            var currHeader = ui.oldHeader;
-            var currContent = currHeader.next(".ui-accordion-content");
-          }
-          // Since we've changed the default behavior, this detects the actual status
-          var isPanelSelected = currHeader.attr("aria-selected") == "true";
-
-          // Toggle the panel's header
-          currHeader
-            .toggleClass("ui-corner-all", isPanelSelected)
-            .toggleClass(
-              "accordion-header-active ui-state-active ui-corner-top",
-              !isPanelSelected
-            )
-            .attr("aria-selected", (!isPanelSelected).toString());
-
-          // Toggle the panel's icon
-          currHeader
-            .children(".ui-icon")
-            .toggleClass("ui-icon-triangle-1-e", isPanelSelected)
-            .toggleClass("ui-icon-triangle-1-s", !isPanelSelected);
-
-          // Toggle the panel's content
-          currContent.toggleClass("accordion-content-active", !isPanelSelected);
-          if (isPanelSelected) {
-            currContent.slideUp(50);
-          } else {
-            currContent.slideDown(50);
-          }
-
-          return false; // Cancels the default action
-        },
-      });
+      global_refresh_sqlquery_proclist(  
+        proceduresData,
+        procedureColumnData,
+        sysProcedure,
+        tablesArray
+      );
     };
 
     var populateStreamedTablesData = function (tables) {
@@ -1642,239 +1413,12 @@ function loadSQLQueryPage(serverName, portid, userName) {
     procedureColumnData,
     sysProcedure
   ) {
-    // Stored Procedures
-    var sysScr = "";
-    var src = "";
-    var defSrc = "";
-    sysScr += '<h3 class="systemHeader">System Stored Procedures</h3>';
-    sysScr += '<div id="systemProcedure" class="listView">';
-    for (var k in sysProcedure) {
-      for (var paramCount in sysProcedure[k]) {
-        sysScr += "<h3>" + k + "</h3>";
-        sysScr += '<div class="listView">';
-        sysScr += "<ul>";
-        for (var i = 0; i < sysProcedure[k][paramCount].length - 1; i++) {
-          sysScr +=
-            '<li class="parameterValue">' +
-            sysProcedure[k][paramCount][i] +
-            "</li>";
-        }
-        sysScr +=
-          '<li class="returnValue">' + sysProcedure[k][paramCount][i] + "</li>";
-        sysScr += "</ul>";
-        sysScr += "</div>";
-      }
-    }
-
-    sysScr += "</div>";
-    for (var i = 0; i < proceduresData.length; ++i) {
-      var connTypeParams = [];
-      var procParams = [];
-      var procName = proceduresData[i][2];
-      for (var p = 0; p < procedureColumnData.length; ++p) {
-        if (procedureColumnData[p][2] == procName) {
-          paramType = procedureColumnData[p][6];
-          paramName = procedureColumnData[p][3];
-          paramOrder = procedureColumnData[p][17] - 1;
-          if (procedureColumnData[p][12] == "ARRAY_PARAMETER") {
-            if (paramType.toLowerCase() == "tinyint")
-              // ENG-2040 and ENG-3101, identify it as an array (byte[])
-              paramType = "byte[]";
-            else paramType += "_array";
-          }
-          procParams[paramOrder] = {
-            name: paramName,
-            type: paramType.toLowerCase(),
-          };
-        }
-      }
-
-      var procArray = procName.split(".");
-      if (
-        procArray.length > 1 &&
-        jQuery.inArray(procArray[0], tablesArray) != -1
-      ) {
-        defSrc += "<h3>" + procName + "</h3>";
-        defSrc += '<div class="listView">';
-        defSrc += "<ul>";
-        for (var p = 0; p < procParams.length; ++p) {
-          defSrc +=
-            '<li class="parameterValue">Param' +
-            p +
-            " (" +
-            procParams[p].type +
-            ")</li>";
-        }
-        defSrc += '<li class="returnValue">Return Table[]</li>';
-        defSrc += "</ul>";
-        defSrc += "</div>";
-      } else {
-        src += "<h3>" + procName + "</h3>";
-        src += '<div class="listView">';
-        src += "<ul>";
-        for (var p = 0; p < procParams.length; ++p) {
-          src +=
-            '<li class="parameterValue">Param' +
-            p +
-            " (" +
-            procParams[p].type +
-            ")</li>";
-        }
-        src += '<li class="returnValue">Return Table[]</li>';
-        src += "</ul>";
-        src += "</div>";
-      }
-    }
-    var defSrcHeader = "";
-    defSrcHeader += '<h3 class="systemHeader">Default Stored Procedures</h3>';
-    defSrcHeader += '<div id="defaultProcedure" class="listView">';
-    var defSrcFooter = "</div>";
-    defSrc =
-      defSrcHeader +
-      (defSrc != ""
-        ? defSrc
-        : '<div style="font-size:12px">No default stored procedures found.</div>') +
-      defSrcFooter;
-
-    var userProcHeader = "";
-    userProcHeader +=
-      '<h3 id="userDefinedStoredProcs" class="systemHeader">User Defined Stored Procedures</h3>';
-    userProcHeader += '<div id="userProcedure" class="listView">';
-    var userProcFooter = "</div>";
-    var userSrc =
-      userProcHeader +
-      (src != ""
-        ? src
-        : '<div style="font-size:12px">No user defined stored procedures found.</div>') +
-      userProcFooter;
-    $("#accordionProcedures").html(sysScr + defSrc + userSrc);
-    $("#accordionProcedures").accordion("refresh");
-    $("#systemProcedure").accordion({
-      collapsible: true,
-      active: false,
-      beforeActivate: function (event, ui) {
-        // The accordion believes a panel is being opened
-        if (ui.newHeader[0]) {
-          var currHeader = ui.newHeader;
-          var currContent = currHeader.next(".ui-accordion-content");
-          // The accordion believes a panel is being closed
-        } else {
-          var currHeader = ui.oldHeader;
-          var currContent = currHeader.next(".ui-accordion-content");
-        }
-        // Since we've changed the default behavior, this detects the actual status
-        var isPanelSelected = currHeader.attr("aria-selected") == "true";
-
-        // Toggle the panel's header
-        currHeader
-          .toggleClass("ui-corner-all", isPanelSelected)
-          .toggleClass(
-            "accordion-header-active ui-state-active ui-corner-top",
-            !isPanelSelected
-          )
-          .attr("aria-selected", (!isPanelSelected).toString());
-
-        // Toggle the panel's icon
-        currHeader
-          .children(".ui-icon")
-          .toggleClass("ui-icon-triangle-1-e", isPanelSelected)
-          .toggleClass("ui-icon-triangle-1-s", !isPanelSelected);
-
-        // Toggle the panel's content
-        currContent.toggleClass("accordion-content-active", !isPanelSelected);
-        if (isPanelSelected) {
-          currContent.slideUp(50);
-        } else {
-          currContent.slideDown(50);
-        }
-
-        return false; // Cancels the default action
-      },
-    });
-    $("#defaultProcedure").accordion({
-      collapsible: true,
-      active: false,
-      beforeActivate: function (event, ui) {
-        // The accordion believes a panel is being opened
-        if (ui.newHeader[0]) {
-          var currHeader = ui.newHeader;
-          var currContent = currHeader.next(".ui-accordion-content");
-          // The accordion believes a panel is being closed
-        } else {
-          var currHeader = ui.oldHeader;
-          var currContent = currHeader.next(".ui-accordion-content");
-        }
-        // Since we've changed the default behavior, this detects the actual status
-        var isPanelSelected = currHeader.attr("aria-selected") == "true";
-
-        // Toggle the panel's header
-        currHeader
-          .toggleClass("ui-corner-all", isPanelSelected)
-          .toggleClass(
-            "accordion-header-active ui-state-active ui-corner-top",
-            !isPanelSelected
-          )
-          .attr("aria-selected", (!isPanelSelected).toString());
-
-        // Toggle the panel's icon
-        currHeader
-          .children(".ui-icon")
-          .toggleClass("ui-icon-triangle-1-e", isPanelSelected)
-          .toggleClass("ui-icon-triangle-1-s", !isPanelSelected);
-
-        // Toggle the panel's content
-        currContent.toggleClass("accordion-content-active", !isPanelSelected);
-        if (isPanelSelected) {
-          currContent.slideUp(50);
-        } else {
-          currContent.slideDown(50);
-        }
-
-        return false; // Cancels the default action
-      },
-    });
-    $("#userProcedure").accordion({
-      collapsible: true,
-      active: false,
-      beforeActivate: function (event, ui) {
-        // The accordion believes a panel is being opened
-        if (ui.newHeader[0]) {
-          var currHeader = ui.newHeader;
-          var currContent = currHeader.next(".ui-accordion-content");
-          // The accordion believes a panel is being closed
-        } else {
-          var currHeader = ui.oldHeader;
-          var currContent = currHeader.next(".ui-accordion-content");
-        }
-        // Since we've changed the default behavior, this detects the actual status
-        var isPanelSelected = currHeader.attr("aria-selected") == "true";
-
-        // Toggle the panel's header
-        currHeader
-          .toggleClass("ui-corner-all", isPanelSelected)
-          .toggleClass(
-            "accordion-header-active ui-state-active ui-corner-top",
-            !isPanelSelected
-          )
-          .attr("aria-selected", (!isPanelSelected).toString());
-
-        // Toggle the panel's icon
-        currHeader
-          .children(".ui-icon")
-          .toggleClass("ui-icon-triangle-1-e", isPanelSelected)
-          .toggleClass("ui-icon-triangle-1-s", !isPanelSelected);
-
-        // Toggle the panel's content
-        currContent.toggleClass("accordion-content-active", !isPanelSelected);
-        if (isPanelSelected) {
-          currContent.slideUp(50);
-        } else {
-          currContent.slideDown(50);
-        }
-
-        return false; // Cancels the default action
-      },
-    });
+    global_refresh_sqlquery_proclist(  
+      proceduresData,
+      procedureColumnData,
+      sysProcedure,
+      tablesArray
+    );
   };
 
   var toggleSpinner = function (show) {
@@ -1914,4 +1458,327 @@ function loadSQLQueryPage(serverName, portid, userName) {
   };
   populateTablesAndViews();
   $("#overlay").hide();
+}
+function global_refresh_sqlquery_proclist (
+  proceduresData,
+  procedureColumnData,
+  sysProcedure,
+  tablesArray
+) {
+  // Stored Procedures
+  var sysScr = "";
+  var src = "";
+  var defSrc = "";
+  var cmpdSrc = "";
+
+  sysScr += '<h3 class="systemHeader">System Stored Procedures</h3>';
+  sysScr += '<div id="systemProcedure" class="listView">';
+  for (var k in sysProcedure) {
+    for (var paramCount in sysProcedure[k]) {
+      sysScr += "<h3>" + k + "</h3>";
+      sysScr += '<div class="listView">';
+      sysScr += "<ul>";
+      for (var i = 0; i < sysProcedure[k][paramCount].length - 1; i++) {
+        sysScr +=
+          '<li class="parameterValue">' +
+          sysProcedure[k][paramCount][i] +
+          "</li>";
+      }
+      sysScr +=
+        '<li class="returnValue">' +
+        sysProcedure[k][paramCount][i] +
+        "</li>";
+      sysScr += "</ul>";
+      sysScr += "</div>";
+    }
+  }
+  sysScr += "</div>";
+
+  for (var i = 0; i < proceduresData.length; ++i) {
+    var connTypeParams = [];
+    var procParams = [];
+    var procName = proceduresData[i][2];
+    for (var p = 0; p < procedureColumnData.length; ++p) {
+      if (procedureColumnData[p][2] == procName) { 
+        paramType = procedureColumnData[p][6];
+        paramName = procedureColumnData[p][3];
+        paramOrder = procedureColumnData[p][17] - 1;
+        if (procedureColumnData[p][12] == "ARRAY_PARAMETER") {
+          if (paramType.toLowerCase() == "tinyint")
+            // ENG-2040 and ENG-3101, identify it as an array (byte[])
+            paramType = "byte[]";
+          else paramType += "_array";
+        }
+        procParams[paramOrder] = {
+          name: paramName,
+          type: paramType.toLowerCase(),
+        };
+      }
+    }
+
+    var procArray = procName.split(".");
+    if (
+      procArray.length > 1 &&
+      jQuery.inArray(procArray[0], tablesArray) != -1
+    ) {  // CRUD procs
+      defSrc += "<h3>" + procName + "</h3>";
+      defSrc += '<div class="listView">';
+      defSrc += "<ul>";
+      for (var p = 0; p < procParams.length; ++p) {
+        defSrc +=
+          '<li class="parameterValue">Param' +
+          p +
+          " (" +
+          procParams[p].type +
+          ")</li>";
+      }
+      defSrc += '<li class="returnValue">Return Table[]</li>';
+      defSrc += "</ul>";
+      defSrc += "</div>";
+    } else {
+      var procRemark = JSON.parse(proceduresData[i][6]);
+      if (procRemark["compound"]) {   // compound procedures
+        cmpdSrc += "<h3>" + procName + "</h3>";
+        cmpdSrc += '<div class="listView">';
+        cmpdSrc += "<ul>";
+        for (var p = 0; p < procParams.length; ++p) {
+          cmpdSrc +=
+            '<li class="parameterValue">Param' +
+            p +
+            " (" +
+            procParams[p].type +
+            ")</li>";
+        }
+        cmpdSrc += '<li class="returnValue">Return Table[]</li>';
+        cmpdSrc += "</ul>";
+        cmpdSrc += "</div>";
+
+      } else {    // user-define procs
+        src += "<h3>" + procName + "</h3>";
+        src += '<div class="listView">';
+        src += "<ul>";
+        for (var p = 0; p < procParams.length; ++p) {
+          src +=
+            '<li class="parameterValue">Param' +
+            p +
+            " (" +
+            procParams[p].type +
+            ")</li>";
+        }
+        src += '<li class="returnValue">Return Table[]</li>';
+        src += "</ul>";
+        src += "</div>";
+
+      }
+
+    }
+  }
+  var defSrcHeader = "";
+  defSrcHeader += '<h3 class="systemHeader">Default Stored Procedures</h3>';
+  defSrcHeader += '<div id="defaultProcedure" class="listView">';
+  var defSrcFooter = "</div>";
+  defSrc =
+    defSrcHeader +
+    (defSrc != ""
+      ? defSrc
+      : '<div style="font-size:12px">No default stored procedures found.</div>') +
+    defSrcFooter;
+
+  var userProcHeader = "";
+  userProcHeader +=
+    '<h3 id="userDefinedStoredProcs" class="systemHeader">User-Defined Stored Procedures</h3>';
+  userProcHeader += '<div id="userProcedure" class="listView">';
+  var userProcFooter = "</div>";
+  var userSrc =
+    userProcHeader +
+    (src != ""
+      ? src
+      : '<div style="font-size:12px">No user defined stored procedures found.</div>') +
+    userProcFooter;
+
+  var cmpdProcHeader = "";
+  if (cmpdSrc != "") {
+    cmpdProcHeader +=
+      '<h3 id="compoundProcs" class="systemHeader">Compound Procedures</h3>';
+    cmpdProcHeader += '<div id="compoundProcedure" class="listView">';
+    var cmpdProcFooter = "</div>";
+    cmpdSrc =
+      cmpdProcHeader +
+      (cmpdSrc != ""
+        ? cmpdSrc
+        : '<div style="font-size:12px">No compound procedures found.</div>') +
+        cmpdProcFooter;
+
+  };
+
+  $("#accordionProcedures").html(sysScr + defSrc + userSrc + cmpdSrc);
+  $("#accordionProcedures").accordion("refresh");
+  $("#systemProcedure").accordion({
+    collapsible: true,
+    active: false,
+    beforeActivate: function (event, ui) {
+      // The accordion believes a panel is being opened
+      if (ui.newHeader[0]) {
+        var currHeader = ui.newHeader;
+        var currContent = currHeader.next(".ui-accordion-content");
+        // The accordion believes a panel is being closed
+      } else {
+        var currHeader = ui.oldHeader;
+        var currContent = currHeader.next(".ui-accordion-content");
+      }
+      // Since we've changed the default behavior, this detects the actual status
+      var isPanelSelected = currHeader.attr("aria-selected") == "true";
+
+      // Toggle the panel's header
+      currHeader
+        .toggleClass("ui-corner-all", isPanelSelected)
+        .toggleClass(
+          "accordion-header-active ui-state-active ui-corner-top",
+          !isPanelSelected
+        )
+        .attr("aria-selected", (!isPanelSelected).toString());
+
+      // Toggle the panel's icon
+      currHeader
+        .children(".ui-icon")
+        .toggleClass("ui-icon-triangle-1-e", isPanelSelected)
+        .toggleClass("ui-icon-triangle-1-s", !isPanelSelected);
+
+      // Toggle the panel's content
+      currContent.toggleClass("accordion-content-active", !isPanelSelected);
+      if (isPanelSelected) {
+        currContent.slideUp(50);
+      } else {
+        currContent.slideDown(50);
+      }
+
+      return false; // Cancels the default action
+    },
+  });
+  $("#defaultProcedure").accordion({
+    collapsible: true,
+    active: false,
+    beforeActivate: function (event, ui) {
+      // The accordion believes a panel is being opened
+      if (ui.newHeader[0]) {
+        var currHeader = ui.newHeader;
+        var currContent = currHeader.next(".ui-accordion-content");
+        // The accordion believes a panel is being closed
+      } else {
+        var currHeader = ui.oldHeader;
+        var currContent = currHeader.next(".ui-accordion-content");
+      }
+      // Since we've changed the default behavior, this detects the actual status
+      var isPanelSelected = currHeader.attr("aria-selected") == "true";
+
+      // Toggle the panel's header
+      currHeader
+        .toggleClass("ui-corner-all", isPanelSelected)
+        .toggleClass(
+          "accordion-header-active ui-state-active ui-corner-top",
+          !isPanelSelected
+        )
+        .attr("aria-selected", (!isPanelSelected).toString());
+
+      // Toggle the panel's icon
+      currHeader
+        .children(".ui-icon")
+        .toggleClass("ui-icon-triangle-1-e", isPanelSelected)
+        .toggleClass("ui-icon-triangle-1-s", !isPanelSelected);
+
+      // Toggle the panel's content
+      currContent.toggleClass("accordion-content-active", !isPanelSelected);
+      if (isPanelSelected) {
+        currContent.slideUp(50);
+      } else {
+        currContent.slideDown(50);
+      }
+
+      return false; // Cancels the default action
+    },
+  });
+  $("#userProcedure").accordion({
+    collapsible: true,
+    active: false,
+    beforeActivate: function (event, ui) {
+      // The accordion believes a panel is being opened
+      if (ui.newHeader[0]) {
+        var currHeader = ui.newHeader;
+        var currContent = currHeader.next(".ui-accordion-content");
+        // The accordion believes a panel is being closed
+      } else {
+        var currHeader = ui.oldHeader;
+        var currContent = currHeader.next(".ui-accordion-content");
+      }
+      // Since we've changed the default behavior, this detects the actual status
+      var isPanelSelected = currHeader.attr("aria-selected") == "true";
+
+      // Toggle the panel's header
+      currHeader
+        .toggleClass("ui-corner-all", isPanelSelected)
+        .toggleClass(
+          "accordion-header-active ui-state-active ui-corner-top",
+          !isPanelSelected
+        )
+        .attr("aria-selected", (!isPanelSelected).toString());
+
+      // Toggle the panel's icon
+      currHeader
+        .children(".ui-icon")
+        .toggleClass("ui-icon-triangle-1-e", isPanelSelected)
+        .toggleClass("ui-icon-triangle-1-s", !isPanelSelected);
+
+      // Toggle the panel's content
+      currContent.toggleClass("accordion-content-active", !isPanelSelected);
+      if (isPanelSelected) {
+        currContent.slideUp(50);
+      } else {
+        currContent.slideDown(50);
+      }
+
+      return false; // Cancels the default action
+    },
+  });
+  $("#cmpdProcedure").accordion({
+    collapsible: true,
+    active: false,
+    beforeActivate: function (event, ui) {
+      // The accordion believes a panel is being opened
+      if (ui.newHeader[0]) {
+        var currHeader = ui.newHeader;
+        var currContent = currHeader.next(".ui-accordion-content");
+        // The accordion believes a panel is being closed
+      } else {
+        var currHeader = ui.oldHeader;
+        var currContent = currHeader.next(".ui-accordion-content");
+      }
+      // Since we've changed the default behavior, this detects the actual status
+      var isPanelSelected = currHeader.attr("aria-selected") == "true";
+
+      // Toggle the panel's header
+      currHeader
+        .toggleClass("ui-corner-all", isPanelSelected)
+        .toggleClass(
+          "accordion-header-active ui-state-active ui-corner-top",
+          !isPanelSelected
+        )
+        .attr("aria-selected", (!isPanelSelected).toString());
+
+      // Toggle the panel's icon
+      currHeader
+        .children(".ui-icon")
+        .toggleClass("ui-icon-triangle-1-e", isPanelSelected)
+        .toggleClass("ui-icon-triangle-1-s", !isPanelSelected);
+
+      // Toggle the panel's content
+      currContent.toggleClass("accordion-content-active", !isPanelSelected);
+      if (isPanelSelected) {
+        currContent.slideUp(50);
+      } else {
+        currContent.slideDown(50);
+      }
+
+      return false; // Cancels the default action
+    },
+  });
 }

@@ -63,7 +63,7 @@ public class StoredProcedureInvocation implements JSONString {
     private static final int NO_PARTITION = -1;
 
     // No timeout - same value used for batch and request timeouts
-    private static final int NO_TIMEOUT = BatchTimeoutOverrideType.NO_TIMEOUT;
+    public static final int NO_TIMEOUT = BatchTimeoutOverrideType.NO_TIMEOUT;
 
     /*
      * This ByteBuffer is accessed from multiple threads concurrently.
@@ -105,11 +105,18 @@ public class StoredProcedureInvocation implements JSONString {
     private int m_requestPriority = Priority.SYSTEM_PRIORITY;
 
     /*
-     * Request timeout: applicable to client requests only.
+     * Request timeout, 2 use cases:
+     *
+     * 1- applicable to client requests.
+     *
      * For added protection against timing out internally-created
      * invocations, we will not time out an SPI whose priority
      * is set to SYSTEM_PRIORITY. This is enforced in method
      * requestHasTimedOut(), below.
+     *
+     * 2- used to specify a compound procedure timeout.
+     *
+     * This use case doesn't call requestHasTimedOut().
      */
     private int m_requestTimeout = NO_TIMEOUT; // a duration, in microseconds
     private long m_requestStartTime = 0; // a point in time, as from System.nanoTime()
@@ -291,6 +298,14 @@ public class StoredProcedureInvocation implements JSONString {
         } else {
             m_requestPriority = priority;
         }
+    }
+
+    public int getRequestTimeout() {
+        return m_requestTimeout;
+    }
+
+    public void setRequestTimeout(int timeout) {
+        m_requestTimeout = timeout;
     }
 
     public boolean hasRequestTimeout() {
