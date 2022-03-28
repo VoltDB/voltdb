@@ -89,9 +89,8 @@ ThreadLocalPool::~ThreadLocalPool() {
             VOLT_ERROR_STACK();
             vassert(false);
         }
-        s_sharedMemoryMutex.lock();
+        std::lock_guard<std::mutex> guard(ThreadLocalPool::s_sharedMemoryMutex);
         SizeBucketMap_t& mapBySize = s_allocations[*m_enginePartitionIdPtr];
-        s_sharedMemoryMutex.unlock();
         auto mapForAdd = mapBySize.begin();
         while (mapForAdd != mapBySize.end()) {
             AllocTraceMap_t& allocMap = mapForAdd->second;
@@ -306,9 +305,8 @@ void* ThreadLocalPool::allocateExactSizedObject(std::size_t sz) {
     PoolForObjectSize* pool;
 #ifdef VOLT_POOL_CHECKING
     int32_t enginePartitionId =  getEnginePartitionId();
-    s_sharedMemoryMutex.lock();
+    std::lock_guard<std::mutex> guard(ThreadLocalPool::s_sharedMemoryMutex);
     SizeBucketMap_t& mapBySize = s_allocations[enginePartitionId];
-    s_sharedMemoryMutex.unlock();
     SizeBucketMap_t::iterator mapForAdd;
 #endif
     if (iter == pools.end()) {
@@ -414,9 +412,8 @@ void ThreadLocalPool::freeExactSizedObject(std::size_t sz, void* object) {
     if (engineId != 16383) {
         VOLT_DEBUG("Deallocating %p of size %lu on engine %d, thread %d", object, sz,
                 engineId, getThreadPartitionId());
-        s_sharedMemoryMutex.lock();
+        std::lock_guard<std::mutex> guard(ThreadLocalPool::s_sharedMemoryMutex);
         auto const it = s_allocations.find(engineId);
-        s_sharedMemoryMutex.unlock();
         if (it == s_allocations.cend()) {
             VOLT_ERROR("Deallocated data pointer %p in wrong context thread (partition %d)",
                     object, engineId);
@@ -432,14 +429,14 @@ void ThreadLocalPool::freeExactSizedObject(std::size_t sz, void* object) {
             if (engineId == SynchronizedThreadLock::s_mpMemoryPartitionId) {
                 StackTrace* st = getStackTraceFor(0, sz, object);
                 if (st) {
-                    VOLT_ERROR("Allocated data partition %d:", 0);
                     st->printLocalTrace();
+                    VOLT_ERROR("Allocated data partition %d:", 0);
                 }
             } else {
                 StackTrace* st = getStackTraceFor(SynchronizedThreadLock::s_mpMemoryPartitionId, sz, object);
                 if (st) {
-                    VOLT_ERROR("Allocated data partition %d:", SynchronizedThreadLock::s_mpMemoryPartitionId);
                     st->printLocalTrace();
+                    VOLT_ERROR("Allocated data partition %d:", SynchronizedThreadLock::s_mpMemoryPartitionId);
                 }
             }
             throwFatalException("Attempt to deallocate exact-sized object of unknown size");

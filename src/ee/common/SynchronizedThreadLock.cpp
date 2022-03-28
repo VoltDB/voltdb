@@ -139,6 +139,7 @@ void SynchronizedThreadLock::resetMemory(int32_t partitionId) {
             s_mpEngine.allocated = nullptr;
             s_mpEngine.context = nullptr;
 #ifdef VOLT_POOL_CHECKING
+            std::lock_guard<std::mutex> guard(ThreadLocalPool::s_sharedMemoryMutex);
             ThreadLocalPool::SizeBucketMap_t& mapBySize = ThreadLocalPool::s_allocations[s_mpMemoryPartitionId];
             auto mapForAdd = mapBySize.begin();
             while (mapForAdd != mapBySize.end()) {
