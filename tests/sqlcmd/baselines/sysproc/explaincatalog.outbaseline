@@ -40,6 +40,7 @@ set $PREV defaultprocread true
 set $PREV sql true
 set $PREV sqlread true
 set $PREV allproc true
+set $PREV compoundproc true
 add /clusters#cluster/databases#database groups user
 set /clusters#cluster/databases#database/groups#user admin false
 set $PREV defaultproc true
@@ -47,6 +48,7 @@ set $PREV defaultprocread true
 set $PREV sql true
 set $PREV sqlread true
 set $PREV allproc true
+set $PREV compoundproc false
 add /clusters#cluster/databases#database tables EMPLOYEES
 set /clusters#cluster/databases#database/tables#EMPLOYEES isreplicated true
 set $PREV partitioncolumn null
