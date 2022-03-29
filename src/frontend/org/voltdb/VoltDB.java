@@ -750,11 +750,6 @@ public class VoltDB {
                 return;
             }
 
-            // Adjust action for safemode flag
-            if (m_startAction == StartAction.RECOVER && m_safeMode) {
-                m_startAction = StartAction.SAFE_RECOVER;
-            }
-
             /*
              *  !!! F R O M  T H I S  P O I N T  O N  Y O U  M A Y  U S E  hostLog  T O  L O G
              */
@@ -765,19 +760,9 @@ public class VoltDB {
                 hostLog.info(msg);
             }
 
-            // ENG-3035 Warn if 'recover' action has a catalog since we won't
-            // be using it. Only cover the 'recover' action since 'start' sometimes
-            // acts as 'recover' and other times as 'create'.
-            if (m_startAction.doesRecover() && m_pathToCatalog != null) {
-                hostLog.warn("Catalog is ignored for 'recover' action.");
-            }
-
-            /*
-             * ENG-2815 If the leader is null, the deployment is null (the user
-             * wants the default), and the start action is not rejoin, supply the
-             * only valid leader value ("localhost").
-             */
-            if (m_leader == null && m_pathToDeployment == null && !m_startAction.doesRejoin()) {
+            // If the leader is null and the deployment is null (the user wants
+            // the default), supply the only valid leader value ("localhost").
+            if (m_leader == null && m_pathToDeployment == null) {
                 m_leader = "localhost";
             }
 
@@ -785,16 +770,22 @@ public class VoltDB {
                 checkInitializationMarker();
             } else if (m_startAction == StartAction.INITIALIZE) {
                 if (isInitialized() && !m_forceVoltdbCreate) {
-                    hostLog.fatal(m_voltdbRoot + " is already initialized"
-                            + "\nUse the start command to start the initialized database or use init --force"
-                            + " to overwrite existing files.");
-                    referToDocAndExit();
+                    hostLog.fatalFmt("%s is already initialized.", m_voltdbRoot);
+                    referToDocAndExit("Use the start command to start the initialized database,\n" +
+                                      "or use init --force to overwrite existing files.");
                 }
-            } else if (m_meshBrokers == null || m_meshBrokers.trim().isEmpty()) {
-                if (m_leader != null) {
-                    m_meshBrokers = m_leader;
+            } else if (m_startAction == StartAction.CREATE) {
+                if (m_meshBrokers == null || m_meshBrokers.trim().isEmpty()) {
+                    if (m_leader != null) {
+                        m_meshBrokers = m_leader;
+                    }
                 }
             }
+            else {
+                hostLog.fatalFmt("Internal error, unexpected start action %s", m_startAction);
+                referToDocAndExit();
+            }
+
             if (m_meshBrokers != null) {
                 m_coordinators = MeshProber.hosts(m_meshBrokers);
                 if (m_leader == null) {
@@ -1057,6 +1048,19 @@ public class VoltDB {
 
             if (m_startAction == null) {
                 generateFatalLog("The startup action is missing (one of INITIALIZE, PROBE, GET)");
+                return m_validateSuccess; // no point in carrying on
+            }
+
+            if (m_startAction.isLegacy()) {
+                switch (m_startAction) {
+                case CREATE:
+                case RECOVER:
+                case SAFE_RECOVER:
+                    break;
+                default:
+                    generateFatalLog("Unsupported legacy start action " + m_startAction);
+                    return m_validateSuccess; // further checks irrelevant
+                }
             }
 
             if (!m_isEnterprise && m_startAction.isEnterpriseOnly()) {
@@ -1073,15 +1077,9 @@ public class VoltDB {
                 }
             }
 
-            EnumSet<StartAction> requiresDeployment = EnumSet.complementOf(
-                    EnumSet.of(StartAction.REJOIN,StartAction.LIVE_REJOIN,StartAction.JOIN,StartAction.INITIALIZE, StartAction.PROBE));
-            if (requiresDeployment.contains(m_startAction) && m_pathToDeployment != null && m_pathToDeployment.trim().isEmpty()) {
+            EnumSet<StartAction> deploymentNotRequired = EnumSet.of(StartAction.INITIALIZE, StartAction.PROBE);
+            if (!deploymentNotRequired.contains(m_startAction) && m_pathToDeployment != null && m_pathToDeployment.trim().isEmpty()) {
                 generateFatalLog("The deployment file location is empty");
-            }
-
-            EnumSet<StartAction> pauseNotAllowed = EnumSet.of(StartAction.JOIN,StartAction.LIVE_REJOIN,StartAction.REJOIN);
-            if (m_isPaused && pauseNotAllowed.contains(m_startAction)) {
-                generateFatalLog("Starting in paused mode is not allowed with startup action " + m_startAction);
             }
 
             if (m_hostCount != UNDEFINED) {
@@ -1096,10 +1094,6 @@ public class VoltDB {
                 else {
                     generateFatalLog("Option \"--count\" may only be specified when using the \"start\" command");
                 }
-            }
-
-            if (m_startAction == StartAction.JOIN && !m_enableAdd) {
-                generateFatalLog("\"add\" and \"noadd\" options cannot be specified at the same time");
             }
 
             return m_validateSuccess;
