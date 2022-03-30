@@ -133,13 +133,17 @@ function server_common() {
     echo
     echo "LOG4J=\"${LOG4J}\""
     echo
-    VOLTDB_OPTS="${VOLTDB_OPTS}" ${VOLTDB} start -H $HOST &
+    VOLTDB_OPTS="${VOLTDB_OPTS}" ${VOLTDB} start -H $HOST
 }
 
 # load schema and procedures
 function init() {
     srccompile-ifneeded
     sqlcmd < ddl.sql
+}
+
+function client() {
+    run-producer
 }
 
 function run-producer() {
