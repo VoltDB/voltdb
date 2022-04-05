@@ -29,10 +29,13 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.network.Connection;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.logging.Level;
+import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.VoltCompoundProcedure.CompoundProcAbortException;
 import org.voltdb.VoltCompoundProcedure.Stage;
@@ -52,6 +55,10 @@ public class CompoundProcedureRunner extends ProcedureRunnerNT {
 
     // Per-stage limit on queued procedure calls
     private static final int QUEUED_PROC_LIMIT = 10;
+
+    // Limit for rate-limited logging (user procedure failures are apt to
+    // be repetitive in nature). Value in seconds.
+    private static final int LOG_RATE_LIMIT = 600;
 
     // Link to our procedure service
     private final NTProcedureService ntProcService;
@@ -83,6 +90,7 @@ public class CompoundProcedureRunner extends ProcedureRunnerNT {
 
     // Volatile for inter-thread visibility
     private volatile boolean stopExecution;
+    private volatile boolean abortedOrFailed;
 
     // Holds proc-call details from queueProcedureCall
     // until the calls are actually issued
@@ -181,7 +189,7 @@ public class CompoundProcedureRunner extends ProcedureRunnerNT {
             catch (Throwable th) {
                 failProcedure(th);
             }
-            if (callQueuedProcedures() != 0) {
+            if (!stopExecution && callQueuedProcedures() != 0) {
                 return; // async completion propagates execution
             }
             next = null;
@@ -189,6 +197,9 @@ public class CompoundProcedureRunner extends ProcedureRunnerNT {
         }
         if (!stopExecution) {
             failProcedure("end of stage list reached and procedure not completed");
+        }
+        else if (!abortedOrFailed) {
+            checkProcQueueEmpty();
         }
     }
 
@@ -284,6 +295,17 @@ public class CompoundProcedureRunner extends ProcedureRunnerNT {
         }
     }
 
+    private void checkProcQueueEmpty() {
+        int n;
+        synchronized (procQueue) {
+            n = procQueue.size();
+        }
+        if (n > 0) {
+            info("completed; %d procedure call%s queued in last stage will not be sent",
+                 n, n == 1 ? "" : "s");
+        }
+    }
+
     /*
      * Called from the executing compound procedure to indicate
      * completion, via wrappers in VoltCompoundProcedure.
@@ -309,28 +331,28 @@ public class CompoundProcedureRunner extends ProcedureRunnerNT {
     }
 
     void abortProcedure(String reason) {
-        stopExecution = true;
+        stopExecution = abortedOrFailed = true;
         String abmsg = String.format("User abort: %s", reason);
         debug("aborted, \\\\%s\\\\", abmsg);
         completeError(ClientResponse.COMPOUND_PROC_USER_ABORT, abmsg);
     }
 
     private void abortProcedure(Exception ex) {
-        stopExecution = true;
+        stopExecution = abortedOrFailed = true;
         String abmsg = String.format("User abort: %s", ex.getMessage());
         debug("abort exception, \\\\%s\\\\", abmsg);
         completeError(ClientResponse.COMPOUND_PROC_USER_ABORT, abmsg);
     }
 
     private void failProcedure(String reason) {
-        stopExecution = true;
+        stopExecution = abortedOrFailed = true;
         String errmsg = String.format("Unexpected failure: %s", reason);
         info("failed, \\\\%s\\\\", errmsg);
         completeError(ClientResponse.UNEXPECTED_FAILURE, errmsg);
     }
 
     private void failProcedure(Throwable th) {
-        stopExecution = true;
+        stopExecution = abortedOrFailed = true;
         if (CoreUtils.isStoredProcThrowableFatalToServer(th)) {
             throw (Error)th; // That's not my department, says Werner Von Braun
         }
@@ -349,16 +371,33 @@ public class CompoundProcedureRunner extends ProcedureRunnerNT {
     }
 
     /*
-     * Logging
+     * Logging. Non-debug logging is rate-limited. Since procedure runners
+     * are ephemeral, this needs careful balance. The 'format' given to the
+     * rate-limiting logger must include the procedure name (to avoid cross-
+     * talk) and the 'format' used for the message itself, but not include the
+     * variable args for the message. Also, it's imperative that the underlying
+     * logger be statically allocated (it is, in NTProcedureService)
      */
     private void debug(String fmt, Object... args) {
         if (debugging) {
-            LOG.debugFmt("Compound proc %s; %s", m_procedureName, String.format(fmt, args));
+            String fmt2 = String.format("Compound proc %s; %s", m_procedureName, fmt);
+            LOG.debugFmt(fmt, args);
         }
     }
 
     private void info(String fmt, Object... args) {
-        LOG.infoFmt("Compound proc %s; %s", m_procedureName, String.format(fmt, args));
+        if (debugging) {
+            String fmt2 = String.format("Compound proc %s; %s", m_procedureName, fmt);
+            LOG.infoFmt(fmt2, args);
+        }
+        else {
+            String fmt2 = String.format("Compound proc %s; %s\n\t(this message is rate-limited to once per %d sec)",
+                                        m_procedureName, fmt, LOG_RATE_LIMIT);
+            RateLimitedLogger.tryLogForMessage(System.currentTimeMillis(),
+                                               LOG_RATE_LIMIT, TimeUnit.SECONDS,
+                                               LOG, Level.INFO,
+                                               fmt2, args);
+        }
     }
 
     /*

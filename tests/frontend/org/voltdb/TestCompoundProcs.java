@@ -237,6 +237,29 @@ public class TestCompoundProcs {
         }
     }
 
+    // Completes with outstanding queued proc calls.
+    // Logs a warning message on the server, but we do not check that.
+    public static class PrematureProc extends VoltCompoundProcedure {
+
+        public long run() {
+            System.out.println("== PrematureProc.run ==");
+            newStageList(this::getData)
+                .then(this::finishUp)
+                .build();
+            return 0;
+        }
+
+        private void getData(ClientResponse[] nil) {
+            queueProcedureCall("MySpProc", 1);
+            completeProcedure(999L);
+            queueProcedureCall("MyOtherSpProc", 2);
+        }
+
+        private void finishUp(ClientResponse[] resp) {
+            abortProcedure("should never get here");
+        }
+    }
+
     // It is an ancient Procedure,
     // And he stoppeth one of three.
     public static class PartialFailureProc extends VoltCompoundProcedure {
@@ -449,6 +472,7 @@ public class TestCompoundProcs {
         "create procedure from class org.voltdb.TestCompoundProcs$MyCompoundProc;\n" +
         "create procedure from class org.voltdb.TestCompoundProcs$IllBehavedProc;\n" +
         "create procedure from class org.voltdb.TestCompoundProcs$AbortExceptionProc;\n" +
+        "create procedure from class org.voltdb.TestCompoundProcs$PrematureProc;\n" +
         "create procedure from class org.voltdb.TestCompoundProcs$PartialFailureProc;\n" +
         "create procedure from class org.voltdb.TestCompoundProcs$IncompleteProc;\n" +
         "create procedure from class org.voltdb.TestCompoundProcs$EarlyFailProc;\n" +
@@ -536,6 +560,11 @@ public class TestCompoundProcs {
     @Test
     public void testAbortException() throws Exception {
         execTest("AbortExceptionProc", ClientResponse.COMPOUND_PROC_USER_ABORT);
+    }
+
+    @Test
+    public void testPrematureCompletion() throws Exception {
+        execTest("PrematureProc", ClientResponse.SUCCESS);
     }
 
     @Test
