@@ -38,4 +38,4 @@ JAVA=`which java`
 CLASSPATH="dusbench.jar"
 $JAVA -classpath dusbench.jar:${VJAR}:${APPCLASSPATH}  \
       client.benchmark.DUSBenchmark \
-      "$WORKLOAD_PARAMS"
+      $WORKLOAD_PARAMS

@@ -3,6 +3,9 @@
 PUSH=1
 [ "$1" = "--no-push" ] && PUSH=0
 
+[ ! -e dusbench.jar ] && echo "ERROR: client jar missing.  build_docker.sh via 'run.sh jar'" 2>&1 && exit 1
+
+rm -rf voltdb
 mkdir -p voltdb/lib
 mkdir -p voltdb/bin
 mkdir -p voltdb/voltdb
