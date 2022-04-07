@@ -23,6 +23,8 @@
 
 package compound;
 
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.time.Instant;
@@ -50,6 +52,9 @@ public class CompoundClient {
 
         @Option(desc = "Test case, 'simple' or 'null'")
         String test = "simple";
+
+        @Option(desc = "Filename to write raw summary statistics to.")
+        String statsfile = "";
 
         @Override
         public void validate() {
@@ -111,8 +116,9 @@ public class CompoundClient {
         completed.incrementAndGet();
         int status = resp.getStatus();
         if (status != ClientResponse.SUCCESS) {
-            failed.incrementAndGet();
-            System.err.printf("Procedure call failed: %s %s",
+            int f = failed.getAndIncrement();
+            if ((f % 10000) == 0)
+                System.err.printf("Procedure call failed: %s %s",
                               status, resp.getStatusString());
         }
         return null;
@@ -122,8 +128,9 @@ public class CompoundClient {
     // Handling is primitive just write a message and forget it.
     //
     Void callException(Throwable th) {
-        excepts.incrementAndGet();
-        System.err.printf("Procedure call exception: %s", th);
+        int e = excepts.getAndIncrement();
+        if ((e % 10000) == 0)
+            System.err.printf("Procedure call exception: %s", th);
         return null;
     }
 
@@ -139,6 +146,7 @@ public class CompoundClient {
             procName = "NullCompoundProc";
 
         print("Running %s test for %d secs ...", procName, config.duration);
+        final long benchmarkStartTime = System.currentTimeMillis();
         final long benchmarkEndTime = System.currentTimeMillis() + (1000l * config.duration);
         while (benchmarkEndTime > System.currentTimeMillis()) {
             gate.waitOpen();
@@ -155,6 +163,13 @@ public class CompoundClient {
 
     // Result stats
     void printStats() {
+        long serverTps = 0L;
+        long elapsedMs = 0L;
+
+        // code duplicates ExportBenchmark stats handling
+        elapsedMs = config.duration;
+        serverTps = completed.get() / config.duration;
+
         print("");
         print("Calls issued: %,d; completed: %,d; failed: %,d",
                           callsIssued, completed.get(), failed.get());
@@ -162,6 +177,40 @@ public class CompoundClient {
         print("Average throughput: %,d txns/sec", stats.getTxnThroughput());
         print("Average end-to-end latency: %,.2f ms", stats.getAverageLatency());
         print("Average latency at server: %,.2f ms", stats.getAverageInternalLatency());
+        print("10th percentile latency:       %,9.2f ms", stats.kPercentileLatencyAsDouble(.1));
+        print("25th percentile latency:       %,9.2f ms", stats.kPercentileLatencyAsDouble(.25));
+        print("50th percentile latency:       %,9.2f ms", stats.kPercentileLatencyAsDouble(.5));
+        print("75th percentile latency:       %,9.2f ms", stats.kPercentileLatencyAsDouble(.75));
+        print("90th percentile latency:       %,9.2f ms", stats.kPercentileLatencyAsDouble(.9));
+        print("95th percentile latency:       %,9.2f ms", stats.kPercentileLatencyAsDouble(.95));
+        print("99th percentile latency:       %,9.2f ms", stats.kPercentileLatencyAsDouble(.99));
+        print("99.5th percentile latency:     %,9.2f ms", stats.kPercentileLatencyAsDouble(.995));
+        print("99.9th percentile latency:     %,9.2f ms", stats.kPercentileLatencyAsDouble(.999));
+        print("99.999th percentile latency:   %,9.2f ms", stats.kPercentileLatencyAsDouble(.99999));
+        print("");
+
+        // Write stats to file if requested
+        try {
+            if ((config.statsfile != null) && (config.statsfile.length() != 0)) {
+                FileWriter fw = new FileWriter(config.statsfile);
+                fw.append(String.format("%d,%d,%d,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,0,0,0\n",
+                                    stats.getStartTimestamp(),
+                                    stats.getDuration(),
+                                    completed.get(),
+                                    stats.kPercentileLatencyAsDouble(0.0),
+                                    stats.kPercentileLatencyAsDouble(1.0),
+                                    stats.kPercentileLatencyAsDouble(0.95),
+                                    stats.kPercentileLatencyAsDouble(0.99),
+                                    stats.kPercentileLatencyAsDouble(0.999),
+                                    stats.kPercentileLatencyAsDouble(0.9999),
+                                    stats.kPercentileLatencyAsDouble(0.99999)
+                                    ));
+                fw.close();
+            }
+        } catch (IOException e) {
+            System.err.print("Error writing stats file");
+            e.printStackTrace();
+        }
         print("");
     }
 

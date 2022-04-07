@@ -59,8 +59,7 @@ import org.voltdb.client.ProcedureCallback;
  */
 public class TopicBenchmark {
 
-    static VoltLogger log = new VoltLogger("ExportBenchmark");
-    // static VoltLogger log = new VoltLogger("TopicBenchmark");
+    static VoltLogger log = new VoltLogger("TopicBenchmark");
     // handy, rather than typing this out several times
     static final String HORIZONTAL_RULE =
             "----------" + "----------" + "----------" + "----------" +
