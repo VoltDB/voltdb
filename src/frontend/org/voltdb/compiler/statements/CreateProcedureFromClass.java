@@ -22,6 +22,8 @@ import java.util.regex.Matcher;
 
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ProcedurePartitionData;
+import org.voltdb.VoltCompoundProcedure;
+import org.voltdb.VoltProcedure;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DDLCompiler;
 import org.voltdb.compiler.DDLCompiler.DDLStatement;
@@ -54,7 +56,7 @@ public class CreateProcedureFromClass extends CreateProcedure {
         if (! statementMatcher.matches()) {
             return false;
         }
-        if (whichProcs != DdlProceduresToLoad.ALL_DDL_PROCEDURES) {
+        if (whichProcs == DdlProceduresToLoad.NO_DDL_PROCEDURES) {
             return true;
         }
         String className = checkIdentifierStart(statementMatcher.group(2), ddlStatement.statement);
@@ -74,6 +76,17 @@ public class CreateProcedureFromClass extends CreateProcedure {
                         "Cannot load class for procedure: %s",
                         className), cause);
             }
+        }
+
+        // Customers can only load a limited kind of procedures; JUnit tests can load anything.
+        boolean allowed = VoltProcedure.class.isAssignableFrom(clazz)
+                || VoltCompoundProcedure.class.isAssignableFrom(clazz)
+                || CoreUtils.isJunitTest();
+        if (!allowed) {
+            throw m_compiler.new VoltCompilerException(String.format(
+                    "Cannot load class: procedure %s must extend either %s or %s.",
+                    className, VoltProcedure.class.getSimpleName(),
+                    VoltCompoundProcedure.class.getSimpleName()));
         }
 
         ProcedureDescriptor descriptor = new VoltCompiler.ProcedureDescriptor(
