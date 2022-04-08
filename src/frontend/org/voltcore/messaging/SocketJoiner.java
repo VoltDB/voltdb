@@ -643,7 +643,9 @@ public class SocketJoiner {
                 }
 
                 active = true;  // we've got a live one
-                LOG.info(jsObj.toString(2));
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug(jsObj.toString(2));
+                }
 
                 // get the connecting node's version string
                 String remoteBuildString = jsObj.getString(VERSION_STRING);
@@ -689,7 +691,7 @@ public class SocketJoiner {
                                         jsObj.getInt(PORT));
                 }
 
-                hostLog.info("Received request type " + type);
+                hostLog.infoFmt("Received request type %s from %s", type, remoteAddress);
                 if (type.equals(ConnectionType.REQUEST_HOSTID.name())) {
                     m_joinHandler.requestJoin(sc, sslEngine, messagingChannel, listeningAddress, jsObj);
                 } else if (type.equals(ConnectionType.PUBLISH_HOSTID.name())){
