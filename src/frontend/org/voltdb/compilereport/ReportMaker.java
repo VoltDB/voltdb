@@ -511,6 +511,9 @@ public class ReportMaker {
         StringBuilder sb = new StringBuilder();
         sb.append("<tr class='primaryrow'>");
 
+        // Modifies display of other columns
+        boolean compound = CatalogUtil.isCompoundProcedure(procedure);
+
         // column 1: procedure name
         String anchor = procedure.getTypeName().toLowerCase();
         sb.append("<td style='white-space: nowrap'><i id='p-" + anchor + "--icon' class='icon-chevron-right'></i> <a href='#p-");
@@ -537,21 +540,25 @@ public class ReportMaker {
 
         // column 3: partitioning
         sb.append("<td>");
-        if (procedure.getSinglepartition()) {
-            tag(sb, "success", "Single");
-        }
-        else {
-            tag(sb, "warning", "Multi");
+        if (!compound) {
+            if (procedure.getSinglepartition()) {
+                tag(sb, "success", "Single");
+            }
+            else {
+                tag(sb, "warning", "Multi");
+            }
         }
         sb.append("</td>");
 
         // column 4: read/write
         sb.append("<td>");
-        if (procedure.getReadonly()) {
-            tag(sb, "success", "Read");
-        }
-        else {
-            tag(sb, "warning", "Write");
+        if (!compound) {
+            if (procedure.getReadonly()) {
+                tag(sb, "success", "Read");
+            }
+            else {
+                tag(sb, "warning", "Write");
+            }
         }
         sb.append("</td>");
 
@@ -590,7 +597,7 @@ public class ReportMaker {
             tag(sb, "important", "Scans");
         }
 
-        if (CatalogUtil.isCompoundProcedure(procedure)) {
+        if (compound) {
             tag(sb,"inverse","Compound");
         }
 
