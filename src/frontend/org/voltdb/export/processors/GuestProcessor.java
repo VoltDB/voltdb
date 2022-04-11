@@ -164,6 +164,8 @@ public class GuestProcessor implements ExportDataProcessor {
             final Class<?> clientClass = Class.forName(exportClientClass);
             ExportClientBase client = (ExportClientBase) clientClass.newInstance();
             client.configure(properties);
+        } catch(RuntimeException re) {
+            throw re;
         } catch(Throwable t) {
             throw new RuntimeException(t);
         }

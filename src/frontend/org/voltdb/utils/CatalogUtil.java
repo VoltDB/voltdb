@@ -972,8 +972,7 @@ public abstract class CatalogUtil {
 
             setupPaths(deployment.getPaths());
             validateResourceMonitorInfo(deployment);
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             // Anything that goes wrong anywhere in trying to handle the deployment file
             // should return an error, and let the caller decide what to do (crash or not, for
             // example)
@@ -1593,6 +1592,10 @@ public abstract class CatalogUtil {
             processorProperties.put(ExportManager.CONFIG_CHECK_ONLY, "true");
             processor.checkProcessorConfig(processorProperties);
             processor.shutdown();
+        } catch (IllegalArgumentException iae) {
+            // don't print a stack trace for expected IllegalArgumentExceptions
+            hostLog.error("Export processor failed its configuration check: " + iae.getMessage());
+            throw new DeploymentCheckException("Export processor failed its configuration check: " + iae.getMessage(), iae);
         } catch (Exception e) {
             hostLog.error("Export processor failed its configuration check", e);
             throw new DeploymentCheckException("Export processor failed its configuration check: " + e.getMessage(), e);

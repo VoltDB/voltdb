@@ -1280,9 +1280,12 @@ public class VoltDB {
         snmp.crash(msg);
     }
 
+    // Set non-null (as reason) to decline crash file
+    public static String declineCrashFile;
+
     /**
      * Exit the process with an error message, generating a file containing
-     * crash details, and optionally logs the crash message.
+     * crash details (unless declineCrashFile set) and optionally logs the crash message.
      *
      * See comments for exitAfterMessage and ignoreCrash for modifiers;
      * but these are not applicable to the majority of cases in VoltDB.
@@ -1293,7 +1296,7 @@ public class VoltDB {
      * At the time of writing, there is only one case (outside this file)
      * of calling the four-argument overload of this method.
      *
-     * @paran errMsg message to print, log, and/or include in trap message
+     * @param errMsg message to print, log, and/or include in trap message
      * @param stackTrace if true, stack traces logged as well as in crash file
      * @param thrown optional cause of crash, details added to crash file
      * @param logFatal if true, errMsg written to host log as well as crash file
@@ -1311,7 +1314,6 @@ public class VoltDB {
     }
 
     public static void crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable thrown, boolean logFatal) {
-
         if (singleton != null) {
             singleton.s_voltdb.notifyOfShutdown();
         }
@@ -1330,9 +1332,6 @@ public class VoltDB {
         while (thrown instanceof InvocationTargetException) {
             thrown = thrown.getCause();
         }
-
-        // Set non-null (as reason) to decline crash file
-        String declineCrashFile = null;
 
         // for test code
         wasCrashCalled = true;
@@ -1384,7 +1383,7 @@ public class VoltDB {
                         getStackTraceAsList(currentStackTrace);
                     }
                     if (log != null) {
-                        log.warn(declineCrashFile);
+                        log.info(declineCrashFile);
                     }
                }
 

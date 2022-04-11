@@ -482,6 +482,7 @@ public class Inits {
             CatalogChangeResult ccr = new CatalogChangeResult();
             try {
                 if (!m_rvdb.validateDeployment(catalog, m_deployment, null, ccr)) {
+                    VoltDB.declineCrashFile = "No crash file generated for deployment validation failures";
                     VoltDB.crashLocalVoltDB(ccr.errorMsg);
                 }
             }
@@ -495,6 +496,7 @@ public class Inits {
             // catalog context.
             String result = CatalogUtil.compileDeployment(catalog, m_deployment, false);
             if (result != null) {
+                VoltDB.declineCrashFile = "No crash file generated for deployment compilation exceptions";
                 VoltDB.crashLocalVoltDB(result);
             }
 
