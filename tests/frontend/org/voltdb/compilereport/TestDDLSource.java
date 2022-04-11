@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -132,8 +132,7 @@ public class TestDDLSource extends TestCase{
                           + "   CLM_SMALLINT,\n"
                           + "   CLM_BIGINT,\n"
                           + "   NUM\n"
-                          + ") AS \n"
-                          + "   SELECT CLM_TINYINT,CLM_SMALLINT,CLM_BIGINT,COUNT(*) FROM ALLTYPES GROUP BY CLM_TINYINT,CLM_SMALLINT,CLM_BIGINT;";
+                          + ")  AS SELECT CLM_TINYINT,CLM_SMALLINT,CLM_BIGINT,COUNT(*) FROM ALLTYPES GROUP BY CLM_TINYINT,CLM_SMALLINT,CLM_BIGINT;";
         assertTrue(reportCreateTableAndView.contains(targetDDL));
     }
 
@@ -166,14 +165,12 @@ public class TestDDLSource extends TestCase{
                           + "   CLM_SMALLINT,\n"
                           + "   CLM_BIGINT,\n"
                           + "   NUM\n"
-                          + ") AS \n"
-                          + "   SELECT CLM_TINYINT,CLM_SMALLINT,CLM_BIGINT,COUNT(*) FROM ALLTYPES GROUP BY CLM_TINYINT,CLM_SMALLINT,CLM_BIGINT;";
+                          + ")  AS SELECT CLM_TINYINT,CLM_SMALLINT,CLM_BIGINT,COUNT(*) FROM ALLTYPES GROUP BY CLM_TINYINT,CLM_SMALLINT,CLM_BIGINT;";
         String targetDDL2 = "CREATE VIEW FLOATFAMILY (\n"
                           + "   CLM_DECIMAL,\n"
                           + "   CLM_FLOAT,\n"
                           + "   NUM\n"
-                          + ") AS \n"
-                          + "   SELECT CLM_DECIMAL,CLM_FLOAT,COUNT(*) FROM ALLTYPES GROUP BY CLM_DECIMAL,CLM_FLOAT;";
+                          + ")  AS SELECT CLM_DECIMAL,CLM_FLOAT,COUNT(*) FROM ALLTYPES GROUP BY CLM_DECIMAL,CLM_FLOAT;";
         assertTrue(reportCreateTableAndViews.contains(targetDDL1));
         assertTrue(reportCreateTableAndViews.contains(targetDDL2));
     }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -144,14 +144,14 @@ protected:
     // until the transaction ends, leaving only one of them.
     boost::shared_ptr<AbstractExpression> m_filterPredicate;
 
+    // the materialized view table
+    PersistentTable *m_dest;
+
     bool failsPredicate(const TableTuple& tuple) const {
         return (m_filterPredicate && !m_filterPredicate->eval(&tuple, NULL).isTrue());
     }
 
 private:
-    // the materialized view table
-    PersistentTable *m_dest;
-
     catalog::MaterializedViewInfo *m_mvInfo;
 
     // the primary index on the view table whose columns

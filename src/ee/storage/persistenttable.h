@@ -556,6 +556,9 @@ public:
      */
     bool deleteMigratedRows(int64_t deletableTxnId);
 
+    bool hasViewCountColumn() const { return m_schema->hasHiddenColumn(HiddenColumn::VIEW_COUNT); }
+    int getViewCountColumnIndex() const { return m_schema->getHiddenColumnIndex(HiddenColumn::VIEW_COUNT); }
+
 private:
     // Zero allocation size uses defaults.
     PersistentTable(int partitionColumn, char const* signature, bool isMaterialized,

@@ -832,7 +832,7 @@ public class DDLCompiler {
         // No matching variant: try and refine the error message (a little hacky but it seems
         // better than spitting out a message with the entire syntax)
         String syntax = "CREATE TABLE name";
-        List<String>words = Arrays.asList(statement.toUpperCase().split("\\s+"));
+        List<String> words = Arrays.asList(statement.toUpperCase().split("\\s+"));
         boolean migrate = words.contains("MIGRATE");
         boolean export = words.contains("EXPORT");
         boolean target = words.contains("TARGET");
@@ -869,6 +869,54 @@ public class DDLCompiler {
         if (values != null) {
             tableXML.attributes.put("topicValueColumnNames", values);
         }
+    }
+
+    /**
+     * Process a VoltDB-specific 'create view ... migrate to target/topic ...' DDL statement.
+     * @param stmt
+     * @throws VoltCompilerException
+     */
+    private void processCreateViewStatement(DDLStatement stmt) throws VoltCompilerException {
+        final String statement = stmt.statement;
+        // If we have 'migrate to target' clause
+        Matcher matcher = SQLParser.matchCreateViewMigrateToTarget(statement);
+        if (matcher.matches()) {
+            VoltXMLElement tableXML = matchedTableXML(matcher, statement);
+            String targetName = checkIdentifierStart(matcher.group(2), statement);
+            tableXML.attributes.put("migrateExport", targetName);
+            return;
+        }
+        // If we have 'migrate to topic' clause
+        matcher = SQLParser.matchCreateViewMigrateToTopic(statement);
+        if (matcher.matches()) {
+            VoltXMLElement tableXML = matchedTableXML(matcher, statement);
+            String topicName = checkIdentifierStart(matcher.group(2), statement);
+            tableXML.attributes.put("migrateExport", topicName);
+            tableXML.attributes.put("topicName", topicName);
+            saveKeysAndValues(matcher, tableXML);
+            return;
+        }
+        // No matching MIGRATE variant. Do nothing more here if not MIGRATE,
+        // else try and come up with a useful error message.
+        List<String> words = Arrays.asList(statement.toUpperCase().split("\\s+"));
+        if (!words.contains("MIGRATE")) {
+            return;
+        }
+        String syntax = "CREATE VIEW name";
+        boolean target = words.contains("TARGET");
+        boolean topic = words.contains("TOPIC");
+        if (target ^ topic) { // if intent is clearly one type
+            if (target) {
+                syntax += " MIGRATE TO TARGET name";
+            } else {
+                syntax += " MIGRATE TO TOPIC name [WITH KEY (key,...) VALUE (value,...)]";
+            }
+        } else { // abbreviated complete syntax
+            syntax += " [MIGRATE TO TARGET|TOPIC name]";
+        }
+        syntax += " (column datatype, ...) ...";
+        throw m_compiler.new VoltCompilerException(String.format("Invalid CREATE VIEW statement: \"%s\" expected syntax: %s",
+                                                                  statement.substring(0, statement.length() - 1), syntax));
     }
 
     private void checkValidPartitionTableIndex(Index index, Column partitionCol, String tableName)
@@ -1007,7 +1055,8 @@ public class DDLCompiler {
             if (ttl != null) {
                 Column ttlColumn = ttl.getTtlcolumn();
 
-                if (ttlColumn.getNullable()) {
+                // Accept nullable TTL columns in views
+                if (ttlColumn.getNullable() && !m_matViewMap.containsKey(table)) {
                     throw m_compiler.new VoltCompilerException(
                             "Column '" + table.getTypeName() + "." + ttlColumn.getName() +
                                     "' cannot be nullable for TTL.");
@@ -1604,6 +1653,66 @@ public class DDLCompiler {
                         .findAny()
                         .orElse(null);
 
+        // Warn user if DR table don't have any unique index.
+        if (isXDCR &&
+                node.attributes.get("drTable") != null &&
+                node.attributes.get("drTable").equalsIgnoreCase("ENABLE")) {
+            boolean hasUniqueIndex = false;
+            for (Index index : table.getIndexes()) {
+                if (index.getUnique()) {
+                    hasUniqueIndex = true;
+                    break;
+                }
+            }
+            if (!hasUniqueIndex) {
+                String info = String.format("Table %s doesn't have any unique index, it will cause full table scans " +
+                                "to update/delete DR record and may become slower as table grow.", table.getTypeName());
+                m_compiler.addWarn(info);
+            }
+        }
+
+        table.setSignature(CatalogUtil.getSignatureForTable(name, columnTypes));
+
+        /*
+         * Validate that each variable-length column is below the max value length,
+         * and that the maximum size for the row is below the max row length.
+         */
+        boolean hasTimestamp = false;
+        int maxRowSize = 0;
+        for (Column c : columnMap.values()) {
+            VoltType t = VoltType.get((byte)c.getType());
+            if (t == VoltType.STRING && (! c.getInbytes())) {
+                // A VARCHAR column whose size is defined in characters.
+
+                if (c.getSize() * MAX_BYTES_PER_UTF8_CHARACTER > VoltType.MAX_VALUE_LENGTH) {
+                    throw m_compiler.new VoltCompilerException("Column " + name + "." + c.getName() +
+                            " specifies a maximum size of " + c.getSize() + " characters" +
+                            " but the maximum supported size is " +
+                            VoltType.humanReadableSize(VoltType.MAX_VALUE_LENGTH / MAX_BYTES_PER_UTF8_CHARACTER) +
+                            " characters or " + VoltType.humanReadableSize(VoltType.MAX_VALUE_LENGTH) + " bytes");
+                }
+                maxRowSize += 4 + c.getSize() * MAX_BYTES_PER_UTF8_CHARACTER;
+            } else if (t.isVariableLength()) {
+                // A VARCHAR(<n> bytes) column, VARBINARY or GEOGRAPHY column.
+
+                if (c.getSize() > VoltType.MAX_VALUE_LENGTH) {
+                    throw m_compiler.new VoltCompilerException("Column " + name + "." + c.getName() +
+                            " specifies a maximum size of " + c.getSize() + " bytes" +
+                            " but the maximum supported size is " + VoltType.humanReadableSize(VoltType.MAX_VALUE_LENGTH));
+                }
+                maxRowSize += 4 + c.getSize();
+            } else {
+                maxRowSize += t.getLengthInBytesForFixedTypes();
+            }
+            hasTimestamp |= t == VoltType.TIMESTAMP;
+        }
+
+        if (maxRowSize > MAX_ROW_SIZE) {
+            throw m_compiler.new VoltCompilerException("Error: Table " + name + " has a maximum row size of " + maxRowSize +
+                    " but the maximum supported row size is " + MAX_ROW_SIZE);
+        }
+
+        // MIGRATE TO TARGET|TOPIC
         final String migrationTarget = node.attributes.get("migrateExport");
         if (!StringUtil.isEmpty(migrationTarget)) {
             table.setMigrationtarget(migrationTarget);
@@ -1614,24 +1723,7 @@ public class DDLCompiler {
                             migratingIndexName, name));
         }
 
-        if (ttlNode != null) {
-            TimeToLive ttl = table.getTimetolive().add(TimeToLiveVoltDB.TTL_NAME);
-            String column = ttlNode.attributes.get("column");
-            int ttlValue = Integer.parseInt(ttlNode.attributes.get("value"));
-            ttl.setTtlunit(ttlNode.attributes.get("unit"));
-            ttl.setTtlvalue(ttlValue);
-            ttlValue = Integer.parseInt(ttlNode.attributes.get("batchSize"));
-            ttl.setBatchsize(ttlValue);
-            ttlValue = Integer.parseInt(ttlNode.attributes.get("maxFrequency"));
-            ttl.setMaxfrequency(ttlValue);
-            for (Column col : table.getColumns()) {
-                if (column.equalsIgnoreCase(col.getName())) {
-                    ttl.setTtlcolumn(col);
-                    break;
-                }
-            }
-        }
-
+        // WITH KEY/VALUE
         String topicName = node.attributes.get("topicName");
         if (!StringUtils.isBlank(topicName)) {
             table.setTopicname(topicName);
@@ -1659,61 +1751,23 @@ public class DDLCompiler {
             }
         }
 
-        // Warn user if DR table don't have any unique index.
-        if (isXDCR &&
-                node.attributes.get("drTable") != null &&
-                node.attributes.get("drTable").equalsIgnoreCase("ENABLE")) {
-            boolean hasUniqueIndex = false;
-            for (Index index : table.getIndexes()) {
-                if (index.getUnique()) {
-                    hasUniqueIndex = true;
+        // USING TTL
+        if (ttlNode != null) {
+            TimeToLive ttl = table.getTimetolive().add(TimeToLiveVoltDB.TTL_NAME);
+            String column = ttlNode.attributes.get("column");
+            int ttlValue = Integer.parseInt(ttlNode.attributes.get("value"));
+            ttl.setTtlunit(ttlNode.attributes.get("unit"));
+            ttl.setTtlvalue(ttlValue);
+            ttlValue = Integer.parseInt(ttlNode.attributes.get("batchSize"));
+            ttl.setBatchsize(ttlValue);
+            ttlValue = Integer.parseInt(ttlNode.attributes.get("maxFrequency"));
+            ttl.setMaxfrequency(ttlValue);
+            for (Column col : table.getColumns()) {
+                if (column.equalsIgnoreCase(col.getName())) {
+                    ttl.setTtlcolumn(col);
                     break;
                 }
             }
-            if (!hasUniqueIndex) {
-                String info = String.format("Table %s doesn't have any unique index, it will cause full table scans " +
-                                "to update/delete DR record and may become slower as table grow.", table.getTypeName());
-                m_compiler.addWarn(info);
-            }
-        }
-
-        table.setSignature(CatalogUtil.getSignatureForTable(name, columnTypes));
-
-        /*
-         * Validate that each variable-length column is below the max value length,
-         * and that the maximum size for the row is below the max row length.
-         */
-        int maxRowSize = 0;
-        for (Column c : columnMap.values()) {
-            VoltType t = VoltType.get((byte)c.getType());
-            if (t == VoltType.STRING && (! c.getInbytes())) {
-                // A VARCHAR column whose size is defined in characters.
-
-                if (c.getSize() * MAX_BYTES_PER_UTF8_CHARACTER > VoltType.MAX_VALUE_LENGTH) {
-                    throw m_compiler.new VoltCompilerException("Column " + name + "." + c.getName() +
-                            " specifies a maximum size of " + c.getSize() + " characters" +
-                            " but the maximum supported size is " +
-                            VoltType.humanReadableSize(VoltType.MAX_VALUE_LENGTH / MAX_BYTES_PER_UTF8_CHARACTER) +
-                            " characters or " + VoltType.humanReadableSize(VoltType.MAX_VALUE_LENGTH) + " bytes");
-                }
-                maxRowSize += 4 + c.getSize() * MAX_BYTES_PER_UTF8_CHARACTER;
-            } else if (t.isVariableLength()) {
-                // A VARCHAR(<n> bytes) column, VARBINARY or GEOGRAPHY column.
-
-                if (c.getSize() > VoltType.MAX_VALUE_LENGTH) {
-                    throw m_compiler.new VoltCompilerException("Column " + name + "." + c.getName() +
-                            " specifies a maximum size of " + c.getSize() + " bytes" +
-                            " but the maximum supported size is " + VoltType.humanReadableSize(VoltType.MAX_VALUE_LENGTH));
-                }
-                maxRowSize += 4 + c.getSize();
-            } else {
-                maxRowSize += t.getLengthInBytesForFixedTypes();
-            }
-        }
-
-        if (maxRowSize > MAX_ROW_SIZE) {
-            throw m_compiler.new VoltCompilerException("Error: Table " + name + " has a maximum row size of " + maxRowSize +
-                    " but the maximum supported row size is " + MAX_ROW_SIZE);
         }
 
         // Temporarily assign the view Query to the annotation so we can use when we build
@@ -2388,6 +2442,13 @@ public class DDLCompiler {
                 if (createTable) {
                     processCreateTableStatement(stmt);
                 }
+
+                boolean createView = ddlStmtInfo.verb.equals(HSQLDDLInfo.Verb.CREATE) &&
+                        ddlStmtInfo.noun.equals(HSQLDDLInfo.Noun.VIEW);
+                if (createView) {
+                    processCreateViewStatement(stmt);
+                }
+
             } catch (HSQLParseException e) {
                 String msg = "DDL Error: \"" + e.getMessage() + "\" in statement starting on lineno: " + stmt.lineNo;
                 throw m_compiler.new VoltCompilerException(msg, stmt.lineNo);

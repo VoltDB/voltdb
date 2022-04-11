@@ -2737,7 +2737,7 @@ public class Table extends TableBase implements SchemaObject {
             ttl.attributes.put("name", TimeToLiveVoltDB.TTL_NAME);
             ttl.attributes.put("value", Integer.toString(timeToLive.ttlValue));
             ttl.attributes.put("unit",  timeToLive.ttlUnit);
-            ttl.attributes.put("column", timeToLive.ttlColumn.getNameString());
+            ttl.attributes.put("column", timeToLive.ttlColumnName.name);
             ttl.attributes.put("maxFrequency", Integer.toString(timeToLive.maxFrequency));
             ttl.attributes.put("batchSize", Integer.toString(timeToLive.batchSize));
             table.children.add(ttl);

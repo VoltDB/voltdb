@@ -1,4 +1,5 @@
 /* Copyright (c) 2001-2009, The HSQL Development Group
+ * Copyright (c) 2010-2022, VoltDB Inc
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -170,7 +171,7 @@ public class View extends TableDerived {
         }
     }
 
-    public String getSQL() {
+    public String getSQL() { // TODO - what is this used for?
 
         StringBuffer sb = new StringBuffer(128);
 
@@ -222,11 +223,42 @@ public class View extends TableDerived {
         // filter schemaObjectNames
     }
 
+    // Look for column by name in a Wiew. We can't use the usual
+    // findColumn since the column schema is not yey populated.
+    HsqlName findColumnName(String name) {
+        if (columnNames != null) {
+            for (HsqlName col : columnNames) {
+                if (col.name.equalsIgnoreCase(name)) {
+                    return col;
+                }
+            }
+        }
+        return null;
+    }
+
+    // Can't use the implementation in Table because column schema
+    // is not available at this point in CREATE VIEW
+    @Override
+    public void addTTL(int ttlValue, String ttlUnit, String ttlColumn,
+                       int batchSize, int maxFrequency) {
+        HsqlName colName = findColumnName(ttlColumn);
+        if (colName == null) {
+            throw Error.error(ErrorCode.X_42501, ttlColumn); // object not found
+        }
+        dropTTL();
+        timeToLive = new TimeToLiveVoltDB(ttlValue, ttlUnit, colName, batchSize, maxFrequency);
+    }
+
     /************************* Volt DB Extensions *************************/
 
     /**
      * VoltDB added method to get a non-catalog-dependent
      * representation of this HSQLDB object.
+     *
+     * We don't add MIGRATE or TTL arguments here. That's done in
+     * DDLCompiler after SQLParser matches the statement against some
+     * monstrous regular expressions. So it goes.
+     *
      * @param session The current Session object may be needed to resolve
      * some names.
      * @return XML, correctly indented, representing this object.

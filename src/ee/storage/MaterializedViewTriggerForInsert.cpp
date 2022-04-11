@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -176,6 +176,11 @@ void MaterializedViewTriggerForInsert::mergeTupleForInsert(const TableTuple &del
         }
         m_updatedTuple.setNValue(columnIndex, newValue);
     }
+    // Copy any migrating information
+    int migIndex = m_dest->getMigrateColumnIndex();
+    if (migIndex != TupleSchema::UNSET_HIDDEN_COLUMN) {
+        m_updatedTuple.setHiddenNValue(migIndex, m_existingTuple.getHiddenNValue(migIndex));
+    }
 }
 
 void MaterializedViewTriggerForInsert::initUpdatableIndexList() {
@@ -286,9 +291,16 @@ void MaterializedViewTriggerForInsert::processTupleInsert(const TableTuple &newT
         }
         // ENG-10892, if no COUNT(*) column exists
         if (numCountStar == 0) {
-            // check which hidden column COUNT(*) lies in, it is always the last one
-            vassert(m_dest->schema()->hiddenColumnCount() == 1);
-            m_updatedTuple.setHiddenNValue(0, m_existingTuple.getHiddenNValue(0).op_increment());
+            // check which hidden column COUNT(*) lies in: assume same index in both tables
+            vassert(m_dest->hasViewCountColumn());
+            int colIndex = m_dest->getViewCountColumnIndex();
+            m_updatedTuple.setHiddenNValue(
+                    colIndex, m_existingTuple.getHiddenNValue(colIndex).op_increment());
+        }
+        // Copy any migrating information
+        int migIndex = m_dest->getMigrateColumnIndex();
+        if (migIndex != TupleSchema::UNSET_HIDDEN_COLUMN) {
+            m_updatedTuple.setHiddenNValue(migIndex, m_existingTuple.getHiddenNValue(migIndex));
         }
         // Shouldn't need to update group-key-only indexes such as the primary key
         // since their keys shouldn't ever change, but do update other indexes.
@@ -317,9 +329,10 @@ void MaterializedViewTriggerForInsert::processTupleInsert(const TableTuple &newT
         }
         // ENG-10892, if no COUNT(*) column exists
         if (numCountStar == 0) {
-            // check which hidden column COUNT(*) lies in, it is always the last one
-            vassert(m_dest->schema()->hiddenColumnCount() == 1);
-            m_updatedTuple.setHiddenNValue(0, ValueFactory::getBigIntValue(1));
+            // check which hidden column COUNT(*) lies in
+            vassert(m_dest->hasViewCountColumn());
+            m_updatedTuple.setHiddenNValue(
+                    m_dest->getViewCountColumnIndex(), ValueFactory::getBigIntValue(1));
         }
         m_dest->insertPersistentTuple(m_updatedTuple, fallible);
     }
@@ -492,8 +505,8 @@ void MaterializedViewTriggerForInsert::initializeTupleHavingNoGroupBy(bool falli
     }
     // ENG-10892, if no COUNT(*) exists
     if (m_countStarColumnIndex == -1) {
-        vassert(m_dest->schema()->hiddenColumnCount() == 1);
-        m_updatedTuple.setHiddenNValue(0, ValueFactory::getBigIntValue(0));
+        vassert(m_dest->hasViewCountColumn());
+        m_updatedTuple.setHiddenNValue(m_dest->getViewCountColumnIndex(), ValueFactory::getBigIntValue(0));
     }
     m_dest->insertPersistentTuple(m_updatedTuple, fallible);
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -415,8 +415,8 @@ void MaterializedViewTriggerForWrite::processTupleDelete(
     // obtain the current count of the number of tuples in the group
     NValue count;
     if ((int) m_countStarColumnIndex == -1) {
-        vassert(destTbl->schema()->hiddenColumnCount() == 1);
-        count = m_existingTuple.getHiddenNValue(0).op_decrement();
+        vassert(destTbl->hasViewCountColumn());
+        count = m_existingTuple.getHiddenNValue(destTbl->getViewCountColumnIndex()).op_decrement();
     } else {
         count = m_existingTuple.getNValue((int) m_countStarColumnIndex).op_decrement();
     }
@@ -520,8 +520,15 @@ void MaterializedViewTriggerForWrite::processTupleDelete(
         m_updatedTuple.setNValue(aggOffset+aggIndex, newValue);
     }
     if (numCountStar == 0) {
-        vassert(destTbl->schema()->hiddenColumnCount() == 1);
-        m_updatedTuple.setHiddenNValue(0, m_existingTuple.getHiddenNValue(0).op_decrement());
+        vassert(destTbl->hasViewCountColumn());
+        int colIndex = destTbl->getViewCountColumnIndex();
+        m_updatedTuple.setHiddenNValue(
+                colIndex, m_existingTuple.getHiddenNValue(colIndex).op_decrement());
+    }
+    // Copy any migrating information
+    int migIndex = m_dest->getMigrateColumnIndex();
+    if (migIndex != TupleSchema::UNSET_HIDDEN_COLUMN) {
+        m_updatedTuple.setHiddenNValue(migIndex, m_existingTuple.getHiddenNValue(migIndex));
     }
     // update the row
     // Shouldn't need to update group-key-only indexes such as the primary key

@@ -1316,7 +1316,9 @@ public class VoltCompiler {
                 tableref.setTabletype(TableType.STREAM.get());
             }
         }
-        if (tableref.getMaterializer() != null) {
+
+        // Reject materialized views except if migrating view
+        if (tableref.getMaterializer() != null && !TableType.isPersistentMigrate(tableref.getTabletype())) {
             compilerLog.error("While configuring export, " + tableName + " is a " +
                                         "materialized view.  A view cannot be export source.");
             throw new VoltCompilerException("View configured as export source");

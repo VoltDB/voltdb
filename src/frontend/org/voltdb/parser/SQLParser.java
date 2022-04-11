@@ -698,6 +698,47 @@ public class SQLParser extends SQLPatternFactory
             "\\s*;\\z"                              // (end statement)
             );
 
+     /**
+     * Pattern: CREATE VIEW table_name MIGRATE TO TARGET target_name
+     *                 (column...) other-stuff
+     *
+     * Capture groups:
+     *  (1) table name
+     *  (2) target name
+     */
+    private static final Pattern PAT_CREATE_VIEW_MIGRATE_TO_TARGET =
+            SPF.statement(
+                    SPF.token("create"), SPF.token("view"),
+                    SPF.capture(SPF.databaseObjectName()),
+                    SPF.token("migrate"), SPF.token("to"), SPF.token("target"),
+                    SPF.capture(SPF.databaseObjectName()),
+                    new SQLPatternPartString("\\s*"), // see ENG-11862 for reason about adding this pattern
+                    SPF.anyColumnFields().withFlags(ADD_LEADING_SPACE_TO_CHILD),
+                    SPF.anythingOrNothing().withFlags(ADD_LEADING_SPACE_TO_CHILD)
+            ).compile("PAT_CREATE_VIEW");
+
+    /**
+     * Pattern: CREATE VIEW table_name MIGRATE TO TOPIC topic_name
+     *                 [WITH [KEY key...] [VALUE value...]]
+     *                 (column...) other-stuff
+     *
+     * Capture groups:
+     *  (1) table name
+     *  (2) topic name
+     *  (n) [topic key/value lists]
+     */
+    private static final Pattern PAT_CREATE_VIEW_MIGRATE_TO_TOPIC =
+            SPF.statement(
+                    SPF.token("create"), SPF.token("view"),
+                    SPF.capture(SPF.databaseObjectName()),
+                    SPF.token("migrate"), SPF.token("to"), SPF.token("topic"),
+                    SPF.capture(SPF.databaseObjectName()),
+                    SPF.optional(KEY_VALUE_CLAUSE),
+                    new SQLPatternPartString("\\s*"), // see ENG-11862 for reason about adding this pattern
+                    SPF.anyColumnFields().withFlags(ADD_LEADING_SPACE_TO_CHILD),
+                    SPF.anythingOrNothing().withFlags(ADD_LEADING_SPACE_TO_CHILD)
+            ).compile("PAT_CREATE_VIEW");
+
     //========== Patterns from SQLCommand ==========
 
     private static final String EndOfLineCommentPatternString =
@@ -1057,6 +1098,24 @@ public class SQLParser extends SQLPatternFactory
     public static Matcher matchAlterTTL(String statement)
     {
         return PAT_ALTER_TTL.matcher(statement);
+    }
+
+    /**
+     * Match statement against create view ... migrate to target ... pattern.
+     * @param statement statement to match against
+     * @return          pattern matcher object
+     */
+    public static Matcher matchCreateViewMigrateToTarget(String statement) {
+        return PAT_CREATE_VIEW_MIGRATE_TO_TARGET.matcher(statement);
+    }
+
+     /**
+     * Match statement against create view ... migrate to topic ... pattern.
+     * @param statement statement to match against
+     * @return          pattern matcher object
+     */
+    public static Matcher matchCreateViewMigrateToTopic(String statement) {
+        return PAT_CREATE_VIEW_MIGRATE_TO_TOPIC.matcher(statement);
     }
 
     /**

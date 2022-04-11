@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -30,6 +30,7 @@ import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+import org.voltdb.TableType;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
@@ -139,11 +140,21 @@ public class MaterializedViewProcessor {
                 }
             }
 
-            // A Materialized view cannot depend on another view.
+            // Check source tables
+            boolean migView = TableType.isPersistentMigrate(destTable.getTabletype());
             for (Table srcTable : stmt.m_tableList) {
+
+                // A Materialized view cannot depend on another view.
                 if (viewTableNames.contains(srcTable.getTypeName())) {
                     String msg = String.format("A materialized view (%s) can not be defined on another view (%s).",
                             viewName, srcTable.getTypeName());
+                    throw m_compiler.new VoltCompilerException(msg);
+                }
+
+                // A Migrating view can only depend on STREAM.
+                if (migView && !TableType.isStream(srcTable.getTabletype())) {
+                    String msg = String.format("Table %s cannot be used in migrating view %s, only streams are allowed.",
+                            srcTable.getTypeName(), viewName);
                     throw m_compiler.new VoltCompilerException(msg);
                 }
             }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2021 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -104,9 +104,12 @@ public abstract class CatalogSchemaTools {
      */
     public static String toSchema(StringBuilder sb, Table catalog_tbl, String viewQuery,
             boolean isExportOnly, String streamPartitionColumn, String streamTarget, String topicName) {
+
         assert(!catalog_tbl.getColumns().isEmpty());
-        boolean tableIsView = (viewQuery != null);
-        boolean toTopic = !StringUtils.isBlank(topicName);
+        final int tableType = catalog_tbl.getTabletype();
+        final String tableName = catalog_tbl.getTypeName();
+        final boolean tableIsView = (viewQuery != null);
+        final boolean toTopic = !StringUtils.isBlank(topicName);
 
         // We need the intermediate results of building the table schema string so that
         // we can return the full CREATE TABLE statement, so accumulate it separately
@@ -116,82 +119,84 @@ public abstract class CatalogSchemaTools {
         final Set<Constraint> skip_constraints = new HashSet<>();
 
         if (tableIsView) {
-            table_sb.append("CREATE VIEW ").append(catalog_tbl.getTypeName()).append(" (");
-        }
-        else {
-            if (TableType.isStream(catalog_tbl.getTabletype())) {
-                table_sb.append("CREATE STREAM ").append(catalog_tbl.getTypeName());
-                if (streamPartitionColumn != null && viewQuery == null) {
-                    table_sb.append(" PARTITION ON COLUMN ").append(streamPartitionColumn);
-                }
-                if (streamTarget != null && !streamTarget.equalsIgnoreCase(Constants.CONNECTORLESS_STREAM_TARGET_NAME) &&
-                        TableType.isStream(catalog_tbl.getTabletype())) {
-                    assert topicName == null : "Table " + catalog_tbl.getTypeName()
-                    + " cannot export to target " + streamTarget + " and to topic " + topicName;
-                    table_sb.append(" EXPORT TO TARGET ").append(streamTarget);
-                }
-                else if (toTopic) {
-                    assert streamTarget == null || streamTarget.equalsIgnoreCase(Constants.CONNECTORLESS_STREAM_TARGET_NAME)
-                            : "Table " + catalog_tbl.getTypeName() + " cannot export to target " + streamTarget + " and to topic " + topicName;
-                    table_sb.append(" EXPORT TO TOPIC ").append(topicName);
+            table_sb.append("CREATE VIEW ").append(tableName);
+            String target = catalog_tbl.getMigrationtarget();
+            if (!StringUtil.isEmpty(target)) {
+                if (toTopic) {
+                    table_sb.append(" MIGRATE TO TOPIC ").append(target);
                     addTopicClauses(table_sb, catalog_tbl);
-                }
-            } else {
-                table_sb.append("CREATE TABLE ").append(catalog_tbl.getTypeName());
-                if (!StringUtil.isEmpty(catalog_tbl.getMigrationtarget())) {
-                    if (toTopic) {
-                        table_sb.append(" MIGRATE TO TOPIC ").append(catalog_tbl.getMigrationtarget());
-                        addTopicClauses(table_sb, catalog_tbl);
-                    } else {
-                        table_sb.append(" MIGRATE TO TARGET ").append(catalog_tbl.getMigrationtarget());
-                    }
-                }
-                if (TableType.isPersistentExport(catalog_tbl.getTabletype())) {
-                    if (toTopic) {
-                        table_sb.append(" EXPORT TO TOPIC ");
-                        table_sb.append(topicName);
-                    } else {
-                        table_sb.append(" EXPORT TO TARGET ");
-                        table_sb.append(streamTarget);
-                    }
-                    table_sb.append(" ON " + TableType.toPersistentExportString(catalog_tbl.getTabletype()));
-                    table_sb.append(" ");
-                    if (toTopic) {
-                        addTopicClauses(table_sb, catalog_tbl);
-                    }
+                } else {
+                    table_sb.append(" MIGRATE TO TARGET ").append(target);
                 }
             }
-            table_sb.append(" (");
+        }
+
+        else if (TableType.isStream(tableType)) {
+            table_sb.append("CREATE STREAM ").append(tableName);
+            if (streamPartitionColumn != null && viewQuery == null) {
+                table_sb.append(" PARTITION ON COLUMN ").append(streamPartitionColumn);
+            }
+            if (streamTarget != null && !streamTarget.equalsIgnoreCase(Constants.CONNECTORLESS_STREAM_TARGET_NAME)) {
+                assert topicName == null : "Table " + tableName +
+                                           " cannot export to target " + streamTarget +
+                                           " and to topic " + topicName;
+                table_sb.append(" EXPORT TO TARGET ").append(streamTarget);
+            }
+            else if (toTopic) {
+                table_sb.append(" EXPORT TO TOPIC ").append(topicName);
+                addTopicClauses(table_sb, catalog_tbl);
+            }
+        }
+
+        else {
+            table_sb.append("CREATE TABLE ").append(tableName);
+            String target = catalog_tbl.getMigrationtarget();
+            if (!StringUtil.isEmpty(target)) {
+                if (toTopic) {
+                    table_sb.append(" MIGRATE TO TOPIC ").append(target);
+                    addTopicClauses(table_sb, catalog_tbl);
+                } else {
+                    table_sb.append(" MIGRATE TO TARGET ").append(target);
+                }
+            }
+            if (TableType.isPersistentExport(tableType)) {
+                String expStr = TableType.toPersistentExportString(tableType);
+                if (toTopic) {
+                    table_sb.append(" EXPORT TO TOPIC ").append(topicName)
+                            .append(" ON ").append(expStr);
+                    addTopicClauses(table_sb, catalog_tbl);
+                } else {
+                    table_sb.append(" EXPORT TO TARGET ").append(streamTarget)
+                            .append(" ON ").append(expStr);
+                }
+            }
         }
 
         // Columns
-        String add = "\n";
+        String add = " (\n";
         for (Column catalog_col : CatalogUtil.getSortedCatalogItems(catalog_tbl.getColumns(), "index")) {
             VoltType col_type = VoltType.get((byte)catalog_col.getType());
 
-            // this next assert would be great if we dealt with default values well
-            //assert(! ((catalog_col.getDefaultvalue() == null) && (catalog_col.getNullable() == false) ) );
+            table_sb.append(add).append(spacer).append(catalog_col.getTypeName());
+            add = ",\n";
 
             if (tableIsView) {
-                table_sb.append(add).append(spacer).append(catalog_col.getTypeName());
-                add = ",\n";
-                continue;
+               continue;
             }
 
-            table_sb.append(add).append(spacer).append(catalog_col.getTypeName()).
-                    append(" ").append(col_type.toSQLString()).append(col_type.isVariableLength() &&
-                    catalog_col.getSize() > 0 ? "(" + catalog_col.getSize() +
-                            (catalog_col.getInbytes() ? " BYTES" : "") + ")" : "");
+            // Type
+            table_sb.append(' ').append(col_type.toSQLString());
+            if (col_type.isVariableLength() && catalog_col.getSize() > 0) {
+                table_sb.append('(').append(catalog_col.getSize())
+                        .append(catalog_col.getInbytes() ? " BYTES" : "")
+                        .append(')');
+            }
 
-            // Default value
+            // Default value (note that "null" may mean null)
             String defaultvalue = catalog_col.getDefaultvalue();
-            //VoltType defaulttype = VoltType.get((byte)catalog_col.getDefaulttype());
             boolean nullable = catalog_col.getNullable();
-            // TODO: Shouldn't have to check whether the string contains "null"
-            if (defaultvalue == null) {
-            }
-            else if (defaultvalue.toLowerCase().equals("null") && nullable) {
-                defaultvalue = null;
+            if (defaultvalue == null || (defaultvalue.toLowerCase().equals("null") && nullable)) {
+                defaultvalue = null; // normalize
             }
             else {
                 if (col_type == VoltType.TIMESTAMP) {
@@ -199,69 +204,58 @@ public abstract class CatalogSchemaTools {
                         defaultvalue = "CURRENT_TIMESTAMP";
                     }
                     else {
-                        assert(defaultvalue.matches("[0-9]+"));
-                        long epoch = Long.parseLong(defaultvalue);
-                        Date d = new Date(epoch / 1000);
+                        assert defaultvalue.matches("[0-9]+");
+                        long t = Long.parseLong(defaultvalue); // time since epoch, in usec
+                        Date d = new Date(t / 1000);
                         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-                        defaultvalue = "\'" + sdf.format(d) + "." +
-                                StringUtils.leftPad(String.valueOf(epoch % 1000000), 6, "0") + "\'";
+                        defaultvalue = "'" + sdf.format(d) + "." +
+                                       StringUtils.leftPad(String.valueOf(t % 1000000), 6, "0") + "'";
                     }
                 }
                 else {
-                    // XXX: if (defaulttype != VoltType.VOLTFUNCTION) {
-                    // TODO: Escape strings properly
-                    defaultvalue = defaultvalue.replace("\'", "\'\'");
+                    defaultvalue = defaultvalue.replace("'", "''");
                     defaultvalue = "'" + defaultvalue + "'";
                 }
+                table_sb.append(" DEFAULT ").append(defaultvalue);
             }
-            if (defaultvalue == null) {
-                table_sb.append((!nullable ? " NOT NULL" : "") );
-            }
-            else {
-                table_sb.append(" DEFAULT ").append(defaultvalue != null ? defaultvalue : "NULL").
-                        append(!nullable ? " NOT NULL" : "");
-            }
+
+            // Nullability
+            table_sb.append(nullable ? "" :" NOT NULL");
 
             // Single-column constraints
             for (ConstraintRef catalog_const_ref : catalog_col.getConstraints()) {
                 Constraint catalog_const = catalog_const_ref.getConstraint();
                 ConstraintType const_type = ConstraintType.get(catalog_const.getType());
 
+                // Only need check for FOREIGN_KEY types
+                if (const_type != ConstraintType.FOREIGN_KEY) {
+                    continue;
+                }
+
                 // Check if there is another column in our table with the same constraint
                 // If there is, then we need to add it to the end of the table definition
                 boolean found = false;
                 for (Column catalog_other_col : catalog_tbl.getColumns()) {
-                    if (catalog_other_col.equals(catalog_col)) {
-                        continue;
-                    }
-                    if (catalog_other_col.getConstraints().getIgnoreCase(catalog_const.getTypeName()) != null) {
+                    if (!catalog_other_col.equals(catalog_col) &&
+                        catalog_other_col.getConstraints().getIgnoreCase(catalog_const.getTypeName()) != null) {
                         found = true;
                         break;
                     }
                 }
-                if (!found) {
-                    switch (const_type) {
-                        case FOREIGN_KEY: {
-                            Table catalog_fkey_tbl = catalog_const.getForeignkeytable();
-                            Column catalog_fkey_col = null;
-                            for (ColumnRef ref : catalog_const.getForeignkeycols()) {
-                                catalog_fkey_col = ref.getColumn();
-                                break; // Nasty hack to get first item
-                            }
 
-                            assert(catalog_fkey_col != null);
-                            table_sb.append(" REFERENCES ").append(catalog_fkey_tbl.getTypeName()).
-                                    append(" (").append(catalog_fkey_col.getTypeName()).append(")");
-                            skip_constraints.add(catalog_const);
-                            break;
-                        }
-                        default:
-                            // Nothing for now
+                if (!found) {
+                    Table catalog_fkey_tbl = catalog_const.getForeignkeytable();
+                    Column catalog_fkey_col = null;
+                    for (ColumnRef ref : catalog_const.getForeignkeycols()) {
+                        catalog_fkey_col = ref.getColumn();
+                        break; // Nasty hack to get first item
                     }
+                    assert(catalog_fkey_col != null);
+                    table_sb.append(" REFERENCES ").append(catalog_fkey_tbl.getTypeName())
+                            .append(" (").append(catalog_fkey_col.getTypeName()).append(')');
+                    skip_constraints.add(catalog_const);
                 }
             }
-
-            add = ",\n";
         }
 
         // Constraints
@@ -275,105 +269,113 @@ public abstract class CatalogSchemaTools {
             if (const_type == ConstraintType.PRIMARY_KEY || const_type == ConstraintType.UNIQUE) {
                 Index catalog_idx = catalog_const.getIndex();
                 if (!tableIsView) {
-                    // Get the ConstraintType.
-
                     table_sb.append(add).append(spacer);
+
                     if (!catalog_const.getTypeName().startsWith(HSQLInterface.AUTO_GEN_PREFIX)) {
-                        table_sb.append("CONSTRAINT ").append(catalog_const.getTypeName()).append(" ");
+                        table_sb.append("CONSTRAINT ").append(catalog_const.getTypeName()).append(' ');
                     }
-                    if (const_type == ConstraintType.PRIMARY_KEY || const_type == ConstraintType.UNIQUE) {
-                        if (const_type == ConstraintType.PRIMARY_KEY) {
-                            table_sb.append("PRIMARY KEY (");
-                        }
-                        else {
-                            if (catalog_idx.getAssumeunique()) {
-                                table_sb.append("ASSUMEUNIQUE (");
-                            }
-                            else {
-                                table_sb.append("UNIQUE (");
-                            }
-                        }
-                        String col_add = "";
-                        if (catalog_idx.getExpressionsjson() != null && !catalog_idx.getExpressionsjson().equals("")) {
-                            String exprStrings = new String();
+
+                    if (const_type == ConstraintType.PRIMARY_KEY) {
+                        table_sb.append("PRIMARY KEY (");
+                    }
+                    else if (catalog_idx.getAssumeunique()) {
+                        table_sb.append("ASSUMEUNIQUE (");
+                    }
+                    else {
+                        table_sb.append("UNIQUE (");
+                    }
+
+                    String jsonExpr = catalog_idx.getExpressionsjson();
+                    if (jsonExpr != null && !jsonExpr.equals("")) {
+                        try {
                             StmtTargetTableScan tableScan = new StmtTargetTableScan(catalog_tbl);
-                            try {
-                                List<AbstractExpression> expressions =
-                                        AbstractExpression.fromJSONArrayString(catalog_idx.getExpressionsjson(), tableScan);
-                                String sep = "";
-                                for (AbstractExpression expr : expressions) {
-                                    exprStrings += sep + expr.explain(catalog_tbl.getTypeName());
-                                    sep = ",";
-                                }
+                            List<AbstractExpression> expressions = AbstractExpression.fromJSONArrayString(jsonExpr, tableScan);
+                            String sep = "";
+                            for (AbstractExpression expr : expressions) {
+                                table_sb.append(sep).append(expr.explain(catalog_tbl.getTypeName()));
+                                sep = ",";
                             }
-                            catch (JSONException e) {
-                            }
-                            table_sb.append(col_add).append(exprStrings);
                         }
-                        else {
-                            for (ColumnRef catalog_colref :
-                                    CatalogUtil.getSortedCatalogItems(catalog_idx.getColumns(), "index")) {
-                                table_sb.append(col_add).append(catalog_colref.getColumn().getTypeName());
-                                col_add = ", ";
-                            } // FOR
+                        catch (JSONException e) {
+                            // ignored
                         }
-                        table_sb.append(")");
                     }
+                    else {
+                        String col_add = "";
+                        for (ColumnRef catalog_colref : CatalogUtil.getSortedCatalogItems(catalog_idx.getColumns(), "index")) {
+                            table_sb.append(col_add).append(catalog_colref.getColumn().getTypeName());
+                            col_add = ", ";
+                        }
+                    }
+
+                    table_sb.append(")");
                 }
                 if (catalog_idx.getTypeName().startsWith(HSQLInterface.AUTO_GEN_PREFIX) ||
                         catalog_idx.getTypeName().startsWith(HSQLInterface.AUTO_GEN_MATVIEW) ) {
                     skip_indexes.add(catalog_idx);
                 }
+            }
 
             // Foreign Key
-            } else if (const_type == ConstraintType.FOREIGN_KEY) {
+            else if (const_type == ConstraintType.FOREIGN_KEY) {
                 Table catalog_fkey_tbl = catalog_const.getForeignkeytable();
                 String col_add = "";
                 String our_columns = "";
                 String fkey_columns = "";
+
                 for (ColumnRef catalog_colref : catalog_const.getForeignkeycols()) {
                     // The name of the ColumnRef is the column in our base table
                     Column our_column = catalog_tbl.getColumns().getIgnoreCase(catalog_colref.getTypeName());
                     assert(our_column != null);
                     our_columns += col_add + our_column.getTypeName();
-
                     Column fkey_column = catalog_colref.getColumn();
                     assert(fkey_column != null);
                     fkey_columns += col_add + fkey_column.getTypeName();
-
                     col_add = ", ";
                 }
-                table_sb.append(add).append(spacer + "CONSTRAINT ").append(catalog_const.getTypeName()).append(" FOREIGN KEY (")
-                        .append(our_columns).append(") REFERENCES ").append(catalog_fkey_tbl.getTypeName())
+
+                table_sb.append(add).append(spacer + "CONSTRAINT ").append(catalog_const.getTypeName())
+                        .append(" FOREIGN KEY (").append(our_columns)
+                        .append(") REFERENCES ").append(catalog_fkey_tbl.getTypeName())
                         .append(" (").append(fkey_columns).append(")");
             }
+
             skip_constraints.add(catalog_const);
         }
 
+        // That's the end of the columns
+        table_sb.append("\n)");
+        String subspacer = spacer.substring(1); // fussily allow for ')'
+
+        // Query expression for views
         if (viewQuery != null) {
-            table_sb.append("\n) AS \n");
-            table_sb.append(spacer).append(viewQuery).append(";\n");
+            table_sb.append(subspacer)
+                    .append("AS ").append(viewQuery);
+            subspacer = "\n" + spacer;
         }
-        else {
-            table_sb.append("\n)");
-            TimeToLive ttl = catalog_tbl.getTimetolive().get(TimeToLiveVoltDB.TTL_NAME);
-            if (ttl != null) {
-                table_sb.append(" USING TTL " + ttl.getTtlvalue() + " ");
-                if (ttl.getTtlunit() != null) {
-                    table_sb.append(ttl.getTtlunit());
-                }
-                table_sb.append(" ON COLUMN " + ttl.getTtlcolumn().getTypeName());
-                table_sb.append(" BATCH_SIZE " + ttl.getBatchsize());
-                table_sb.append(" MAX_FREQUENCY " + ttl.getMaxfrequency() + " ");
+
+        // USING TTL
+        TimeToLive ttl = catalog_tbl.getTimetolive().get(TimeToLiveVoltDB.TTL_NAME);
+        if (ttl != null) {
+            table_sb.append(subspacer)
+                    .append("USING TTL ").append(ttl.getTtlvalue());
+            if (ttl.getTtlunit() != null) {
+                table_sb.append(' ').append(ttl.getTtlunit());
             }
-            table_sb.append(";\n");
+            table_sb.append(" ON COLUMN ").append(ttl.getTtlcolumn().getTypeName())
+                    .append(" BATCH_SIZE ").append(ttl.getBatchsize())
+                    .append(" MAX_FREQUENCY ").append(ttl.getMaxfrequency());
+            subspacer = "\n" + spacer;
         }
+
+        // That's the end of the statement
+        table_sb.append(";\n");
 
         // We've built the full CREATE TABLE statement for this table,
         // Append the generated table schema to the canonical DDL StringBuilder
         sb.append(table_sb.toString());
 
-        // Partition Table for regular tables (non-streams)
+        // Partition Table for regular tables (non-streams, non-views
         if (catalog_tbl.getPartitioncolumn() != null && viewQuery == null && !isExportOnly) {
             sb.append("PARTITION TABLE ").append(catalog_tbl.getTypeName()).append(" ON COLUMN ").
                     append(catalog_tbl.getPartitioncolumn().getTypeName()).append(";\n");
@@ -385,22 +387,22 @@ public abstract class CatalogSchemaTools {
                 continue;
             }
 
+            String createIdx;
             if (catalog_idx.getUnique()) {
                 if (catalog_idx.getAssumeunique()) {
-                    sb.append("CREATE ASSUMEUNIQUE INDEX ");
+                    createIdx = "CREATE ASSUMEUNIQUE INDEX ";
                 } else {
-                    sb.append("CREATE UNIQUE INDEX ");
+                    createIdx = "CREATE UNIQUE INDEX ";
                 }
-            } else {    // MITGRATE flag does not imply any changes on the "CREATE INDEX" syntax
-                sb.append("CREATE INDEX ");
+            } else { // MIGRATE flag does not imply any changes on the "CREATE INDEX" syntax
+                createIdx= "CREATE INDEX " ;
             }
+            sb.append(createIdx).append(catalog_idx.getTypeName())
+              .append(" ON ").append(catalog_tbl.getTypeName())
+              .append(" (");
 
-
-            sb.append(catalog_idx.getTypeName()).append(" ON ").append(catalog_tbl.getTypeName()).append(" (");
             add = "";
-
             String jsonstring = catalog_idx.getExpressionsjson();
-
             if (jsonstring.isEmpty()) {
                 for (ColumnRef catalog_colref : CatalogUtil.getSortedCatalogItems(catalog_idx.getColumns(), "index")) {
                     sb.append(add).append(catalog_colref.getColumn().getTypeName());
@@ -692,7 +694,8 @@ public abstract class CatalogSchemaTools {
                     // A View cannot precede a table that it depends on in the DDL
                     for (Table table : viewList) {
                         String viewQuery = ((TableAnnotation) table.getAnnotation()).ddl;
-                        toSchema(sb, table, viewQuery, false, null, null, null);
+                        String topicName = StringUtils.isBlank(table.getTopicname()) ? null : table.getTopicname();
+                        toSchema(sb, table, viewQuery, false, null, null, topicName);
                     }
                 }
 

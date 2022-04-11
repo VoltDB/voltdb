@@ -344,6 +344,11 @@ public class ParserDDL extends ParserRoutine {
                 return compileAlterTable();
             }
 
+            case Tokens.VIEW : {
+                read();
+                return compileAlterView();
+            }
+
             case Tokens.STREAM : {
                 read();
                 return compileAlterStream();
@@ -978,6 +983,26 @@ public class ParserDDL extends ParserRoutine {
         }
     }
 
+    // Compiles ALTER VIEW statement.
+    // Only ALTER USING TTL... is supported, with
+    // syntax the same as used on the CREATE VIEW.
+    Statement compileAlterView() {
+
+        String tableName = token.tokenString;
+        HsqlName schema = session.getSchemaHsqlName(token.namePrefix);
+        Table t = database.schemaManager.getUserTable(session, tableName, schema.name);
+
+        if (!t.isView()) {
+            throw Error.error(ErrorCode.X_42501, tableName);
+        }
+
+        read();  // skip past table name
+        readThis(Tokens.ALTER);
+        checkIsThis(Tokens.USING);
+
+        return readTimeToLive(t, true);
+    }
+
     // Compiles ALTER STREAM statement
     Statement compileAlterStream() {
 
@@ -1167,9 +1192,7 @@ public class ParserDDL extends ParserRoutine {
 
         // Time to live
         read();
-        if (token.tokenType != Tokens.TTL) {
-            throw unexpectedTokenRequire(Tokens.T_TTL);
-        }
+        checkIsThis(Tokens.TTL);
         timeLiveValue = readInt();
         read();
         if (token.tokenType == Tokens.SECONDS || token.tokenType == Tokens.MINUTES ||
@@ -1181,15 +1204,13 @@ public class ParserDDL extends ParserRoutine {
         // Column for TTL determination
         readThis(Tokens.ON);
         readThis(Tokens.COLUMN);
-        if (token.tokenType != Tokens.X_IDENTIFIER) {
-            throw unexpectedTokenRequire("identifier");
-        }
+        checkIsValidIdentifier();
         ttlColumn = token.tokenString;
 
         // BATCH_SIZE, MAX_FREQUENCY, in either order
         read();
         boolean seenBatch = false, seenFreq = false;
-        while (token.tokenType != Tokens.SEMICOLON) {
+        while (token.tokenType != Tokens.SEMICOLON && token.tokenType != Tokens.X_ENDPARSE) {
             switch (token.tokenType) {
 
             case Tokens.BATCH_SIZE:
@@ -1231,6 +1252,17 @@ public class ParserDDL extends ParserRoutine {
         }
 
         // Semantic checks on column
+        // Only limited checks possible for views during creation
+        if (table instanceof View && !alter) {
+            View view = (View)table;
+            if (view.findColumnName(ttlColumn) == null) {
+                throw Error.error(ErrorCode.X_42501, ttlColumn); // object not found
+            }
+            view.addTTL(timeLiveValue, ttlUnit, ttlColumn, batchSize, maxFrequency);
+            return null;
+        }
+
+        // Table or stream
         int index = table.findColumn(ttlColumn);
         if (index < 0) {
             throw Error.error(ErrorCode.X_42501, ttlColumn); // object not found
@@ -1244,7 +1276,7 @@ public class ParserDDL extends ParserRoutine {
 
         // At this moment we don't allow alter TTL column of migrate table on the fly
         if (alter && table.hasMigrationTarget()) {
-            String oldColumn = table.getTTL().ttlColumn.getNameString();
+            String oldColumn = table.getTTL().ttlColumnName.name;
             if (!ttlColumn.equals(oldColumn)) {
                 throw Error.error(ErrorCode.X_42513, "TTL column"); // property cannot be changed
             }
@@ -1284,30 +1316,32 @@ public class ParserDDL extends ParserRoutine {
     // Common code for readMigrateTargetOrTopic, readExportTargetOrTopic
     private Pair<String,Integer> readToTargetOrTopic() {
         read();
-        if (token.tokenType != Tokens.TO) {
-            throw unexpectedTokenRequire(Tokens.T_TO);
-        }
-        read();
+        readThis(Tokens.TO);
         if (token.tokenType != Tokens.TARGET && token.tokenType != Tokens.TOPIC) {
             throw unexpectedTokenRequire(Tokens.T_TARGET + " or " + Tokens.T_TOPIC);
         }
         int targetType = token.tokenType;
         read();
-        if (!isValidIdentifier()) {
-            throw unexpectedTokenRequire("identifier");
-        }
+        checkIsValidIdentifier();
         String ident = token.tokenString;
         read();
         return new Pair<>(ident, targetType);
     }
 
-    // Acceptable identifier for MIGRATE TO or EXPORT TO clauses.
+    // Acceptable identifier for MIGRATE TO, EXPORT TO, or
+    // TTL .. ON COLUMN clauses.
     // - any unquoted ident, including SQL reserved keywords
     //   such as 'default'.
     // - quoted idents are not allowed, since SQLParser does
     //   not support them.
     private boolean isValidIdentifier() {
         return token.isUndelimitedIdentifier;
+    }
+
+    private void checkIsValidIdentifier() {
+        if (!token.isUndelimitedIdentifier) {
+            throw unexpectedTokenRequire("identifier");
+        }
     }
 
     private Statement createTimeToLive(Table table, int value, String unit, String column,
@@ -1414,7 +1448,7 @@ public class ParserDDL extends ParserRoutine {
         // Here we might have EXPORT TO or MIGRATE TO, and the
         // object of that can be a TARGET or a TOPIC. If EXPORT,
         // there may be 'ON triggers'. If TOPIC, there may be
-        // 'ON KEY ... VALUE ...'.
+        // 'WITH KEY ... VALUE ...'.
         Pair<String,Integer> target = null;
         if (token.tokenType == Tokens.MIGRATE) {
             table.setHasMigrationTarget(true);
@@ -1427,7 +1461,7 @@ public class ParserDDL extends ParserRoutine {
                                       target.getSecond() == Tokens.TOPIC);
         }
         if (token.tokenType == Tokens.WITH) {
-            if (target.getSecond() != Tokens.TOPIC) {
+            if (target == null || target.getSecond() != Tokens.TOPIC) {
                 throw unexpectedToken(); // stopping here gives a better diagnostic
             }
             skipTopicKeysAndValues();
@@ -1738,17 +1772,9 @@ public class ParserDDL extends ParserRoutine {
         assert token.tokenType == Tokens.PARTITION;
 
         read();
-        if (token.tokenType != Tokens.ON) {
-            throw unexpectedToken();
-        }
-        read();
-        if (token.tokenType != Tokens.COLUMN) {
-            throw unexpectedToken();
-        }
-        read();
-        if (!isValidIdentifier()) {
-            throw unexpectedToken();
-        }
+        readThis(Tokens.ON);
+        readThis(Tokens.COLUMN);
+        checkIsValidIdentifier();
         read();
     }
 
@@ -1758,10 +1784,7 @@ public class ParserDDL extends ParserRoutine {
 
         // Common skipping EXPORT TO [ TARGET | TOPIC ] <identifier>
         read();
-        if (token.tokenType != Tokens.TO) {
-            throw unexpectedToken();
-        }
-        read();
+        readThis(Tokens.TO);
         if (token.tokenType == Tokens.TOPIC) {
             toTopic = true;
         }
@@ -1769,9 +1792,7 @@ public class ParserDDL extends ParserRoutine {
             throw unexpectedToken();
         }
         read();
-        if (!isValidIdentifier()) {
-            throw unexpectedToken();
-        }
+        checkIsValidIdentifier();
         read();
 
         // TO TOPIC might have WITH keys and values, but for
@@ -2370,8 +2391,8 @@ public class ParserDDL extends ParserRoutine {
     // Called from StatementSchema
     void processCreateView() {
 
-        StatementSchema cs   = compileCreateView();
-        View            view = (View) cs.arguments[0];
+        StatementSchema cs = compileCreateView();
+        View view = (View) cs.arguments[0];
 
         checkSchemaUpdateAuthorisation(view.getSchemaName());
         database.schemaManager.checkSchemaObjectNotExists(view.getName());
@@ -2380,22 +2401,36 @@ public class ParserDDL extends ParserRoutine {
 
     StatementSchema compileCreateView() {
 
-        read();
+        read(); // skip over VIEW
 
         HsqlName name = readNewSchemaObjectName(SchemaObject.VIEW);
-
         name.setSchemaIfNull(session.getCurrentSchemaHsqlName());
+
+        // Here we might have MIGRATE TO, and the object of that can be a
+        // TARGET or a TOPIC. If TOPIC, there may be 'WITH KEY ... VALUE ...'.
+        Pair<String,Integer> target = null;
+        if (token.tokenType == Tokens.MIGRATE) {
+            target = readMigrateTargetOrTopic();
+        }
+        if (token.tokenType == Tokens.WITH) {
+            if (target == null || target.getSecond() != Tokens.TOPIC) {
+                throw unexpectedToken();
+            }
+            skipTopicKeysAndValues();
+        }
 
         HsqlName[] colList = null;
 
+        // Optional list of columns in view
         if (token.tokenType == Tokens.OPENBRACKET) {
             colList = readColumnNames(name);
         }
 
+        // AS selection
         readThis(Tokens.AS);
         startRecording();
 
-        int             position = getPosition();
+        int position = getPosition();
         QueryExpression queryExpression;
 
         try {
@@ -2405,9 +2440,10 @@ public class ParserDDL extends ParserRoutine {
         }
 
         Token[] statement = getRecordedStatement();
-        String  sql       = getLastPart(position);
-        int     check     = SchemaObject.ViewCheckModes.CHECK_NONE;
+        String sql = getLastPart(position);
 
+        // Undocumented WITH ... CHECK OPTION
+        int check = SchemaObject.ViewCheckModes.CHECK_NONE;
         if (token.tokenType == Tokens.WITH) {
             read();
 
@@ -2423,21 +2459,29 @@ public class ParserDDL extends ParserRoutine {
             readThis(Tokens.OPTION);
         }
 
+        // Create basic view
         View view = new View(session, database, name, colList, sql, check);
+        if (target != null) {
+            view.setHasMigrationTarget(true);
+        }
+
+        // Now we can parse any TTL
+        if (token.tokenType == Tokens.USING) {
+            readTimeToLive(view, false);
+        }
 
         queryExpression.setAsTopLevel();
         queryExpression.setView(view);
         queryExpression.resolve(session);
-        view.compile(session);
+        view.compile(session); // column schema gets filled in here
         checkSchemaUpdateAuthorisation(name.schema);
         database.schemaManager.checkSchemaObjectNotExists(name);
 
         String statementSQL = Token.getSQL(statement);
-
         view.statement = statementSQL;
 
-        String   fullSQL = getLastPart();
-        Object[] args    = new Object[]{ view };
+        String fullSQL = getLastPart();
+        Object[] args = new Object[] { view };
 
         return new StatementSchema(fullSQL, StatementTypes.CREATE_VIEW, args,
                                    null, null);

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -330,6 +330,11 @@ namespace voltdb {
             }
             m_updatedTuple.setNValue(columnIndex, newValue);
         }
+        // Copy any migrating information
+        int migIndex = m_destTable->getMigrateColumnIndex();
+        if (migIndex != TupleSchema::UNSET_HIDDEN_COLUMN) {
+            m_updatedTuple.setHiddenNValue(migIndex, m_existingTuple.getHiddenNValue(migIndex));
+        }
     }
 
     void MaterializedViewHandler::setEnabled(bool enabled) {
@@ -456,6 +461,11 @@ namespace voltdb {
 
                 m_updatedTuple.setNValue(columnIndex, newValue);
             }
+        }
+        // Copy any migrating information
+        int migIndex = m_destTable->getMigrateColumnIndex();
+        if (migIndex != TupleSchema::UNSET_HIDDEN_COLUMN) {
+            m_updatedTuple.setHiddenNValue(migIndex, m_existingTuple.getHiddenNValue(migIndex));
         }
     }
 

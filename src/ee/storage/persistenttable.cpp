@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -825,6 +825,24 @@ void PersistentTable::doInsertTupleCommon(TableTuple& source, TableTuple& target
     target.setInlinedDataIsVolatileFalse();
     target.setNonInlinedDataIsVolatileFalse();
 
+    // Prepare migrating work
+    bool migrating = isTableWithMigrate(m_tableType);
+    int64_t txnId = 0ll;
+    if (migrating) {
+        vassert(m_shadowStream != nullptr);
+        uint16_t colIndex = getMigrateColumnIndex();
+        NValue txnIdVal = target.getHiddenNValue(colIndex);
+        if(!txnIdVal.isNull()){
+            txnId = ValuePeeker::peekBigInt(txnIdVal);
+            if (txnId == 0) {
+                // MaterializedViewTriggerForInsert::processTupleInsert sends tuples
+                // initialized from a zeroed-out buffer. Prevent a txnId == 0 from
+                // being inserted in the migrating rows. Must do this before indexing.
+                target.setHiddenNValue(colIndex, NValue::getNullValue(ValueType::tBIGINT));
+                VOLT_DEBUG("Nulled out migrating txnId column %d at address %p", colIndex, target.address());
+            }
+        }
+    }
 
     TableTuple conflict(m_schema);
     try {
@@ -849,13 +867,11 @@ void PersistentTable::doInsertTupleCommon(TableTuple& source, TableTuple& target
         target.setDirtyFalse();
     }
 
-    // add it to migrating index when loading tuple from a recover or rejoin snapshot (only)
-     if (isTableWithMigrate(m_tableType)) {
-         vassert(m_shadowStream != nullptr);
-         NValue txnId = target.getHiddenNValue(getMigrateColumnIndex());
-         if(!txnId.isNull()){
-            migratingAdd(ValuePeeker::peekBigInt(txnId), target);
-         }
+    // If inserted tuple had hidden txnId, add to migrating index (must only be when loading tuple
+    // from a recover or rejoin snapshot)
+     if (migrating && txnId != 0ll) {
+         VOLT_DEBUG("Add recovered/rejoined migrating txnId %lld at address %p", txnId, target.address());
+         migratingAdd(txnId, target);
      }
 
     // this is skipped for inserts that are never expected to fail,
@@ -938,6 +954,7 @@ void PersistentTable::insertTupleForUndo(char* tuple) {
     if (isTableWithMigrate(m_tableType)) {
        NValue txnId = target.getHiddenNValue(getMigrateColumnIndex());
        if (!txnId.isNull()) {
+          VOLT_DEBUG("Re-add migrating txnId %lld at address %p", ValuePeeker::peekBigInt(txnId), target.address());
           migratingAdd(ValuePeeker::peekBigInt(txnId), target);
        }
     }
@@ -999,15 +1016,26 @@ void PersistentTable::updateTupleWithSpecificIndexes(
 
     if (isTableWithMigrate(m_tableType)) {
        uint16_t migrateColumnIndex = getMigrateColumnIndex();
-       NValue txnId = sourceTupleWithNewValues.getHiddenNValue(migrateColumnIndex);
-       if (txnId.isNull()) {
+       NValue txnIdValue = sourceTupleWithNewValues.getHiddenNValue(migrateColumnIndex);
+       if (txnIdValue.isNull()) {
            if (fromMigrate) {
                int64_t txnId = getTableTxnId();
+               VOLT_DEBUG("Set migrateColumn to txnId %lld at index %d on source %p, target %p",
+                       txnId,
+                       migrateColumnIndex,
+                       sourceTupleWithNewValues.address(),
+                       targetTupleToUpdate.address());
                sourceTupleWithNewValues.setHiddenNValue(migrateColumnIndex, ValueFactory::getBigIntValue(txnId));
            }
        } else {
+           int64_t txnId = ValuePeeker::peekBigInt(txnIdValue);
+           vassert(txnId != 0ll);       // Failing this might be in an uninitialized view tuple
+           VOLT_DEBUG("Remove and null out migrating txnId %lld on source %p, target %p",
+                   txnId,
+                   sourceTupleWithNewValues.address(),
+                   targetTupleToUpdate.address());
            sourceTupleWithNewValues.setHiddenNValue(migrateColumnIndex, NValue::getNullValue(ValueType::tBIGINT));
-           migratingRemove(ValuePeeker::peekBigInt(txnId), targetTupleToUpdate);
+           migratingRemove(txnId, targetTupleToUpdate);
        }
     }
 
@@ -1103,6 +1131,7 @@ void PersistentTable::updateTupleWithSpecificIndexes(
 
     if (fromMigrate) {
         vassert(isTableWithMigrate(m_tableType) && m_shadowStream != nullptr);
+        VOLT_DEBUG("Add migrating txnId %lld on target %p", getTableTxnId(), targetTupleToUpdate.address());
         migratingAdd(getTableTxnId(), targetTupleToUpdate);
         // add to shadow stream if the table is partitioned or partition 0 for replicated table
         if (!isReplicatedTable() || m_executorContext->getPartitionId() == 0) {
@@ -1222,10 +1251,13 @@ void PersistentTable::updateTupleForUndo(char* tupleWithUnwantedValues,
     if (fromMigrate) {
         vassert(m_shadowStream != nullptr);
         vassert(targetTupleToUpdate.getHiddenNValue(getMigrateColumnIndex()).isNull());
+        VOLT_DEBUG("Remove migrating txnId %lld on target %p", getTableTxnId(), targetTupleToUpdate.address());
         migratingRemove(getTableTxnId(), targetTupleToUpdate);
     } else if (isTableWithMigrate(m_tableType)) {
         NValue const txnId = targetTupleToUpdate.getHiddenNValue(getMigrateColumnIndex());
         if(!txnId.isNull()){
+            VOLT_DEBUG("Add migrating txnId %lld on target %p",
+                    ValuePeeker::peekBigInt(txnId), targetTupleToUpdate.address());
             migratingAdd(ValuePeeker::peekBigInt(txnId), targetTupleToUpdate);
         }
     }
@@ -1261,6 +1293,8 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible, bool remove
     if (isTableWithMigrate(m_tableType) && removeMigratingIndex) {
         NValue txnId = target.getHiddenNValue(getMigrateColumnIndex());
         if (!txnId.isNull()) {
+            VOLT_DEBUG("Remove migrating txnId %lld on target %p",
+                    ValuePeeker::peekBigInt(txnId), target.address());
             migratingRemove(ValuePeeker::peekBigInt(txnId), target);
         }
     }
@@ -1408,6 +1442,8 @@ void PersistentTable::deleteTupleForUndo(char* tupleData, bool skipLookup) {
     if (isTableWithMigrate(m_tableType)) {
         NValue txnId = target.getHiddenNValue(getMigrateColumnIndex());
         if(!txnId.isNull()){
+            VOLT_DEBUG("Remove migrating txnId %lld on target %p",
+                    ValuePeeker::peekBigInt(txnId), target.address());
             migratingRemove(ValuePeeker::peekBigInt(txnId), target);
         }
     }
@@ -2394,13 +2430,16 @@ void PersistentTable::migratingAdd(int64_t txnId, TableTuple& tuple) {
     __attribute__((unused)) auto const success =
         it->second.insert(addr);
     vassert(success.second);
+    VOLT_DEBUG("Added migrating txnId %lld for address %p", txnId, addr);
 };
 
 bool PersistentTable::migratingRemove(int64_t txnId, TableTuple& tuple) {
     vassert(isTableWithMigrate(m_tableType) && m_shadowStream != nullptr);
     MigratingRows::iterator it = m_migratingRows.find(txnId);
     if (it == m_migratingRows.end()) {
-        vassert(false);
+        // Migrating views may be called to remove a migrating flag that
+        // hasn't been set yet
+        vassert(m_isMaterialized);
         return false;
     }
 
@@ -2408,7 +2447,9 @@ bool PersistentTable::migratingRemove(int64_t txnId, TableTuple& tuple) {
     if (it->second.empty()) {
         m_migratingRows.erase(it);
     }
+
     vassert(found == 1);
+    VOLT_DEBUG("Removed migrating txnId %lld for address %p", txnId, tuple.address());
     return found == 1;
 }
 
@@ -2431,6 +2472,9 @@ bool PersistentTable::deleteMigratedRows(int64_t deletableTxnId) {
    // will be deleted next round, one batch at a time
    BOOST_FOREACH (auto toDelete, batch) {
       targetTuple.move(toDelete);
+      VOLT_DEBUG("Deleting migrated tuple for txnId %lld hidden txnId %lld, address %p",
+              currIt->first, ValuePeeker::peekBigInt(targetTuple.getHiddenNValue(getMigrateColumnIndex())),
+              targetTuple.address());
       vassert(ValuePeeker::peekBigInt(targetTuple.getHiddenNValue(getMigrateColumnIndex())) == currIt->first);
       deleteTuple(targetTuple, true, false);
    }

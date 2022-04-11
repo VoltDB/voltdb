@@ -1,4 +1,5 @@
 /* Copyright (c) 2001-2009, The HSQL Development Group
+ * Copyright (c) 2010-2022, VoltDB Inc
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -30,20 +31,36 @@
 
 package org.hsqldb_voltpatches;
 
+import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
+
 //VoltDB extension to support TTL
 public class TimeToLiveVoltDB {
     public final static String TTL_NAME = "ttl";
     final int ttlValue;
     final String ttlUnit;
     final ColumnSchema ttlColumn;
+    final HsqlName ttlColumnName;
     final int batchSize;
     final int maxFrequency;
 
+    // The normal case for tables
     public TimeToLiveVoltDB(int value, String unit, ColumnSchema column,
-            int batchSize, int maxFrequency) {
+                            int batchSize, int maxFrequency) {
         ttlValue = value;
         ttlUnit = unit;
         ttlColumn = column;
+        ttlColumnName = column.getName();
+        this.batchSize = batchSize;
+        this.maxFrequency = maxFrequency;
+    }
+
+    // For views when the column schema is not yet populated
+    public TimeToLiveVoltDB(int value, String unit, HsqlName columnName,
+                            int batchSize, int maxFrequency) {
+        ttlValue = value;
+        ttlUnit = unit;
+        ttlColumn = null; // not available for a view
+        ttlColumnName = columnName;
         this.batchSize = batchSize;
         this.maxFrequency = maxFrequency;
     }
@@ -52,14 +69,11 @@ public class TimeToLiveVoltDB {
     public boolean equals(Object o) {
         if (o instanceof TimeToLiveVoltDB) {
             TimeToLiveVoltDB ttl = (TimeToLiveVoltDB)o;
-            boolean ret = (ttl.ttlValue == ttlValue && ttl.ttlUnit.equalsIgnoreCase(ttlUnit) &&
-                    ttl.ttlColumn.getName().equals(ttlColumn.getName()) &&
-                    ttl.batchSize == batchSize && ttl.maxFrequency == maxFrequency);
-            if (!ret) {
-                return false;
-            }
-
-            return true;
+            return (ttl.ttlValue == ttlValue &&
+                    ttl.ttlUnit.equalsIgnoreCase(ttlUnit) &&
+                    ttl.ttlColumnName.equals(ttlColumnName) &&
+                    ttl.batchSize == batchSize &&
+                    ttl.maxFrequency == maxFrequency);
         }
         return false;
     }
