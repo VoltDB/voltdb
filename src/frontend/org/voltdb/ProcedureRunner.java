@@ -323,11 +323,8 @@ public class ProcedureRunner {
         if (m_perCallStats != null) {
             m_perCallStats.setResultSize(result.getResults());
         }
+        m_statsCollector.endProcedure(result.aborted(), result.failed(), m_perCallStats);
 
-        m_statsCollector.endProcedure(result.getStatus() == ClientResponse.USER_ABORT,
-                                      (result.getStatus() != ClientResponse.USER_ABORT) &&
-                                      (result.getStatus() != ClientResponse.SUCCESS),
-                                      m_perCallStats);
         // allow the GC to collect per-call stats if this proc isn't called for a while
         m_perCallStats = null;
 

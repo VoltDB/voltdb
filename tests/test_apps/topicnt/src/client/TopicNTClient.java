@@ -93,6 +93,9 @@ public class TopicNTClient {
         @Option(desc = "If true, use Kafka producer (default true)")
         boolean produce = true;
 
+        @Option(desc = "If true, trigger aborts and failures (default false)")
+        boolean fail = false;
+
         @Option(desc = "If true, use Volt partitioner (default true)")
         boolean voltpartitioner = true;
 
@@ -365,8 +368,12 @@ public class TopicNTClient {
                 }
 
                 final Record selectedRecord = record;
+                final String value = String.format("%s,%d",
+                        selectedRecord.url,
+                        m_config.fail ? 1 : 0);
+
                 ProducerRecord<Long, Object> producedRecord = new ProducerRecord<Long, Object>(
-                        "topicnt", selectedRecord.cookieId, selectedRecord.url);
+                        "topicnt", selectedRecord.cookieId, value);
 
                 producer.send(producedRecord,
                         new Callback() {

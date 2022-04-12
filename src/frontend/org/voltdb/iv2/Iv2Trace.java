@@ -114,6 +114,8 @@ public class Iv2Trace
                 return "SUCCESS";
             case ClientResponse.USER_ABORT:
                 return "USER_ABORT";
+            case ClientResponse.COMPOUND_PROC_USER_ABORT:
+                return "COMPOUND_PROC_USER_ABORT";
             case ClientResponse.GRACEFUL_FAILURE:
                 return "GRACEFUL_FAILURE";
             case ClientResponse.UNEXPECTED_FAILURE:

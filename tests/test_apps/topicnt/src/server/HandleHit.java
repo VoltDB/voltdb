@@ -23,6 +23,7 @@
 package server;
 
 import java.net.URL;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltCompoundProcedure;
@@ -33,16 +34,20 @@ public class HandleHit extends VoltCompoundProcedure {
 
     long cookieId;
     String urlStr;
+    boolean fakeFailures;
     String domain;
     String userName;
     Long accountId;
     boolean errorsReported;
 
-    public long run(long id, String str) {
+    static AtomicInteger failCount = new AtomicInteger(0);
+
+    public long run(long id, String str, int fails) {
 
         // Save inputs
         cookieId = id;
         urlStr = str;
+        fakeFailures = fails != 0;
 
         // Build stages
         newStageList(this::doLookups)
@@ -105,6 +110,18 @@ public class HandleHit extends VoltCompoundProcedure {
         else {
             reportError(String.format("No account match found for domain %s", domain));
             allGood = false;
+        }
+
+        // GENERATE FAILURES
+        if (fakeFailures && (cookieId % 4 == 0 || cookieId % 7 == 0)) {
+            if (failCount.incrementAndGet() % 2 == 0) {
+                // Should be counted as an abort
+                abortProcedure(String.format("ABORT for cookieId %d", cookieId));
+            }
+            else {
+                // Should be counted as a fail
+                throw new RuntimeException(String.format("THROW for cookieId %d", cookieId));
+            }
         }
 
         // Did we get all we need?

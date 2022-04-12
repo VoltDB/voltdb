@@ -54,10 +54,10 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.LockSupport;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+
 import javax.net.ssl.SSLEngine;
 import javax.security.auth.Subject;
 
-import com.google_voltpatches.common.net.HostAndPort;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.network.CipherExecutor;
@@ -69,12 +69,14 @@ import org.voltcore.utils.Pair;
 import org.voltcore.utils.ssl.SSLConfiguration;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
-import org.voltdb.common.Constants;
 import org.voltdb.client.VoltBulkLoader.BulkLoaderFailureCallBack;
 import org.voltdb.client.VoltBulkLoader.BulkLoaderState;
 import org.voltdb.client.VoltBulkLoader.BulkLoaderSuccessCallback;
 import org.voltdb.client.VoltBulkLoader.VoltBulkLoader;
+import org.voltdb.common.Constants;
 import org.voltdb.utils.Encoder;
+
+import com.google_voltpatches.common.net.HostAndPort;
 
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.handler.ssl.SslContext;
@@ -1523,19 +1525,8 @@ public class Client2Impl implements Client2 {
                 response.setClientRoundtrip(elapsedTime);
                 int clusterRTT = response.getClusterRoundtrip(); // msec
 
-                boolean abort = false,  fail = false;
-                switch (response.getStatus()) {
-                case ClientResponse.SUCCESS:
-                    break;
-                case ClientResponse.USER_ABORT:
-                case ClientResponse.GRACEFUL_FAILURE:
-                case ClientResponse.UNSUPPORTED_DYNAMIC_CHANGE:
-                    abort = true;
-                    break;
-                default:
-                    fail = true;
-                    break;
-                }
+                boolean abort = response.aborted();
+                boolean fail = response.failed();
 
                 String procName = context.invocation.getProcName();
                 context.cxn.clientStats(procName).update(elapsedTime, clusterRTT, abort, fail, false);

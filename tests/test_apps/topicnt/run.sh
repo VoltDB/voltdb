@@ -207,6 +207,22 @@ function testsmall() {
       --rate=2
 }
 
+# small test case, with fail
+function testfail() {
+  srccompile-ifneeded
+  java -classpath topicnt-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file:${LOG4J} \
+      client.TopicNTClient \
+      --servers=localhost \
+      --fail=true \
+      --duration=60 \
+      --users=10 \
+      --cookies=1 \
+      --urls=100 \
+      --domains=10 \
+      --producers=1 \
+      --rate=2
+}
+
 # rerun small test case without trying to initialize the database
 function again() {
   srccompile-ifneeded

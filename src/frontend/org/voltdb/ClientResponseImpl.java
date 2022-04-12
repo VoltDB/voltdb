@@ -396,4 +396,20 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
     public void dropResultTable() {
         results = new VoltTable[] {};
     }
+
+    public static boolean aborted(byte status) {
+        return status == USER_ABORT || status == COMPOUND_PROC_USER_ABORT;
+    }
+
+    public boolean aborted() {
+        return aborted(status);
+    }
+
+    public static boolean failed(byte status) {
+        return status != SUCCESS && !aborted(status);
+    }
+
+    public boolean failed() {
+        return failed(status);
+    }
 }

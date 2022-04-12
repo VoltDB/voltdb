@@ -79,7 +79,6 @@ import com.google_voltpatches.common.collect.Maps;
 
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.handler.ssl.SslContext;
-import jsr166y.ThreadLocalRandom;
 
 /**
  * De/multiplexes transactions across a cluster
@@ -785,21 +784,8 @@ class Distributer {
                 final long deltaNanos = Math.max(1, endNanos - callTimeNanos);
                 final ProcedureCallback cb = stuff.callback;
                 assert(cb != null);
-                final byte status = response.getStatus();
-                boolean abort = false;
-                boolean error = false;
-                switch (status) {
-                case ClientResponse.SUCCESS:
-                    break;
-                case ClientResponse.USER_ABORT:
-                case ClientResponse.GRACEFUL_FAILURE:
-                case ClientResponse.UNSUPPORTED_DYNAMIC_CHANGE:
-                    abort = true;
-                    break;
-                default:
-                    error = true;
-                    break;
-                }
+                boolean abort = response.aborted();
+                boolean error = response.failed();
 
                 int clusterRoundTrip = response.getClusterRoundtrip();
                 m_rateLimiter.transactionResponseReceived(endNanos, clusterRoundTrip, stuff.ignoreBackpressure);

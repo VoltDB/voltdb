@@ -317,10 +317,8 @@ public class ProcedureRunnerNT {
         if (m_perCallStats.samplingProcedure()) {
             m_perCallStats.setResultSize(response.getResults());
         }
-        m_statsCollector.endProcedure(response.getStatus() == ClientResponse.USER_ABORT,
-                                      (response.getStatus() != ClientResponse.USER_ABORT) &&
-                                      (response.getStatus() != ClientResponse.SUCCESS),
-                                      m_perCallStats);
+        m_statsCollector.endProcedure(response.aborted(), response.failed(), m_perCallStats);
+
         // allow the GC to collect per-call stats if this proc isn't called for a while
         m_perCallStats = null;
 
@@ -349,10 +347,8 @@ public class ProcedureRunnerNT {
         if (m_perCallStats.samplingProcedure()) {
             m_perCallStats.setResultSize(response.getResults());
         }
-        m_statsCollector.endProcedure(response.getStatus() == ClientResponse.USER_ABORT,
-                                      (response.getStatus() != ClientResponse.USER_ABORT) &&
-                                      (response.getStatus() != ClientResponse.SUCCESS),
-                                      m_perCallStats);
+        m_statsCollector.endProcedure(response.aborted(), response.failed(), m_perCallStats);
+
         // allow the GC to collect per-call stats if this proc isn't called for a while
         m_perCallStats = null;
         respond(response);
