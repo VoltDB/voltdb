@@ -1,7 +1,7 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # This file is part of VoltDB.
-# Copyright (C) 2008-2020 VoltDB Inc.
+# Copyright (C) 2008-2022 VoltDB Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -25,15 +25,13 @@
 import argparse
 import json
 import collections
-import os
 import sys
 import time
 import datetime
 import socket
 
-
-sys.path.append(os.path.join(os.path.dirname(sys.path[0]),"lib","python"))
-import voltdbclientpy2
+sys.path.append("../lib/python")
+from voltdbclient import *
 
 class ProcedureCaller:
     '''Creates a client and has methods to call procedures and check responses.'''
@@ -51,23 +49,23 @@ class ProcedureCaller:
 
     def __init__(self, args):
         try:
-            self.client = voltdbclientpy2.FastSerializer(args.server, args.port, False, args.username, args.password)
-        except socket.error,e:
-            print "Can't connect to " + args.server + ":" + str(args.port)
-            print str(e)
+            self.client = FastSerializer(args.server, args.port, False, args.username, args.password)
+        except socket.error:
+            print ("Can't connect to " + args.server + ":" + str(args.port))
             exit(-1)
 
-        self.stats_caller = voltdbclientpy2.VoltProcedure( self.client, "@Statistics", [voltdbclientpy2.FastSerializer.VOLTTYPE_STRING,voltdbclientpy2.FastSerializer.VOLTTYPE_INTEGER] )
-        print "Connected to VoltDB server: " + args.server + ":" + str(args.port)
+        self.stats_caller = VoltProcedure( self.client, "@Statistics", [FastSerializer.VOLTTYPE_STRING,FastSerializer.VOLTTYPE_INTEGER] )
+        self.querystats_caller = VoltProcedure( self.client, "@QueryStats", [FastSerializer.VOLTTYPE_STRING] )
+        print ("Connected to VoltDB server: " + args.server + ":" + str(args.port))
 
     def check_response(self,response):
         '''procedure call response error handling'''
         status = response.status
         ex = response.exception
         if status != 1:
-            print status_codes.get(status, "No Status code was returned") + ": " + response.statusString
+            print (status_codes.get(status, "No Status code was returned") + ": " + response.statusString)
         if ex is not None:
-            print ex.typestr + ": " + ex.message
+            print (ex.typestr + ": " + ex.message)
             exit(-1)
 
     def call_stats(self,component):
@@ -76,7 +74,14 @@ class ProcedureCaller:
         self.check_response(response)
         return response.tables
 
-class ImporterStatsKeeper:
+    def call_querystats(self,query):
+        '''Call @QueryStats and check response'''
+        response = self.querystats_caller.call([query])
+        self.check_response(response)
+        return response.tables
+
+
+class ImporterStatsTracker:
     '''Process importer stats'''
 
     def __init__(self):
@@ -125,8 +130,20 @@ class ImporterStatsKeeper:
 
         return self.agg_stats
 
+class CounterDiffTracker:
+    '''class to calculate diff from previous counter value'''
 
-class TableStatsKeeper:
+    def __init__(self):
+        self.last_val = 0
+
+    def calc(self,new_value):
+        diff = new_value - self.last_val
+        self.last_val = new_value
+        return diff
+
+
+
+class TableStatsTracker:
     '''Process TABLE stats'''
 
     def __init__(self):
@@ -187,7 +204,7 @@ class TableStatsKeeper:
         self.agg_stats["TABLE"] = (new_tuples, new_streamed, stream_buffered)
         return self.agg_stats
 
-class ProcedureStatsKeeper:
+class ProcedureStatsTracker:
     '''Process PROCEDURE stats'''
 
     def __init__(self):
@@ -261,7 +278,7 @@ def get_proc_name(procname):
     return procname
 
 
-def agg_cpu(table):
+def agg_avg_cpu(table):
     cpu_level = 0
     cnt = 0
     for row in table.tuples:
@@ -269,15 +286,13 @@ def agg_cpu(table):
         cnt += 1
     return cpu_level/cnt
 
-def agg_liveclients(table):
+def agg_sum_liveclients(table):
     outstanding_tx = 0
     connections = 0
     for row in table.tuples:
         outstanding_tx += row[8]
         connections += 1
     return connections, outstanding_tx
-
-
 
 def print_metrics(data):
     # get variables from data dictionary (separate entries from different sources)
@@ -286,17 +301,17 @@ def print_metrics(data):
     new_tuples, streamrows, buffered = data.get("TABLE",(0,0,0))
     invs, tps, exec_millis, c_svrs, mbin, mbout = data.get("PROCEDURE",(0,0,0,0,0,0))
     connections, outstanding_tx = data.get("LIVECLIENTS",(0,0))
+    streamrows = data["EXPORT_INSERTS"]
+    buffered = data["EXPORT_PENDING"]
 
     if (invs >= 0):
-        print '%19s %3d %10d %10d %10d %7d %10d %11d %7d %5.2f %10d %10d %10d %8.3f %8.3f' % (
-            utc_now, cpu, incr_successes, incr_failures, outstanding, connections, outstanding_tx, invs, tps, c_svrs, new_tuples, streamrows, buffered, mbin, mbout)
-        sys.stdout.flush()
+        print ('%19s %3d %10d %10d %10d %7d %10d %11d %7d %5.2f %10d %10d %10d %8.3f %8.3f' % (
+            utc_now, cpu, incr_successes, incr_failures, outstanding, connections, outstanding_tx, invs, tps, c_svrs, new_tuples, streamrows, buffered, mbin, mbout))
 
 def print_header():
-    print "           utc_time cpu   imported   failures im pending clients cl pending invocations txn/sec     c new_tuples   streamed bufferedKB   inMB/s  outMB/s"
-    print "------------------- --- ---------- ---------- ---------- ------- ---------- ----------- ------- ----- ---------- ---------- ---------- -------- --------"
-    #      2017-03-03 15:54:51
-    sys.stdout.flush()
+    print ("                       |----------- Importer -----------|                                                       |------ Exporter -----|")
+    print ("           utc_time cpu    records   failures    pending clients   requests invocations txn/sec  work new_tuples    inserts    pending   inMB/s  outMB/s")
+    print ("------------------- --- ---------- ---------- ---------- ------- ---------- ----------- ------- ----- ---------- ---------- ---------- -------- --------")
 
 def print_usage():
     # replaces the standard argparse-generated usage to include definitions of the output columns
@@ -305,17 +320,19 @@ def print_usage():
 Output column definitions:
   utc_time:      current UTC time
   cpu:           percentage CPU usage
-  imported:      # of records imported successfully (committed) in the last interval
-  failures:      # of importer failures in the last interval (rollback + fail to invoke procedure)
-  im pending:    # of outstanding procedure calls for all importers
+  Importer:
+   records:      # of records imported successfully (committed) in the last interval
+   failures:     # of importer failures in the last interval (rollback + fail to invoke procedure)
+   pending:      # of outstanding procedure calls for all importers
   clients:       # of client connections
-  cl pending:    # of outstanding requests from clients
+  requests:      # of outstanding requests from clients
   invocations:   # of executed transactions in the last interval
   txn/sec:       rate of transactions in the last interval
-  c:             total partition execution time / elapsed time
+  work:          total partition execution time / elapsed time
   new_tuples:    net change to # of records in all tables
-  streamed:      # of records inserted into streams
-  bufferedKB:    size of stream data (in KB) currently buffered for export
+  Exporter:
+   inserts:      # of records inserted into streams
+   pending:      # of records pending export output
   inMB/s:        MB/s passed in as procedure invocation parameters
   outMB/s:       MB/s returned as results of procedure invocations
 '''
@@ -330,9 +347,10 @@ parser.add_argument('-d', '--duration', help='Duration of gathering statistics i
 args = parser.parse_args()
 
 caller = ProcedureCaller(args)
-imp_keeper = ImporterStatsKeeper()
-table_keeper = TableStatsKeeper()
-proc_keeper = ProcedureStatsKeeper()
+imp_tracker = ImporterStatsTracker()
+table_tracker = TableStatsTracker()
+proc_tracker = ProcedureStatsTracker()
+export_rows_tracker = CounterDiffTracker()
 print_header()
 
 # begin monitoring every (frequency) seconds for (duration) minutes
@@ -344,31 +362,36 @@ while end_time > time.time():
     utc_datetime = datetime.datetime.utcnow()
     utc_now = utc_datetime.strftime("%Y-%m-%d %H:%M:%S")
 
+    # Get Stats
     imp_tables = caller.call_stats("IMPORTER")
     cpu_tables = caller.call_stats("CPU")
     table_tables = caller.call_stats("TABLE")
     proc_tables = caller.call_stats("PROCEDURE")
     liveclients_tables = caller.call_stats("LIVECLIENTS")
+    export_tables = caller.call_querystats("select coalesce(sum(tuple_count),0) as tuples, coalesce(sum(tuple_pending),0) as pending from statistics(export,0) where status='ACTIVE'")
 
+    # Process stats
+    imp_data = imp_tracker.process(imp_tables[0])
+    table_data = table_tracker.process(table_tables[0])
+    proc_data = proc_tracker.process(proc_tables[0])
+    cpu_level = agg_avg_cpu(cpu_tables[0])
+    client_data = agg_sum_liveclients(liveclients_tables[0])
+    export_inserts = export_rows_tracker.calc(export_tables[0].tuples[0][0])
+
+    # Add processing results to "data" for output
     data = dict()
-    imp_data = imp_keeper.process(imp_tables[0])
     data.update(imp_data)
-
-    table_data = table_keeper.process(table_tables[0])
     data.update(table_data)
-
-    proc_data = proc_keeper.process(proc_tables[0])
     data.update(proc_data)
-
-    cpu_level = agg_cpu(cpu_tables[0])
     data["CPU"] = cpu_level
-
-    client_data = agg_liveclients(liveclients_tables[0])
     data["LIVECLIENTS"] = client_data
+    data["EXPORT_INSERTS"] = export_inserts
+    data["EXPORT_PENDING"] = export_tables[0].tuples[0][1]
 
-    #print data
+    # skip output on first round, stats need a baseline
     if (lines_output > 0):
         print_metrics(data)
     lines_output += 1
 
+    # sleep until next round
     time.sleep(args.frequency)

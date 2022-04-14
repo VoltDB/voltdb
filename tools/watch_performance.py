@@ -1,7 +1,7 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # This file is part of VoltDB.
-# Copyright (C) 2008-2020 VoltDB Inc.
+# Copyright (C) 2008-2022 VoltDB Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -25,19 +25,18 @@
 import argparse
 import json
 import collections
-import os
 import sys
 import time
 
-sys.path.append(os.path.join(os.path.dirname(sys.path[0]),"lib","python"))
-import voltdbclientpy2
+sys.path.append("../lib/python")
+from voltdbclient import *
 
 def print_usage():
     # replaces the standard argparse-generated usage to include definitions of the output columns
     return '''watch_performance.py
 
 Output column definitions:
-  time:          current local time
+  utc_time:      current UTC time
   procedure:     name of each procedure that was executed in this interval
   label:         SP (single partition), MP (multi-partition), RO (read-only), RW (read-write)
   exec_pct:      percentage of the overall procedure execution workload during this interval
@@ -47,8 +46,7 @@ Output column definitions:
                   (since the last schema change, not just for this interval)
   lat_ms:        servers-side latency in milliseconds, including wait time
                   (from the last of possibly multiple hosts that initiated this procedure)
-  c:             total partition execution time / elapsed time
-                  (1.0 means one ideal partition worked these invocations the entire interval)
+  work:          total partition execution time / elapsed time
   cpu:           percentage CPU usage
   partitions:    fraction of partitions that executed this procedure during this interval
   skew:          coefficient of variance for the # of invocations executed by each partition
@@ -67,7 +65,7 @@ parser.add_argument('-f', '--frequency', help='Frequency of gathering statistics
 parser.add_argument('-d', '--duration', help='Duration of gathering statistics in minutes (default = 30)', type=int, default=30)
 args = parser.parse_args()
 
-client = voltdbclientpy2.FastSerializer(args.server, args.port, False, args.username, args.password)
+client = FastSerializer(args.server, args.port, False, args.username, args.password)
 
 # procedure call response error handling
 def check_response(response):
@@ -84,15 +82,15 @@ def check_response(response):
             -8: "Transaction Restart",
             -9: "Operational Failure"
         }
-        print status_codes.get(status, "No Status code was returned") + ": " + response.statusString
+        print (status_codes.get(status, "No Status code was returned") + ": " + response.statusString)
         ex = response.exception
         if ex is not None:
-            print ex.typestr + ": " + ex.message
+            print (ex.typestr + ": " + ex.message)
         exit(-1)
 
 # define procedure calls
-proc_stats = voltdbclientpy2.VoltProcedure( client, "@Statistics", [voltdbclientpy2.FastSerializer.VOLTTYPE_STRING,voltdbclientpy2.FastSerializer.VOLTTYPE_INTEGER] )
-proc_catalog = voltdbclientpy2.VoltProcedure( client, "@SystemCatalog", [voltdbclientpy2.FastSerializer.VOLTTYPE_STRING] )
+proc_stats = VoltProcedure( client, "@Statistics", [FastSerializer.VOLTTYPE_STRING,FastSerializer.VOLTTYPE_INTEGER] )
+proc_catalog = VoltProcedure( client, "@SystemCatalog", [FastSerializer.VOLTTYPE_STRING] )
 
 # function to get short name of procedure
 def get_proc_name(procname):
@@ -158,13 +156,13 @@ def get_latencies():
     return latencies
 
 
-# Statistics calculation functions (for Python 2.7)
+# Statistics calculation functions
 def mean(data):
     """Return the sample arithmetic mean of data."""
     n = len(data)
     if n < 1:
         raise ValueError('mean requires at least one data point')
-    return sum(data)/n # in Python 2 use sum(data)/float(n)
+    return sum(data)/n
 
 def _ss(data):
     """Return sum of square deviations of sequence data."""
@@ -206,9 +204,8 @@ partition_stats = dict()
 procedure_stats = dict()
 partition_count = get_partition_count()
 
-print "    time                                procedure label exec_pct invocations txn/sec    exec_ms  lat_ms     c cpu partitions   skew   inMB/s  outMB/s"
-print "-------- ---------------------------------------- ----- -------- ----------- ------- ---------- ------- ----- --- ---------- ------ -------- --------"
-sys.stdout.flush()
+print ("           utc_time                                procedure label exec_pct invocations txn/sec    exec_ms  lat_ms  work cpu partitions   skew   inMB/s  outMB/s")
+print ("------------------- ---------------------------------------- ----- -------- ----------- ------- ---------- ------- ----- --- ---------- ------ -------- --------")
 
 # begin monitoring every (frequency) seconds for (duration) minutes
 start_time = time.time()
@@ -220,7 +217,8 @@ while end_time > time.time():
     partition_proc_stats.clear()
     partition_stats.clear()
     procedure_stats.clear()
-    now = time.strftime('%X')
+    utc_datetime = datetime.datetime.utcnow()
+    utc_now = utc_datetime.strftime("%Y-%m-%d %H:%M:%S")
 
     # gather cpu and latency metrics
     cpu = get_cpu()
@@ -251,21 +249,21 @@ while end_time > time.time():
         last_stats[(host_id, partition_id, procname)] = (epochmillis, invs)
 
 
-        # compute tps, c_svrs
+        # compute tps, work
         tps = 0
         exec_millis = 0
-        c_svrs = 0.0
+        work = 0.0
         mbin = 0.0
         mbout = 0.0
         if (incr_millis > 0):
             tps = incr_invs *1000 / incr_millis
             exec_millis = float(avgnanos) * incr_invs / 1000000
-            c_svrs = exec_millis / incr_millis
+            work = exec_millis / incr_millis
             mbin = float(avgbytesin*incr_invs)/(incr_millis*1000)
             mbout = float(avgbytesout*incr_invs)/(incr_millis*1000)
 
 
-        new_values = (incr_invs, tps, exec_millis, c_svrs, mbin, mbout)
+        new_values = (incr_invs, tps, exec_millis, work, mbin, mbout)
 
         if (incr_invs > 0 and exec_millis > 0):
             if (procname, partition_id) in partition_proc_stats:
@@ -282,11 +280,11 @@ while end_time > time.time():
                 else:
                     partition_stats[partition_id] = new_values
 
-    procs_sort = procedure_stats.items()
+    procs_sort = list(procedure_stats.items())
     procs_sort.sort(key=lambda x:x[1][3], reverse=True) # sort procedures by exec_millis (highest first)
     for row in procs_sort:
         procname = row[0]
-        invs, tps, exec_millis, c_svrs, mbin, mbout = row[1]
+        invs, tps, exec_millis, work, mbin, mbout = row[1]
         avgms = exec_millis/invs
         exec_pct = 100 * exec_millis / total_exec_millis
         label = proc_labels.get(procname)
@@ -311,8 +309,6 @@ while end_time > time.time():
 
         partitions_used_string = str(partitions_used) + "/" + str(partition_count)
 
-        print '%8s %40s %5s %8.1f %11d %7d %10.3f %7d %5.2f %3d %10s %6.3f %8.3f %8.3f' % (now, procname, label, exec_pct, invs, tps, avgms, latency, c_svrs, cpu, partitions_used_string, tps_coeff_var, mbin, mbout)
-        sys.stdout.flush()
-
+        print ('%19s %40s %5s %8.1f %11d %7d %10.3f %7d %5.2f %3d %10s %6.3f %8.3f %8.3f' % (utc_now, procname, label, exec_pct, invs, tps, avgms, latency, work, cpu, partitions_used_string, tps_coeff_var, mbin, mbout))
 
     time.sleep(args.frequency)
