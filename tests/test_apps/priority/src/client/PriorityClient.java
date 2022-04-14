@@ -206,6 +206,15 @@ public class PriorityClient {
         @Option(desc = "List of per-priority MP invocation rates/second (default [-1,1,1000], -1 dont test, 0 no rate, invoke as fast as possible).")
         String mprates = "-1,1,1000";
 
+        @Option(desc = "File with SSL properties")
+        String sslfile = "";
+
+        @Option(desc = "username")
+        String username = "";
+
+        @Option(desc = "password")
+        String password = "";
+
         @Override
         public void validate() {
             if (warmup < 0) exitWithMessageAndUsage("warmup must be >= 0");
@@ -289,15 +298,19 @@ public class PriorityClient {
         }};
 
     Client getClient1() {
-        ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
-        clientConfig.setTopologyChangeAware(true);
-        return ClientFactory.createClient(clientConfig);
+        return getClient1(-1);
     }
 
     Client getClient1(int priority) {
-        ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
+        ClientConfig clientConfig = new ClientConfig(this.m_config.username, this.m_config.password, new StatusListener());
         clientConfig.setTopologyChangeAware(true);
-        clientConfig.setRequestPriority(priority);
+        if (priority != -1) {
+            clientConfig.setRequestPriority(priority);
+        }
+        if (this.m_config.sslfile.trim().length() > 0) {
+            clientConfig.setTrustStoreConfigFromPropertyFile(this.m_config.sslfile);
+            clientConfig.enableSSL();
+        }
         return ClientFactory.createClient(clientConfig);
     }
 
@@ -309,7 +322,15 @@ public class PriorityClient {
                 .clientRequestBackpressureLevel(REQUEST_LIMIT_FACTOR * 9, REQUEST_LIMIT_FACTOR * 6)
                 .lateResponseHandler(this::lateResponseHandler)
                 .connectionDownHandler(this::handleConnectionDown)
-                .requestBackpressureHandler(wrapper::backPress);
+                .requestBackpressureHandler(wrapper::backPress)
+                .username(this.m_config.username)
+                .password(this.m_config.password);
+
+        if (this.m_config.sslfile.trim().length() > 0) {
+            clientConfig.trustStoreFromPropertyFile(this.m_config.sslfile);
+            clientConfig.enableSSL();
+        }
+
         wrapper.client = ClientFactory.createClient(clientConfig);
         return wrapper;
     }
