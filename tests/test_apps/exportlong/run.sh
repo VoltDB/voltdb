@@ -90,7 +90,7 @@ function server_common() {
     echo
     echo "VOLTDB_BIN=\"${VOLTDB_BIN}\""
     echo
-    VOLTDB_OPTS="${VOLTDB_OPTS}" ${VOLTDB} start -H $HOST -l ${LICENSE}
+    VOLTDB_OPTS="${VOLTDB_OPTS}" ${VOLTDB} start -H $HOST -l ${LICENSE} &
 }
 
 # Default test: localhost, 10 sources, 2 targets, 120s
@@ -98,6 +98,19 @@ function client() {
   srccompile-ifneeded
   java -classpath exportlong-client.jar:$CLIENTCLASSPATH \
       client.ExportLongClient
+}
+
+# Generate a large PBD data set to investigate file parsing on restart
+# Must export to DISABLED DiscardingExportClient targets
+function ENG-21603() {
+  srccompile-ifneeded
+  java -classpath exportlong-client.jar:$CLIENTCLASSPATH \
+    client.ExportLongClient \
+    --servers=localhost \
+    --sources=500 \
+    --targets=2 \
+    --rate=250 \
+    --duration=0
 }
 
 function ENG-21637() {

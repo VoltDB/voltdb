@@ -1138,12 +1138,10 @@ public class PersistentBinaryDeque<M> implements BinaryDeque<M> {
 
                 // Any recovered segment that is not final should be checked
                 // for internal consistency.
-                if (!segment.isFinal()) {
-                    m_usageSpecificLog.warn("Segment " + segment.file() + " (final: " + segment.isFinal()
-                            + "), has been recovered but is not in a final state");
-                } else if (m_usageSpecificLog.isDebugEnabled()) {
-                    m_usageSpecificLog.debug(
-                            "Segment " + segment.file() + " (final: " + segment.isFinal() + "), has been recovered");
+                if (m_usageSpecificLog.isDebugEnabled()) {
+                    m_usageSpecificLog.debugFmt(
+                            "Segment %s (final: %b) has been recovered%s",
+                            segment.file(), segment.isFinal(), segment.isFinal() ? "" : ", but is not in a final state");
                 }
             } catch (IOException e) {
                 m_usageSpecificLog.warn(

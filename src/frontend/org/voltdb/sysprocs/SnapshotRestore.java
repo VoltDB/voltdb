@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2021 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -1338,6 +1338,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
         StreamStartAction action = isRecover ? StreamStartAction.RECOVER : StreamStartAction.SNAPSHOT_RESTORE;
 
         // Iterate the tables actually exporting to a data source (PBD)
+        SNAP_LOG.info("Truncating export and topic data sources");
         for (Table t : db.getTables()) {
             if (!TableType.needsExportDataSource(t.getTabletype())) {
                 continue;
@@ -1405,6 +1406,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
         if (context.isLowestSiteId()) {
             VoltDB.getExportManager().updateDanglingExportStates(action, exportSequenceNumbers);
         }
+        SNAP_LOG.info("Finished truncating export and topic data sources");
     }
 
     private void performRecoverDigestState(

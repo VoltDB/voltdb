@@ -5,9 +5,9 @@
     <commandlog enabled="true" />
     <export>
       <!-- Exports for default test case -->
-      <configuration target="TARGET00" enabled="true" type="custom" exportconnectorclass="org.voltdb.exportclient.DiscardingExportClient" >
+      <configuration target="TARGET00" enabled="false" type="custom" exportconnectorclass="org.voltdb.exportclient.DiscardingExportClient" >
       </configuration>
-      <configuration target="TARGET01" enabled="true" type="custom" exportconnectorclass="org.voltdb.exportclient.DiscardingExportClient" >
+      <configuration target="TARGET01" enabled="false" type="custom" exportconnectorclass="org.voltdb.exportclient.DiscardingExportClient" >
       </configuration>
 	    <!-- Exports targeting OracleXE on volt17c - note port 1539 instead of 1521
 	     ALSO NOTE:

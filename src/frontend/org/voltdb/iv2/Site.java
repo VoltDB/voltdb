@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2021 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -601,7 +601,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
         @Override
         public void resetDrAppliedTracker(int clusterId) {
-            m_maxSeenDrLogsBySrcPartition.remove((int) clusterId);
+            m_maxSeenDrLogsBySrcPartition.remove(clusterId);
             setReplicableTables(clusterId, null, true);
             if (drLog.isDebugEnabled()) {
                 drLog.debug("Reset DR Applied trackers and replicable tables for " + clusterId);
@@ -1595,6 +1595,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             VoltDB.instance().setClusterCreateTime(clusterCreateTime);
         }
 
+        hostLog.info("Truncating export and topic data sources");
         for (Map.Entry<String, Map<Integer, ExportSnapshotTuple>> tableEntry : exportSequenceNumbers.entrySet()) {
             Table catalogTable = m_context.tables.get(tableEntry.getKey());
             Topic opaqueTopic = m_context.database.getTopics().get(tableEntry.getKey());
@@ -1637,6 +1638,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         if (m_sysprocContext.isLowestSiteId()) {
             VoltDB.getExportManager().updateDanglingExportStates(StreamStartAction.REJOIN, exportSequenceNumbers);
         }
+        hostLog.info("Finished truncating export and topic data sources");
 
         if (drSequenceNumbers != null) {
             Long partitionDRSequenceNumber = drSequenceNumbers.get(m_partitionId);
