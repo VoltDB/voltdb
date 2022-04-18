@@ -817,7 +817,7 @@ public final class InvocationDispatcher {
             return rejectStopNode("@PrepareStopNode: " + ihid + " is not valid.", task);
         }
 
-       String reason = m_cartographer.verifyPartitonLeaderMigrationForStopNode(ihid);
+       String reason = m_cartographer.verifyPartitionLeaderMigrationForStopNode(ihid);
        if (reason != null) {
            return rejectStopNode("@PrepareStopNode: " + reason, task);
        }

@@ -1624,7 +1624,7 @@ public class TestPlansSubQueries extends PlannerTestCase {
                 "where T1.A = P2.A", joinErrorMsg);
 
 
-        // Invalid LIMIT/OFFSET on parent subquery with partitoned nested subquery
+        // Invalid LIMIT/OFFSET on parent subquery with partitioned nested subquery
         failToCompile(
                 "SELECT * FROM (SELECT T0.A, R1.C FROM R1, " +
                 "                 (SELECT P1.A, C FROM P1,R2 where P1.A = R2.A) T0 " +

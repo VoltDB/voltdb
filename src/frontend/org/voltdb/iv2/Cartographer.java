@@ -709,7 +709,7 @@ public class Cartographer extends StatsSource
         }
     }
 
-    public String verifyPartitonLeaderMigrationForStopNode(final int ihid) {
+    public String verifyPartitionLeaderMigrationForStopNode(final int ihid) {
         if (m_configuredReplicationFactor == 0) {
             return "Stopping individual nodes is only allowed on a K-safe cluster";
         }

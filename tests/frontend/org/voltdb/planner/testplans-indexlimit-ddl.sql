@@ -23,7 +23,7 @@ CREATE INDEX ER_IDX3_TREE ON ER(C1 - C2, C2 - C3);
 CREATE INDEX ER_IDX4_TREE ON ER(C1, C2 * C3);
 CREATE INDEX ER_IDX5_TREE ON ER(C1 + C2, C3);
 
--- partitioned table, partiton column is indexable
+-- partitioned table, partition column is indexable
 CREATE TABLE P1 (
     C1 INTEGER NOT NULL,
     C2 INTEGER NOT NULL,
@@ -36,7 +36,7 @@ CREATE INDEX P1_IDX2_TREE ON P1(C1, C2);
 CREATE INDEX P1_IDX3_TREE ON P1(C2, C1);
 CREATE INDEX P1_IDX4_TREE ON P1(C1, C2, C3);
 
--- partitioned table, partiton column is not indexable
+-- partitioned table, partition column is not indexable
 CREATE TABLE P2 (
     C1 INTEGER NOT NULL,
     C2 INTEGER NOT NULL,
