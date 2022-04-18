@@ -16,5 +16,5 @@ partition table mumble on column intval;
 create procedure MySpProc partition on table foo column intval as select strval from foo where intval = ?;
 create procedure MyOtherSpProc partition on table bar column intval as select strval from bar where intval = ?;
 create procedure MyLastProc partition on table mumble column intval as insert into mumble values (?, ?, ?);
-create procedure from class compound.NullCompoundProc;
-create procedure from class compound.SimpleCompoundProc;
+create compound procedure from class compound.NullCompoundProc;
+create compound procedure from class compound.SimpleCompoundProc;

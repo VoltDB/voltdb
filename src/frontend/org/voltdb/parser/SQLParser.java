@@ -289,12 +289,15 @@ public class SQLParser extends SQLPatternFactory
      * NB supports only unquoted table and column names
      *
      * Capture groups:
-     *  (1) ALLOW/PARTITION clauses full text - needs further parsing
-     *  (2) Class name
+     *  (1) Optional type modifier, DIRECTED or COMPOUND
+     *  (2) ALLOW/PARTITION clauses full text - needs further parsing
+     *  (3) Class name
      */
     private static final Pattern PAT_CREATE_PROCEDURE_FROM_CLASS =
         SPF.statement(
-            SPF.token("create"), SPF.token("procedure"),
+            SPF.token("create"),
+            SPF.optional(SPF.capture(SPF.tokenAlternatives("directed", "compound"))),
+            SPF.token("procedure"),
             unparsedProcedureModifierClauses(),
             SPF.token("from"), SPF.token("class"), SPF.capture(SPF.className())
         ).compile("PAT_CREATE_PROCEDURE_FROM_CLASS");
@@ -306,13 +309,16 @@ public class SQLParser extends SQLPatternFactory
      * NB supports only unquoted table and column names
      *
      * Capture groups:
-     *  (1) Procedure name
-     *  (2) ALLOW/PARTITION clauses full text - needs further parsing
-     *  (3) SELECT or DML statement
+     *  (1) Optional type modifier, DIRECTED or COMPOUND
+     *  (2) Procedure name
+     *  (3) ALLOW/PARTITION clauses full text - needs further parsing
+     *  (4) SELECT or DML statement
      */
     private static final Pattern PAT_CREATE_PROCEDURE_FROM_SQL =
         SPF.statement(
-            SPF.token("create"), SPF.token("procedure"), SPF.capture(SPF.procedureName()),
+            SPF.token("create"),
+            SPF.optional(SPF.capture(SPF.tokenAlternatives("directed", "compound"))),
+            SPF.token("procedure"), SPF.capture(SPF.procedureName()),
             unparsedProcedureModifierClauses(),
             SPF.token("as"), SPF.capture(SPF.anyClause())
         ).compile("PAT_CREATE_PROCEDURE_FROM_SQL");
@@ -327,16 +333,19 @@ public class SQLParser extends SQLPatternFactory
      * matching is done in a loop in SQLexer.splitStatements()
      *
      * Capture groups:
-     *  (1) Procedure name
-     *  (2) ALLOW/PARTITION clauses full text - needs further parsing
-     *  (3) SELECT or DML statement
+     *  (1) Optional type modifier, DIRECTED or COMPOUND
+     *  (2) Procedure name
+     *  (3) ALLOW/PARTITION clauses full text - needs further parsing
+     *  (4) SELECT or DML statement
      */
-    private static final Pattern PAT_CREATE_MULTI_STMT_PROCEDURE_FROM_SQL =
+    private static final Pattern PAT_CREATE_PROCEDURE_FROM_MULTI_STMT_SQL =
         SPF.statement(
-            SPF.token("create"), SPF.token("procedure"), SPF.capture(SPF.procedureName()),
+            SPF.token("create"),
+            SPF.optional(SPF.capture(SPF.tokenAlternatives("directed", "compound"))),
+            SPF.token("procedure"), SPF.capture(SPF.procedureName()),
             unparsedProcedureModifierClauses(),
             SPF.token("as"), SPF.token("begin"), SPF.capture(SPF.anyClause())
-        ).compile("PAT_CREATE_MULTI_STMT_PROCEDURE_FROM_SQL");
+        ).compile("PAT_CREATE_PROCEDURE_FROM_MULTI_STMT_SQL");
 
     /*
      * CREATE FUNCTION <NAME> FROM METHOD <CLASS NAME>.<METHOD NAME>
@@ -409,14 +418,17 @@ public class SQLParser extends SQLPatternFactory
      * This used to support GROOVY, but now will just offer a compile error.
      *
      * Capture groups:
-     *  (1) Procedure name
-     *  (2) ALLOW/PARTITION clauses - needs further parsing
-     *  (3) Code block content
-     *  (4) Language name
+     *  (1) Optional type modifier, DIRECTED or COMPOUND
+     *  (2) Procedure name
+     *  (3) ALLOW/PARTITION clauses - needs further parsing
+     *  (4) Code block content
+     *  (5) Language name
      */
     private static final Pattern PAT_CREATE_PROCEDURE_AS_SCRIPT =
         SPF.statement(
-            SPF.token("create"), SPF.token("procedure"), SPF.capture(SPF.procedureName()),
+            SPF.token("create"),
+            SPF.optional(SPF.capture(SPF.tokenAlternatives("directed", "compound"))),
+            SPF.token("procedure"), SPF.capture(SPF.procedureName()),
             unparsedProcedureModifierClauses(),
             SPF.token("as"),
             SPF.delimitedCaptureBlock(SQLLexer.BLOCK_DELIMITER, null),
@@ -668,16 +680,20 @@ public class SQLParser extends SQLPatternFactory
      *  accepted VoltDB commands, rejected non-VoltDB commands, and grouped
      *  the actual command keyword(s) with their arbitrary whitespace
      *  separators. A wrapper function should clean up from there.
+     *
+     * Regex crib sheet for the "?(...)" expressions:
+     * <= means zero-width positive lookbehind; the "CREATE\\s{}" is required to
+     *    match but is not part of the capture group(1)
+     * :  means simple non-capture; the token sequence will not be assigned a group
+     *    but it will be part of the enclosing capture group(1).
      */
     private static final Pattern PAT_ALL_VOLTDB_STATEMENT_PREAMBLES = Pattern.compile(
             "(?i)" +                               // ignore case instruction
             //TODO: why not factor \\A out of the group -- it's common to all options
             "(" +                                  // start (group 1)
-            // <= means zero-width positive lookbehind.
-            // This means that the "CREATE\\s{}" is required to match but is not part of the capture.
-            "(?<=\\ACREATE\\s{0,1024})" +          //TODO: 0 min whitespace should be 1?
-            "(?:PROCEDURE|ROLE|FUNCTION|TASK|AGGREGATE)|" + // token options after CREATE
-            // the rest are stand-alone token options
+            "(?<=\\ACREATE\\s{1,1024})(?>COMPOUND\\s+|DIRECTED\\s+)?(?:PROCEDURE)|" +
+            "(?<=\\ACREATE\\s{1,1024})(?:ROLE|FUNCTION|TASK|AGGREGATE)|" +
+            // the rest are stand-alone token options (except for the one that isn't)
             "\\ADROP|" +
             "\\APARTITION|" +
             "\\AREPLICATE|" +
@@ -1175,9 +1191,9 @@ public class SQLParser extends SQLPatternFactory
      * @param statement  statement to match against
      * @return           pattern matcher object
      */
-    public static Matcher matchCreateMultiStmtProcedureAsSQL(String statement)
+    public static Matcher matchCreateProcedureAsMultiStmtSQL(String statement)
     {
-        return PAT_CREATE_MULTI_STMT_PROCEDURE_FROM_SQL.matcher(statement);
+        return PAT_CREATE_PROCEDURE_FROM_MULTI_STMT_SQL.matcher(statement);
     }
 
     /**
@@ -1434,7 +1450,7 @@ public class SQLParser extends SQLPatternFactory
      *  (5) PARTITION clause: table name 2
      *  (6) PARTITION clause: column name 2
      *  (7) PARTITION clause: parameter number 2
-     *  (8) DIRECTED clause for directed procedures
+     *  (8) DIRECTED|COMPOUND modifier
      */
     private static SQLPatternPart makeInnerProcedureModifierClausePattern(boolean captureTokens)
     {
@@ -1471,7 +1487,7 @@ public class SQLParser extends SQLPatternFactory
                         )
                      )
                 ),
-                SPF.group(captureTokens, SPF.token("directed"))
+                SPF.group(captureTokens, SPF.tokenAlternatives("directed", "compound"))
             );
     }
 
@@ -1505,7 +1521,8 @@ public class SQLParser extends SQLPatternFactory
     static SQLPatternPart unparsedProcedureModifierClauses()
     {
         // Force the leading space to go inside the repeat block.
-        return SPF.capture(SPF.repeat(makeInnerProcedureModifierClausePattern(false))).withFlags(SQLPatternFactory.ADD_LEADING_SPACE_TO_CHILD);
+        return SPF.capture(SPF.repeat(makeInnerProcedureModifierClausePattern(false)))
+                  .withFlags(SQLPatternFactory.ADD_LEADING_SPACE_TO_CHILD);
     }
 
     /**

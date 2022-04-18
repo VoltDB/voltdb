@@ -61,6 +61,7 @@ public class VoltDBStatementProcessor extends StatementProcessor {
         }
         // Either PROCEDURE, FUNCTION, REPLICATE, PARTITION, ROLE, EXPORT, DR OR AGGREGATE
         m_commandPrefix = statementMatcher.group(1).toUpperCase();
+        // TODO: fix this for compound etc
         return false;
     }
 

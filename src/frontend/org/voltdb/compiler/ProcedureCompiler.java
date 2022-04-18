@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -62,8 +62,10 @@ import com.google_voltpatches.common.collect.ImmutableMap;
 /**
  * Compiles stored procedures into a given catalog,
  * invoking the StatementCompiler as needed.
+ *
+ * All member functions are static.
  */
-public abstract class ProcedureCompiler {
+public class ProcedureCompiler {
 
     static void compile(VoltCompiler compiler,
                         HSQLInterface hsql,
@@ -431,12 +433,13 @@ public abstract class ProcedureCompiler {
     public static void addPartitioningInfo(VoltCompiler compiler, Procedure procedure,
             Database db, Class<?>[] paramTypes, ProcedurePartitionData partitionData)
                     throws VoltCompilerException {
-        // parse the procedureInfo
-        procedure.setSinglepartition(partitionData.isSinglePartition());
+
         if (partitionData.isMultiPartitionProcedure()) {
+            procedure.setSinglepartition(false);
             return;
         }
 
+        procedure.setSinglepartition(partitionData.isSinglePartition());
         setCatalogProcedurePartitionInfo(compiler, db, procedure, partitionData);
         if (procedure.getPartitionparameter() == -1) {
             return;
@@ -515,10 +518,12 @@ public abstract class ProcedureCompiler {
             procedure.setAnnotation(pa);
         }
 
-        // check if partition info was set in ddl
+        // check if partition info was set in ddl.
+        // if not, it's multi-partition; other non-partitioned cases (directed
+        // and compound) have info containg a null partition table name
         ProcedurePartitionData info = procedureDescriptor.m_partitionData;
         if (info == null) {
-            info = new ProcedurePartitionData();
+            info = new ProcedurePartitionData(ProcedurePartitionData.Type.MULTI);
         }
 
         // if the procedure is non-transactional, then take this special path here
@@ -526,6 +531,7 @@ public abstract class ProcedureCompiler {
             compileNTProcedure(compiler, procClass, procedure, jarOutput);
             return;
         }
+
         // if still here, that means the procedure is transactional
         procedure.setTransactional(true);
 
@@ -785,8 +791,9 @@ public abstract class ProcedureCompiler {
 
         ProcedurePartitionData info = procedureDescriptor.m_partitionData;
         if (info == null) {
-            info = new ProcedurePartitionData();
+            info = new ProcedurePartitionData(ProcedurePartitionData.Type.MULTI);
         }
+
         String[] stmts = SQLLexer.splitStatements(stmtsStr).getCompletelyParsedStmts().toArray(new String[0]);
 
         int stmtNum = 0;

@@ -16,4 +16,4 @@ create table ORDERS (ORDERID bigint not null,
                      primary key(ORDERID));
 partition table ORDERS on column ORDERID;
 
-create procedure from class OrderProc;
+create compound procedure from class OrderProc;

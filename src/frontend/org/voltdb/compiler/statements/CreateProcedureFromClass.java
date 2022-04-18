@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -51,6 +51,7 @@ public class CreateProcedureFromClass extends CreateProcedure {
             DDLStatement ddlStatement,
             Database db,
             DdlProceduresToLoad whichProcs) throws VoltCompilerException {
+
         // Matches if it is CREATE PROCEDURE [ALLOW <role> ...] [PARTITION ON ...] FROM CLASS <class-name>;
         Matcher statementMatcher = SQLParser.matchCreateProcedureFromClass(ddlStatement.statement);
         if (! statementMatcher.matches()) {
@@ -59,7 +60,16 @@ public class CreateProcedureFromClass extends CreateProcedure {
         if (whichProcs == DdlProceduresToLoad.NO_DDL_PROCEDURES) {
             return true;
         }
-        String className = checkIdentifierStart(statementMatcher.group(2), ddlStatement.statement);
+
+        // Capture groups:
+        //  (1) Optional type modifier, DIRECTED or COMPOUND
+        //  (2) ALLOW/PARTITION clauses full text - needs further parsing
+        //  (3) Class name
+
+        String typeModifier = statementMatcher.group(1);
+        String otherClauses = statementMatcher.group(2);
+        String className = checkIdentifierStart(statementMatcher.group(3), ddlStatement.statement);
+
         Class<?> clazz;
         try {
             clazz = Class.forName(className, true, m_classLoader);
@@ -78,24 +88,16 @@ public class CreateProcedureFromClass extends CreateProcedure {
             }
         }
 
-        // Customers can only load a limited kind of procedures; JUnit tests can load anything.
-        boolean allowed = VoltProcedure.class.isAssignableFrom(clazz)
-                || VoltCompoundProcedure.class.isAssignableFrom(clazz)
-                || CoreUtils.isJunitTest();
-        if (!allowed) {
-            throw m_compiler.new VoltCompilerException(String.format(
-                    "Cannot load class: procedure %s must extend either %s or %s.",
-                    className, VoltProcedure.class.getSimpleName(),
-                    VoltCompoundProcedure.class.getSimpleName()));
-        }
-
         ProcedureDescriptor descriptor = new VoltCompiler.ProcedureDescriptor(
                 new ArrayList<String>(), null, clazz);
 
-        // Parse the ALLOW and PARTITION clauses.
+        // Parse the COMPOUND|DIRECTED, ALLOW, and PARTITION clauses.
         // Populate descriptor roles and returned partition data as needed.
         ProcedurePartitionData partitionData =
-                parseCreateProcedureClauses(descriptor, statementMatcher.group(1));
+            parseCreateProcedureClauses(descriptor, typeModifier, otherClauses);
+
+        // Ensure appropriate base class
+        checkClassAndStmtConsistent(partitionData != null && partitionData.isCompoundProcedure(), clazz);
 
         // track the defined procedure
         String procName = m_tracker.add(descriptor);
@@ -104,5 +106,42 @@ public class CreateProcedureFromClass extends CreateProcedure {
         addProcedurePartitionInfo(procName, partitionData, ddlStatement.statement);
 
         return true;
+    }
+
+    /*
+     * Checks for consistency between statement use and base class
+     * of user-supplied procedure implementation. Specifically, most
+     * procedures must extend VoltProcedure; compound procedures must
+     * extend VoltCompoundProcedure.
+     *
+     * Unit tests are given special dispensation to load classes
+     * derived from anything, although we still insist on using
+     * CREATE COMPOUND PROCEDURE if the base is VoltCompoundProcedure.
+     */
+    private void checkClassAndStmtConsistent(boolean compoundProcStmt, Class<?> clazz)
+        throws VoltCompilerException {
+
+        String badBase = null;
+        boolean compoundProcClass = VoltCompoundProcedure.class.isAssignableFrom(clazz);
+        boolean simpleProcClass = VoltProcedure.class.isAssignableFrom(clazz);
+
+        if (compoundProcStmt) {
+            if (!compoundProcClass) {
+                badBase = String.format("Compound procedure %s must extend %s",
+                                        clazz.getSimpleName(), VoltCompoundProcedure.class.getSimpleName());
+            }
+        }
+        else if (compoundProcClass) {
+            badBase = String.format("Class %s is extended from %s and must be declared with CREATE COMPOUND PROCEDURE ...",
+                                    clazz.getSimpleName(), VoltCompoundProcedure.class.getSimpleName());
+        }
+        else if (!simpleProcClass && !CoreUtils.isJunitTest()) {
+            badBase = String.format("Procedure %s must extend %s",
+                                    clazz.getSimpleName(), VoltProcedure.class.getSimpleName());
+        }
+
+        if (badBase != null) {
+            throw m_compiler.new VoltCompilerException(badBase);
+        }
     }
 }

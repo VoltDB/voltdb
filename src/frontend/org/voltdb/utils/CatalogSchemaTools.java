@@ -538,7 +538,9 @@ public abstract class CatalogSchemaTools {
     }
 
     /**
-     * Convert a Catalog Procedure into a DDL string.
+     * Convert a Catalog Procedure into a DDL string,
+     * with a certain amount of fussiness over layout.
+     *
      * @param proc
      */
     public static void toSchema(StringBuilder sb, Procedure proc)
@@ -550,7 +552,24 @@ public abstract class CatalogSchemaTools {
             return;
         }
 
-        // Build the optional ALLOW clause.
+        // Convenient procedure attributes; there's a little historical voodoo here:
+        // - Compound procs may or may not be marked 'single partition'
+        // - Directed procs are single-partition but have no partitioning info
+        // - Thus 'really partitioned' procs need to have non-null partitioning
+        final boolean compound = CatalogUtil.isCompoundProcedure(proc);
+        final boolean directed = proc.getSinglepartition() && proc.getPartitiontable() == null && !compound;
+        final boolean partitioned = proc.getPartitiontable() != null || proc.getPartitiontable2() != null;
+
+        // Optional type modifier
+        String typeModifier = "";
+        if (compound) {
+            typeModifier = "COMPOUND ";
+        }
+        else if (directed) {
+            typeModifier = "DIRECTED ";
+        }
+
+        // Build the optional ALLOW clause (on new line with indent)
         CatalogMap<GroupRef> roleList = proc.getAuthgroups();
         String add;
         String allowClause = new String();
@@ -562,73 +581,58 @@ public abstract class CatalogSchemaTools {
             }
         }
 
-        // Build the optional PARTITION clause.
+        // Build the optional PARTITION clause (on new line with indent)
         StringBuilder partitionClause = new StringBuilder();
         ProcedureAnnotation annot = (ProcedureAnnotation) proc.getAnnotation();
-        if (CatalogUtil.isProcedurePartitioned(proc)) {
+        if (partitioned) {
+            partitionClause.append("\n");
             if (annot != null && annot.classAnnotated) {
                 partitionClause.append("--Annotated Partitioning Takes Precedence Over DDL Procedure " +
                         "Partitioning Statement\n--");
             }
-            else {
-                partitionClause.append("\n");
-            }
+
+            // First partition clause
             partitionClause.append(spacer);
-            if (proc.getPartitiontable() == null) {
-                partitionClause.append("DIRECTED");
-            } else {
-                partitionClause.append("PARTITION ON TABLE ").append(proc.getPartitiontable().getTypeName())
-                        .append(" COLUMN ").append(proc.getPartitioncolumn().getTypeName());
-
-                if (proc.getPartitionparameter() != 0) {
-                    partitionClause.append(" PARAMETER ").append(proc.getPartitionparameter());
-                }
+            partitionClause.append("PARTITION ON TABLE ").append(proc.getPartitiontable().getTypeName())
+                           .append(" COLUMN ").append(proc.getPartitioncolumn().getTypeName());
+            if (proc.getPartitionparameter() != 0) {
+                partitionClause.append(" PARAMETER ").append(proc.getPartitionparameter());
             }
 
-            // For the second partition clause in 2p txn
+            // Second partition clause in 2p txn
             if (proc.getPartitioncolumn2() != null) {
-                partitionClause.append(spacer);
-                partitionClause.append(String.format(
-                        "AND ON TABLE %s COLUMN %s",
-                        proc.getPartitiontable2().getTypeName(),
-                        proc.getPartitioncolumn2().getTypeName() ));
+                partitionClause.append(" AND ON TABLE ").append( proc.getPartitiontable2().getTypeName())
+                               .append(" COLUMN ").append(proc.getPartitioncolumn2().getTypeName());
                 if (proc.getPartitionparameter2() != 1) {
-                    partitionClause.append(String.format(
-                            " PARAMETER %s",
-                            String.valueOf(proc.getPartitionparameter2()) ));
+                    partitionClause.append(" PARAMETER ").append(proc.getPartitionparameter2());
                 }
             }
         }
 
         // Build the appropriate CREATE PROCEDURE statement variant.
-        if (!proc.getHasjava()) {
-            // SQL Statement procedure
-
-            sb.append(String.format(
-                    "CREATE PROCEDURE %s%s%s\n%sAS\nBEGIN\n%s%s",
-                    proc.getClassname(),
-                    allowClause,
-                    partitionClause.toString(),
-                    spacer,
-                    spacer,
-                    proc.getStatements().get("SQL0").getSqltext().trim()));
-
-            for (int i = 1 ; i < proc.getStatements().size() ; i++ ) {
-                sb.append(String.format(
-                        "\n%s%s",
-                        spacer,
-                        proc.getStatements().get("SQL" + String.valueOf(i)).getSqltext().trim()));
+        final boolean procFromClass = proc.getHasjava();
+        if (!procFromClass) {
+            // SQL statement procedure
+            sb.append(String.format("CREATE %sPROCEDURE %s%s%s\n%sAS\nBEGIN",
+                                    typeModifier,
+                                    proc.getClassname(),
+                                    allowClause,
+                                    partitionClause.toString(),
+                                    spacer)); // indent AS
+            for (int i = 0 ; i < proc.getStatements().size() ; i++ ) {
+                String stmt = proc.getStatements().get("SQL"+i).getSqltext().trim();
+                sb.append(String.format("\n%s%s", spacer, stmt));
             }
             sb.append("\nEND");
         }
         else {
-            // Java Class
-            sb.append(String.format(
-                    "CREATE PROCEDURE %s%s\n%sFROM CLASS %s",
-                    allowClause,
-                    partitionClause.toString(),
-                    spacer,
-                    proc.getClassname()));
+            // Java class
+            sb.append(String.format("CREATE %sPROCEDURE %s%s\n%sFROM CLASS %s",
+                                    typeModifier,
+                                    allowClause,
+                                    partitionClause.toString(),
+                                    spacer, // indent FROM CLASS
+                                    proc.getClassname()));
         }
 
         // The SQL statement variant may have terminated the CREATE PROCEDURE statement.

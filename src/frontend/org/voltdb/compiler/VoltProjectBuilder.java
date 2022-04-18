@@ -609,7 +609,7 @@ public class VoltProjectBuilder {
     }
 
     public void addStmtProcedure(String name, String sql) {
-        addStmtProcedure(name, sql, new ProcedurePartitionData());
+        addStmtProcedure(name, sql, new ProcedurePartitionData(ProcedurePartitionData.Type.MULTI));
     }
 
     // compatible with old deprecated syntax for test ONLY

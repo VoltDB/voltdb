@@ -469,18 +469,18 @@ public class TestCompoundProcs {
         "create table dummy (intval integer not null, primary key(intval));\n" +
         "partition table dummy on column intval;\n" +
         "" +
-        "create procedure from class org.voltdb.TestCompoundProcs$MyCompoundProc;\n" +
-        "create procedure from class org.voltdb.TestCompoundProcs$IllBehavedProc;\n" +
-        "create procedure from class org.voltdb.TestCompoundProcs$AbortExceptionProc;\n" +
-        "create procedure from class org.voltdb.TestCompoundProcs$PrematureProc;\n" +
-        "create procedure from class org.voltdb.TestCompoundProcs$PartialFailureProc;\n" +
-        "create procedure from class org.voltdb.TestCompoundProcs$IncompleteProc;\n" +
-        "create procedure from class org.voltdb.TestCompoundProcs$EarlyFailProc;\n" +
-        "create procedure from class org.voltdb.TestCompoundProcs$ArgumentativeProc;\n" +
-        "create procedure from class org.voltdb.TestCompoundProcs$SwitchProc;\n" +
-        "create procedure from class org.voltdb.TestCompoundProcs$ExcessiveProc;\n" +
-        "create procedure from class org.voltdb.TestCompoundProcs$NastyNestyProc;\n" +
-        "create procedure from class org.voltdb.TestCompoundProcs$LongProc;\n" +
+        "create compound procedure from class org.voltdb.TestCompoundProcs$MyCompoundProc;\n" +
+        "create compound procedure from class org.voltdb.TestCompoundProcs$IllBehavedProc;\n" +
+        "create compound procedure from class org.voltdb.TestCompoundProcs$AbortExceptionProc;\n" +
+        "create compound procedure from class org.voltdb.TestCompoundProcs$PrematureProc;\n" +
+        "create compound procedure from class org.voltdb.TestCompoundProcs$PartialFailureProc;\n" +
+        "create compound procedure from class org.voltdb.TestCompoundProcs$IncompleteProc;\n" +
+        "create compound procedure from class org.voltdb.TestCompoundProcs$EarlyFailProc;\n" +
+        "create compound procedure from class org.voltdb.TestCompoundProcs$ArgumentativeProc;\n" +
+        "create compound procedure from class org.voltdb.TestCompoundProcs$SwitchProc;\n" +
+        "create compound procedure from class org.voltdb.TestCompoundProcs$ExcessiveProc;\n" +
+        "create compound procedure from class org.voltdb.TestCompoundProcs$NastyNestyProc;\n" +
+        "create compound procedure from class org.voltdb.TestCompoundProcs$LongProc;\n" +
         "create procedure from class org.voltdb.TestCompoundProcs$WillFailMP;\n" +
         "create procedure partition on table dummy column intval from class org.voltdb.TestCompoundProcs$SayThreadSP;\n" +
         "" +
@@ -626,7 +626,7 @@ public class TestCompoundProcs {
 
         ClientResponse response = null;
         try {
-                response = client.callProcedureAsync(opts, "TestCompoundProcs$LongProc").get();
+            response = client.callProcedureAsync(opts, "TestCompoundProcs$LongProc").get();
         }
         catch (Exception ex) {
             System.out.printf("Client exception: %s\n", ex);

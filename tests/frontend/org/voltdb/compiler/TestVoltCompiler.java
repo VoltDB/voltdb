@@ -215,8 +215,10 @@ public class TestVoltCompiler extends TestCase {
 
     private boolean isFeedbackPresent(String expectedError,
             ArrayList<Feedback> fbs) {
+        String expErr = expectedError.replaceAll("\\s+", " ");
         for (Feedback fb : fbs) {
-            if (fb.getStandardFeedbackLine().contains(expectedError)) {
+            String fbLine = fb.getStandardFeedbackLine().replaceAll("\\s+", " ");
+            if (fbLine.contains(expErr)) {
                 return true;
             }
         }
@@ -2377,8 +2379,8 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE FUNCTION func FROM METHOD package..class.method",
                 "CREATE FUNCTION func FROM METHOD package.class.method."
         };
-        String expectedError = "Invalid CREATE FUNCTION statement: \"%s\", "
-                + "expected syntax: \"CREATE FUNCTION <name> FROM METHOD <class-name>.<method-name>\"";
+        String expectedError = "Invalid CREATE FUNCTION statement: \"%s\""
+                + " expected syntax: \"CREATE FUNCTION name FROM METHOD class-name.method-name\"";
 
         for (String ddl : ddls) {
             fbs = checkInvalidDDL(ddl + ";");
@@ -2509,7 +2511,7 @@ public class TestVoltCompiler extends TestCase {
                 );
         expectedError = "Invalid CREATE PROCEDURE statement: " +
                 "\"CREATE PROCEDURE FROM GLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger\"" +
-                ", expected syntax: \"CREATE PROCEDURE";
+                " expected syntax: \"CREATE PROCEDURE";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
         fbs = checkInvalidDDL(
@@ -2519,9 +2521,9 @@ public class TestVoltCompiler extends TestCase {
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger FOR TABLE PKEY_INTEGER COLUMN PKEY;"
                 );
         expectedError = "Invalid PARTITION statement: \"PARTITION PROCEDURE " +
-                "NotAnnotatedPartitionParamInteger FOR TABLE PKEY_INTEGER COLUMN PKEY\", " +
-                "expected syntax: PARTITION PROCEDURE <procedure> ON " +
-                "TABLE <table> COLUMN <column> [PARAMETER <parameter-index-no>]";
+                "NotAnnotatedPartitionParamInteger FOR TABLE PKEY_INTEGER COLUMN PKEY\"" +
+                " expected syntax: PARTITION PROCEDURE procedure ON " +
+                "TABLE table COLUMN column [PARAMETER parameter-index-no]";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
         fbs = checkInvalidDDL(
@@ -2531,9 +2533,9 @@ public class TestVoltCompiler extends TestCase {
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER CLUMN PKEY PARMTR 0;"
                 );
         expectedError = "Invalid PARTITION statement: \"PARTITION PROCEDURE " +
-                "NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER CLUMN PKEY PARMTR 0\", " +
-                "expected syntax: PARTITION PROCEDURE <procedure> ON " +
-                "TABLE <table> COLUMN <column> [PARAMETER <parameter-index-no>]";
+                "NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER CLUMN PKEY PARMTR 0\"" +
+                " expected syntax: PARTITION PROCEDURE procedure ON " +
+                "TABLE table COLUMN column [PARAMETER parameter-index-no]";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
         fbs = checkInvalidDDL(
@@ -2543,9 +2545,9 @@ public class TestVoltCompiler extends TestCase {
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN PKEY PARAMETER hello;"
                 );
         expectedError = "Invalid PARTITION statement: \"PARTITION PROCEDURE " +
-                "NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN PKEY PARAMETER hello\", " +
-                "expected syntax: PARTITION PROCEDURE <procedure> ON " +
-                "TABLE <table> COLUMN <column> [PARAMETER <parameter-index-no>]";
+                "NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN PKEY PARAMETER hello\"" +
+                " expected syntax: PARTITION PROCEDURE procedure ON " +
+                "TABLE table COLUMN column [PARAMETER parameter-index-no]";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
         fbs = checkInvalidDDL(
@@ -2556,9 +2558,9 @@ public class TestVoltCompiler extends TestCase {
                 );
         expectedError = "Invalid PARTITION statement: " +
                 "\"PARTITION PROGEDURE NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER " +
-                "COLUMN PKEY PARAMETER hello\", expected syntax: \"PARTITION TABLE <table> " +
-                "ON COLUMN <column>\" or \"PARTITION PROCEDURE <procedure> ON " +
-                "TABLE <table> COLUMN <column> [PARAMETER <parameter-index-no>]\"";
+                "COLUMN PKEY PARAMETER hello\" expected syntax: \"PARTITION TABLE table " +
+                "ON COLUMN column\" or: \"PARTITION PROCEDURE procedure ON " +
+                "TABLE table COLUMN column [PARAMETER parameter-index-no]\"";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
         fbs = checkInvalidDDL(
@@ -2569,7 +2571,7 @@ public class TestVoltCompiler extends TestCase {
                 );
         expectedError = "Invalid CREATE PROCEDURE statement: " +
                 "\"CREATE PROCEDURE OUTOF CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger\"" +
-                ", expected syntax: \"CREATE PROCEDURE";
+                " expected syntax: \"CREATE PROCEDURE";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
         fbs = checkInvalidDDL(
@@ -2674,9 +2676,9 @@ public class TestVoltCompiler extends TestCase {
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger TABLE PKEY_INTEGER ON TABLE PKEY_INTEGER COLUMN PKEY;"
                 );
         expectedError = "Invalid PARTITION statement: \"PARTITION PROCEDURE " +
-                "NotAnnotatedPartitionParamInteger TABLE PKEY_INTEGER ON TABLE PKEY_INTEGER COLUMN PKEY\", " +
-                "expected syntax: PARTITION PROCEDURE <procedure> ON " +
-                "TABLE <table> COLUMN <column> [PARAMETER <parameter-index-no>]";
+                "NotAnnotatedPartitionParamInteger TABLE PKEY_INTEGER ON TABLE PKEY_INTEGER COLUMN PKEY\"" +
+                " expected syntax: PARTITION PROCEDURE procedure ON " +
+                "TABLE table COLUMN column [PARAMETER parameter-index-no]";
         assertTrue(isFeedbackPresent(expectedError, fbs));
     }
 
@@ -3005,7 +3007,7 @@ public class TestVoltCompiler extends TestCase {
         else {
             assertFalse(String.format("Expected error (\"%s\")\n\nDDL: %s", errorRegex, ddl), success);
             assertFalse("Expected at least one error message.", error.isEmpty());
-            Matcher m = Pattern.compile(errorRegex).matcher(error);
+            Matcher m = Pattern.compile(errorRegex, Pattern.DOTALL).matcher(error);
             assertTrue(String.format("%s\nEXPECTED: %s", error, errorRegex), m.matches());
         }
     }
@@ -3096,7 +3098,7 @@ public class TestVoltCompiler extends TestCase {
                                       StringUtils.join(ddl, " ")),
                         success);
             assertFalse("Expected at least one error message.", error.isEmpty());
-            Matcher m = Pattern.compile(errorRegex).matcher(error);
+            Matcher m = Pattern.compile(errorRegex, Pattern.DOTALL).matcher(error);
             assertTrue(String.format("%s\nEXPECTED: %s", error, errorRegex), m.matches());
             return null;
         }

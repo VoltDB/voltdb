@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,15 +17,17 @@
 
 package org.voltdb;
 
-import static com.google_voltpatches.common.base.MoreObjects.firstNonNull;
-
 import org.voltdb.catalog.Procedure;
+import org.voltdb.utils.CatalogUtil;
 
 /**
  * Partition data for a procedure
  */
 public class ProcedurePartitionData {
-    public final boolean m_singlePartition;
+
+    public enum Type { MULTI, SINGLE, TWOPAR, DIRECTED, COMPOUND };
+
+    public final Type m_type;
     public final String m_tableName;
     public final String m_columnName;
     public final String m_paramIndex;
@@ -35,133 +37,149 @@ public class ProcedurePartitionData {
     public final String m_columnName2;
     public final String m_paramIndex2;
 
-    // constructor for NULL partition data
-    public ProcedurePartitionData () {
-        this(null, null, null, null, null, null);
+    // Common internal construction
+    private ProcedurePartitionData(Type typ, String tbl, String col, String idx,
+                                   String tbl2, String col2, String idx2) {
+        m_type = typ;
+        if (tbl == null) {
+            m_tableName = m_columnName = m_paramIndex = null;
+            m_tableName2 = m_columnName2 = m_paramIndex2 = null;
+        }
+        else {
+            m_tableName = tbl;
+            m_columnName = col;
+            m_paramIndex = (idx == null ? "0" : idx);
+            if (tbl2 == null) {
+                m_tableName2 = m_columnName2 = m_paramIndex2 = null;
+            }
+            else {
+                m_tableName2 = tbl2;
+                m_columnName2 = col2;
+                m_paramIndex2 = (idx2 == null && m_paramIndex.equals("0") ? "1" : idx2);
+            }
+        }
+    }
+
+    public ProcedurePartitionData(Type typ) {
+        this(typ, null, null, null, null, null, null);
+        assert typ != Type.SINGLE && typ != Type.TWOPAR;
     }
 
     public ProcedurePartitionData(String tableName, String columnName) {
-        this(tableName, columnName, "0");
+        this(Type.SINGLE, tableName, columnName, "0", null, null, null);
+        assert tableName != null;
     }
 
     public ProcedurePartitionData(String tableName, String columnName, String paramIndex) {
-        this(tableName, columnName, paramIndex, null, null, null);
+        this(Type.SINGLE, tableName, columnName, paramIndex, null, null, null);
+        assert tableName != null;
     }
 
     public ProcedurePartitionData(String tableName, String columnName, String paramIndex,
-            String tableName2, String columnName2, String paramIndex2) {
-        m_tableName = tableName;
-        m_columnName = columnName;
-        m_paramIndex = firstNonNull(paramIndex, "0");
-
-        m_tableName2 = tableName2;
-        m_columnName2 = columnName2;
-        // Only set a default if table is not null and the first column is using the default
-        m_paramIndex2 = m_tableName2 == null || m_paramIndex != "0" ? paramIndex2 : firstNonNull(paramIndex2, "1");
-
-        m_singlePartition = m_tableName != null && m_tableName2 == null;
-    }
-
-    public ProcedurePartitionData(boolean singlePartition) {
-        m_singlePartition = singlePartition;
-        m_tableName = null;
-        m_columnName = null;
-        m_paramIndex = null;
-        m_tableName2 = null;
-        m_columnName2 = null;
-        m_paramIndex2 = null;
+                                  String tableName2, String columnName2, String paramIndex2) {
+        this(tableName == null ? Type.MULTI : tableName2 == null ? Type.SINGLE : Type.TWOPAR,
+             tableName, columnName, paramIndex, tableName2, columnName2, paramIndex2);
     }
 
     public boolean isSinglePartition() {
-        return m_singlePartition;
+        // For historical reasons, non-partitioned types are reported as single-partition.
+        // TODO: can we fix this?
+        return m_type == Type.SINGLE || m_type == Type.DIRECTED || m_type == Type.COMPOUND;
     }
 
     public boolean isTwoPartitionProcedure() {
-        return  m_tableName != null && m_tableName2 != null;
+        return m_type == Type.TWOPAR;
     }
 
     public boolean isMultiPartitionProcedure() {
-        return !(isSinglePartition() || isTwoPartitionProcedure());
+        return m_type == Type.MULTI;
+    }
+
+    public boolean isDirectedProcedure() {
+        return m_type == Type.DIRECTED;
+    }
+
+    public boolean isCompoundProcedure() {
+        return m_type == Type.COMPOUND;
     }
 
     public static ProcedurePartitionData extractPartitionData(Procedure proc) {
-        // if this is MP procedure
-        if (proc.getPartitiontable() == null && !proc.getSinglepartition()) {
-            return new ProcedurePartitionData();
-        }
 
-        // extract partition data
-        String partitionTableName = null, columnName = null, partitionIndex = null;
-        String partitionTableName2 = null, columnName2 = null, partitionIndex2 = null;
-
-        if (proc.getPartitiontable() != null) {
-            // handle single partition
-            partitionTableName = proc.getPartitiontable().getTypeName();
-            columnName = proc.getPartitioncolumn().getTypeName();
-            partitionIndex = Integer.toString(proc.getPartitionparameter());
-
-            // handle two partition transaction
-            if (proc.getPartitiontable2() != null) {
-                partitionTableName2 = proc.getPartitiontable2().getTypeName();
-                columnName2 = proc.getPartitioncolumn2().getTypeName();
-                partitionIndex2 = Integer.toString(proc.getPartitionparameter2());
+        // Quickly dispose of types that are not partitioned
+        if (proc.getPartitiontable() == null) {
+            Type type = Type.MULTI;
+            if (proc.getSinglepartition()) {
+                if (CatalogUtil.isCompoundProcedure(proc)) {
+                    type = Type.COMPOUND;
+                }
+                else {
+                    type = Type.DIRECTED;
+                }
             }
+            return new ProcedurePartitionData(type);
         }
 
-        if (partitionTableName == null && proc.getSinglepartition()) {
-            // Note: DIRECTED procedures have no partition table data
-            return new ProcedurePartitionData(true);
+        // Single-partition cases
+        String tableName =  proc.getPartitiontable().getTypeName(),
+               columnName = proc.getPartitioncolumn().getTypeName(),
+               paramIndex = Integer.toString(proc.getPartitionparameter());
+        if (proc.getPartitiontable2() == null) {
+            return new ProcedurePartitionData(tableName, columnName, paramIndex);
         }
-        else {
-            return new ProcedurePartitionData(partitionTableName, columnName, partitionIndex,
-                    partitionTableName2, columnName2, partitionIndex2);
-        }
+
+        // Two-partition transaction
+        String tableName2 =  proc.getPartitiontable2().getTypeName(),
+               columnName2 = proc.getPartitioncolumn2().getTypeName(),
+               paramIndex2 = Integer.toString(proc.getPartitionparameter2());
+        return new ProcedurePartitionData(tableName, columnName, paramIndex,
+                                          tableName2, columnName2, paramIndex2);
     }
 
     /**
      * For Testing usage ONLY.
      * From a partition information string to @ProcedurePartitionData
+     *
      * string format:
      *     1) String.format("%s.%s: %s", tableName, columnName, parameterNo)
      *     1) String.format("%s.%s: %s, %s.%s: %s", tableName, columnName, parameterNo, tableName2, columnName2, parameterNo2)
+     *
+     * Result is limited to SINGLE, MULTI, TWOPAR types
+     *
      * @return
      */
     public static ProcedurePartitionData fromPartitionInfoString(String partitionInfoString) {
         if (partitionInfoString == null || partitionInfoString.trim().isEmpty()) {
-            return new ProcedurePartitionData();
+            return new ProcedurePartitionData(Type.MULTI);
         }
 
-        String[] partitionInfoParts = partitionInfoString.split(",");
+        String[] infoParts = partitionInfoString.split(",");
+        assert infoParts.length <= 2;
 
-        assert(partitionInfoParts.length <= 2);
-        if (partitionInfoParts.length == 2) {
-            ProcedurePartitionData partitionInfo = fromPartitionInfoString(partitionInfoParts[0]);
-            ProcedurePartitionData partitionInfo2 = fromPartitionInfoString(partitionInfoParts[1]);
-            return partitionInfo.addSecondPartitionInfo(partitionInfo2);
+        if (infoParts.length == 2) {
+            ProcedurePartitionData info1 = fromPartitionInfoString(infoParts[0]);
+            ProcedurePartitionData info2 = fromPartitionInfoString(infoParts[1]);
+            return new ProcedurePartitionData(info1.m_tableName, info1.m_columnName, info1.m_paramIndex,
+                                              info2.m_tableName, info2.m_columnName, info2.m_paramIndex);
         }
 
-        String subClause = partitionInfoParts[0];
-        // split on the colon
-        String[] parts = subClause.split(":");
-        assert(parts.length == 2);
+        // Split on the colon: "columnInfo : paramIndex"
+        String[] partsA = infoParts[0].split(":");
+        assert partsA.length == 2;
 
-        // relabel the parts for code readability
-        String columnInfo = parts[0].trim();
-        String paramIndex = parts[1].trim();
+        // Split columnInfo on the dot: "tableName . columnName"
+        String[] partsB = partsA[0].split("\\.");
+        assert partsB.length == 2;
 
-        // split the columninfo
-        parts = columnInfo.split("\\.");
-        assert(parts.length == 2);
-
-        // relabel the parts for code readability
-        String tableName = parts[0].trim();
-        String columnName = parts[1].trim();
-
-        return new ProcedurePartitionData(tableName, columnName, paramIndex);
+        return new ProcedurePartitionData(partsB[0].trim(), partsB[1].trim(), partsA[1].trim());
     }
 
-    private ProcedurePartitionData addSecondPartitionInfo(ProcedurePartitionData infoData) {
-        return new ProcedurePartitionData(m_tableName, m_columnName, m_paramIndex, infoData.m_tableName,
-                infoData.m_columnName, m_paramIndex);
+    /**
+     * Debug use
+     */
+    @Override
+    public String toString() {
+        return String.format("%s [%s/%s/%s%s]", m_type, m_tableName, m_columnName, m_paramIndex,
+                             m_tableName2 == null ? ""
+                             : String.format(", %s/%s/%s", m_tableName2, m_columnName2, m_paramIndex2));
     }
 }

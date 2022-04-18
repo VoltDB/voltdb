@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -50,7 +50,7 @@ public class CreateProcedureAsScript extends StatementProcessor {
         if (! statementMatcher.matches()) {
             return false;
         }
-        throw m_compiler.new VoltCompilerException("VoltDB doesn't support inline proceudre creation..");
+        throw m_compiler.new VoltCompilerException("VoltDB doesn't support inline procedure creation.");
     }
 
 }

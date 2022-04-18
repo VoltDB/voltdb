@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -40,30 +40,40 @@ public class CreateProcedureAsSQL extends CreateProcedure {
     protected boolean processStatement(DDLStatement ddlStatement, Database db, DdlProceduresToLoad whichProcs)
             throws VoltCompilerException {
 
-        /* first check if it matches a multi statement procedure
-         * if not, then check if it is a single statement procedure
-         */
-        // Matches if it is CREATE PROCEDURE <proc-name> [ALLOW <role> ...] [PARTITION ON ...] AS BEGIN <select-or-dml-statement>
-        Matcher statementMatcher = SQLParser.matchCreateMultiStmtProcedureAsSQL(ddlStatement.statement);
-
+        // Matches if it is CREATE <type> PROCEDURE <proc-name> [ALLOW <role> ...] [PARTITION ON ...] AS BEGIN <select-or-dml-statement>
+        Matcher statementMatcher = SQLParser.matchCreateProcedureAsMultiStmtSQL(ddlStatement.statement);
         if (! statementMatcher.matches()) {
-         // Matches if it is CREATE PROCEDURE <proc-name> [ALLOW <role> ...] [PARTITION ON ...] AS <select-or-dml-statement>
+            // Matches if it is CREATE <type> PROCEDURE <proc-name> [ALLOW <role> ...] [PARTITION ON ...] AS <select-or-dml-statement>
             statementMatcher = SQLParser.matchCreateProcedureAsSQL(ddlStatement.statement);
             if (! statementMatcher.matches()) {
                 return false;
             }
         }
-        String clazz = checkProcedureIdentifier(statementMatcher.group(1), ddlStatement.statement);
-        String sqlStatement = statementMatcher.group(3) + ";";
+
+        // Capture groups:
+        //  (1) Optional type modifier, DIRECTED or COMPOUND
+        //  (2) Procedure name
+        //  (3) ALLOW/PARTITION clauses full text - needs further parsing
+        //  (4) SELECT or DML statement
+
+        String typeModifier = statementMatcher.group(1);
+        String clazz = checkProcedureIdentifier(statementMatcher.group(2), ddlStatement.statement);
+        String otherClauses =  statementMatcher.group(3);
+        String sqlStatement = statementMatcher.group(4) + ";";
 
         ProcedureDescriptor descriptor = new VoltCompiler.ProcedureDescriptor(
                 new ArrayList<String>(), clazz, sqlStatement, null, null, false, null);
 
         // Parse the ALLOW and PARTITION clauses.
         // Populate descriptor roles and returned partition data as needed.
-        ProcedurePartitionData partitionData =
-                parseCreateProcedureClauses(descriptor, statementMatcher.group(2));
+        ProcedurePartitionData partitionData = parseCreateProcedureClauses(descriptor, typeModifier, otherClauses);
 
+        // The syntax allows 'compound', but it is not meaningful here
+        if (partitionData != null && partitionData.isCompoundProcedure()) {
+            throw m_compiler.new VoltCompilerException("COMPOUND is only allowed with CREATE PROCEDURE FROM CLASS");
+        }
+
+        // track the defined procedure
         m_tracker.add(descriptor);
 
         // add partitioning if specified
@@ -73,7 +83,7 @@ public class CreateProcedureAsSQL extends CreateProcedure {
     }
 
     /**
-     * Check whether or not a procedure name is acceptible.
+     * Check whether or not a procedure name is acceptable.
      * @param identifier the identifier to check
      * @param statement the statement where the identifier is
      * @return the given identifier unmodified

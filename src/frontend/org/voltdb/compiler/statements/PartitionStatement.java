@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -65,8 +65,8 @@ public class PartitionStatement extends StatementProcessor {
 
         if ( ! statementMatcher.matches()) {
             throw m_compiler.new VoltCompilerException(String.format(
-                    "Invalid PARTITION statement: \"%s\", " +
-                    "expected syntax: PARTITION TABLE <table> ON COLUMN <column>",
+                    "Invalid PARTITION statement: \"%s\"" +
+                    "\nexpected syntax: PARTITION TABLE table ON COLUMN column",
                     statement.substring(0,statement.length()-1))); // remove trailing semicolon
         }
         // group(1) -> table, group(2) -> column
@@ -99,9 +99,9 @@ public class PartitionStatement extends StatementProcessor {
 
         if ( ! statementMatcher.matches()) {
             throw m_compiler.new VoltCompilerException(String.format(
-                    "Invalid PARTITION statement: \"%s\", " +
-                    "expected syntax: PARTITION PROCEDURE <procedure> ON "+
-                    "TABLE <table> COLUMN <column> [PARAMETER <parameter-index-no>]",
+                    "Invalid PARTITION statement: \"%s\"" +
+                    "\nexpected syntax: PARTITION PROCEDURE procedure ON" +
+                    " TABLE table COLUMN column [PARAMETER parameter-index-no]",
                     ddlStatement.statement.substring(0, ddlStatement.statement.length() - 1))); // remove trailing semicolon
         }
 

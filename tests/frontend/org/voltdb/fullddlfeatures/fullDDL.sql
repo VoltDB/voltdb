@@ -595,7 +595,7 @@ FROM CLASS
     org.voltdb_testprocs.fullddlfeatures.testCreateProcFromClassProc
 ;
 
-CREATE PROCEDURE DIRECTED
+CREATE DIRECTED PROCEDURE
 ALLOW
     admin
 FROM CLASS

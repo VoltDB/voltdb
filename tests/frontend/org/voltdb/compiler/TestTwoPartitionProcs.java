@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -92,7 +92,7 @@ public class TestTwoPartitionProcs extends TestCase {
 
         VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compileDDL(ddl, compiler);
-        assertTrue(success);
+        assertTrue("compilation failed", success);
 
         for (Feedback fb : compiler.m_warnings) {
             System.out.println(fb.getStandardFeedbackLine());
@@ -108,7 +108,8 @@ public class TestTwoPartitionProcs extends TestCase {
         pb.addLiteralSchema(ddl);
         pb.setHTTPDPort(8080);
         pb.setJSONAPIEnabled(true);
-        assertTrue(pb.compile(Configuration.getPathToCatalogForTest("compileNT.jar")));
+        boolean success = pb.compile(Configuration.getPathToCatalogForTest("compileNT.jar"));
+        assertTrue("compilation failed", success);
         MiscUtils.copyFile(pb.getPathToDeployment(), Configuration.getPathToCatalogForTest("compileNT.xml"));
 
         VoltDB.Configuration config = new VoltDB.Configuration();
