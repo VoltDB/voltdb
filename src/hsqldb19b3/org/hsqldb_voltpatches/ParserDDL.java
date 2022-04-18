@@ -1262,16 +1262,11 @@ public class ParserDDL extends ParserRoutine {
             return null;
         }
 
-        // Table or stream
+        // Table or stream.
+        // Check on type of TTL column is done in Volt's DDLCompiler.
         int index = table.findColumn(ttlColumn);
         if (index < 0) {
             throw Error.error(ErrorCode.X_42501, ttlColumn); // object not found
-        }
-        ColumnSchema col = table.getColumn(index);
-        int colType = col.getDataType().typeCode;
-        // TODO: is this wrong? DDLCompiler insists on type being TIMESTAMP
-        if (colType != Types.SQL_INTEGER && colType != Types.SQL_BIGINT && colType != Types.SQL_TIMESTAMP) {
-            throw Error.error(ErrorCode.X_42512, ttlColumn); // invalid property value
         }
 
         // At this moment we don't allow alter TTL column of migrate table on the fly
