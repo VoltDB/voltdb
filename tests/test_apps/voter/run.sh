@@ -116,7 +116,8 @@ function async-benchmark() {
         --duration=120 \
         --servers=$SERVERS \
         --contestants=6 \
-        --maxvotes=2
+        --maxvotes=2 \
+        --affinityreport=false
 }
 
 # latencyreport: default is OFF
@@ -144,7 +145,8 @@ function client2-async-benchmark() {
         --duration=120 \
         --servers=$SERVERS \
         --contestants=6 \
-        --maxvotes=2
+        --maxvotes=2 \
+        --affinityreport=false
 }
 
 function client2-sync-benchmark() {

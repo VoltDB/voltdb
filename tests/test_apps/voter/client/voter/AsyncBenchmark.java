@@ -43,6 +43,7 @@
 package voter;
 
 import java.io.IOException;
+import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.CountDownLatch;
@@ -54,6 +55,7 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ClientAffinityStats;
 import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
 import org.voltdb.client.ClientStatusListenerExt;
@@ -128,6 +130,9 @@ public class AsyncBenchmark {
 
         @Option(desc = "Report latency for async benchmark run.")
         boolean latencyreport = false;
+
+        @Option(desc = "Report client affinity stats for async benchmark run.")
+        boolean affinityreport = false;
 
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
@@ -364,8 +369,28 @@ public class AsyncBenchmark {
             System.out.println(HORIZONTAL_RULE);
             System.out.println(stats.latencyHistoReport());
         }
+
         // 4. Write stats to file if requested
         client.writeSummaryCSV(stats, config.statsfile);
+
+        // 5. Affinity stats
+        Map<Integer,ClientAffinityStats> casMap = fullStatsContext.getAffinityStats();
+        if (config.affinityreport && !casMap.isEmpty()) {
+            System.out.print("\n" + HORIZONTAL_RULE);
+            System.out.println(" Client Affinity Statistics");
+            System.out.println(HORIZONTAL_RULE);
+            System.out.printf("%10s %21s %21s%n", "",
+                              "Affinity    ", "Round Robin   ");
+            System.out.printf("%10s %10s %10s %10s %10s%n", "Partition",
+                              "Reads", "Writes", "Reads", "Writes");
+            for (Map.Entry<Integer,ClientAffinityStats>  ent : casMap.entrySet()) {
+                int partitionId = ent.getKey();
+                ClientAffinityStats cas = ent.getValue();
+                System.out.printf("%10d %,10d %,10d %,10d %,10d%n", partitionId,
+                                  cas.getAffinityReads(), cas.getAffinityWrites(),
+                                  cas.getRrReads(), cas.getRrWrites());
+            }
+        }
     }
 
     /**

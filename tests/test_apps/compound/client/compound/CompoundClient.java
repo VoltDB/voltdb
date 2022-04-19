@@ -25,6 +25,7 @@ package compound;
 
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.time.Instant;
@@ -34,6 +35,7 @@ import org.voltdb.client.Client2;
 import org.voltdb.client.Client2Config;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ClientAffinityStats;
 import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
 
@@ -52,6 +54,12 @@ public class CompoundClient {
 
         @Option(desc = "Test case, 'simple' or 'null'")
         String test = "simple";
+
+        @Option(desc = "Report affinity stats to stdout")
+        boolean affinityreport = false;
+
+        @Option(desc = "Report network I/O stats to stdout")
+        boolean ioreport = false;
 
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
@@ -118,8 +126,8 @@ public class CompoundClient {
         if (status != ClientResponse.SUCCESS) {
             int f = failed.getAndIncrement();
             if ((f % 10000) == 0)
-                System.err.printf("Procedure call failed: %s %s",
-                              status, resp.getStatusString());
+                System.err.printf("Procedure call failed: %s %s%n",
+                                  status, resp.getStatusString());
         }
         return null;
     }
@@ -130,7 +138,7 @@ public class CompoundClient {
     Void callException(Throwable th) {
         int e = excepts.getAndIncrement();
         if ((e % 10000) == 0)
-            System.err.printf("Procedure call exception: %s", th);
+            System.err.printf("Procedure call exception: %s%n", th);
         return null;
     }
 
@@ -157,7 +165,14 @@ public class CompoundClient {
         }
 
         client.drain();
+
+        print("");
         printStats();
+        if (config.affinityreport)
+            printAffinityStats();
+        if (config.ioreport)
+            printIoStats();
+
         client.close();
     }
 
@@ -170,7 +185,6 @@ public class CompoundClient {
         elapsedMs = config.duration;
         serverTps = completed.get() / config.duration;
 
-        print("");
         print("Calls issued: %,d; completed: %,d; failed: %,d",
                           callsIssued, completed.get(), failed.get());
         ClientStats stats = statsCtx.fetch().getStats();
@@ -208,8 +222,47 @@ public class CompoundClient {
                 fw.close();
             }
         } catch (IOException e) {
-            System.err.print("Error writing stats file");
+            System.err.println("Error writing stats file");
             e.printStackTrace();
+        }
+    }
+
+    // Affinity stats
+    void printAffinityStats() {
+        Map<Integer,ClientAffinityStats> casMap = statsCtx.getAffinityStats();
+        if (casMap.isEmpty()) {
+            print("No affinity stats available");
+        }
+        else {
+            print("%10s %21s %21s", "",
+                  "Affinity    ", "Round Robin   ");
+            print("%10s %10s %10s %10s %10s", "Partition",
+                   "Reads", "Writes", "Reads", "Writes");
+            for (Map.Entry<Integer,ClientAffinityStats>  ent : casMap.entrySet()) {
+                int partitionId = ent.getKey();
+                ClientAffinityStats cas = ent.getValue();
+                print("%10d %,10d %,10d %,10d %,10d", partitionId,
+                                  cas.getAffinityReads(), cas.getAffinityWrites(),
+                                  cas.getRrReads(), cas.getRrWrites());
+            }
+        }
+        print("");
+    }
+
+    // I/O stats
+    void printIoStats() {
+        Map<Long, ClientStats> csMap = statsCtx.getStatsByConnection();
+        if (csMap.isEmpty()) {
+            print("No I/O stats available");
+        }
+        else {
+            print("%8s  %12s %15s %15s", "Conn Id", "Proc Calls", "Bytes Written", "Bytes Read");
+            for (Map.Entry<Long, ClientStats> ent : csMap.entrySet()) {
+                long cxnId = ent.getKey();
+                ClientStats cs = ent.getValue();
+                print("%8d  %,12d %,15d %,15d", cxnId, cs.getInvocationsCompleted(),
+                      cs.getBytesWritten(), cs.getBytesRead());
+            }
         }
         print("");
     }

@@ -71,6 +71,8 @@ function doclient {
         -classpath compound-client.jar:$CLIENTCLASSPATH compound/CompoundClient \
         --duration=60 \
         --servers=$SERVERS \
+        --affinityreport=false \
+        --ioreport=false \
         --test=$1
 }
 

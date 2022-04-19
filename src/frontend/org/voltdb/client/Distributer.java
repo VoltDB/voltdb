@@ -167,18 +167,17 @@ class Distributer {
 
     private static final class Procedure {
         final static int PARAMETER_NONE = -1;
-        private final boolean multiPart;
+        private enum Type { SINGLE, MULTI, COMPOUND };
+        private final Type procType;
         private final boolean readOnly;
         private final int partitionParameter;
         private final int partitionParameterType;
-        private Procedure(boolean multiPart,
-                          boolean readOnly,
-                          int partitionParameter,
-                          int partitionParameterType) {
-            this.multiPart = multiPart;
+        private Procedure(boolean single, boolean compound, boolean readOnly,
+                          int partitionParameter, int partitionParameterType) {
+            this.procType = single ? Type.SINGLE : compound ? Type.COMPOUND : Type.MULTI;
             this.readOnly = readOnly;
-            this.partitionParameter = multiPart ? PARAMETER_NONE : partitionParameter;
-            this.partitionParameterType = multiPart ? PARAMETER_NONE : partitionParameterType;
+            this.partitionParameter = single ? partitionParameter : PARAMETER_NONE;
+            this.partitionParameterType = single ? partitionParameterType : PARAMETER_NONE;
         }
     }
 
@@ -1378,25 +1377,30 @@ class Distributer {
             if (procedures != null) {
                 procedureInfo = procedures.get(invocation.getProcName());
             }
-            Integer hashedPartition = invocation.getPartitionDestination();
 
-            if (procedureInfo != null) {
-                hashedPartition = Constants.MP_INIT_PID;
-                if (invocation.hasPartitionDestination()) {
-                    hashedPartition = invocation.getPartitionDestination();
-                } else if (!procedureInfo.multiPart && procedureInfo.partitionParameter != Procedure.PARAMETER_NONE
-                           && procedureInfo.partitionParameter < invocation.getPassedParamCount()) {
-                    // User may have passed too few parameters to allow dispatching.
-                    // Avoid an indexing error here to fall through to the proper ProcCallException.
-                    hashedPartition =
-                        m_hashinator.getHashedPartitionForParameter(procedureInfo.partitionParameterType,
-                                                                    invocation.getPartitionParamValue(procedureInfo.partitionParameter));
+            Integer hashedPartition = -1; // no partition
+            if (invocation.hasPartitionDestination()) { // for all-partition calls
+                hashedPartition = invocation.getPartitionDestination();
+            }
+            else if (procedureInfo != null) {
+                switch (procedureInfo.procType) {
+                case SINGLE:
+                    if (procedureInfo.partitionParameter != Procedure.PARAMETER_NONE &&
+                        procedureInfo.partitionParameter < invocation.getPassedParamCount()) {
+                        hashedPartition = m_hashinator.getHashedPartitionForParameter(procedureInfo.partitionParameterType,
+                                                                                      invocation.getPartitionParamValue(procedureInfo.partitionParameter));
+                    } else { // got to send it somewhere
+                        hashedPartition = Constants.MP_INIT_PID;
+                    }
+                    break;
+                case MULTI:
+                case COMPOUND:
+                    hashedPartition = Constants.MP_INIT_PID;
+                    break;
                 }
-                cxn = m_partitionMasters.get(hashedPartition);
-            } else if (invocation.hasPartitionDestination()) {
-                cxn = m_partitionMasters.get(hashedPartition);
             }
 
+            cxn = m_partitionMasters.get(hashedPartition);
             if (cxn != null && !cxn.m_isConnected) {
                 // Client affinity picked a connection that was actually disconnected.
                 // Reset to null and let the round-robin choice pick a connection
@@ -1404,10 +1408,10 @@ class Distributer {
             }
 
             // Return affinity stats data for updating when we actually
-            // decide to send the transaction
+            // decide to send the transaction.
             ClientAffinityStats stats = m_clientAffinityStats.get(hashedPartition);
             if (stats == null) {
-                stats = new ClientAffinityStats(hashedPartition, 0, 0, 0, 0);
+                stats = new ClientAffinityStats(hashedPartition);
                 m_clientAffinityStats.put(hashedPartition, stats);
             }
             statsData.stats = stats;
@@ -1417,7 +1421,7 @@ class Distributer {
 
         // No connection found using hashinator: use round-robin
         for (int i=0; cxn==null && i<totalConnections; ++i) {
-            NodeConnection tmpCxn = m_connections.get(Math.abs(++m_nextConnection % totalConnections)); // TODO: why 'abs' ?
+            NodeConnection tmpCxn = m_connections.get(Math.abs(++m_nextConnection % totalConnections));
             if (!tmpCxn.hadBackPressure() || ignoreBackpressure) {
                 cxn = tmpCxn;
             }
@@ -1697,19 +1701,17 @@ class Distributer {
                 String jsString = vt.getString(6);
                 String procedureName = vt.getString(2);
                 JSONObject jsObj = new JSONObject(jsString);
-                boolean readOnly = jsObj.getBoolean(Constants.JSON_READ_ONLY);
-                if (jsObj.getBoolean(Constants.JSON_SINGLE_PARTITION)) {
-                    int partitionParameter = jsObj.getInt(Constants.JSON_PARTITION_PARAMETER);
-                    int partitionParameterType =
-                        jsObj.getInt(Constants.JSON_PARTITION_PARAMETER_TYPE);
-                    procs.put(procedureName,
-                            new Procedure(false,readOnly, partitionParameter, partitionParameterType));
-                } else {
-                    // Multi Part procedure JSON descriptors omit the partitionParameter
-                    procs.put(procedureName, new Procedure(true, readOnly, Procedure.PARAMETER_NONE,
-                                Procedure.PARAMETER_NONE));
+                boolean readOnly = jsObj.optBoolean(Constants.JSON_READ_ONLY);
+                boolean compound = jsObj.optBoolean(Constants.JSON_COMPOUND);
+                boolean single = jsObj.optBoolean(Constants.JSON_SINGLE_PARTITION);
+                int partitionParam = Procedure.PARAMETER_NONE;
+                int paramType = Procedure.PARAMETER_NONE;
+                if (single) {
+                    partitionParam = jsObj.getInt(Constants.JSON_PARTITION_PARAMETER);
+                    paramType = jsObj.getInt(Constants.JSON_PARTITION_PARAMETER_TYPE);
                 }
-
+                procs.put(procedureName, new Procedure(single, compound, readOnly,
+                                                       partitionParam, paramType));
             } catch (JSONException e) {
                 e.printStackTrace();
             }

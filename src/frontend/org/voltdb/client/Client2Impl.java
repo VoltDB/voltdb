@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2021 VoltDB Inc.
+ * Copyright (C) 2021-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -181,15 +181,16 @@ public class Client2Impl implements Client2 {
     // ProcInfo holds facts about a procedure itself
     private static class ProcInfo {
         final static int PARAMETER_NONE = -1;
-        final boolean multiPart;
+        enum Type { SINGLE, MULTI, COMPOUND };
+        final Type procType;
         final boolean readOnly;
         final int partitionParameter;
         final int parameterType;
-        ProcInfo(boolean multiPart, boolean readOnly, int partitionParameter, int parameterType) {
-            this.multiPart = multiPart;
+        ProcInfo(boolean single, boolean compound, boolean readOnly, int partitionParameter, int parameterType) {
+            this.procType = single ? Type.SINGLE : compound ? Type.COMPOUND : Type.MULTI;
             this.readOnly = readOnly;
-            this.partitionParameter = multiPart ? PARAMETER_NONE : partitionParameter;
-            this.parameterType = multiPart ? PARAMETER_NONE : parameterType;
+            this.partitionParameter = single ? partitionParameter : PARAMETER_NONE;
+            this.parameterType = single ? parameterType : PARAMETER_NONE;
         }
     }
 
@@ -1719,17 +1720,25 @@ public class Client2Impl implements Client2 {
         HashinatorLite hashi = hashinator.get(); // local reference for thread safety
 
         int hashedPartition = -1; // no partition
-        if (invocation.hasPartitionDestination()) {
+        if (invocation.hasPartitionDestination()) { // for all-partition calls
             hashedPartition = invocation.getPartitionDestination();
         }
         else if (hashi != null && procInfo != null) {
-            if (procInfo.partitionParameter != ProcInfo.PARAMETER_NONE && // always NONE for multipart proc
-                procInfo.partitionParameter < invocation.getPassedParamCount()) {
-                hashedPartition = hashi.getHashedPartitionForParameter(procInfo.parameterType,
-                                                                       invocation.getPartitionParamValue(procInfo.partitionParameter));
-            }
-            else {
+            switch (procInfo.procType) {
+            case SINGLE:
+                if (procInfo.partitionParameter != ProcInfo.PARAMETER_NONE &&
+                    procInfo.partitionParameter < invocation.getPassedParamCount()) {
+                    hashedPartition = hashi.getHashedPartitionForParameter(procInfo.parameterType,
+                                                                           invocation.getPartitionParamValue(procInfo.partitionParameter));
+                }
+                else { // let the MPI deal with it
+                    hashedPartition = Constants.MP_INIT_PID;
+                }
+                break;
+            case MULTI:
+            case COMPOUND:
                 hashedPartition = Constants.MP_INIT_PID;
+                break;
             }
         }
 
@@ -2105,8 +2114,9 @@ public class Client2Impl implements Client2 {
             try {
                 procName = procTable.getString(2);
                 JSONObject jsObj = new JSONObject(procTable.getString(6));
-                boolean readOnly = jsObj.getBoolean(Constants.JSON_READ_ONLY);
-                boolean single = jsObj.getBoolean(Constants.JSON_SINGLE_PARTITION);
+                boolean readOnly = jsObj.optBoolean(Constants.JSON_READ_ONLY);
+                boolean compound = jsObj.optBoolean(Constants.JSON_COMPOUND);
+                boolean single = jsObj.optBoolean(Constants.JSON_SINGLE_PARTITION);
                 int partitionParam = ProcInfo.PARAMETER_NONE;
                 int paramType = ProcInfo.PARAMETER_NONE;
                 if (single) {
@@ -2118,10 +2128,10 @@ public class Client2Impl implements Client2 {
                         debug("  Proc %s : SP, param %d, type %d", procName, partitionParam, paramType);
                     }
                     else {
-                        debug("  Proc %s : MP", procName);
+                        debug("  Proc %s : %s", procName, compound ? "compound" : "MP");
                     }
                 }
-                newProcInfoMap.put(procName, new ProcInfo(!single, readOnly, partitionParam, paramType));
+                newProcInfoMap.put(procName, new ProcInfo(single, compound, readOnly, partitionParam, paramType));
             } catch (JSONException ex) {
                 if (++badJson <= 10) { // let's not go too crazy
                     logError("Catalog parse error for procedure '%s'", procName);

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -57,6 +57,7 @@ public class Constants
     public static final String JSON_PARTITION_PARAMETER_TYPE = "partitionParameterType";
     public static final String JSON_SINGLE_PARTITION = "singlePartition";
     public static final String JSON_READ_ONLY = "readOnly";
+    public static final String JSON_COMPOUND = "compound";
 
     // The transaction id layout.
     static final long UNUSED_SIGN_BITS = 1;
