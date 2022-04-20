@@ -23,7 +23,8 @@
 
 package compound;
 
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.Random;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltdb.VoltCompoundProcedure;
 import org.voltdb.VoltCompoundProcedure.CompoundProcAbortException;
@@ -34,9 +35,13 @@ import org.voltdb.client.ClientResponse;
 // Run two table lookups in parallel, and process results
 // in a third procedure. Implementation is asynchronous.
 //
+// The id generator is a sorry attempt to get unique ids
+// in multinode clusters. Don't try this at home.
+//
 public class SimpleCompoundProc extends VoltCompoundProcedure {
 
-    private static final AtomicInteger nextId = new AtomicInteger();
+    private static final long startId = (long)(new Random()).nextInt(31) << 32L;
+    private static final AtomicLong nextId = new AtomicLong(startId);
 
     public long run() {
         newStageList(this::getData)
@@ -55,7 +60,7 @@ public class SimpleCompoundProc extends VoltCompoundProcedure {
 
     private void doInsert(ClientResponse[] resp) {
         String val1 = extractString(resp[0]), val2 = extractString(resp[1]);
-        int id = nextId.incrementAndGet();
+        long id = nextId.incrementAndGet();
         queueProcedureCall("MyLastProc", id, val1, val2);
     }
 

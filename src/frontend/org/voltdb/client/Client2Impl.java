@@ -1532,7 +1532,9 @@ public class Client2Impl implements Client2 {
                 String procName = context.invocation.getProcName();
                 context.cxn.clientStats(procName).update(elapsedTime, clusterRTT, abort, fail, false);
                 if (debugging && abort|fail) {
-                    debug("Procedure %s failed, %d", procName, response.getStatus());
+                    String msg = response.getStatusString();
+                    if (msg == null || msg.isEmpty()) msg = "no message";
+                    debug("Procedure %s failed, %d, %s", procName, response.getStatus(), msg);
                 }
                 context.future.complete(response);
             }
@@ -1713,6 +1715,13 @@ public class Client2Impl implements Client2 {
      * Find connection for invocation preferably using hashinator data,
      * but falling back to round-robin where necesssary.  Updates affinity
      * stats as a side-effect.
+     *
+     * We use round-robin when:
+     * - preferred connection is not available
+     * - we have not yet acquired partitioning data
+     * - procedure name is not (yet) known
+     * - caller failed to provide value for partition column
+     * - procedure is a compound procedure
      */
     private ClientConnection findConnection(ProcedureInvocation invocation) {
         ProcInfo procInfo = procInfoMap.get().get(invocation.getProcName());
@@ -1731,13 +1740,12 @@ public class Client2Impl implements Client2 {
                     hashedPartition = hashi.getHashedPartitionForParameter(procInfo.parameterType,
                                                                            invocation.getPartitionParamValue(procInfo.partitionParameter));
                 }
-                else { // let the MPI deal with it
-                    hashedPartition = Constants.MP_INIT_PID;
-                }
                 break;
             case MULTI:
-            case COMPOUND:
                 hashedPartition = Constants.MP_INIT_PID;
+                break;
+            case COMPOUND:
+                // use round-robin
                 break;
             }
         }
@@ -1749,7 +1757,7 @@ public class Client2Impl implements Client2 {
             byAffinity = false;
         }
 
-        if (cxn != null && hashedPartition != -1) {
+        if (cxn != null) {
             updateAffinityStats(hashedPartition, readOnly, byAffinity);
         }
 

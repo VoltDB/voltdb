@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2021 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -1368,64 +1368,71 @@ class Distributer {
         NodeConnection cxn = null;
         statsData.stats = null;
 
-        // Check if the master for the partition is known. No backpressure check, to ensure correct
-        // routing, but backpressure will be managed anyways. This is where we guess partition based
-        // on client affinity and known topology (hashinator initialized).
-        if (m_hashinator != null) {
-            final ImmutableSortedMap<String, Procedure> procedures = m_procedureInfo.get();
-            Procedure procedureInfo = null;
-            if (procedures != null) {
-                procedureInfo = procedures.get(invocation.getProcName());
-            }
-
-            Integer hashedPartition = -1; // no partition
-            if (invocation.hasPartitionDestination()) { // for all-partition calls
-                hashedPartition = invocation.getPartitionDestination();
-            }
-            else if (procedureInfo != null) {
-                switch (procedureInfo.procType) {
-                case SINGLE:
-                    if (procedureInfo.partitionParameter != Procedure.PARAMETER_NONE &&
-                        procedureInfo.partitionParameter < invocation.getPassedParamCount()) {
-                        hashedPartition = m_hashinator.getHashedPartitionForParameter(procedureInfo.partitionParameterType,
-                                                                                      invocation.getPartitionParamValue(procedureInfo.partitionParameter));
-                    } else { // got to send it somewhere
-                        hashedPartition = Constants.MP_INIT_PID;
-                    }
-                    break;
-                case MULTI:
-                case COMPOUND:
-                    hashedPartition = Constants.MP_INIT_PID;
-                    break;
-                }
-            }
-
-            cxn = m_partitionMasters.get(hashedPartition);
-            if (cxn != null && !cxn.m_isConnected) {
-                // Client affinity picked a connection that was actually disconnected.
-                // Reset to null and let the round-robin choice pick a connection
-                cxn = null;
-            }
-
-            // Return affinity stats data for updating when we actually
-            // decide to send the transaction.
-            ClientAffinityStats stats = m_clientAffinityStats.get(hashedPartition);
-            if (stats == null) {
-                stats = new ClientAffinityStats(hashedPartition);
-                m_clientAffinityStats.put(hashedPartition, stats);
-            }
-            statsData.stats = stats;
-            statsData.readOnly = (procedureInfo != null && procedureInfo.readOnly);
-            statsData.roundRobin = (cxn == null);
+        final ImmutableSortedMap<String, Procedure> procedures = m_procedureInfo.get();
+        Procedure procedureInfo = null;
+        if (procedures != null) {
+            procedureInfo = procedures.get(invocation.getProcName());
         }
 
-        // No connection found using hashinator: use round-robin
+        // Check if the master for the partition is known. This is where we guess
+        // partition based on client affinity and known topology (if hashinator
+        // initialized).
+        int hashedPartition = -1; // no partition
+        if (invocation.hasPartitionDestination()) { // for all-partition calls
+            hashedPartition = invocation.getPartitionDestination();
+        }
+        else if (m_hashinator != null && procedureInfo != null) {
+            switch (procedureInfo.procType) {
+            case SINGLE:
+                if (procedureInfo.partitionParameter != Procedure.PARAMETER_NONE &&
+                    procedureInfo.partitionParameter < invocation.getPassedParamCount()) {
+                    hashedPartition = m_hashinator.getHashedPartitionForParameter(procedureInfo.partitionParameterType,
+                                                                                  invocation.getPartitionParamValue(procedureInfo.partitionParameter));
+                }
+                break;
+            case MULTI:
+                hashedPartition = Constants.MP_INIT_PID;
+                break;
+            case COMPOUND:
+                // use round-robin
+                break;
+            }
+        }
+
+        // No backpressure check when selecting connection, to ensure correct routing,
+        // but backpressure be managed anyways.
+        cxn = m_partitionMasters.get(hashedPartition);
+        if (cxn != null && !cxn.m_isConnected) {
+            // Client affinity picked a connection that was actually disconnected.
+            // Reset to null and let the round-robin choice pick a connection
+            cxn = null;
+        }
+
+        // Fall back to using round-robin when:
+        // - preferred connection is not available
+        // - we have not yet acquired partitioning data
+        // - procedure name is not (yet) known
+        // - caller failed to provide value for partition column
+        // - procedure is a compound procedure
+        boolean roundRobin = false;
         for (int i=0; cxn==null && i<totalConnections; ++i) {
             NodeConnection tmpCxn = m_connections.get(Math.abs(++m_nextConnection % totalConnections));
             if (!tmpCxn.hadBackPressure() || ignoreBackpressure) {
                 cxn = tmpCxn;
+                roundRobin = true;
             }
         }
+
+        // Return affinity stats data for updating when we actually
+        // decide to send the transaction.
+        ClientAffinityStats stats = m_clientAffinityStats.get(hashedPartition);
+        if (stats == null) {
+            stats = new ClientAffinityStats(hashedPartition);
+            m_clientAffinityStats.put(hashedPartition, stats);
+        }
+        statsData.stats = stats;
+        statsData.readOnly = (procedureInfo != null && procedureInfo.readOnly);
+        statsData.roundRobin = roundRobin;
 
         // Still no unbackpressured connection? Report backpressure while
         // still under Distributer sync
