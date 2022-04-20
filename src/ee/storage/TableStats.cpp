@@ -38,6 +38,8 @@ vector<string> TableStats::generateTableStatsColumnNames() {
     columnNames.push_back("TUPLE_ALLOCATED_MEMORY");
     columnNames.push_back("TUPLE_DATA_MEMORY");
     columnNames.push_back("STRING_DATA_MEMORY");
+    columnNames.push_back("TUPLE_LIMIT");
+    columnNames.push_back("PERCENT_FULL");
     columnNames.push_back("DR");
     columnNames.push_back("EXPORT");
     return columnNames;
@@ -82,6 +84,18 @@ void TableStats::populateTableStatsSchema(vector<ValueType> &types, vector<int32
     types.push_back(ValueType::tBIGINT);
     columnLengths.push_back(NValue::getTupleStorageSize(ValueType::tBIGINT));
     allowNull.push_back(false);
+    inBytes.push_back(false);
+
+    // TUPLE_LIMIT
+    types.push_back(ValueType::tINTEGER);
+    columnLengths.push_back(NValue::getTupleStorageSize(ValueType::tINTEGER));
+    allowNull.push_back(true);
+    inBytes.push_back(false);
+
+    // PERCENT_FULL
+    types.push_back(ValueType::tINTEGER);
+    columnLengths.push_back(NValue::getTupleStorageSize(ValueType::tINTEGER));
+    allowNull.push_back(true);
     inBytes.push_back(false);
 
     // DR
@@ -186,6 +200,10 @@ void TableStats::updateStatsTuple(TableTuple *tuple) {
             ValueFactory::getBigIntValue(occupied_tuple_mem_kb));
     tuple->setNValue(StatsSource::m_columnName2Index["STRING_DATA_MEMORY"],
             ValueFactory::getBigIntValue(string_data_mem_kb));
+
+    tuple->setNValue(StatsSource::m_columnName2Index["TUPLE_LIMIT"], ValueFactory::getNullValue());
+    tuple->setNValue(StatsSource::m_columnName2Index["PERCENT_FULL"],ValueFactory::getNullValue());
+
 
     NValue *drValue = &m_falseValue;
     NValue *expValue = &m_falseValue;

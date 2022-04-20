@@ -42,15 +42,13 @@ import com.google_voltpatches.common.collect.ImmutableMap;
  */
 public class StatsAgent extends OpsAgent
 {
-    private final NonBlockingHashMap<StatsSelector, NonBlockingHashMap<Long, NonBlockingHashSet<StatsSource>>> m_registeredStatsSources =
-            new NonBlockingHashMap<StatsSelector, NonBlockingHashMap<Long, NonBlockingHashSet<StatsSource>>>();
+    private final Map<StatsSelector, Map<Long, Set<StatsSource>>> m_registeredStatsSources = new NonBlockingHashMap<>();
 
     public StatsAgent()
     {
         super("StatsAgent");
-        StatsSelector selectors[] = StatsSelector.values();
-        for (StatsSelector selector : selectors) {
-            m_registeredStatsSources.put(selector, new NonBlockingHashMap<Long,NonBlockingHashSet<StatsSource>>());
+        for (StatsSelector selector : StatsSelector.values()) {
+            m_registeredStatsSources.put(selector, new NonBlockingHashMap<>());
         }
     }
 
@@ -110,27 +108,24 @@ public class StatsAgent extends OpsAgent
     private Supplier<Map<String, Boolean>> m_procedureInfo = getProcedureInformationfoSupplier();
 
     private Supplier<Map<String, Boolean>> getProcedureInformationfoSupplier() {
-        return Suppliers.memoize(new Supplier<Map<String, Boolean>>() {
-                @Override
-                public Map<String, Boolean> get() {
-                    ImmutableMap.Builder<String, Boolean> b = ImmutableMap.builder();
-                    CatalogContext ctx = VoltDB.instance().getCatalogContext();
-                    for (Procedure p : ctx.procedures) {
-                        b.put(p.getClassname(), p.getReadonly());
-                    }
-                    return b.build();
-                }
-            });
+        return Suppliers.memoize(() -> {
+            ImmutableMap.Builder<String, Boolean> b = ImmutableMap.builder();
+            CatalogContext ctx = VoltDB.instance().getCatalogContext();
+            for (Procedure p : ctx.procedures) {
+                b.put(p.getClassname(), p.getReadonly());
+            }
+            return b.build();
+        });
     }
 
     /**
      * Check if procedure is readonly?
      *
-     * @param pname
-     * @return
+     * @param name of procedure
+     * @return {@code true} when procedure is readonly
      */
-    private boolean isReadOnlyProcedure(String pname) {
-        final Boolean b = m_procedureInfo.get().get(pname);
+    private boolean isReadOnlyProcedure(String name) {
+        final Boolean b = m_procedureInfo.get().get(name);
         if (b == null) {
             return false;
         }
@@ -227,6 +222,7 @@ public class StatsAgent extends OpsAgent
         }
         return new VoltTable[] { timeTable.sortByAverage("EXECUTION_TIME") };
     }
+
     /**
      * Produce PROCEDUREINPUT aggregation of PROCEDURE subselector
      */
@@ -304,8 +300,7 @@ public class StatsAgent extends OpsAgent
      */
     public void notifyOfCatalogUpdate() {
         m_procedureInfo = getProcedureInformationfoSupplier();
-        m_registeredStatsSources.put(StatsSelector.PROCEDURE,
-                new NonBlockingHashMap<Long, NonBlockingHashSet<StatsSource>>());
+        m_registeredStatsSources.put(StatsSelector.PROCEDURE, new NonBlockingHashMap<>());
     }
 
     @Override
@@ -315,7 +310,7 @@ public class StatsAgent extends OpsAgent
         JSONObject obj = new JSONObject();
         obj.put("selector", "STATISTICS");
         // parseParamsForStatistics has a clumsy contract, see definition
-        String err = null;
+        String err;
         if (selector == OpsSelector.STATISTICS) {
             err = parseParamsForStatistics(params, obj);
         } else {
@@ -449,7 +444,7 @@ public class StatsAgent extends OpsAgent
     }
 
     public VoltTable[] collectDistributedStats(JSONObject obj) throws Exception {
-        VoltTable[] stats = null;
+        VoltTable[] stats;
         // dispatch to collection
         String subselectorString = obj.getString("subselector");
         boolean interval = obj.getBoolean("interval");
@@ -487,8 +482,7 @@ public class StatsAgent extends OpsAgent
         assert selector != null;
         assert source != null;
 
-        final NonBlockingHashMap<Long, NonBlockingHashSet<StatsSource>> siteIdToStatsSources =
-                m_registeredStatsSources.get(selector);
+        final Map<Long, Set<StatsSource>> siteIdToStatsSources = m_registeredStatsSources.get(selector);
         assert siteIdToStatsSources != null;
 
         siteIdToStatsSources.computeIfAbsent(siteId, s -> new NonBlockingHashSet<>()).add(source);
@@ -497,11 +491,10 @@ public class StatsAgent extends OpsAgent
     public void deregisterStatsSource(StatsSelector selector, long siteId, StatsSource source) {
         assert selector != null;
         assert source != null;
-        final NonBlockingHashMap<Long, NonBlockingHashSet<StatsSource>> siteIdToStatsSources =
-                m_registeredStatsSources.get(selector);
+        final Map<Long, Set<StatsSource>> siteIdToStatsSources = m_registeredStatsSources.get(selector);
         assert siteIdToStatsSources != null;
 
-        NonBlockingHashSet<StatsSource> statsSources = siteIdToStatsSources.get(siteId);
+        Set<StatsSource> statsSources = siteIdToStatsSources.get(siteId);
         if (statsSources != null) {
             statsSources.remove(source);
         }
@@ -509,8 +502,7 @@ public class StatsAgent extends OpsAgent
 
     public void deregisterStatsSourcesFor(StatsSelector selector, long siteId) {
         assert selector != null;
-        final NonBlockingHashMap<Long, NonBlockingHashSet<StatsSource>> siteIdToStatsSources =
-                m_registeredStatsSources.get(selector);
+        final Map<Long, Set<StatsSource>> siteIdToStatsSources = m_registeredStatsSources.get(selector);
         if (siteIdToStatsSources != null) {
             siteIdToStatsSources.remove(siteId);
         }
@@ -519,8 +511,7 @@ public class StatsAgent extends OpsAgent
     public Set<StatsSource> lookupStatsSource(StatsSelector selector, long siteId) {
         assert selector != null;
 
-        final NonBlockingHashMap<Long, NonBlockingHashSet<StatsSource>> siteIdToStatsSources =
-                m_registeredStatsSources.get(selector);
+        final Map<Long, Set<StatsSource>> siteIdToStatsSources = m_registeredStatsSources.get(selector);
         assert siteIdToStatsSources != null;
 
         return siteIdToStatsSources.get(siteId);
@@ -550,8 +541,7 @@ public class StatsAgent extends OpsAgent
             final Long now)
     {
         assert selector != null;
-        NonBlockingHashMap<Long, NonBlockingHashSet<StatsSource>> siteIdToStatsSources =
-                m_registeredStatsSources.get(selector);
+        Map<Long, Set<StatsSource>> siteIdToStatsSources = m_registeredStatsSources.get(selector);
 
         // There are cases early in rejoin where we can get polled before the server is ready to provide
         // stats.  Just return null for now, which will result in no tables from this node.
@@ -561,7 +551,7 @@ public class StatsAgent extends OpsAgent
 
         VoltTable resultTable = null;
 
-        for (NonBlockingHashSet<StatsSource> statsSources : siteIdToStatsSources.values()) {
+        for (Set<StatsSource> statsSources : siteIdToStatsSources.values()) {
             if (statsSources == null || statsSources.isEmpty()) {
                 continue;
             }
@@ -584,9 +574,9 @@ public class StatsAgent extends OpsAgent
                 } else {
                     if (resultTable == null) {
                         ArrayList<ColumnInfo> columns = ss.getColumnSchema();
-                        resultTable = new VoltTable(columns.toArray(new ColumnInfo[columns.size()]));
+                        resultTable = new VoltTable(columns.toArray(new ColumnInfo[0]));
                     }
-                    Object statsRows[][] = ss.getStatsRows(interval, now);
+                    Object[][] statsRows = ss.getStatsRows(interval, now);
                     for (Object[] row : statsRows) {
                         if (row.length != resultTable.m_colCount) {
                             new VoltLogger("HOST").warn("Dump ss: " + ss + ": " + selector);

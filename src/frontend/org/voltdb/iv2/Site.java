@@ -1448,10 +1448,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             long stringMem = 0;
 
             // update table stats
-            final VoltTable[] s1 =
-                m_ee.getStats(StatsSelector.TABLE, tableIds, false, time);
-            if ((s1 != null) && (s1.length > 0)) {
-                VoltTable stats = s1[0];
+            final VoltTable[] eeStatistics = m_ee.getStats(StatsSelector.TABLE, tableIds, false, time);
+            if ((eeStatistics != null) && (eeStatistics.length > 0)) {
+                VoltTable stats = eeStatistics[0];
                 assert(stats != null);
 
                 // rollup the table memory stats for this site

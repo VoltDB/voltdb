@@ -25,6 +25,7 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 
+import org.awaitility.Awaitility;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -48,54 +49,60 @@ public class TestEmptySchema extends RegressionSuite
 
     public void testEmptySchema() throws Exception {
         final Client client = getClient();
-        // sleep a little so that we have time for the IPC backend to actually be running
-        // so it can screw us on empty results
-        Thread.sleep(1000);
 
         // Even running should be an improvement (ENG-4645), but do something just to be sure
         // Also, check to be sure we get a full schema for the table and index stats
-        ColumnInfo[] expectedSchema = new ColumnInfo[13];
-        expectedSchema[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
-        expectedSchema[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
-        expectedSchema[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
-        expectedSchema[3] = new ColumnInfo("SITE_ID", VoltType.INTEGER);
-        expectedSchema[4] = new ColumnInfo("PARTITION_ID", VoltType.BIGINT);
-        expectedSchema[5] = new ColumnInfo("TABLE_NAME", VoltType.STRING);
-        expectedSchema[6] = new ColumnInfo("TABLE_TYPE", VoltType.STRING);
-        expectedSchema[7] = new ColumnInfo("TUPLE_COUNT", VoltType.BIGINT);
-        expectedSchema[8] = new ColumnInfo("TUPLE_ALLOCATED_MEMORY", VoltType.BIGINT);
-        expectedSchema[9] = new ColumnInfo("TUPLE_DATA_MEMORY", VoltType.BIGINT);
-        expectedSchema[10] = new ColumnInfo("STRING_DATA_MEMORY", VoltType.BIGINT);
-        expectedSchema[11] = new ColumnInfo("DR", VoltType.STRING);
-        expectedSchema[12] = new ColumnInfo("EXPORT", VoltType.STRING);
-        VoltTable expectedTable = new VoltTable(expectedSchema);
+        ColumnInfo[] expectedTableSchema = new ColumnInfo[15];
+        expectedTableSchema[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
+        expectedTableSchema[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
+        expectedTableSchema[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
+        expectedTableSchema[3] = new ColumnInfo("SITE_ID", VoltType.INTEGER);
+        expectedTableSchema[4] = new ColumnInfo("PARTITION_ID", VoltType.BIGINT);
+        expectedTableSchema[5] = new ColumnInfo("TABLE_NAME", VoltType.STRING);
+        expectedTableSchema[6] = new ColumnInfo("TABLE_TYPE", VoltType.STRING);
+        expectedTableSchema[7] = new ColumnInfo("TUPLE_COUNT", VoltType.BIGINT);
+        expectedTableSchema[8] = new ColumnInfo("TUPLE_ALLOCATED_MEMORY", VoltType.BIGINT);
+        expectedTableSchema[9] = new ColumnInfo("TUPLE_DATA_MEMORY", VoltType.BIGINT);
+        expectedTableSchema[10] = new ColumnInfo("STRING_DATA_MEMORY", VoltType.BIGINT);
+        expectedTableSchema[11] = new ColumnInfo("TUPLE_LIMIT", VoltType.INTEGER);
+        expectedTableSchema[12] = new ColumnInfo("PERCENT_FULL", VoltType.INTEGER);
+        expectedTableSchema[13] = new ColumnInfo("DR", VoltType.STRING);
+        expectedTableSchema[14] = new ColumnInfo("EXPORT", VoltType.STRING);
+        VoltTable expectedTable = new VoltTable(expectedTableSchema);
 
-        VoltTable[] results = client.callProcedure("@Statistics", "TABLE", 0).getResults();
-        System.out.println("TABLE RESULTS: " + results[0]);
-        assertEquals(0, results[0].getRowCount());
-        assertEquals(expectedSchema.length, results[0].getColumnCount());
-        validateSchema(results[0], expectedTable);
+        VoltTable[] results = Awaitility
+                .await("for the IPC backend to actually be running")
+                .until(
+                        () -> client.callProcedure("@Statistics", "TABLE", 0).getResults(),
+                        voltTables -> voltTables.length > 0);
 
-        expectedSchema = new ColumnInfo[12];
-        expectedSchema[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
-        expectedSchema[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
-        expectedSchema[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
-        expectedSchema[3] = new ColumnInfo("SITE_ID", VoltType.INTEGER);
-        expectedSchema[4] = new ColumnInfo("PARTITION_ID", VoltType.BIGINT);
-        expectedSchema[5] = new ColumnInfo("INDEX_NAME", VoltType.STRING);
-        expectedSchema[6] = new ColumnInfo("TABLE_NAME", VoltType.STRING);
-        expectedSchema[7] = new ColumnInfo("INDEX_TYPE", VoltType.STRING);
-        expectedSchema[8] = new ColumnInfo("IS_UNIQUE", VoltType.TINYINT);
-        expectedSchema[9] = new ColumnInfo("IS_COUNTABLE", VoltType.TINYINT);
-        expectedSchema[10] = new ColumnInfo("ENTRY_COUNT", VoltType.BIGINT);
-        expectedSchema[11] = new ColumnInfo("MEMORY_ESTIMATE", VoltType.BIGINT);
-        expectedTable = new VoltTable(expectedSchema);
+        VoltTable result = results[0];
+        System.out.println("TABLE RESULTS: " + result);
+        assertEquals(0, result.getRowCount());
+        assertEquals(expectedTableSchema.length, result.getColumnCount());
+        validateSchema(result, expectedTable);
+
+        ColumnInfo[] expectedIndexSchema = new ColumnInfo[12];
+        expectedIndexSchema[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
+        expectedIndexSchema[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
+        expectedIndexSchema[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
+        expectedIndexSchema[3] = new ColumnInfo("SITE_ID", VoltType.INTEGER);
+        expectedIndexSchema[4] = new ColumnInfo("PARTITION_ID", VoltType.BIGINT);
+        expectedIndexSchema[5] = new ColumnInfo("INDEX_NAME", VoltType.STRING);
+        expectedIndexSchema[6] = new ColumnInfo("TABLE_NAME", VoltType.STRING);
+        expectedIndexSchema[7] = new ColumnInfo("INDEX_TYPE", VoltType.STRING);
+        expectedIndexSchema[8] = new ColumnInfo("IS_UNIQUE", VoltType.TINYINT);
+        expectedIndexSchema[9] = new ColumnInfo("IS_COUNTABLE", VoltType.TINYINT);
+        expectedIndexSchema[10] = new ColumnInfo("ENTRY_COUNT", VoltType.BIGINT);
+        expectedIndexSchema[11] = new ColumnInfo("MEMORY_ESTIMATE", VoltType.BIGINT);
+        expectedTable = new VoltTable(expectedIndexSchema);
 
         results = client.callProcedure("@Statistics", "INDEX", 0).getResults();
-        System.out.println("INDEX RESULTS: " + results[0]);
-        assertEquals(0, results[0].getRowCount());
-        assertEquals(expectedSchema.length, results[0].getColumnCount());
-        validateSchema(results[0], expectedTable);
+        result = results[0];
+        System.out.println("INDEX RESULTS: " + result);
+        assertEquals(0, result.getRowCount());
+        assertEquals(expectedIndexSchema.length, result.getColumnCount());
+        validateSchema(result, expectedTable);
     }
 
     static public Test suite() throws IOException {

@@ -24,11 +24,15 @@
 package org.voltdb.regressionsuites.statistics;
 
 import java.io.IOException;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
+import org.assertj.core.api.Assertions;
+import org.awaitility.Awaitility;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -38,6 +42,8 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.regressionsuites.StatisticsTestSuiteBase;
 
 import junit.framework.Test;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 public class TestStatisticsSuiteDatabaseElementStats extends StatisticsTestSuiteBase {
 
@@ -86,7 +92,7 @@ public class TestStatisticsSuiteDatabaseElementStats extends StatisticsTestSuite
         System.out.println("\n\nTESTING TABLE STATS\n\n\n");
         Client client  = getFullyConnectedClient();
 
-        ColumnInfo[] expectedSchema = new ColumnInfo[13];
+        ColumnInfo[] expectedSchema = new ColumnInfo[15];
         expectedSchema[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
         expectedSchema[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
         expectedSchema[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
@@ -98,39 +104,29 @@ public class TestStatisticsSuiteDatabaseElementStats extends StatisticsTestSuite
         expectedSchema[8] = new ColumnInfo("TUPLE_ALLOCATED_MEMORY", VoltType.BIGINT);
         expectedSchema[9] = new ColumnInfo("TUPLE_DATA_MEMORY", VoltType.BIGINT);
         expectedSchema[10] = new ColumnInfo("STRING_DATA_MEMORY", VoltType.BIGINT);
-        expectedSchema[11] = new ColumnInfo("DR", VoltType.STRING);
-        expectedSchema[12] = new ColumnInfo("EXPORT", VoltType.STRING);
+        expectedSchema[11] = new ColumnInfo("TUPLE_LIMIT", VoltType.INTEGER);
+        expectedSchema[12] = new ColumnInfo("PERCENT_FULL", VoltType.INTEGER);
+        expectedSchema[13] = new ColumnInfo("DR", VoltType.STRING);
+        expectedSchema[14] = new ColumnInfo("EXPORT", VoltType.STRING);
         VoltTable expectedTable = new VoltTable(expectedSchema);
 
-        VoltTable[] results = null;
-        boolean success = false;
-        long start = System.currentTimeMillis();
-        while (!success) {
-            if (System.currentTimeMillis() - start > 60000) fail("Took too long");
-            success = true;
-            // table
-            //
-            results = client.callProcedure("@Statistics", "table", 0).getResults();
-            System.out.println("Test statistics table: " + results[0].toString());
-            // one aggregate table returned
-            assertEquals(1, results.length);
-            validateSchema(results[0], expectedTable);
-            // with 10 rows per site. Can be two values depending on the test scenario of cluster vs. local.
-            if (HOSTS * SITES * 3 != results[0].getRowCount()) {
-                success = false;
-            }
-            // Validate that each site returns a result for each table
-            if (success) {
-                success = validateRowSeenAtAllSites(results[0], "TABLE_NAME", "WAREHOUSE", true);
-            }
-            if (success) {
-                success = validateRowSeenAtAllSites(results[0], "TABLE_NAME", "NEW_ORDER", true);
-            }
-            if (success) {
-                validateRowSeenAtAllSites(results[0], "TABLE_NAME", "ITEM", true);
-            }
-            if (success) break;
-        }
+        Awaitility.await("for rows seen at all sites")
+                .atMost(1, TimeUnit.MINUTES)
+                .untilAsserted(
+                    () -> {
+                        VoltTable[] results = client.callProcedure("@Statistics", "table", 0).getResults();
+                        assertThat(results).hasSize(1);
+                        VoltTable voltTable = results[0];
+
+                        // with 10 rows per site. Can be two values depending on the test scenario of cluster vs. local.
+                        assertThat(voltTable.getRowCount()).isEqualTo(HOSTS * SITES * 3);
+                        validateSchema(voltTable, expectedTable);
+
+                        assertThat(validateRowSeenAtAllSites(voltTable, "TABLE_NAME", "WAREHOUSE", true)).isTrue();
+                        assertThat(validateRowSeenAtAllSites(voltTable, "TABLE_NAME", "NEW_ORDER", true)).isTrue();
+                        assertThat(validateRowSeenAtAllSites(voltTable, "TABLE_NAME", "ITEM", true)).isTrue();
+                    }
+                );
     }
 
     public void testIndexStatistics() throws Exception {
@@ -152,27 +148,20 @@ public class TestStatisticsSuiteDatabaseElementStats extends StatisticsTestSuite
         expectedSchema[11] = new ColumnInfo("MEMORY_ESTIMATE", VoltType.BIGINT);
         VoltTable expectedTable = new VoltTable(expectedSchema);
 
-        VoltTable[] results = null;
+        Awaitility.await("for rows seen at all sites")
+                .atMost(1, TimeUnit.MINUTES)
+                .untilAsserted(
+                        () -> {
+                            VoltTable[] results = client.callProcedure("@Statistics", "index", 0).getResults();
+                            assertThat(results).hasSize(1);
+                            VoltTable voltTable = results[0];
 
-        boolean success = false;
-        long start = System.currentTimeMillis();
-        while (!success) {
-            if (System.currentTimeMillis() - start > 60000) fail("Took too long");
-            success = true;
-            results = client.callProcedure("@Statistics", "index", 0).getResults();
-            System.out.println("Index results: " + results[0].toString());
-            assertEquals(1, results.length);
-            validateSchema(results[0], expectedTable);
-            if (success) {
-                success = validateRowSeenAtAllSites(results[0], "INDEX_NAME",
-                        HSQLInterface.AUTO_GEN_NAMED_CONSTRAINT_IDX + "W_PK_TREE", true);
-            }
-            if (success) {
-                success = validateRowSeenAtAllSites(results[0], "INDEX_NAME",
-                        HSQLInterface.AUTO_GEN_NAMED_CONSTRAINT_IDX + "I_PK_TREE", true);
-            }
-            if (success) break;
-        }
+                            validateSchema(voltTable, expectedTable);
+
+                            assertThat(validateRowSeenAtAllSites(voltTable, "INDEX_NAME", HSQLInterface.AUTO_GEN_NAMED_CONSTRAINT_IDX + "W_PK_TREE", true)).isTrue();
+                            assertThat(validateRowSeenAtAllSites(voltTable, "INDEX_NAME", HSQLInterface.AUTO_GEN_NAMED_CONSTRAINT_IDX + "I_PK_TREE", true)).isTrue();
+                        }
+                );
     }
 
     public void testProcedureStatistics() throws Exception {

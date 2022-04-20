@@ -33,6 +33,8 @@ public class TableStats extends SiteStatsSource {
         TUPLE_ALLOCATED_MEMORY  (VoltType.BIGINT),
         TUPLE_DATA_MEMORY       (VoltType.BIGINT),
         STRING_DATA_MEMORY      (VoltType.BIGINT),
+        TUPLE_LIMIT             (VoltType.INTEGER),
+        PERCENT_FULL            (VoltType.INTEGER),
         DR                      (VoltType.STRING),
         EXPORT                  (VoltType.STRING);
 
