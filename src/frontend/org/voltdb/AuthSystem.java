@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -57,7 +57,6 @@ import org.ietf.jgss.MessageProp;
 import org.mindrot.BCrypt;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.RateLimitedLogger;
 import org.voltcore.utils.ssl.MessagingChannel;
 import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.Database;
@@ -440,7 +439,7 @@ public class AuthSystem {
                  * If not 40 should be 60 since it is bcrypt
                  */
                 VoltDB.crashGlobalVoltDB(
-                        "Found a shadowPassword in the catalog that was in an unrecogized format", true, null);
+                        "Found a shadowPassword in the catalog that was in an unrecognized format", true, null);
             }
 
             final AuthUser user = new AuthUser( sha1ShadowPassword, sha2ShadowPassword, shadowPassword, sha256shadowPassword, catalogUser.getTypeName());
@@ -733,6 +732,7 @@ public class AuthSystem {
             else if (m_authProvider != AuthProvider.HASH) {
                 return false;
             }
+
             final AuthUser user = m_users.get(m_user);
             if (user == null) {
                 logAuthFails(LogKeys.auth_AuthSystem_NoSuchUser.name(), m_user, fromAddress);
@@ -740,15 +740,14 @@ public class AuthSystem {
             }
 
             boolean matched = isPasswordMatch(user, scheme, m_password);
-
-            if (matched) {
-                m_authenticatedUser = m_user;
-                logAuthSuccess(m_authenticatedUser, fromAddress);
-                return true;
+            if (!matched) {
+                logAuthFails(LogKeys.auth_AuthSystem_AuthFailedPasswordMistmatch.name(), m_user, fromAddress);
+                return false;
             }
 
-            logAuthFails(LogKeys.auth_AuthSystem_AuthFailedPasswordMistmatch.name(), m_user, fromAddress);
-            return false;
+            m_authenticatedUser = m_user;
+            logAuthSuccess(m_authenticatedUser, fromAddress);
+            return true;
         }
     }
 
@@ -779,21 +778,35 @@ public class AuthSystem {
         return matched;
     }
 
+    /*
+     * Log authentication success. We want to do individual rate-limiting
+     * for each unique user/address pair, so we format the message before
+     * calling the rate-limited logger.
+     */
     private static void logAuthSuccess(String user, String fromAddress) {
-        //Make sure its logged per user
-        if (fromAddress == null) {
-            fromAddress = "NULL";
-        }
-        String authenticationLogMessage = String.format(
-                "Authenticated user %s from %s. This message is rate limited to once every 60 seconds.",
-                user, fromAddress);
-
-        RateLimitedLogger.tryLogForMessage(System.currentTimeMillis(), 60, TimeUnit.SECONDS,
-            authLogger, Level.INFO, authenticationLogMessage);
+        String message = String.format("Authenticated user %s from %s. This message is rate limited to once every 60 seconds.",
+                                       displayableUser(user), displayableAddress(fromAddress));
+        authLogger.rateLimitedInfo(60, message);
     }
 
+    /*
+     * Log authentication failures. Not currently rate-limited.
+     * TODO: rate limit this?
+     */
     private static void logAuthFails(String key, String user, String fromAddress) {
-        authLogger.l7dlog(Level.INFO, key, new String[] {user, fromAddress}, null);
+        String[] args = { displayableUser(user), displayableAddress(fromAddress) };
+        authLogger.l7dlog(Level.INFO, key, args, null);
+    }
+
+    /*
+     * For making log messages readable, ONLY.
+     */
+    static String displayableUser(String user) {
+        return user != null && !user.isEmpty() ? user : "(none)";
+    }
+
+    static String displayableAddress(String addr) {
+        return addr != null && !addr.isEmpty() ? addr : "(unknown address)";
     }
 
     public class SpnegoPassthroughRequest extends AuthenticationRequest {
@@ -956,6 +969,7 @@ public class AuthSystem {
                 logAuthFails(LogKeys.auth_AuthSystem_NoSuchUser.name(), authenticatedUser, fromAddress);
                 return false;
             }
+
             m_authenticatedUser = authenticatedUser;
             logAuthSuccess(m_authenticatedUser, fromAddress);
             return true;

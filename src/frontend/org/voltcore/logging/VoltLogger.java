@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2021 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -454,33 +454,24 @@ public class VoltLogger {
      * argument rather than being implicit in the method name.
      */
     public void log(Level level, Object message, Throwable t) {
-        switch (level) {
-        case WARN:
-        case INFO:
-        case DEBUG:
-        case TRACE:
-            execute(level, message, null, t);
-            break;
-        case FATAL:
-        case ERROR:
-            submit(level, message, null, t);
-            break;
-        default:
-            throw new AssertionError("Unrecognized level " + level);
-        }
+        logFmt(level, t, message, (Object[])null);
     }
 
     public void logFmt(Level level, String format, Object... args) {
+        logFmt(level, (Throwable)null, format, args);
+    }
+
+    public void logFmt(Level level, Throwable t, Object message, Object... args) {
         switch (level) {
         case WARN:
         case INFO:
         case DEBUG:
         case TRACE:
-            execute(level, format, args, null);
+            execute(level, message, args, t);
             break;
         case FATAL:
         case ERROR:
-            submit(level, format, args, null);
+            submit(level, message, args, t);
             break;
         default:
             throw new AssertionError("Unrecognized level " + level);
@@ -511,6 +502,18 @@ public class VoltLogger {
         RateLimitedLogger.tryLogForMessage(EstTime.currentTimeMillis(),
                                            suppressInterval, TimeUnit.SECONDS,
                                            this, level, cause, format, args);
+    }
+
+    public void rateLimitedError(long suppressInterval, String format, Object... args) {
+        rateLimitedLog(suppressInterval, Level.ERROR, null, format, args);
+    }
+
+    public void rateLimitedWarn(long suppressInterval, String format, Object... args) {
+        rateLimitedLog(suppressInterval, Level.WARN, null, format, args);
+    }
+
+    public void rateLimitedInfo(long suppressInterval, String format, Object... args) {
+        rateLimitedLog(suppressInterval, Level.INFO, null, format, args);
     }
 
     /**

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,10 +17,6 @@
 
 package org.voltcore.utils;
 
-import java.util.Arrays;
-import java.util.IllegalFormatConversionException;
-import java.util.MissingFormatArgumentException;
-import java.util.UnknownFormatConversionException;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -33,9 +29,10 @@ import com.google_voltpatches.common.cache.Cache;
 import com.google_voltpatches.common.cache.CacheBuilder;
 
 /*
- * Log a message to the specified logger, but limit the rate at which the message is logged.
- *
- * You can technically feed this thing nanoseconds and it will work
+ * Wraps a VoltLogger to provide rate-limited logging.
+ * A single RateLimitedLogger will not log more frequently
+ * than its configured limit. This rate limitation is
+ * independent of the message and log level.
  */
 public class RateLimitedLogger {
 
@@ -45,10 +42,17 @@ public class RateLimitedLogger {
     private final VoltLogger m_logger;
     private final Level m_level;
 
-    public RateLimitedLogger(long maxLogIntervalMillis, VoltLogger logger, Level level) {
+    /**
+     * Rate-limited logger constructor.
+     *
+     * @param maxLogIntervalMillis rate limit in millisecs
+     * @param logger a {@link VoltLogger}
+     * @param level default logging {@link Level}
+     */
+     public RateLimitedLogger(long maxLogIntervalMillis, VoltLogger logger, Level level) {
         m_maxLogIntervalMillis = maxLogIntervalMillis;
         m_logger = logger;
-        m_level = level;
+        m_level = level; // default
     }
 
     /**
@@ -69,7 +73,7 @@ public class RateLimitedLogger {
      *
      * @param message string to be logged
      * @param now current time (as millisecs)
-     * @param level a {@link Level debug level}
+     * @param level a logging {@link Level}
      */
     public void log(String message, long now, Level level) {
         if (now - m_lastLogTime > m_maxLogIntervalMillis) {
@@ -83,51 +87,26 @@ public class RateLimitedLogger {
     }
 
     /**
-     * Log a rate-limited message. Delays the formatting of the string message
+     * Log a rate-limited message. Delays the formatting of the message
      * until (and if) it is actually logged.
      *
      * @param now current time (as millisecs)
-     * @param level a {@link Level debug level}
+     * @param level a logging {@link Level}
      * @param cause evidentiary exception, possibly null
-     * @param format a {@link String#format(String, Object...) string format}
+     * @param format a {@link String#format(String, Object...)} string format
      * @param args format arguments
      */
-    public void log(long now, Level level, Throwable cause, String format, Object...args) {
+    public void log(long now, Level level, Throwable cause, String format, Object... args) {
         if (now - m_lastLogTime > m_maxLogIntervalMillis) {
             synchronized (this) {
                 if (now - m_lastLogTime > m_maxLogIntervalMillis) {
                     if (m_logger.isEnabledFor(level)) {
-                        m_logger.log(level, formatMessage(cause, format, args), null);
+                        m_logger.logFmt(level, cause, format, args);
                     }
                     m_lastLogTime = now;
                 }
             }
         }
-    }
-
-    private String formatMessage(Throwable cause, String stemformat, Object...args) {
-        String format = stemformat;
-        if (cause != null) {
-            format = new StringBuilder(stemformat.length()+8)
-                .append(stemformat).append("\n%s")
-                .toString().intern()
-                ;
-            args = Arrays.copyOf(args, args.length+1);
-            args[args.length-1] = Throwables.getStackTraceAsString(cause);
-        }
-        String msg = null;
-        try {
-            msg = String.format(format, args);
-        } catch (MissingFormatArgumentException |
-                 IllegalFormatConversionException |
-                 UnknownFormatConversionException ex) {
-            m_logger.error("Failed to format log message. Format: " + format +
-                           ", arguments: " + Arrays.toString(args), ex);
-        }
-        if (msg == null) {
-            msg = "Format: " + format + ", arguments: " + Arrays.toString(args);
-        }
-        return msg;
     }
 
     /*
@@ -145,9 +124,10 @@ public class RateLimitedLogger {
      * @param maxLogInterval suppress time
      * @param maxLogIntervalUnit suppress time units
      * @param logger a {@link VoltLogger}
-     * @param level a {@link Level debug level}
-     * @param format a {@link String#format(String, Object...) string format}
-     * @param parameters format parameters
+     * @param level a logging {@link Level}
+     * @param format a {@link String#format(String, Object...)} string format
+     * @param parameters format arguments
+     * @see #tryLogForMessage(long,long,TimeUnit,VoltLogger,Level,Throwable,String,Object...)
      */
     public static void tryLogForMessage(long now,
             final long maxLogInterval,
@@ -162,15 +142,25 @@ public class RateLimitedLogger {
      * Rate-limited logger. Logger is looked up cache by format
      * prior to expansion with parameters, which is only done
      * if the message is actually logged.
+     * <p>
+     * The <code>maxLogInterval</code>, <code>maxLogIntervalUntil</code>,
+     * and <code>logger</code> values are used when creating a
+     * <code>RateLimitedLogger</code> in the cache, and therefore
+     * changing the values on subsequent calls with the same format
+     * will not be effective.
+     * <p>
+     * VoltDB code wishing to use rate-limited logging is recommended
+     * to <b>not</b> call this method directly, but to instead use
+     * {@link VoltLogger#rateLimitedLog}.
      *
      * @param now current time (as millisecs)
      * @param maxLogInterval suppress time
      * @param maxLogIntervalUnit suppress time units
      * @param logger a {@link VoltLogger}
-     * @param level a {@link Level debug level}
+     * @param level a logging {@link Level}
      * @param cause evidentiary exception (may be null)
-     * @param format a {@link String#format(String, Object...) string format}
-     * @param parameters format parameters
+     * @param format a {@link String#format(String, Object...)} string format
+     * @param parameters format arguments
      */
     public static void tryLogForMessage(long now,
             final long maxLogInterval,

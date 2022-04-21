@@ -55,7 +55,6 @@ import org.HdrHistogram_voltpatches.AbstractHistogram;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONObject;
-import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.BinaryPayloadMessage;
 import org.voltcore.messaging.HostMessenger;
@@ -75,7 +74,6 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
-import org.voltcore.utils.RateLimitedLogger;
 import org.voltcore.utils.ssl.MessagingChannel;
 import org.voltdb.AuthSystem.AuthProvider;
 import org.voltdb.AuthSystem.AuthUser;
@@ -180,8 +178,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private static final VoltLogger networkLog = new VoltLogger("NETWORK");
 
     static final VoltLogger tmLog = new VoltLogger("TM");
-
-    private static final RateLimitedLogger m_rateLimitedLogger =  new RateLimitedLogger(TimeUnit.MINUTES.toMillis(60), authLog, Level.WARN);
 
     // Used by NT procedure to generate handle, don't use elsewhere.
     public static final int NTPROC_JUNK_ID = -2;
@@ -576,6 +572,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             responseBuffer.putInt(2);//message length
             responseBuffer.put(version);//version
 
+            // Use sourceIP for cases where we want an IP address only
+            // Use sourceNameAndIP for cases (typically logging) where we'll take a host name if we have one
+            InetAddress sourceInetAddr = ((InetSocketAddress)(socket.socket().getRemoteSocketAddress())).getAddress();
+            final String sourceIP = sourceInetAddr.getHostAddress();
+            final String sourceNameAndIP = sourceInetAddr.toString().replaceFirst("^/", "");
+
             /*
              * The login message is a length preceded name string followed by a length preceded
              * SHA-1 single hash of the password.
@@ -602,7 +604,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             double seconds = delta / 1000.0;
                             StringBuilder sb = new StringBuilder();
                             sb.append("Timed out authenticating client from ");
-                            sb.append(socket.socket().getRemoteSocketAddress().toString());
+                            sb.append(sourceNameAndIP);
                             sb.append(String.format(" after %.2f seconds (timeout target is %.2f seconds)", seconds, AUTH_TIMEOUT_MS / 1000.0));
                             timeoutRef.set(sb.toString());
                             try {
@@ -647,7 +649,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 try {
                     hashScheme = ClientAuthScheme.get(message.get());
                 } catch (IllegalArgumentException ex) {
-                    authLog.warn("Failure to authenticate connection Invalid Hash Scheme presented.");
+                    authLog.warn("Failure to authenticate connection: Invalid Hash Scheme presented.");
                     //Send negative response
                     responseBuffer.put(WIRE_PROTOCOL_FORMAT_ERROR).flip();
                     messagingChannel.writeMessage(responseBuffer);
@@ -657,18 +659,19 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
             //SHA1 is deprecated log it.
             if (hashScheme == ClientAuthScheme.HASH_SHA1) {
-                m_rateLimitedLogger.log(EstTime.currentTimeMillis(), Level.WARN, null,
-                        "Client connected using deprecated SHA1 hashing. SHA2 is strongly recommended for all client connections. Client IP: %s", socket.socket().getRemoteSocketAddress().toString());
+                authLog.rateLimitedWarn(60*60, "Client connected using deprecated SHA1 hashing. SHA2 is strongly recommended for all client connections. Client IP: %s",
+                                        sourceIP);
             }
             FastDeserializer fds = new FastDeserializer(message);
             final String service = fds.readString();
             final String username = fds.readString();
+            final String displayableUser = AuthSystem.displayableUser(username);
             final int digestLen = ClientAuthScheme.getDigestLength(hashScheme);
             final byte password[] = new byte[digestLen];
             //We should be left with SHA bytes only which varies based on scheme.
             if (message.remaining() != digestLen) {
-                authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress()
-                        + "): user " + username + " failed authentication.");
+                authLog.warnFmt("Failure to authenticate connection(%s): user %s failed authentication.",
+                                sourceNameAndIP, displayableUser);
                 //Send negative response
                 responseBuffer.put(AUTHENTICATION_FAILURE).flip();
                 messagingChannel.writeMessage(responseBuffer);
@@ -682,8 +685,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             AuthProvider ap = null;
             try {
                 ap = AuthProvider.fromService(service);
-            } catch (IllegalArgumentException unkownProvider) {
-                // handle it bellow
+            } catch (IllegalArgumentException ex) {
+                // handle it below
             }
 
             if (ap == null) {
@@ -691,9 +694,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 responseBuffer.put(EXPORT_DISABLED_REJECTION).flip();
                 messagingChannel.writeMessage(responseBuffer);
                 socket.close();
-                authLog.warn("Rejected user " + username +
-                        " attempting to use disabled or unconfigured service " +
-                        service + ".");
+                authLog.warnFmt("Rejected user %s attempting to use disabled or unconfigured service %s.",
+                                displayableUser, service);
                 authLog.warn("VoltDB Export services are no longer available through clients.");
                 return null;
             }
@@ -712,7 +714,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 /*
                  * Authenticate the user.
                  */
-                boolean authenticated = arq.authenticate(hashScheme, socket.socket().getRemoteSocketAddress().toString());
+                boolean authenticated = arq.authenticate(hashScheme, sourceIP);
 
                 if (!authenticated) {
                     long timestamp = System.currentTimeMillis();
@@ -720,20 +722,20 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     if (es != null && !es.isShutdown()) {
                         es.submit(new Runnable() {
                             @Override
-                            public void run()
-                            {
-                                ((RealVoltDB)VoltDB.instance()).logMessageToFLC(timestamp, username, socket.socket().getRemoteSocketAddress().toString());
+                            public void run() {
+                                // use 'displayableUser' for better logging by the FLC
+                                ((RealVoltDB)VoltDB.instance()).logMessageToFLC(timestamp, displayableUser, sourceIP);
                             }
                         });
                     }
 
                     Exception faex = arq.getAuthenticationFailureException();
                     if (faex != null) {
-                        authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
-                                     "):", faex);
+                        authLog.warnFmt(faex, "Failure to authenticate connection(%s) for user %s",
+                                        sourceNameAndIP, displayableUser);
                     } else {
-                        authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
-                                     "): user " + username + " failed authentication.");
+                        authLog.warnFmt("Failure to authenticate connection(%s): user %s failed authentication.",
+                                        sourceNameAndIP, displayableUser);
                     }
 
                     boolean isItIo = false;
@@ -750,8 +752,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     return null;
                 }
             } else {
-                authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
-                        "): user " + username + " because this node is rejoining.");
+                authLog.warnFmt("Failure to authenticate connection(%s) for user %s, because this node is rejoining.",
+                                sourceNameAndIP, displayableUser);
                 //Send negative response
                 responseBuffer.put(AUTHENTICATION_FAILURE_DUE_TO_REJOIN).flip();
                 messagingChannel.writeMessage(responseBuffer);
@@ -2284,7 +2286,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 CreateMode.EPHEMERAL, tmLog,
                 "Migrate Partition Leader");
         if (errorMessage != null) {
-            tmLog.rateLimitedLog(60, Level.INFO, null, errorMessage);
+            tmLog.rateLimitedInfo(60, errorMessage);
             return;
         }
 
@@ -2489,7 +2491,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             String errorMessage = VoltZK.createActionBlocker(m_zk, VoltZK.decommissionReplicasInProgress,
                     CreateMode.EPHEMERAL, tmLog, "remove replicas");
             if (errorMessage != null) {
-                tmLog.rateLimitedLog(60, Level.INFO, null, errorMessage);
+                tmLog.rateLimitedInfo(60, errorMessage);
                 return false;
             }
             SimpleClientResponseAdapter.SyncCallback cb = new SimpleClientResponseAdapter.SyncCallback();

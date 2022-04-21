@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -26,9 +26,15 @@ public abstract class AuthenticationRequest {
     protected Exception m_authenticationFailure = null;
 
     /**
-     * Perform the authentication request
+     * Perform the authentication request.
+     * <p>
+     * <code>fromAddress</code> is used for logging success/failure
+     * of the request. It should be 'the same' for repeated requests
+     * from the same source, so it is inadvisable to include a TCP
+     * port number, for example.
+     *
      * @param scheme is the type of Hash scheme
-     * @param fromAddress is the remote IP address of this authenticate request
+     * @param fromAddress is the remote IP address of this authentication request
      * @return true if authenticated, false if not
      * @throws {@link IllegalStateException} if this request was already made
      */
@@ -48,6 +54,9 @@ public abstract class AuthenticationRequest {
 
     /**
      * Authentication provider implementation of the request
+     * <p>
+     * See {@link #authenticate} for the use of <code>fromAddress</code>
+     *
      * @return true if authenticated, false if not
      * @throws Exception raised by the provider (if any)
      */
