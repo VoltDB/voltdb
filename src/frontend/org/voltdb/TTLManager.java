@@ -380,7 +380,7 @@ public class TTLManager extends StatsSource{
         try {
             latch.await(NT_PROC_TIMEOUT, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
-            hostLog.warn("Nibble export waiting interrupted" + e.getMessage());
+            // ignored
         }
     }
 
