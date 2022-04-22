@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2021 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -60,7 +60,6 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.network.Connection;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
-import org.voltcore.utils.RateLimitedLogger;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.client.ClientResponse;
@@ -1307,8 +1306,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             initiateSnapshotScan();
             break;
         case SCANNING:
-            RateLimitedLogger.tryLogForMessage(now, 5, TimeUnit.MINUTES,
-                                               SNAP_LOG, Level.INFO, "Blocked in scanning");
+            SNAP_LOG.rateLimitedInfo(5*60, "Blocked in scanning");
             break;
         case WAITING:
             processWaitingPeriodicWork(now);

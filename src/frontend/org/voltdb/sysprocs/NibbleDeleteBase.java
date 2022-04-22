@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -24,7 +24,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.DefaultProcedureManager;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
@@ -157,11 +156,8 @@ public class NibbleDeleteBase extends VoltSystemProcedure {
         }
 
         if (!hasIndex(catTable, column)) {
-            RateLimitedLogger.tryLogForMessage(System.currentTimeMillis(),
-                    60, TimeUnit.SECONDS,
-                    hostLog, Level.WARN,
-                    "Column %s doesn't have an index, it may leads to very slow delete "
-                            + "which requires full table scan.", column.getTypeName());
+            hostLog.rateLimitedWarn(60, "Column %s doesn't have an index, it may lead to very slow delete "
+                                    + "which requires full table scan.", column.getTypeName());
         }
 
         // so far should only be single column, single row table

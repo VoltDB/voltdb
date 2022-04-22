@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -27,7 +27,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.RateLimitedLogger;
 
 public class FailedLoginCounter {
     public class TimeBucket {
@@ -77,35 +76,17 @@ public class FailedLoginCounter {
         }
         int userFailedCount = m_userFailedAttempts.getOrDefault(user,0) + 1;
         String messageFormat = "User "+ user +" failed to authenticate %d times in last minute";
-        RateLimitedLogger.tryLogForMessage(timestampMilis,
-                                           10000,
-                                           TimeUnit.MILLISECONDS,
-                                           authLog,
-                                           Level.INFO,
-                                           messageFormat,
-                                           userFailedCount);
+        authLog.rateLimitedInfo(10, messageFormat, userFailedCount);
         m_userFailedAttempts.put(user, userFailedCount);
 
         int ipFailedCount = m_ipFailedAttempts.getOrDefault(ip, 0) + 1;
         messageFormat = "IP address "+ ip +" failed to authenticate %d times in last minute";
-        RateLimitedLogger.tryLogForMessage(timestampMilis,
-                                           10000,
-                                           TimeUnit.MILLISECONDS,
-                                           authLog,
-                                           Level.INFO,
-                                           messageFormat,
-                                           ipFailedCount);
+        authLog.rateLimitedInfo(10, messageFormat, ipFailedCount);
         m_ipFailedAttempts.put(ip, ipFailedCount);
 
         m_totalFailedAttempts++;
         messageFormat = "Total failed logins: %d in last minute";
-        RateLimitedLogger.tryLogForMessage(timestampMilis,
-                                           ONE_MINUTE_IN_MILLIS,
-                                           TimeUnit.MILLISECONDS,
-                                           authLog,
-                                           Level.INFO,
-                                           messageFormat,
-                                           m_totalFailedAttempts);
+        authLog.rateLimitedInfo(60, messageFormat, m_totalFailedAttempts);
     }
 
     public void checkCounter(long timestamp) {

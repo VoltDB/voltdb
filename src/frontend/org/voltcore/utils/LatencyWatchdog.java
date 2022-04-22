@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -41,11 +41,11 @@ public class LatencyWatchdog extends Thread {
 
     private static ConcurrentHashMap<Thread, AtomicLong> sLatencyMap = new ConcurrentHashMap<Thread, AtomicLong>();
 
-    private static final long WATCHDOG_THRESHOLD = Long.getLong("WATCHDOG_THRESHOLD", 100);  /* millisecond, same below */
+    private static final long WATCHDOG_THRESHOLD = Long.getLong("WATCHDOG_THRESHOLD", 100);  /* milliseconds */
 
-    private static final long WAKEUP_INTERVAL = Long.getLong("WAKEUP_INTERVAL", 25);
+    private static final long WAKEUP_INTERVAL = Long.getLong("WAKEUP_INTERVAL", 25); /* milliseconds */
 
-    private static final long MIN_LOG_INTERVAL = Long.getLong("MIN_LOG_INTERVAL", 10 * 1000);
+    private static final long MIN_LOG_INTERVAL_SEC = Long.getLong("MIN_LOG_INTERVAL", 10); /* seconds */
 
     static LatencyWatchdog sWatchdog;
 
@@ -81,8 +81,8 @@ public class LatencyWatchdog extends Thread {
     public void run() {
         Thread.currentThread().setName("Latency Watchdog");
         LOG.info(String.format("Latency Watchdog enabled -- threshold:%d(ms) " +
-                               "wakeup_interval:%d(ms) min_log_interval:%d(ms)\n",
-                               WATCHDOG_THRESHOLD, WAKEUP_INTERVAL, MIN_LOG_INTERVAL));
+                               "wakeup_interval:%d(ms) min_log_interval:%d(sec)\n",
+                               WATCHDOG_THRESHOLD, WAKEUP_INTERVAL, MIN_LOG_INTERVAL_SEC));
         while (true) {
             for (Entry<Thread, AtomicLong> entry : sLatencyMap.entrySet()) {
                 Thread t = entry.getKey();
@@ -95,7 +95,7 @@ public class LatencyWatchdog extends Thread {
                         sb.append(ste);
                         sb.append("\n");
                     }
-                    RateLimitedLogger.tryLogForMessage(now, MIN_LOG_INTERVAL, TimeUnit.MILLISECONDS, LOG, Level.INFO, format, sb.toString());
+                    LOG.rateLimitedInfo(MIN_LOG_INTERVAL_SEC, format, sb.toString());
                 }
             }
             try {

@@ -35,7 +35,6 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.network.Connection;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.logging.Level;
-import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.VoltCompoundProcedure.CompoundProcAbortException;
 import org.voltdb.VoltCompoundProcedure.Stage;
@@ -393,10 +392,7 @@ public class CompoundProcedureRunner extends ProcedureRunnerNT {
         else {
             String fmt2 = String.format("Compound proc %s; %s\n\t(this message is rate-limited to once per %d sec)",
                                         m_procedureName, fmt, LOG_RATE_LIMIT);
-            RateLimitedLogger.tryLogForMessage(System.currentTimeMillis(),
-                                               LOG_RATE_LIMIT, TimeUnit.SECONDS,
-                                               LOG, Level.INFO,
-                                               fmt2, args);
+            LOG.rateLimitedInfo(LOG_RATE_LIMIT, fmt2, args);
         }
     }
 

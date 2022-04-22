@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -28,7 +28,6 @@ import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.DeferredSerialization;
-import org.voltcore.utils.RateLimitedLogger;
 
 /**
 *
@@ -175,11 +174,7 @@ public abstract class NIOWriteStreamBase {
                 networkLog.fatal("Sloppy serialization size for message class " + ds);
                 System.exit(-1);
             }
-            RateLimitedLogger.tryLogForMessage(
-                    System.currentTimeMillis(),
-                    1, TimeUnit.HOURS,
-                    networkLog,
-                    Level.WARN, "Sloppy serialization size for message class %s", ds);
+            networkLog.rateLimitedWarn(60*60, "Sloppy serialization size for message class %s", ds);
         }
     }
 

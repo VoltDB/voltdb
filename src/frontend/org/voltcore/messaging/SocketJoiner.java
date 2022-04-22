@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -53,7 +53,6 @@ import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.ReverseDNSCache;
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.RateLimitedLogger;
 import org.voltcore.utils.VersionChecker;
 import org.voltcore.utils.ssl.MessagingChannel;
 import org.voltdb.client.TLSHandshaker;
@@ -100,6 +99,7 @@ public class SocketJoiner {
     private static final int NAME_LOOKUP_RETRY_MS = 1000;
     private static final int NAME_LOOKUP_RETRY_LIMIT = 10;
     private static final int SOCKET_CONNECT_RETRY_MS = 250;
+    private static final int LOG_RATE_LIMIT = 30;
 
     public static final String FAIL_ESTABLISH_MESH_MSG = "Failed to establish socket mesh.";
 
@@ -229,10 +229,10 @@ public class SocketJoiner {
                     break;
                 } catch (UnknownHostException e) {
                     if (--nameRetries <= 0) {
-                        warnInfrequently("Unknown host name '%s', no more retries", coordHost);
+                        LOG.rateLimitedWarn(LOG_RATE_LIMIT, "Unknown host name '%s', no more retries", coordHost);
                         break; // no more retries; move on to next potential coordinator
                     }
-                    warnInfrequently("Unknown host name '%s', retrying", coordHost);
+                    LOG.rateLimitedWarn(LOG_RATE_LIMIT, "Unknown host name '%s', retrying", coordHost);
                     safeSleep(NAME_LOOKUP_RETRY_MS);
                 } catch (SocketRetryException e) {
                     LOG.debug(String.format("Cannot connect to %s. %s", primary, e.getMessage()));
@@ -338,13 +338,13 @@ public class SocketJoiner {
             while (m_coordIp == null) {
                 try {
                     leaderAddr = addressFromHost(leader); // may throw for unresolved host name
-                    infoInfrequently("Connecting to the VoltDB cluster leader " + leaderAddr);
+                    LOG.rateLimitedInfo(LOG_RATE_LIMIT, "Connecting to the VoltDB cluster leader " + leaderAddr);
                     connectToPrimary(leaderAddr);
                 } catch (UnknownHostException e) {
-                    warnInfrequently("Unknown host name '%s', retrying", leader);
+                    LOG.rateLimitedWarn(LOG_RATE_LIMIT, "Unknown host name '%s', retrying", leader);
                     safeSleep(NAME_LOOKUP_RETRY_MS);
                 } catch (SocketRetryException e) {
-                    warnInfrequently("Cannot connect to %s, retrying. %s", leaderAddr, e.getMessage());
+                    LOG.rateLimitedWarn(LOG_RATE_LIMIT, "Cannot connect to %s, retrying. %s", leaderAddr, e.getMessage());
                     safeSleep(SOCKET_CONNECT_RETRY_MS);
                 } catch (Exception e) {
                     hostLog.error(FAIL_ESTABLISH_MESH_MSG, e);
@@ -425,25 +425,6 @@ public class SocketJoiner {
         }
     }
 
-
-    /*
-     * Handles repetitive logging from the retry loops in start().
-     * Prevents the same message from being logged more frequently
-     * than once every 30 secs.
-     */
-    private void warnInfrequently(String format, Object... args) {
-        RateLimitedLogger.tryLogForMessage(System.currentTimeMillis(),
-                                           30, TimeUnit.SECONDS,
-                                           LOG, Level.WARN,
-                                           format, args);
-    }
-
-    private void infoInfrequently(String format, Object... args) {
-        RateLimitedLogger.tryLogForMessage(System.currentTimeMillis(),
-                                           30, TimeUnit.SECONDS,
-                                           consoleLog, Level.INFO,
-                                           format, args);
-    }
 
     /*
      * Wrapper for sleep(), catching and ignoring interrupts.

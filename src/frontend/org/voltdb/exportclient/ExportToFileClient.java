@@ -73,6 +73,7 @@ import au.com.bytecode.opencsv_voltpatches.CSVWriter;
 public class ExportToFileClient extends ExportClientBase {
 
     private static final VoltLogger m_logger = new VoltLogger("ExportClient");
+    private static final int LOG_RATE_LIMIT = 10; // seconds
     private static final int EXPORT_DELIM_NUM_CHARACTERS = 4;
     private static final String DEFAULT_DATE_FORMAT = "yyyyMMddHHmmss";
 
@@ -562,7 +563,7 @@ public class ExportToFileClient extends ExportClientBase {
             }
             catch (Exception e) {
                 if (e instanceof IOException) {
-                    rateLimitedLogError(m_logger, "Failed to create output file: " + path + " , file may be unavailable/unwritable, or not enough space.");
+                    m_logger.rateLimitedError(LOG_RATE_LIMIT, "Failed to create output file: " + path + " , file may be unavailable/unwritable, or not enough space.");
                     throw e;
                 } else {
                     m_logger.error("Error: Failed to create output file: " + path + " " + Throwables.getStackTraceAsString(e));
@@ -604,7 +605,7 @@ public class ExportToFileClient extends ExportClientBase {
                 }
                 catch (Exception e) {
                     if (e instanceof IOException) {
-                        rateLimitedLogError(m_logger, "Failed to write schema file: " + path + " , file may be unavailable/unwritable, or not enough space.");
+                        m_logger.rateLimitedError(LOG_RATE_LIMIT, "Failed to write schema file: " + path + " , file may be unavailable/unwritable, or not enough space.");
                         throw e;
                     } else {
                         m_logger.error("Error: Failed to create output file: " + path + " " + Throwables.getStackTraceAsString(e));
@@ -800,7 +801,7 @@ public class ExportToFileClient extends ExportClientBase {
                 m_csvWriterDecoder.decode(rd.generation, rd.tableName, rd.types, rd.names, m_writer,rd.values);
             }
             catch (IOException io) {
-                rateLimitedLogError(m_logger, "failed to to process export row %s", Throwables.getStackTraceAsString(io));
+                m_logger.rateLimitedError(LOG_RATE_LIMIT, "failed to to process export row %s", Throwables.getStackTraceAsString(io));
                 return false;
             }
             return true;
@@ -815,7 +816,7 @@ public class ExportToFileClient extends ExportClientBase {
             m_batchLock.readLock().unlock();
             // checkError on PrintWriter inside m_writer also does the flush, so no need to call flush explicitly
             if (m_writer.checkError()) {
-                rateLimitedLogWarn(m_logger, "Failed to flush file '" + m_current.getFileHandle(m_metaData.tableName, m_metaData.generation) +
+                m_logger.rateLimitedWarn(LOG_RATE_LIMIT, "Failed to flush file '" + m_current.getFileHandle(m_metaData.tableName, m_metaData.generation) +
                         "'. Export file may be unavailable/unwritable, or not enough space.");
                 m_writer.resetWriter();
                 throw new RestartBlockException("Failed to complete the block.", true);

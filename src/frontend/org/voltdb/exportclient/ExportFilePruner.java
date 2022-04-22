@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2021 VoltDB Inc.
+ * Copyright (C) 2021-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -31,8 +31,6 @@ import java.util.regex.Pattern;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.EstTime;
-import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.VoltDB;
 
 /**
@@ -42,7 +40,7 @@ import org.voltdb.VoltDB;
 class ExportFilePruner {
 
     private static final VoltLogger logger = new VoltLogger("ExportClient");
-    private static final int LOG_RATE_LIMIT_MINS = 60;
+    private static final int LOG_RATE_LIMIT = 60 * 60; // seconds
 
     private Pattern m_namePattern;
     private SimpleDateFormat m_dateFormat;
@@ -216,10 +214,9 @@ class ExportFilePruner {
             err = ex.toString();
         }
         if (ts < 0) {
-            RateLimitedLogger.tryLogForMessage(EstTime.currentTimeMillis(), LOG_RATE_LIMIT_MINS, TimeUnit.MINUTES,
-                                               logger, Level.WARN,
-                                               "Unable to extract timestamp from '%s' using pattern '%s' and date format '%s' - %s",
-                                               name, m_namePattern, m_dateFormat.toPattern(), err);
+            logger.rateLimitedWarn(LOG_RATE_LIMIT,
+                                   "Unable to extract timestamp from '%s' using pattern '%s' and date format '%s' - %s",
+                                   name, m_namePattern, m_dateFormat.toPattern(), err);
         }
         return ts;
     }
@@ -237,10 +234,8 @@ class ExportFilePruner {
             ts = Files.getLastModifiedTime(file.toPath()).toMillis();
         }
         catch (IOException ex) {
-            RateLimitedLogger.tryLogForMessage(EstTime.currentTimeMillis(), LOG_RATE_LIMIT_MINS, TimeUnit.MINUTES,
-                                               logger, Level.WARN,
-                                               "Unable to determine last-modification time of '%s' - %s",
-                                               file, ex.toString());
+            logger.rateLimitedWarn(LOG_RATE_LIMIT, "Unable to determine last-modification time of '%s' - %s",
+                                   file, ex.toString());
         }
         return ts;
     }

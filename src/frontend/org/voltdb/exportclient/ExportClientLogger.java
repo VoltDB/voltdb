@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,8 +21,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.EstTime;
-import org.voltcore.utils.RateLimitedLogger;
 
 public class ExportClientLogger {
 
@@ -32,13 +30,8 @@ public class ExportClientLogger {
     public ExportClientLogger() {
     }
 
-    private void log(Level level, Throwable cause, String format, Object...args) {
-        RateLimitedLogger.tryLogForMessage(
-                EstTime.currentTimeMillis(),
-                SUPPRESS_INTERVAL, TimeUnit.SECONDS,
-                m_logger, level,
-                cause, format, args
-                );
+    private void log(Level level, Throwable cause, String format, Object... args) {
+        m_logger.rateLimitedLog(SUPPRESS_INTERVAL, level, cause, format, args);
     }
 
     public VoltLogger getLogger() {

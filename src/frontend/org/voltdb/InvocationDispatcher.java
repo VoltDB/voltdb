@@ -51,7 +51,6 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.network.Connection;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.EstTime;
-import org.voltcore.utils.RateLimitedLogger;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.SystemProcedureCatalog.Config;
@@ -307,10 +306,7 @@ public final class InvocationDispatcher {
 
         if (catProc == null) {
             String errorMessage = "Procedure " + procName + " was not found";
-            RateLimitedLogger.tryLogForMessage(EstTime.currentTimeMillis(),
-                            60, TimeUnit.SECONDS, authLog, Level.WARN,
-                            errorMessage + ". This message is rate limited to once every 60 seconds."
-                            );
+            authLog.rateLimitedWarn(60, errorMessage + ". This message is rate limited to once every 60 seconds.");
             return unexpectedFailureResponse(errorMessage, task.clientHandle);
         }
 
@@ -344,11 +340,7 @@ public final class InvocationDispatcher {
                         (batchTimeout > systemTimeout || batchTimeout == ExecutionEngine.NO_BATCH_TIMEOUT_VALUE)) {
                     String errorMessage = "The attempted individual query timeout value " + batchTimeout +
                             " milliseconds override was ignored because the connection lacks ADMIN privileges.";
-                    RateLimitedLogger.tryLogForMessage(EstTime.currentTimeMillis(),
-                            60, TimeUnit.SECONDS,
-                            log, Level.INFO,
-                            errorMessage + " This message is rate limited to once every 60 seconds.");
-
+                    log.rateLimitedInfo(60, errorMessage + " This message is rate limited to once every 60 seconds.");
                     task.setBatchTimeout(systemTimeout);
                 }
             }
@@ -859,8 +851,7 @@ public final class InvocationDispatcher {
         long connectionId = handler.connectionId();
         final ClientInterfaceHandleManager cihm = m_cihm.get(connectionId);
         if (cihm == null) {
-            hostLog.rateLimitedLog(60, Level.WARN, null,
-                    "Dispatch Non-Transactional Procedure request rejected. "
+            hostLog.rateLimitedWarn(60, "Dispatch Non-Transactional Procedure request rejected. "
                     + "This is likely due to VoltDB ceasing client communication as it "
                     + "shuts down.");
 
@@ -1369,7 +1360,7 @@ public final class InvocationDispatcher {
         assert(!isSinglePartition || (partitions.length == 1));
         final ClientInterfaceHandleManager cihm = m_cihm.get(connectionId);
         if (cihm == null) {
-            hostLog.rateLimitedLog(60, Level.WARN, null,
+            hostLog.rateLimitedWarn(60,
                     "InvocationDispatcher.createTransaction request rejected. "
                     + "This is likely due to VoltDB ceasing client communication as it "
                     + "shuts down.");
@@ -1396,8 +1387,7 @@ public final class InvocationDispatcher {
         }
 
         if (initiatorHSId == null) {
-            hostLog.rateLimitedLog(60, Level.INFO, null,
-                    String.format(
+            hostLog.rateLimitedInfo(60, String.format(
                             "InvocationDispatcher.createTransaction request rejected for partition %d invocation %s."
                                     + " isReadOnly=%s isSinglePartition=%s, isEveryPartition=%s isForReplay=%s."
                                     + " This is likely due to partition leader being removed during elastic shrink.",

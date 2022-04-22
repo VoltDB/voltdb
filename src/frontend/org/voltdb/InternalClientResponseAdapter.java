@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -41,8 +41,6 @@ import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.network.WriteStream;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DeferredSerialization;
-import org.voltcore.utils.EstTime;
-import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
@@ -114,7 +112,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
         public void handleResponse(ClientResponse response) throws Exception {
             if (response.getStatus() != ClientResponse.SUCCESS && m_kattrs.isImporter()) {
                 String fmt = "Stored procedure failed: %s Error: %s failures: %d";
-                rateLimitedLog(Level.WARN, null, fmt, m_procName, response.getStatusString(), m_failures.incrementAndGet());
+                m_logger.rateLimitedWarn(SUPPRESS_INTERVAL, fmt, m_procName, response.getStatusString(), m_failures.incrementAndGet());
             }
             if (m_cb != null) {
                 m_cb.clientCallback(response);
@@ -332,16 +330,6 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
         }
     }
 
-    //Do rate limited logging for messages.
-    private void rateLimitedLog(Level level, Throwable cause, String format, Object...args) {
-        RateLimitedLogger.tryLogForMessage(
-                EstTime.currentTimeMillis(),
-                SUPPRESS_INTERVAL, TimeUnit.SECONDS,
-                m_logger, level,
-                cause, format, args
-                );
-    }
-
     @Override
     public int calculatePendingWriteDelta(long now) {
         throw new UnsupportedOperationException();
@@ -431,14 +419,14 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
     public long connectionId(long clientHandle) {
         InternalCallback callback = m_callbacks.get(clientHandle);
         if (callback==null) {
-            m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.WARN, null,
+            m_logger.rateLimitedWarn(SUPPRESS_INTERVAL,
                     "Could not find caller details for client handle %d. Using internal adapter level connection id", clientHandle);
             return connectionId();
         }
 
         Long internalId = m_internalConnectionIds.get(callback.getInternalContext().getName());
         if (internalId==null) {
-            m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.WARN, null,
+            m_logger.rateLimitedWarn(SUPPRESS_INTERVAL,
                 "Could not find internal connection id for client handle %d. Using internal adapter level connection id", clientHandle);
             return connectionId();
         } else {

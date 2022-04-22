@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -39,7 +39,6 @@ import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
-import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.VoltDB;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -395,12 +394,8 @@ public class MeshArbiter {
         // that we've entered a loop, exit here.
         if (m_localHistoricDecisions.size() >= 100) {
             // Too many decisions have been made without converging
-            RateLimitedLogger.tryLogForMessage(System.currentTimeMillis(),
-                                               10, TimeUnit.SECONDS,
-                                               REJOIN_LOGGER,
-                                               Level.WARN,
-                                               "Agreement, %d local decisions have been made without converging",
-                                               m_localHistoricDecisions.size());
+            REJOIN_LOGGER.rateLimitedWarn(10, "Agreement, %d local decisions have been made without converging",
+                                          m_localHistoricDecisions.size());
         }
         for (SiteFailureMessage lhd : m_localHistoricDecisions) {
             if (lhd.m_survivors.equals(sfm.m_survivors)) {

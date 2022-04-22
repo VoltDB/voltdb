@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -24,7 +24,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
-import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.ExpectedProcedureException;
 import org.voltdb.ProcedureRunner;
@@ -95,11 +94,7 @@ abstract public class ProcedureTask extends TransactionTask
                                 "This can happen if a catalog update removing the procedure occurred " +
                                 "after the procedure was submitted " +
                                 "but before the procedure was executed.";
-                RateLimitedLogger.tryLogForMessage(
-                        System.currentTimeMillis(),
-                        60, TimeUnit.SECONDS,
-                        hostLog,
-                        Level.WARN, error + " %s", "This log message is rate limited to once every 60 seconds.");
+                hostLog.rateLimitedWarn(60, error + " %s", "This log message is rate limited to once every 60 seconds.");
                 response.setResults(
                         new ClientResponseImpl(
                                 ClientResponse.UNEXPECTED_FAILURE,

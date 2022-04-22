@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -22,8 +22,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.EstTime;
-import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.export.AdvertisedDataSource;
 
 /**
@@ -112,13 +110,5 @@ public class ExportClientBase {
     public ExportDecoderBase constructExportDecoder(AdvertisedDataSource source) {
         throw new UnsupportedOperationException("constructExportDecoder of onserver export client "
                 + "should be export client specific and must be implemented.");
-    }
-
-    public static void rateLimitedLogError(VoltLogger logger, String format, Object... parameters) {
-        RateLimitedLogger.tryLogForMessage(EstTime.currentTimeMillis(), 10, TimeUnit.SECONDS, logger, Level.ERROR, null, format, parameters);
-    }
-
-    public static void rateLimitedLogWarn(VoltLogger logger, String format, Object... parameters) {
-        RateLimitedLogger.tryLogForMessage(EstTime.currentTimeMillis(), 10, TimeUnit.SECONDS, logger, Level.WARN, null, format, parameters);
     }
 }

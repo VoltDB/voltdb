@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -32,8 +32,6 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.EstTime;
-import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.AuthenticationResult;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.HTTPClientInterface;
@@ -129,9 +127,6 @@ public class VoltBaseServlet extends HttpServlet {
     }
 
     public void rateLimitedLogWarn(String format, Object... parameters) {
-        //Rate limited every 60 seconds.
-        RateLimitedLogger.tryLogForMessage(EstTime.currentTimeMillis(), 60, TimeUnit.SECONDS, m_log, Level.WARN, null, format, parameters);
+        m_log.rateLimitedWarn(60, format, parameters);
     }
-
-
 }

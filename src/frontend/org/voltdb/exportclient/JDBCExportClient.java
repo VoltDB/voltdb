@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -60,6 +60,7 @@ import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 
 public class JDBCExportClient extends ExportClientBase {
     private static final VoltLogger m_logger = new VoltLogger("ExportClient");
+    private static final int LOG_RATE_LIMIT = 10; // seconds
 
     String schema_prefix;
     boolean ignoreGenerations = false;
@@ -627,7 +628,7 @@ public class JDBCExportClient extends ExportClientBase {
             Connection conn = m_conn;
 
             if (pstmt == null || conn == null) {
-                rateLimitedLogWarn(m_logger, "Unable to commit, connection closed, probably after block timeout");
+                m_logger.rateLimitedWarn(LOG_RATE_LIMIT, "Unable to commit, connection closed, probably after block timeout");
                 throw new RestartBlockException(true);
             }
 
@@ -645,11 +646,11 @@ public class JDBCExportClient extends ExportClientBase {
                 throw new RestartBlockException(true);
             } catch (SQLException e) {
                 if (!warnClosed(conn)) {
-                    rateLimitedLogError(m_logger, "commit() failed for row %s", Throwables.getStackTraceAsString(e));
+                    m_logger.rateLimitedError(LOG_RATE_LIMIT, "commit() failed for row %s", Throwables.getStackTraceAsString(e));
                 }
                 throw new RestartBlockException(true);
             } catch (Exception e) {
-                rateLimitedLogError(m_logger, "Exception while executing and committing batch %s", Throwables.getStackTraceAsString(e));
+                m_logger.rateLimitedError(LOG_RATE_LIMIT, "Exception while executing and committing batch %s", Throwables.getStackTraceAsString(e));
                 throw new RestartBlockException(true);
             } finally{
                 m_dataRows.clear();
@@ -661,7 +662,7 @@ public class JDBCExportClient extends ExportClientBase {
         private boolean warnClosed(Connection conn) {
             try {
                 if (conn.isClosed()) {
-                    rateLimitedLogWarn(m_logger, "Unable to commit, connection closed, probably after block timeout");
+                    m_logger.rateLimitedWarn(LOG_RATE_LIMIT, "Unable to commit, connection closed, probably after block timeout");
                     return true;
                 }
             } catch (Exception e) {
@@ -685,7 +686,7 @@ public class JDBCExportClient extends ExportClientBase {
                 }
             }
             Throwable rootCause = ExceptionUtils.getRootCause(e);
-            rateLimitedLogError(m_logger, "commit() failed in table %s for row(s):\n %s",
+            m_logger.rateLimitedError(LOG_RATE_LIMIT, "commit() failed in table %s for row(s):\n %s",
                     builder.toString(),
                     Throwables.getStackTraceAsString(rootCause != null ? rootCause : e));
         }
@@ -732,7 +733,7 @@ public class JDBCExportClient extends ExportClientBase {
 
             if (rowinst.getOperation() == ROW_OPERATION.UPDATE_NEW && !m_supportsUpsert) {
                 if (!m_warnedOfUnsupportedOperation) {
-                    rateLimitedLogWarn(m_logger, "JDBC export skipped past a row with an operation type " +
+                    m_logger.rateLimitedWarn(LOG_RATE_LIMIT, "JDBC export skipped past a row with an operation type " +
                             rowinst.getOperation().name() + " from stream " + rowinst.tableName);
                 }
                 return true;
@@ -856,11 +857,11 @@ public class JDBCExportClient extends ExportClientBase {
                         m_pstmt.executeUpdate();
                     }
                 } catch (SQLException e) {
-                    rateLimitedLogError(m_logger, "executeUpdate() failed in processRow() for table %s %s", (rowinst == null ? "Unknown" : rowinst.tableName), Throwables.getStackTraceAsString(e));
+                    m_logger.rateLimitedError(LOG_RATE_LIMIT, "executeUpdate() failed in processRow() for table %s %s", (rowinst == null ? "Unknown" : rowinst.tableName), Throwables.getStackTraceAsString(e));
                     restartBlock = true;
                 }
             } catch (Exception e) {
-                rateLimitedLogError(m_logger, "processRow() failed in table %s, %s", (rowinst == null ? "Unknown" : rowinst.tableName), Throwables.getStackTraceAsString(e));
+                m_logger.rateLimitedError(LOG_RATE_LIMIT, "processRow() failed in table %s, %s", (rowinst == null ? "Unknown" : rowinst.tableName), Throwables.getStackTraceAsString(e));
                 restartBlock = true;
             }
 

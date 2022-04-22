@@ -110,6 +110,7 @@ import static org.voltdb.utils.HDFSUtils.OctetStreamContentTypeHeader;
 
 public class HttpExportClient extends ExportClientBase {
     private static final VoltLogger m_logger = new VoltLogger("ExportClient");
+    private static final int LOG_RATE_LIMIT = 10; // seconds
 
     private static final Pattern uriRE = Pattern.compile("\\A([\\w-]+)://");
     private static final Pattern modtimeRE = Pattern.compile("\"modificationTime\":(?<modtime>\\d+)");
@@ -484,7 +485,7 @@ public class HttpExportClient extends ExportClientBase {
             status = checkResponse(m_client.execute(dirMaker,null).get());
             if (status != DecodedStatus.OK) return status;
         } catch (InterruptedException|ExecutionException|URISyntaxException e) {
-            rateLimitedLogError(m_logger, "error creating parent directory for %s %s", path, Throwables.getStackTraceAsString(e));
+            m_logger.rateLimitedError(LOG_RATE_LIMIT, "error creating parent directory for %s %s", path, Throwables.getStackTraceAsString(e));
             throw new PathHandlingException("error creating parent directory for " + path, e);
         }
 
@@ -502,7 +503,7 @@ public class HttpExportClient extends ExportClientBase {
             }
             status = checkResponse(m_client.execute(fileMaker,null).get());
         } catch (InterruptedException | ExecutionException | URISyntaxException e) {
-            rateLimitedLogError(m_logger, "error creating file %s %s", path, Throwables.getStackTraceAsString(e));
+            m_logger.rateLimitedError(LOG_RATE_LIMIT, "error creating file %s %s", path, Throwables.getStackTraceAsString(e));
             throw new PathHandlingException("error creating file " + path,e);
         }
         if (status == DecodedStatus.FILE_ALREADY_EXISTS) {
@@ -543,7 +544,7 @@ public class HttpExportClient extends ExportClientBase {
                     }
                     status = checkResponse(m_client.execute(fileMaker,null).get());
                 } catch (InterruptedException | ExecutionException | IOException e) {
-                    rateLimitedLogError(m_logger, "error creating file %s %s", path, Throwables.getStackTraceAsString(e));
+                    m_logger.rateLimitedError(LOG_RATE_LIMIT, "error creating file %s %s", path, Throwables.getStackTraceAsString(e));
                     throw new PathHandlingException("error creating file " + path,e);
                 }
             }
@@ -563,7 +564,7 @@ public class HttpExportClient extends ExportClientBase {
     private void adjustReplicationFactorForURI(HttpPut httpPut) throws URISyntaxException{
         String queryString = httpPut.getURI().getQuery();
         if(!StringUtils.isEmpty(queryString) && queryString.contains("op=CREATE") && (queryString.contains("replication=") || !StringUtils.isEmpty(m_blockReplication))){
-            rateLimitedLogWarn(m_logger, "Set block replication factor in the target system.");
+            m_logger.rateLimitedWarn(LOG_RATE_LIMIT, "Set block replication factor in the target system.");
             if(!StringUtils.isEmpty(m_blockReplication) && !queryString.contains("replication=")){
                 StringBuilder builder = new StringBuilder(128);
                 builder.append(queryString).append("&replication=").append(m_blockReplication);
@@ -612,7 +613,7 @@ public class HttpExportClient extends ExportClientBase {
 
             if (checkResponse(fut.get()) != DecodedStatus.OK) return false;
         } catch (InterruptedException|ExecutionException|URISyntaxException e) {
-            rateLimitedLogError(m_logger, "error creating parent directory %s", Throwables.getStackTraceAsString(e));
+            m_logger.rateLimitedError(LOG_RATE_LIMIT, "error creating parent directory %s", Throwables.getStackTraceAsString(e));
             throw new PathHandlingException("error creating parent directory",e);
         }
         try {
@@ -627,7 +628,7 @@ public class HttpExportClient extends ExportClientBase {
             if (checkResponse(fut.get()) != DecodedStatus.OK) return false;
 
         } catch (InterruptedException | ExecutionException | URISyntaxException e) {
-            rateLimitedLogError(m_logger, "error writing avro schema file %s", Throwables.getStackTraceAsString(e));
+            m_logger.rateLimitedError(LOG_RATE_LIMIT, "error writing avro schema file %s", Throwables.getStackTraceAsString(e));
             throw new PathHandlingException("error writing avro schema file",e);
         }
         return true;
@@ -690,10 +691,10 @@ public class HttpExportClient extends ExportClientBase {
             hmac.init(key);
         } catch (NoSuchAlgorithmException e) {
             // should never happen
-            rateLimitedLogError(m_logger, "Fail to get HMAC instance %s", Throwables.getStackTraceAsString(e));
+            m_logger.rateLimitedError(LOG_RATE_LIMIT, "Fail to get HMAC instance %s", Throwables.getStackTraceAsString(e));
             return null;
         } catch (InvalidKeyException e) {
-            rateLimitedLogError(m_logger, "Fail to sign the message %s", Throwables.getStackTraceAsString(e));
+            m_logger.rateLimitedError(LOG_RATE_LIMIT, "Fail to sign the message %s", Throwables.getStackTraceAsString(e));
             return null;
         }
 
@@ -718,7 +719,7 @@ public class HttpExportClient extends ExportClientBase {
                 try {
                     uri = HDFSUtils.opAdder(uri, "APPEND");
                 } catch (IllegalArgumentException e) {
-                    rateLimitedLogError(m_logger, "Invalid URI %s %s", uri.toString(), Throwables.getStackTraceAsString(e));
+                    m_logger.rateLimitedError(LOG_RATE_LIMIT, "Invalid URI %s %s", uri.toString(), Throwables.getStackTraceAsString(e));
                     return null;
                 }
             }
@@ -753,7 +754,7 @@ public class HttpExportClient extends ExportClientBase {
                 try {
                     uri = HDFSUtils.opAdder(uri, "APPEND");
                 } catch (IllegalArgumentException e) {
-                    rateLimitedLogError(m_logger, "Invalid URI %s %s", uri.toString(), Throwables.getStackTraceAsString(e));
+                    m_logger.rateLimitedError(LOG_RATE_LIMIT, "Invalid URI %s %s", uri.toString(), Throwables.getStackTraceAsString(e));
                     return null;
                 }
             }
@@ -941,7 +942,7 @@ public class HttpExportClient extends ExportClientBase {
                 try {
                     connect();
                 } catch (IOReactorException e) {
-                    rateLimitedLogError(m_logger, "Unable to create HTTP client %s", Throwables.getStackTraceAsString(e));
+                    m_logger.rateLimitedError(LOG_RATE_LIMIT, "Unable to create HTTP client %s", Throwables.getStackTraceAsString(e));
                     throw new RestartBlockException(true);
                 }
             }
@@ -955,7 +956,7 @@ public class HttpExportClient extends ExportClientBase {
                 writeAvroSchema(row);
                 m_startedProcessingRows = true;
             } catch (PathHandlingException e) {
-                    rateLimitedLogError(m_logger, "Unable to prime http export client to %s %s", exportPath, Throwables.getStackTraceAsString(e));
+                    m_logger.rateLimitedError(LOG_RATE_LIMIT, "Unable to prime http export client to %s %s", exportPath, Throwables.getStackTraceAsString(e));
                 throw new RestartBlockException(true);
             }
 
@@ -966,7 +967,7 @@ public class HttpExportClient extends ExportClientBase {
                     rqst = makeRequest(exportPath, m_nvpairDecoder.decode(row.generation, row.tableName, row.types, row.names, null, row.values));
                 } catch (RuntimeException e) {
                     // non restartable structural failure
-                    rateLimitedLogError(m_logger, "unable to build an HTTP request from an exported row %s", Throwables.getStackTraceAsString(e));
+                    m_logger.rateLimitedError(LOG_RATE_LIMIT, "unable to build an HTTP request from an exported row %s", Throwables.getStackTraceAsString(e));
                     return false;
                 }
             } else if (m_batchMode) {
@@ -975,7 +976,7 @@ public class HttpExportClient extends ExportClientBase {
                     return true;
                 } catch (RuntimeException e) {
                     // non restartable structural failure
-                    rateLimitedLogError(m_logger, "unable to acummulate export records in batch mode %s", Throwables.getStackTraceAsString(e));
+                    m_logger.rateLimitedError(LOG_RATE_LIMIT, "unable to acummulate export records in batch mode %s", Throwables.getStackTraceAsString(e));
                     return false;
                 }
             } else {
@@ -987,7 +988,7 @@ public class HttpExportClient extends ExportClientBase {
                 m_outstanding.add(m_client.execute(rqst, null));
             } catch (Exception e) {
                 // May be recoverable, retry with a backoff
-                rateLimitedLogError(m_logger, "Unable to dispatch a request to \"%s\". Reason:\n%s", rqst, Throwables.getStackTraceAsString(e));
+                m_logger.rateLimitedError(LOG_RATE_LIMIT, "Unable to dispatch a request to \"%s\". Reason:\n%s", rqst, Throwables.getStackTraceAsString(e));
                 throw new RestartBlockException(true);
             }
 
@@ -1056,18 +1057,18 @@ public class HttpExportClient extends ExportClientBase {
                     }
                     String queryString = rqst.getURI().getQuery();
                     if (queryString.contains("op=APPEND") && status.requiresReplicationAdjustment()) {
-                        rateLimitedLogWarn(m_logger, "error in appending data to block. System is trying to set block replication size to 1. Please verify the configurations in the target export file system.");
+                        m_logger.rateLimitedWarn(LOG_RATE_LIMIT, "error in appending data to block. System is trying to set block replication size to 1. Please verify the configurations in the target export file system.");
                         try{
                             HttpPut replicationPutter = HDFSUtils.createSetReplicationRequest(exportPath, 1);
                             HttpResponse response = m_client.execute(replicationPutter, null).get();
                             status = checkResponse(response);
                             if (status != DecodedStatus.OK){
-                                 rateLimitedLogError(m_logger, "error set replication size 1 for %s", exportPath);
+                                 m_logger.rateLimitedError(LOG_RATE_LIMIT, "error set replication size 1 for %s", exportPath);
                             }else{
                                  throw new RestartBlockException("requeing after replication reset",true);
                             }
                         }catch (InterruptedException | ExecutionException  e) {
-                            rateLimitedLogError(m_logger, "error set replication size %s %s", exportPath, Throwables.getStackTraceAsString(e));
+                            m_logger.rateLimitedError(LOG_RATE_LIMIT, "error set replication size %s %s", exportPath, Throwables.getStackTraceAsString(e));
                             throw e;
                         }
                     }
@@ -1075,9 +1076,8 @@ public class HttpExportClient extends ExportClientBase {
                         throw new RestartBlockException("requeing on failed response check: " + status, true);
                     }
                 } catch (Exception e) {
-                    // May be recoverable, retry with a backoff
-                    rateLimitedLogError(
-                            m_logger,
+                    // May be recoverable, retry with a backoff'
+                    m_logger.rateLimitedError(LOG_RATE_LIMIT,
                             "Unable to complete request to \"%s\". Reason:\n%s",
                             rqst, Throwables.getStackTraceAsString(e)
                             );
@@ -1091,7 +1091,7 @@ public class HttpExportClient extends ExportClientBase {
                         throw new RestartBlockException("requeing on failed response check", true);
                     }
                 } catch (Exception e) {
-                    rateLimitedLogError(m_logger, "Failure reported in request response. Reason:\n%s", Throwables.getStackTraceAsString(e));
+                    m_logger.rateLimitedError(LOG_RATE_LIMIT, "Failure reported in request response. Reason:\n%s", Throwables.getStackTraceAsString(e));
                     throw new RestartBlockException(true);
                 }
             }
@@ -1167,13 +1167,13 @@ public class HttpExportClient extends ExportClientBase {
             if (m_isHdfs) {
                 try {
                     String msg = EntityUtils.toString(response.getEntity(), Charsets.UTF_8);
-                    rateLimitedLogError(m_logger, "Notification request failed with %s.\nNotification response: %s", response.getStatusLine().toString(), msg);
+                    m_logger.rateLimitedError(LOG_RATE_LIMIT, "Notification request failed with %s.\nNotification response: %s", response.getStatusLine().toString(), msg);
                 } catch (IOException e) {
                     m_logger.error("could not trace response body",e);
                 }
             }
             else {
-                rateLimitedLogError(m_logger, "Notification request failed with %s", response.getStatusLine().toString());
+                m_logger.rateLimitedError(LOG_RATE_LIMIT, "Notification request failed with %s", response.getStatusLine().toString());
             }
         }
         return status;

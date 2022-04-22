@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -57,7 +57,6 @@ import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.network.VoltPort;
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.RateLimitedLogger;
 
 import com.google_voltpatches.common.collect.ImmutableSet;
 
@@ -398,16 +397,11 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
     }
 
     private long m_lastHeartbeatTime = System.nanoTime();
+
     private void processMessage(VoltMessage message) throws Exception {
         if (!m_hsIds.contains(message.m_sourceHSId)) {
             String messageFormat = "Dropping message %s because it is not from a known up site";
-            RateLimitedLogger.tryLogForMessage(m_lastHeartbeatTime,
-                                               10000,
-                                               TimeUnit.MILLISECONDS,
-                                               m_agreementLog,
-                                               Level.INFO,
-                                               messageFormat,
-                                               message);
+            m_agreementLog.rateLimitedInfo(10, messageFormat, message);
             return;
         }
         if (message instanceof TransactionInfoBaseMessage) {

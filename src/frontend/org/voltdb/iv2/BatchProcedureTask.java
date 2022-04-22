@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2020 VoltDB Inc.
+ * Copyright (C) 2020-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -30,7 +30,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
-import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.ExpectedProcedureException;
 import org.voltdb.PrivateVoltTableFactory;
@@ -114,8 +113,7 @@ abstract class BatchProcedureTask {
                 String error = "Procedure " + procName + " is not present in the catalog. "
                         + "This can happen if a catalog update removing the procedure occurred "
                         + "after the procedure was submitted " + "but before the procedure was executed.";
-                RateLimitedLogger.tryLogForMessage(System.currentTimeMillis(), 60, TimeUnit.SECONDS, hostLog,
-                        Level.WARN, error + " %s", "This log message is rate limited to once every 60 seconds.");
+                hostLog.rateLimitedWarn(60, error + " %s", "This log message is rate limited to once every 60 seconds.");
                 response.setResults(
                         new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE, new VoltTable[] {}, error));
                 return response;
@@ -179,9 +177,7 @@ abstract class BatchProcedureTask {
                             }
 
                             if (totalResult == -2) {
-                                RateLimitedLogger.tryLogForMessage(System.currentTimeMillis(), 60, TimeUnit.SECONDS,
-                                        hostLog, Level.WARN,
-                                        "During batch processing, procedure %s is returning results that are ignored. "
+                                hostLog.rateLimitedWarn(60, "During batch processing, procedure %s is returning results that are ignored. "
                                                 + "Batch procedures should either be void or return tables which can be interpreted as a scalar long. "
                                                 + "See org.voltdb.VoltTable.asScalarLong()",
                                         procName);
