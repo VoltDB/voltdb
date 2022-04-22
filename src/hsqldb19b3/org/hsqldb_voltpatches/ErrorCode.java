@@ -1,4 +1,5 @@
 /* Copyright (c) 2001-2009, The HSQL Development Group
+ * Copyright (c) 2010-2022, VoltDB Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -529,6 +530,7 @@ public interface ErrorCode {
     int X_42547 = 5547;                                   // merge when matched already used
     int X_42548 = 5548;                                   // merge when not matched altready used
     int X_42549 = 5549;                                   // LIMIT, OFFSET or FETCH altready used
+    int X_42550 = 5550;                                   // INSERT not permitted for view
 
     //
     int X_42551 = 5551;                                   // too many identifier parts
@@ -659,6 +661,6 @@ public interface ErrorCode {
 
     // CLI-specific condition - 200x
     int X_HY093 = 6800;                                   // CLI-specific condition: invalid datalink value
-    
+
     int X_UDAF01 = 6900;                                  // user-defined aggregate functions are not allowed to have "distinct" keyword
 }

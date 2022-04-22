@@ -1,4 +1,5 @@
 /* Copyright (c) 2001-2009, The HSQL Development Group
+ * Copyright (c) 2010-2022, VoltDB Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -74,7 +75,7 @@ public class ParserDML extends ParserDQL {
         int position = getPosition();
 
         if (!table.isInsertable()) {
-            throw Error.error(ErrorCode.X_42545);
+            throw Error.error(ErrorCode.X_42550);
         }
 
         Table baseTable = table.getBaseTable();
