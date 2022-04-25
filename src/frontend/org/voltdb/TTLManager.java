@@ -284,7 +284,7 @@ public class TTLManager extends StatsSource{
                                 table.getTypeName(), column.getName(), index.getTypeName(), table.getTypeName(), column.getName());
                         return false;
                     }
-                 return true;
+                    return true;
                 }
             }
         }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2021 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -159,8 +159,12 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                     try {
                         newCatalogJar = addDDLToCatalog(context.catalog, oldJar, adhocDDLStmts, sqlNodes,
                             drRole == DrRoleType.XDCR, user);
-                    } catch (IOException | VoltCompilerException | PlanningErrorException e) {
-                        retval.errorMsg = e.getMessage();
+                    } catch (IOException | VoltCompilerException | PlanningErrorException ex) {
+                        retval.errorMsg = ex.getMessage();
+                        return retval;
+                    } catch (CatalogException ex) {
+                        compilerLog.warn("Catalog error when applying DDL statements: " + ex.getMessage());
+                        retval.errorMsg = ex.getMessage();
                         return retval;
                     } catch (Exception ex) {
                         compilerLog.error("Unexpected " + ex.getClass().getName() +

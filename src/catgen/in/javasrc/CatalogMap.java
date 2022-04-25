@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -167,6 +167,8 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
             }
 
             return x;
+        } catch (RuntimeException ex) {
+            throw ex;
         } catch (Exception ex) {
             throw new RuntimeException(ex);
         }
@@ -195,6 +197,8 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
             for (Entry<String, T> e : m_items.entrySet()) {
                 e.getValue().m_relativeIndex = index++;
             }
+        } catch (RuntimeException ex) {
+            throw ex;
         } catch (Exception ex) {
             throw new RuntimeException(ex);
         }
