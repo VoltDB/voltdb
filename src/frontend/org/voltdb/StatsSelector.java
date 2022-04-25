@@ -86,7 +86,10 @@ public enum StatsSelector {
     STOP_CHECK,
     PAUSE_CHECK,
     XDCR_READINESS,
-    CLOCKSKEW;
+    // End of 'operator' support
+
+    CLOCKSKEW,
+    COMPOUNDPROC;
 
     /** Whether or not this stat supports interval collection */
     private final boolean m_supportsInterval;

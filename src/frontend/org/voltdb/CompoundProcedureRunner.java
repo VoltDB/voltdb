@@ -62,17 +62,22 @@ public class CompoundProcedureRunner extends ProcedureRunnerNT {
     // Link to our procedure service
     private final NTProcedureService ntProcService;
 
+    // Stats specific to compound procedure execution
+    private final CompoundProcCallStats compoundProcStats;
+
     CompoundProcedureRunner(long id, AuthUser user, Connection ccxn, boolean isAdmin, long ciHandle,
                             long clientHandle, int timeout, VoltCompoundProcedure procedure,
                             String procName, Method procMethod, Class<?>[] paramTypes,
                             ExecutorService responseService, NTProcedureService procService,
-                            Mailbox mailbox,  ProcedureStatsCollector statsCollector) {
+                            Mailbox mailbox,  ProcedureStatsCollector statsCollector,
+                            CompoundProcCallStats compoundStats) {
         super(id, user, ccxn, isAdmin, ciHandle,
               clientHandle, timeout, procedure,
               procName, procMethod, paramTypes,
               responseService, procService,
               mailbox, statsCollector);
         this.ntProcService = procService;
+        this.compoundProcStats = compoundStats;
         procedure.setRunner(this);
     }
 
@@ -248,6 +253,7 @@ public class CompoundProcedureRunner extends ProcedureRunnerNT {
         }
         if (count != 0) {
             debug("issuing %d proc calls", count);
+            trackCalledProcedures(procs);
             final CompletableFuture<?>[] fut = new CompletableFuture<?>[count];
             for (int i=0; i<count; i++) {
                 Proc p = procs.get(i);
@@ -256,6 +262,12 @@ public class CompoundProcedureRunner extends ProcedureRunnerNT {
             CompletableFuture.allOf(fut).whenComplete((nil, th) -> batchComplete(fut));
         }
         return count;
+    }
+
+    private void trackCalledProcedures(List<Proc> procs) {
+        for (Proc p : procs) {
+            compoundProcStats.trackCallTo(p.name);
+        }
     }
 
     private void batchComplete(CompletableFuture<?>[] fut) {

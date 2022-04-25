@@ -174,6 +174,7 @@ public class NTProcedureService {
         final Method m_procMethod;
         final Class<?>[] m_paramTypes;
         final ProcedureStatsCollector m_statsCollector;
+        final CompoundProcCallStats m_compoundCallStats;
         final boolean m_isCompound;
 
         ProcedureRunnerNTGenerator(Class<? extends VoltNonTransactionalProcedure> clz) {
@@ -197,12 +198,21 @@ public class NTProcedureService {
             m_procMethod = procMethod;
             m_paramTypes = paramTypes;
 
-            // make a stats source for this proc
+            // make any stats sources for this proc
+            StatsAgent sa = VoltDB.instance().getStatsAgent();
             m_statsCollector = new ProcedureStatsCollector(
                     CoreUtils.getSiteIdFromHSId(m_mailbox.getHSId()), 0, m_procClz.getName(),
                     false, null, false);
-            VoltDB.instance().getStatsAgent().registerStatsSource(
-                    StatsSelector.PROCEDURE, CoreUtils.getSiteIdFromHSId(m_mailbox.getHSId()), m_statsCollector);
+            sa.registerStatsSource(StatsSelector.PROCEDURE,
+                    CoreUtils.getSiteIdFromHSId(m_mailbox.getHSId()), m_statsCollector);
+
+            if (m_isCompound) {
+                m_compoundCallStats = new CompoundProcCallStats(m_procedureName);
+                sa.registerStatsSource(StatsSelector.COMPOUNDPROC, 0, m_compoundCallStats);
+            }
+            else {
+                m_compoundCallStats = null;
+            }
         }
 
         /**
@@ -221,7 +231,7 @@ public class NTProcedureService {
                     id, user, ccxn, isAdmin, ciHandle, clientHandle, timeout,
                     (VoltCompoundProcedure)procedure, m_procedureName,
                     m_procMethod, m_paramTypes, m_compoundProcExecutorService,
-                    NTProcedureService.this, m_mailbox, m_statsCollector);
+                    NTProcedureService.this, m_mailbox, m_statsCollector, m_compoundCallStats);
             } else {
                 return new ProcedureRunnerNT(
                     id, user, ccxn, isAdmin, ciHandle, clientHandle, timeout,
