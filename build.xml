@@ -330,6 +330,7 @@
     <include name='org/voltdb/exportclient/kafka/TestKafkaExportClient.class' />
     <include name='org/voltdb/groovy/TestGroovyDeployment.class' />
     <include name='org/voltdb/importer/TestChannelDistributer.class' />
+    <include name='org/voltdb/logging/Test*.class' />
     <include name='org/voltdb/np/Test*.class' />
     <include name='org/voltdb/task/Test*.class' />
     <include name='org/voltdb/e3/topics/**/Test*.class' />

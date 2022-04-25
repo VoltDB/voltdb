@@ -107,6 +107,7 @@
                   org/voltcore/logging/VoltLogger.java
                   org/voltcore/logging/VoltNullLogger.java
                   org/voltcore/logging/VoltUtilLoggingLogger.java
+                  org/voltcore/logging/LogRateLimiter.java
                   org/voltcore/network/*.java
 
                   org/voltcore/utils/CoreUtils.java

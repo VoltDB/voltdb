@@ -112,13 +112,18 @@ public class RateLimitedLogger {
     /*
      * Internal cache of loggers used by tryLogForMessage (below)
      */
-    private static final Cache<String, RateLimitedLogger> m_loggersCached =
-            CacheBuilder.newBuilder().maximumSize(1000).build();
+    private static Cache<String, RateLimitedLogger> m_loggersCached;
+    private static Object m_cacheLock = new Object();
 
     /**
      * Rate-limited logger. Logger is looked up cache by format
      * prior to expansion with parameters, which is only done
      * if the message is actually logged.
+     * <p>
+     * @deprecated
+     * VoltDB code wishing to use rate-limited logging is recommended
+     * to <b>not</b> use this method, but to instead use {@link VoltLogger#rateLimitedLog}
+     * and similar <code>VoltLogger</code> methods.
      *
      * @param now current time (as millisecs)
      * @param maxLogInterval suppress time
@@ -129,6 +134,7 @@ public class RateLimitedLogger {
      * @param parameters format arguments
      * @see #tryLogForMessage(long,long,TimeUnit,VoltLogger,Level,Throwable,String,Object...)
      */
+    @Deprecated
     public static void tryLogForMessage(long now,
             final long maxLogInterval,
             final TimeUnit maxLogIntervalUnit,
@@ -149,9 +155,10 @@ public class RateLimitedLogger {
      * changing the values on subsequent calls with the same format
      * will not be effective.
      * <p>
+     * @deprecated
      * VoltDB code wishing to use rate-limited logging is recommended
-     * to <b>not</b> call this method directly, but to instead use
-     * {@link VoltLogger#rateLimitedLog}.
+     * to <b>not</b> use this method, but to instead use {@link VoltLogger#rateLimitedLog}
+     * and similar <code>VoltLogger</code> methods.
      *
      * @param now current time (as millisecs)
      * @param maxLogInterval suppress time
@@ -162,12 +169,19 @@ public class RateLimitedLogger {
      * @param format a {@link String#format(String, Object...)} string format
      * @param parameters format arguments
      */
+    @Deprecated
     public static void tryLogForMessage(long now,
             final long maxLogInterval,
             final TimeUnit maxLogIntervalUnit,
             final VoltLogger logger,
             final Level level, Throwable cause,
             String format, Object... parameters) {
+
+        synchronized (m_cacheLock) {
+            if (m_loggersCached == null) {
+                m_loggersCached = CacheBuilder.newBuilder().maximumSize(1000).build();
+            }
+        }
 
         Callable<RateLimitedLogger> builder = new Callable<RateLimitedLogger>() {
             @Override

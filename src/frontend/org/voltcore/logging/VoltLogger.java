@@ -30,8 +30,6 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import org.voltcore.logging.VoltNullLogger.CoreNullLogger;
-import org.voltcore.utils.EstTime;
-import org.voltcore.utils.RateLimitedLogger;
 
 import com.google_voltpatches.common.base.Throwables;
 
@@ -499,9 +497,9 @@ public class VoltLogger {
      * will in fact be logged.
      */
     public void rateLimitedLog(long suppressInterval, Level level, Throwable cause, String format, Object... args) {
-        RateLimitedLogger.tryLogForMessage(EstTime.currentTimeMillis(),
-                                           suppressInterval, TimeUnit.SECONDS,
-                                           this, level, cause, format, args);
+        if (m_rateLimiter.shouldLog(format, suppressInterval * 1000)) {
+            logFmt(level, cause, format, args);
+        }
     }
 
     public void rateLimitedError(long suppressInterval, String format, Object... args) {
@@ -515,6 +513,8 @@ public class VoltLogger {
     public void rateLimitedInfo(long suppressInterval, String format, Object... args) {
         rateLimitedLog(suppressInterval, Level.INFO, null, format, args);
     }
+
+    private static final LogRateLimiter m_rateLimiter = new LogRateLimiter();
 
     /**
      * Tests for whether the "non-error" severities are enabled
