@@ -649,6 +649,90 @@ AbstractExpression* functionFactory(int functionId, const std::vector<AbstractEx
          case FUNC_VOLT_DWITHIN_POLYGON_POINT:
             ret = new GeneralFunctionExpression<FUNC_VOLT_DWITHIN_POLYGON_POINT>(arguments);
             break;
+          case FUNC_VOLT_TIME_WINDOW_YEAR_START:
+              ret = new GeneralFunctionExpression<FUNC_VOLT_TIME_WINDOW_YEAR_START>(arguments);
+              break;
+          case FUNC_VOLT_TIME_WINDOW_YEAR_END:
+              ret = new GeneralFunctionExpression<FUNC_VOLT_TIME_WINDOW_YEAR_END>(arguments);
+              break;
+          case FUNC_VOLT_TIME_WINDOW_QUARTER_START:
+              ret = new GeneralFunctionExpression<FUNC_VOLT_TIME_WINDOW_QUARTER_START>(arguments);
+              break;
+          case FUNC_VOLT_TIME_WINDOW_QUARTER_END:
+              ret = new GeneralFunctionExpression<FUNC_VOLT_TIME_WINDOW_QUARTER_END>(arguments);
+              break;
+          case FUNC_VOLT_TIME_WINDOW_MONTH_START:
+              ret = new GeneralFunctionExpression<FUNC_VOLT_TIME_WINDOW_MONTH_START>(arguments);
+              break;
+          case FUNC_VOLT_TIME_WINDOW_MONTH_END:
+              ret = new GeneralFunctionExpression<FUNC_VOLT_TIME_WINDOW_MONTH_END>(arguments);
+              break;
+          case FUNC_VOLT_TIME_WINDOW_WEEK_START:
+              ret = new GeneralFunctionExpression<FUNC_VOLT_TIME_WINDOW_WEEK_START>(arguments);
+              break;
+          case FUNC_VOLT_TIME_WINDOW_WEEK_END:
+              ret = new GeneralFunctionExpression<FUNC_VOLT_TIME_WINDOW_WEEK_END>(arguments);
+              break;
+          case FUNC_VOLT_TIME_WINDOW_DAY_START:
+              ret = new GeneralFunctionExpression<FUNC_VOLT_TIME_WINDOW_DAY_START>(arguments);
+              break;
+          case FUNC_VOLT_TIME_WINDOW_DAY_END:
+              ret = new GeneralFunctionExpression<FUNC_VOLT_TIME_WINDOW_DAY_END>(arguments);
+              break;
+          case FUNC_VOLT_TIME_WINDOW_HOUR_START:
+              ret = new GeneralFunctionExpression<FUNC_VOLT_TIME_WINDOW_HOUR_START>(arguments);
+              break;
+          case FUNC_VOLT_TIME_WINDOW_HOUR_END:
+              ret = new GeneralFunctionExpression<FUNC_VOLT_TIME_WINDOW_HOUR_END>(arguments);
+              break;
+          case FUNC_VOLT_TIME_WINDOW_MINUTE_START:
+              ret = new GeneralFunctionExpression<FUNC_VOLT_TIME_WINDOW_MINUTE_START>(arguments);
+              break;
+          case FUNC_VOLT_TIME_WINDOW_MINUTE_END:
+              ret = new GeneralFunctionExpression<FUNC_VOLT_TIME_WINDOW_MINUTE_END>(arguments);
+              break;
+          case FUNC_VOLT_TIME_WINDOW_SECOND_START:
+              ret = new GeneralFunctionExpression<FUNC_VOLT_TIME_WINDOW_SECOND_START>(arguments);
+              break;
+          case FUNC_VOLT_TIME_WINDOW_SECOND_END:
+              ret = new GeneralFunctionExpression<FUNC_VOLT_TIME_WINDOW_SECOND_END>(arguments);
+              break;
+          case FUNC_VOLT_TIME_WINDOW_MILLIS_START:
+              ret = new GeneralFunctionExpression<FUNC_VOLT_TIME_WINDOW_MILLIS_START>(arguments);
+              break;
+          case FUNC_VOLT_TIME_WINDOW_MILLIS_END:
+              ret = new GeneralFunctionExpression<FUNC_VOLT_TIME_WINDOW_MILLIS_END>(arguments);
+              break;
+          case FUNC_VOLT_DATETIME_DIFF_YEAR:
+              ret = new GeneralFunctionExpression<FUNC_VOLT_DATETIME_DIFF_YEAR>(arguments);
+              break;
+          case FUNC_VOLT_DATETIME_DIFF_QUARTER:
+              ret = new GeneralFunctionExpression<FUNC_VOLT_DATETIME_DIFF_QUARTER>(arguments);
+              break;
+          case FUNC_VOLT_DATETIME_DIFF_MONTH:
+              ret = new GeneralFunctionExpression<FUNC_VOLT_DATETIME_DIFF_MONTH>(arguments);
+              break;
+          case FUNC_VOLT_DATETIME_DIFF_WEEK:
+              ret = new GeneralFunctionExpression<FUNC_VOLT_DATETIME_DIFF_WEEK>(arguments);
+              break;
+          case FUNC_VOLT_DATETIME_DIFF_DAY:
+              ret = new GeneralFunctionExpression<FUNC_VOLT_DATETIME_DIFF_DAY>(arguments);
+              break;
+          case FUNC_VOLT_DATETIME_DIFF_HOUR:
+              ret = new GeneralFunctionExpression<FUNC_VOLT_DATETIME_DIFF_HOUR>(arguments);
+              break;
+          case FUNC_VOLT_DATETIME_DIFF_MINUTE:
+              ret = new GeneralFunctionExpression<FUNC_VOLT_DATETIME_DIFF_MINUTE>(arguments);
+              break;
+          case FUNC_VOLT_DATETIME_DIFF_SECOND:
+              ret = new GeneralFunctionExpression<FUNC_VOLT_DATETIME_DIFF_SECOND>(arguments);
+              break;
+          case FUNC_VOLT_DATETIME_DIFF_MILLIS:
+              ret = new GeneralFunctionExpression<FUNC_VOLT_DATETIME_DIFF_MILLIS>(arguments);
+              break;
+          case FUNC_VOLT_DATETIME_DIFF_MICROS:
+              ret = new GeneralFunctionExpression<FUNC_VOLT_DATETIME_DIFF_MICROS>(arguments);
+              break;
          case FUNC_VOLT_FORMAT_TIMESTAMP:
             ret = new UserDefinedFunctionExpression(functionId, arguments);
             break;

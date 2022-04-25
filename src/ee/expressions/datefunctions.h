@@ -47,6 +47,10 @@ static const int64_t PTIME_MIN_MILLISECOND_INTERVAL = -PTIME_MAX_MILLISECOND_INT
 static const int64_t PTIME_MAX_MICROSECOND_INTERVAL = PTIME_MAX_MILLISECOND_INTERVAL * 1000;
 static const int64_t PTIME_MIN_MICROSECOND_INTERVAL = -PTIME_MAX_MICROSECOND_INTERVAL;
 
+#define EMICROS (((int64_t )epoch_microseconds_from_components(EPOCH_DATE.year())))
+// Given value is mapped to start or end of the interval if value is less than EPOCH ceil and floor is flipped.
+#define START_OR_END_OFFSET_BY_INTERVAL(start, isLtEpoch, value, multiplier)        (isLtEpoch ? ((start ? std::ceil(value) : std::floor(value)) * multiplier) : ((start ? std::floor(value) : std::ceil(value)) * multiplier))
+
 static inline bool epochMicrosOutOfRange(int64_t epochMicros) {
     return (epochMicros < GREGORIAN_EPOCH || epochMicros > NYE9999);
 }
@@ -57,7 +61,7 @@ static inline void throwOutOfRangeTimestampInput(const std::string& func) {
     oss << "Input to SQL function " << func << " is outside of the supported range (years 1583 to 9999, inclusive).";
 
     throw voltdb::SQLException(voltdb::SQLException::data_exception_numeric_value_out_of_range,
-                               oss.str().c_str());
+                               oss.str());
 }
 
 static inline void throwOutOfRangeTimestampOutput(const std::string& func) {
@@ -66,7 +70,7 @@ static inline void throwOutOfRangeTimestampOutput(const std::string& func) {
     oss << "SQL function " << func << " would produce a value outside of the supported range (years 1583 to 9999, inclusive).";
 
     throw voltdb::SQLException(voltdb::SQLException::data_exception_numeric_value_out_of_range,
-                               oss.str().c_str());
+                               oss.str());
 }
 
 
@@ -454,7 +458,7 @@ template<> inline NValue NValue::callUnary<FUNC_TO_TIMESTAMP_MILLISECOND>() cons
         // This would overflow the valid range of the 64-bit int storage, so decline to
         // produce a result from this undefined behavior
         std::string message = "Input to TO_TIMESTAMP would overflow TIMESTAMP data type";
-        throw SQLException(SQLException::data_exception_numeric_value_out_of_range, message.c_str());
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range, message);
     }
 
     int64_t epoch_micros = millis * 1000;
@@ -1081,5 +1085,848 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_IS_VALID_TIMESTAMP>() const
     return getBooleanValue(timestampIsValid(timestamp_number));
 }
 
+static inline int64_t getYearByIntervalWindow(bool start, int64_t epochMicrosIn, int64_t interval) {
+    boost::posix_time::time_duration tsf;
+    boost::gregorian::date dsf;
+
+    try {
+        micros_to_date_and_time ( epochMicrosIn, dsf, tsf);
+
+        if (dsf.year() < EPOCH_DATE.year()) {
+            double x = (EPOCH_DATE.year()-dsf.year()) / (double )interval;
+            double y = START_OR_END_OFFSET_BY_INTERVAL(start, true, x, interval);
+            boost::gregorian::date d = EPOCH_DATE - boost::gregorian::years ( y);
+            return epoch_microseconds_from_components( d.year());
+        } else {
+            double x = (dsf.year()-EPOCH_DATE.year()) / (double )interval;
+            double y = START_OR_END_OFFSET_BY_INTERVAL(start, false, x, interval);
+            boost::gregorian::date d = EPOCH_DATE + boost::gregorian::years ( y);
+            return epoch_microseconds_from_components(d.year());
+        }
+    } catch (std::out_of_range &e) {
+        throw voltdb::SQLException(voltdb::SQLException::data_exception_numeric_value_out_of_range, "invalid interval or interval is too large for TIME_WINDOW function");
+    }
+}
+
+template<> inline NValue NValue::call<FUNC_VOLT_TIME_WINDOW_YEAR_START>(const std::vector<NValue>& arguments) {
+    vassert(arguments.size() == 2);
+
+    const NValue& number = arguments[0];
+    if (number.isNull()) {
+        return getNullValue(ValueType::tTIMESTAMP);
+    }
+    int64_t interval = number.castAsBigIntAndGetValue();
+    if (interval <= 0) {
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range, "invalid interval or interval is too large for TIME_WINDOW function");
+    }
+    const NValue& date = arguments[1];
+    if (date.isNull()) {
+        return getNullValue(ValueType::tTIMESTAMP);
+    }
+
+    int64_t epochMicrosIn = date.getTimestamp();
+    if (epochMicrosOutOfRange(epochMicrosIn)) {
+        throwOutOfRangeTimestampInput("TIME_WINDOW");
+    }
+    return getTimestampValue(getYearByIntervalWindow(true, epochMicrosIn, interval));
+}
+
+template<> inline NValue NValue::call<FUNC_VOLT_TIME_WINDOW_YEAR_END>(const std::vector<NValue>& arguments) {
+    vassert(arguments.size() == 2);
+
+    const NValue& number = arguments[0];
+    if (number.isNull()) {
+        return getNullValue(ValueType::tTIMESTAMP);
+    }
+    int64_t interval = number.castAsBigIntAndGetValue();
+    if (interval <= 0) {
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range, "invalid interval or interval is too large for TIME_WINDOW function");
+    }
+    const NValue& date = arguments[1];
+    if (date.isNull()) {
+        return getNullValue(ValueType::tTIMESTAMP);
+    }
+
+    int64_t epochMicrosIn = date.getTimestamp();
+    if (epochMicrosOutOfRange(epochMicrosIn)) {
+        throwOutOfRangeTimestampInput("TIME_WINDOW");
+    }
+    return getTimestampValue(getYearByIntervalWindow(false, epochMicrosIn, interval));
+}
+
+static inline int64_t getQuarterByIntervalWindow(bool start, int64_t epochMicrosIn, int64_t interval) {
+    boost::posix_time::time_duration tsf;
+    boost::gregorian::date dsf;
+
+    try {
+        micros_to_date_and_time ( epochMicrosIn, dsf, tsf);
+        if (dsf.year() < EPOCH_DATE.year()) {
+            double x = ( ((EPOCH_DATE.year() - dsf.year()) * 12) - (dsf.month()) ) / (double )(interval * 3.0);
+            double y = START_OR_END_OFFSET_BY_INTERVAL(start, true, x, (interval * 3.0));
+            boost::gregorian::date d(1970, boost::date_time::Jan, 1);
+            d = d - boost::gregorian::months ( y);
+            return epoch_microseconds_from_components( d.year(), d.month());
+        } else {
+            double x = ( ((dsf.year() - EPOCH_DATE.year()) * 12) + (dsf.month()) ) / (double (interval * 3.0));
+            double y = START_OR_END_OFFSET_BY_INTERVAL(start, false, x, (interval * 3.0));
+            boost::gregorian::date d(1970, boost::date_time::Jan, 1);
+            d = d + boost::gregorian::months(y);
+            return epoch_microseconds_from_components( d.year(), d.month());
+        }
+    } catch (std::out_of_range &e) {
+        throw voltdb::SQLException(voltdb::SQLException::data_exception_numeric_value_out_of_range, "invalid interval or interval is too large for TIME_WINDOW function");
+    }
+}
+
+template<> inline NValue NValue::call<FUNC_VOLT_TIME_WINDOW_QUARTER_START>(const std::vector<NValue>& arguments) {
+    vassert(arguments.size() == 2);
+
+    const NValue& number = arguments[0];
+    if (number.isNull()) {
+        return getNullValue(ValueType::tTIMESTAMP);
+    }
+    int64_t interval = number.castAsBigIntAndGetValue();
+    if (interval <= 0) {
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range, "invalid interval or interval is too large for TIME_WINDOW function");
+    }
+    const NValue& date = arguments[1];
+    if (date.isNull()) {
+        return getNullValue(ValueType::tTIMESTAMP);
+    }
+
+    int64_t epochMicrosIn = date.getTimestamp();
+    if (epochMicrosOutOfRange(epochMicrosIn)) {
+        throwOutOfRangeTimestampInput("TIME_WINDOW");
+    }
+    return getTimestampValue(getQuarterByIntervalWindow(true, epochMicrosIn, interval));
+}
+
+template<> inline NValue NValue::call<FUNC_VOLT_TIME_WINDOW_QUARTER_END>(const std::vector<NValue>& arguments) {
+    vassert(arguments.size() == 2);
+
+    const NValue& number = arguments[0];
+    if (number.isNull()) {
+        return getNullValue(ValueType::tTIMESTAMP);
+    }
+    int64_t interval = number.castAsBigIntAndGetValue();
+    if (interval <= 0) {
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range, "invalid interval or interval is too large for TIME_WINDOW function");
+    }
+    const NValue& date = arguments[1];
+    if (date.isNull()) {
+        return getNullValue(ValueType::tTIMESTAMP);
+    }
+
+    int64_t epochMicrosIn = date.getTimestamp();
+    if (epochMicrosOutOfRange(epochMicrosIn)) {
+        throwOutOfRangeTimestampInput("TIME_WINDOW");
+    }
+    return getTimestampValue(getQuarterByIntervalWindow(false, epochMicrosIn, interval));
+}
+
+static inline int64_t getMonthByIntervalWindow(bool start, int64_t epochMicrosIn, int64_t interval) {
+    boost::posix_time::time_duration tsf;
+    boost::gregorian::date dsf;
+
+    try {
+        micros_to_date_and_time ( epochMicrosIn, dsf, tsf);
+        if (dsf.year() < EPOCH_DATE.year()) {
+            double x = ( ((EPOCH_DATE.year() - dsf.year()) * 12) - (dsf.month()) ) / (double )interval;
+            double y = START_OR_END_OFFSET_BY_INTERVAL(start, true, x, interval);
+            boost::gregorian::date d = EPOCH_DATE - boost::gregorian::months ( y);
+            return epoch_microseconds_from_components( d.year(), d.month());
+        } else {
+            double x = ( ((dsf.year() - EPOCH_DATE.year()) * 12) + (dsf.month()) )/ (double )interval;
+            double y = START_OR_END_OFFSET_BY_INTERVAL(start, false, x, interval);
+            boost::gregorian::date d = EPOCH_DATE + boost::gregorian::months(y);
+            return epoch_microseconds_from_components( d.year(), d.month());
+        }
+    } catch (std::out_of_range &e) {
+        throw voltdb::SQLException(voltdb::SQLException::data_exception_numeric_value_out_of_range, "invalid interval or interval is too large for TIME_WINDOW function");
+    }
+}
+
+template<> inline NValue NValue::call<FUNC_VOLT_TIME_WINDOW_MONTH_START>(const std::vector<NValue>& arguments) {
+    vassert(arguments.size() == 2);
+
+    const NValue& number = arguments[0];
+    if (number.isNull()) {
+        return getNullValue(ValueType::tTIMESTAMP);
+    }
+    int64_t interval = number.castAsBigIntAndGetValue();
+    if (interval <= 0) {
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range, "invalid interval or interval is too large for TIME_WINDOW function");
+    }
+    const NValue& date = arguments[1];
+    if (date.isNull()) {
+        return getNullValue(ValueType::tTIMESTAMP);
+    }
+
+    int64_t epochMicrosIn = date.getTimestamp();
+    if (epochMicrosOutOfRange(epochMicrosIn)) {
+        throwOutOfRangeTimestampInput("TIME_WINDOW");
+    }
+
+    return getTimestampValue(getMonthByIntervalWindow(true, epochMicrosIn, interval));
+}
+
+template<> inline NValue NValue::call<FUNC_VOLT_TIME_WINDOW_MONTH_END>(const std::vector<NValue>& arguments) {
+    vassert(arguments.size() == 2);
+
+    const NValue& number = arguments[0];
+    if (number.isNull()) {
+        return getNullValue(ValueType::tTIMESTAMP);
+    }
+    int64_t interval = number.castAsBigIntAndGetValue();
+    if (interval <= 0) {
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range, "invalid interval or interval is too large for TIME_WINDOW function");
+    }
+    const NValue& date = arguments[1];
+    if (date.isNull()) {
+        return getNullValue(ValueType::tTIMESTAMP);
+    }
+
+    int64_t epochMicrosIn = date.getTimestamp();
+    if (epochMicrosOutOfRange(epochMicrosIn)) {
+        throwOutOfRangeTimestampInput("TIME_WINDOW");
+    }
+
+    return getTimestampValue(getMonthByIntervalWindow(false, epochMicrosIn, interval));
+}
+
+static  int64_t inline getWeekByIntervalWindow(bool start, int64_t epochMicrosIn, int64_t interval) {
+    boost::posix_time::time_duration tsf;
+    boost::gregorian::date dsf;
+
+    try {
+        // We do week calculations based on 12/29/1969 is a Monday just befoe EPOCH
+        micros_to_date_and_time ( epochMicrosIn, dsf, tsf);
+        if (dsf.year() < EPOCH_DATE.year()) {
+            int64_t days = (((EPOCH_DATE - dsf).days())) + 3;
+            double x = ((days) / (double )(interval * 7));
+            double y = START_OR_END_OFFSET_BY_INTERVAL(start, true, x, (interval * 7));
+            boost::gregorian::date d(1969, boost::date_time::Dec, 29);
+            d = d - boost::gregorian::days(y);
+            return epoch_microseconds_from_components(d.year(), d.month(), d.day());
+        } else {
+            int64_t days = (((dsf - EPOCH_DATE).days())) + 3;
+            double x = ((days) / (double )(interval * 7));
+            double y = START_OR_END_OFFSET_BY_INTERVAL(start, false, x, (interval * 7));
+            boost::gregorian::date d(1969, boost::date_time::Dec, 29);
+            d = d + boost::gregorian::days(y);
+            return epoch_microseconds_from_components(d.year(), d.month(), d.day());
+        }
+    } catch (std::out_of_range &e) {
+        throw voltdb::SQLException(voltdb::SQLException::data_exception_numeric_value_out_of_range, "invalid interval or interval is too large for TIME_WINDOW function");
+    }
+
+}
+
+template<> inline NValue NValue::call<FUNC_VOLT_TIME_WINDOW_WEEK_START>(const std::vector<NValue>& arguments) {
+    vassert(arguments.size() == 2);
+
+    const NValue& number = arguments[0];
+    if (number.isNull()) {
+        return getNullValue(ValueType::tTIMESTAMP);
+    }
+    int64_t interval = number.castAsBigIntAndGetValue();
+    if (interval <= 0) {
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range, "invalid interval or interval is too large for TIME_WINDOW function");
+    }
+    const NValue& date = arguments[1];
+    if (date.isNull()) {
+        return getNullValue(ValueType::tTIMESTAMP);
+    }
+
+    int64_t epochMicrosIn = date.getTimestamp();
+    if (epochMicrosOutOfRange(epochMicrosIn)) {
+        throwOutOfRangeTimestampInput("TIME_WINDOW");
+    }
+    return getTimestampValue(getWeekByIntervalWindow(true, epochMicrosIn, interval));
+}
+
+template<> inline NValue NValue::call<FUNC_VOLT_TIME_WINDOW_WEEK_END>(const std::vector<NValue>& arguments) {
+    vassert(arguments.size() == 2);
+
+    const NValue& number = arguments[0];
+    if (number.isNull()) {
+        return getNullValue(ValueType::tTIMESTAMP);
+    }
+    int64_t interval = number.castAsBigIntAndGetValue();
+    if (interval <= 0) {
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range, "invalid interval or interval is too large for TIME_WINDOW function");
+    }
+    const NValue& date = arguments[1];
+    if (date.isNull()) {
+        return getNullValue(ValueType::tTIMESTAMP);
+    }
+
+    int64_t epochMicrosIn = date.getTimestamp();
+    if (epochMicrosOutOfRange(epochMicrosIn)) {
+        throwOutOfRangeTimestampInput("TIME_WINDOW");
+    }
+    return getTimestampValue(getWeekByIntervalWindow(false, epochMicrosIn, interval));
+}
+
+static inline int64_t getDayByIntervalWindow(bool start, int64_t epochMicrosIn, int64_t interval) {
+    boost::posix_time::time_duration tsf;
+    boost::gregorian::date dsf;
+
+    try {
+        micros_to_date_and_time(epochMicrosIn, dsf, tsf);
+        if (dsf.year() < EPOCH_DATE.year()) {
+            int64_t days = (((EPOCH_DATE - dsf).days()));
+            double x = ((days) / (double) interval);
+            double y = START_OR_END_OFFSET_BY_INTERVAL(start, true, x, interval);
+            boost::gregorian::date d = EPOCH_DATE - boost::gregorian::days(y);
+            return epoch_microseconds_from_components(d.year(), d.month(), d.day());
+        } else {
+            int64_t days = (((dsf - EPOCH_DATE).days()));
+            double x = ((days) / (double) interval);
+            double y = START_OR_END_OFFSET_BY_INTERVAL(start, false, x, interval);
+            boost::gregorian::date d = EPOCH_DATE + boost::gregorian::days(y);
+            return epoch_microseconds_from_components(d.year(), d.month(), d.day());
+        }
+    } catch (std::out_of_range &e) {
+        throw voltdb::SQLException(voltdb::SQLException::data_exception_numeric_value_out_of_range, "invalid interval or interval is too large for TIME_WINDOW function");
+    }
+}
+
+template<> inline NValue NValue::call<FUNC_VOLT_TIME_WINDOW_DAY_START>(const std::vector<NValue>& arguments) {
+    vassert(arguments.size() == 2);
+
+    const NValue& number = arguments[0];
+    if (number.isNull()) {
+        return getNullValue(ValueType::tTIMESTAMP);
+    }
+    int64_t interval = number.castAsBigIntAndGetValue();
+    if (interval <= 0) {
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range, "invalid interval or interval is too large for TIME_WINDOW function");
+    }
+    const NValue& date = arguments[1];
+    if (date.isNull()) {
+        return getNullValue(ValueType::tTIMESTAMP);
+    }
+
+    int64_t epochMicrosIn = date.getTimestamp();
+    if (epochMicrosOutOfRange(epochMicrosIn)) {
+        throwOutOfRangeTimestampInput("TIME_WINDOW");
+    }
+    return getTimestampValue(getDayByIntervalWindow(true, epochMicrosIn, interval));
+}
+
+template<> inline NValue NValue::call<FUNC_VOLT_TIME_WINDOW_DAY_END>(const std::vector<NValue>& arguments) {
+    vassert(arguments.size() == 2);
+
+    const NValue& number = arguments[0];
+    if (number.isNull()) {
+        return getNullValue(ValueType::tTIMESTAMP);
+    }
+    int64_t interval = number.castAsBigIntAndGetValue();
+    if (interval <= 0 || interval > PTIME_MAX_DAY_INTERVAL) {
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range, "invalid interval or interval is too large for TIME_WINDOW function");
+    }
+    const NValue& date = arguments[1];
+    if (date.isNull()) {
+        return getNullValue(ValueType::tTIMESTAMP);
+    }
+
+    int64_t epochMicrosIn = date.getTimestamp();
+    if (epochMicrosOutOfRange(epochMicrosIn)) {
+        throwOutOfRangeTimestampInput("TIME_WINDOW");
+    }
+    return getTimestampValue(getDayByIntervalWindow(false, epochMicrosIn, interval));
+}
+
+static inline int64_t getHourByIntervalWindow(bool start, int64_t epochMicrosIn, int64_t interval) {
+    boost::posix_time::time_duration tsf;
+    boost::gregorian::date dsf;
+
+    micros_to_date_and_time ( epochMicrosIn, dsf, tsf);
+    if (dsf.year() < EPOCH_DATE.year()) {
+        int64_t hours = (((EPOCH_DATE - dsf).days()) * 24) - tsf.hours();
+        double x = ((hours) / (double )interval);
+        double y = START_OR_END_OFFSET_BY_INTERVAL(start, true, x, interval);
+        return EMICROS - (int64_t )y * 60L * 60L * 1000L * 1000L;
+    } else {
+        int64_t hours = (((dsf - EPOCH_DATE).days()) * 24) + tsf.hours();
+        double x = ((hours) / (double )interval);
+        double y = START_OR_END_OFFSET_BY_INTERVAL(start, false, x, interval);
+        return (int64_t )y * 60L * 60L * 1000L * 1000L;
+    }
+}
+
+template<> inline NValue NValue::call<FUNC_VOLT_TIME_WINDOW_HOUR_START>(const std::vector<NValue>& arguments) {
+    vassert(arguments.size() == 2);
+
+    const NValue& number = arguments[0];
+    if (number.isNull()) {
+        return getNullValue(ValueType::tTIMESTAMP);
+    }
+    int64_t interval = number.castAsBigIntAndGetValue();
+    if (interval < 0) {
+        return getNullValue(ValueType::tTIMESTAMP);
+    }
+    if (interval <= 0 || interval > PTIME_MAX_HOUR_INTERVAL) {
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range, "invalid interval or interval is too large for TIME_WINDOW function");
+    }
+    const NValue& date = arguments[1];
+    if (date.isNull()) {
+        return getNullValue(ValueType::tTIMESTAMP);
+    }
+
+    int64_t epochMicrosIn = date.getTimestamp();
+    if (epochMicrosOutOfRange(epochMicrosIn)) {
+        throwOutOfRangeTimestampInput("TIME_WINDOW");
+    }
+
+    return getTimestampValue(getHourByIntervalWindow(true, epochMicrosIn, interval));
+}
+
+template<> inline NValue NValue::call<FUNC_VOLT_TIME_WINDOW_HOUR_END>(const std::vector<NValue>& arguments) {
+    vassert(arguments.size() == 2);
+
+    const NValue& number = arguments[0];
+    if (number.isNull()) {
+        return getNullValue(ValueType::tTIMESTAMP);
+    }
+    int64_t interval = number.castAsBigIntAndGetValue();
+    if (interval <= 0 || interval > PTIME_MAX_HOUR_INTERVAL) {
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range, "invalid interval or interval is too large for TIME_WINDOW function");
+    }
+    const NValue& date = arguments[1];
+    if (date.isNull()) {
+        return getNullValue(ValueType::tTIMESTAMP);
+    }
+
+    int64_t epochMicrosIn = date.getTimestamp();
+    if (epochMicrosOutOfRange(epochMicrosIn)) {
+        throwOutOfRangeTimestampInput("TIME_WINDOW");
+    }
+
+    return getTimestampValue(getHourByIntervalWindow(false, epochMicrosIn, interval));
+}
+
+static inline int64_t getMinuteByIntervalWindow(bool start, int64_t epochMicrosIn, int64_t interval) {
+    boost::posix_time::time_duration tsf;
+    boost::gregorian::date dsf;
+
+    micros_to_date_and_time ( epochMicrosIn, dsf, tsf);
+    if (dsf.year() < EPOCH_DATE.year()) {
+        int64_t minutes = ( (((EPOCH_DATE - dsf).days()) * 24) - tsf.hours() ) * 60L - tsf.minutes();
+        double x = ((minutes) / (double )interval);
+        double y = START_OR_END_OFFSET_BY_INTERVAL(start, true, x, interval);
+        return EMICROS - (int64_t )y * 60L * 1000L * 1000L;
+    } else {
+        int64_t minutes = ( (((dsf - EPOCH_DATE).days()) * 24) + tsf.hours() ) * 60L + tsf.minutes();
+        double x = ((minutes) / (double )interval);
+        double y = START_OR_END_OFFSET_BY_INTERVAL(start, false, x, interval);
+        return (int64_t )y * 60L * 1000L * 1000L;
+    }
+}
+
+template<> inline NValue NValue::call<FUNC_VOLT_TIME_WINDOW_MINUTE_START>(const std::vector<NValue>& arguments) {
+    vassert(arguments.size() == 2);
+
+    const NValue& number = arguments[0];
+    if (number.isNull()) {
+        return getNullValue(ValueType::tTIMESTAMP);
+    }
+    int64_t interval = number.castAsBigIntAndGetValue();
+    if (interval <= 0) {
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range, "invalid interval or interval is too large for TIME_WINDOW function");
+    }
+    const NValue& date = arguments[1];
+    if (date.isNull()) {
+        return getNullValue(ValueType::tTIMESTAMP);
+    }
+
+    int64_t epochMicrosIn = date.getTimestamp();
+    if (epochMicrosOutOfRange(epochMicrosIn)) {
+        throwOutOfRangeTimestampInput("TIME_WINDOW");
+    }
+
+    return getTimestampValue(getMinuteByIntervalWindow(true, epochMicrosIn, interval));
+}
+
+template<> inline NValue NValue::call<FUNC_VOLT_TIME_WINDOW_MINUTE_END>(const std::vector<NValue>& arguments) {
+    vassert(arguments.size() == 2);
+
+    const NValue& number = arguments[0];
+    if (number.isNull()) {
+        return getNullValue(ValueType::tTIMESTAMP);
+    }
+    int64_t interval = number.castAsBigIntAndGetValue();
+    if (interval <= 0) {
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range, "invalid interval or interval is too large for TIME_WINDOW function");
+    }
+    const NValue& date = arguments[1];
+    if (date.isNull()) {
+        return getNullValue(ValueType::tTIMESTAMP);
+    }
+
+    int64_t epochMicrosIn = date.getTimestamp();
+    if (epochMicrosOutOfRange(epochMicrosIn)) {
+        throwOutOfRangeTimestampInput("TIME_WINDOW");
+    }
+
+    return getTimestampValue(getMinuteByIntervalWindow(false, epochMicrosIn, interval));
+}
+
+static inline int64_t getSecondByIntervalWindow(bool start, int64_t epochMicrosIn, int64_t interval) {
+    boost::posix_time::time_duration tsf;
+    boost::gregorian::date dsf;
+
+    micros_to_date_and_time ( epochMicrosIn, dsf, tsf);
+    if (dsf.year() < EPOCH_DATE.year()) {
+        int64_t seconds = ( ( (((EPOCH_DATE - dsf).days()) * 24) - tsf.hours() ) * 60L - tsf.minutes()) * 60L - tsf.seconds();
+        double x = ((seconds) / (double )interval);
+        double y = START_OR_END_OFFSET_BY_INTERVAL(start, true, x, interval);
+        return EMICROS - (int64_t )y * 1000L * 1000L;
+    } else {
+        int64_t minutes = ( ( (((dsf - EPOCH_DATE).days()) * 24) + tsf.hours() ) * 60L + tsf.minutes()) * 60L + tsf.seconds();
+        double x = ((minutes) / (double )interval);
+        double y = START_OR_END_OFFSET_BY_INTERVAL(start, false, x, interval);
+        return (int64_t )y * 1000L * 1000L;
+    }
+}
+
+template<> inline NValue NValue::call<FUNC_VOLT_TIME_WINDOW_SECOND_START>(const std::vector<NValue>& arguments) {
+    vassert(arguments.size() == 2);
+
+    const NValue& number = arguments[0];
+    if (number.isNull()) {
+        return getNullValue(ValueType::tTIMESTAMP);
+    }
+    int64_t interval = number.castAsBigIntAndGetValue();
+    if (interval <= 0) {
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range, "invalid interval or interval is too large for TIME_WINDOW function");
+    }
+    const NValue& date = arguments[1];
+    if (date.isNull()) {
+        return getNullValue(ValueType::tTIMESTAMP);
+    }
+
+    int64_t epochMicrosIn = date.getTimestamp();
+    if (epochMicrosOutOfRange(epochMicrosIn)) {
+        throwOutOfRangeTimestampInput("TIME_WINDOW");
+    }
+
+    return getTimestampValue(getSecondByIntervalWindow(true, epochMicrosIn, interval));
+}
+
+template<> inline NValue NValue::call<FUNC_VOLT_TIME_WINDOW_SECOND_END>(const std::vector<NValue>& arguments) {
+    vassert(arguments.size() == 2);
+
+    const NValue& number = arguments[0];
+    if (number.isNull()) {
+        return getNullValue(ValueType::tTIMESTAMP);
+    }
+    int64_t interval = number.castAsBigIntAndGetValue();
+    if (interval <= 0) {
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range, "invalid interval or interval is too large for TIME_WINDOW function");
+    }
+    const NValue& date = arguments[1];
+    if (date.isNull()) {
+        return getNullValue(ValueType::tTIMESTAMP);
+    }
+
+    int64_t epochMicrosIn = date.getTimestamp();
+    if (epochMicrosOutOfRange(epochMicrosIn)) {
+        throwOutOfRangeTimestampInput("TIME_WINDOW");
+    }
+
+    return getTimestampValue(getSecondByIntervalWindow(false, epochMicrosIn, interval));
+}
+
+static inline int64_t getMilliByIntervalWindow(bool start, int64_t epochMicrosIn, int64_t interval) {
+    boost::posix_time::time_duration tsf;
+    boost::gregorian::date dsf;
+
+    micros_to_date_and_time ( epochMicrosIn, dsf, tsf);
+    if (dsf.year() < EPOCH_DATE.year()) {
+        double x = ((EMICROS - epochMicrosIn)/1000L) / (double )interval;
+        double y = START_OR_END_OFFSET_BY_INTERVAL(start, true, x, interval);
+        return EMICROS - ((int64_t )y * 1000L);
+    } else {
+        double x = (((epochMicrosIn-EMICROS)/1000L) / (double )interval);
+        double y = START_OR_END_OFFSET_BY_INTERVAL(start, false, x, interval);
+        return (int64_t )y * 1000L;
+    }
+}
+
+template<> inline NValue NValue::call<FUNC_VOLT_TIME_WINDOW_MILLIS_START>(const std::vector<NValue>& arguments) {
+    vassert(arguments.size() == 2);
+
+    const NValue& number = arguments[0];
+    if (number.isNull()) {
+        return getNullValue(ValueType::tTIMESTAMP);
+    }
+    int64_t interval = number.castAsBigIntAndGetValue();
+    if (interval <= 0) {
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range, "invalid interval or interval is too large for TIME_WINDOW function");
+    }
+    const NValue& date = arguments[1];
+    if (date.isNull()) {
+        return getNullValue(ValueType::tTIMESTAMP);
+    }
+
+    int64_t epochMicrosIn = date.getTimestamp();
+    if (epochMicrosOutOfRange(epochMicrosIn)) {
+        throwOutOfRangeTimestampInput("TIME_WINDOW");
+    }
+    return getTimestampValue(getMilliByIntervalWindow(true, epochMicrosIn, interval));
+}
+
+template<> inline NValue NValue::call<FUNC_VOLT_TIME_WINDOW_MILLIS_END>(const std::vector<NValue>& arguments) {
+    vassert(arguments.size() == 2);
+
+    const NValue& number = arguments[0];
+    if (number.isNull()) {
+        return getNullValue(ValueType::tTIMESTAMP);
+    }
+    int64_t interval = number.castAsBigIntAndGetValue();
+    if (interval <= 0) {
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range, "invalid interval or interval is too large for TIME_WINDOW function");
+    }
+    const NValue& date = arguments[1];
+    if (date.isNull()) {
+        return getNullValue(ValueType::tTIMESTAMP);
+    }
+
+    int64_t epochMicrosIn = date.getTimestamp();
+    if (epochMicrosOutOfRange(epochMicrosIn)) {
+        throwOutOfRangeTimestampInput("TIME_WINDOW");
+    }
+    return getTimestampValue(getMilliByIntervalWindow(false, epochMicrosIn, interval));
+}
+
+template<> inline NValue NValue::call<FUNC_VOLT_DATETIME_DIFF_YEAR>(const std::vector<NValue>& arguments) {
+    vassert(arguments.size() == 2);
+
+    const NValue& first = arguments[0];
+    if (first.isNull()) {
+        return getNullValue(ValueType::tBIGINT);
+    }
+    const NValue& second = arguments[1];
+    if (second.isNull()) {
+        return getNullValue(ValueType::tBIGINT);
+    }
+
+    boost::posix_time::time_duration tsf;
+    boost::gregorian::date dsf;
+    micros_to_date_and_time(first.getTimestamp(), dsf, tsf);
+
+    boost::posix_time::time_duration tss;
+    boost::gregorian::date dss;
+    micros_to_date_and_time(second.getTimestamp(), dss, tss);
+
+    return getBigIntValue(dss.year() - dsf.year());
+}
+
+template<> inline NValue NValue::call<FUNC_VOLT_DATETIME_DIFF_QUARTER>(const std::vector<NValue>& arguments) {
+    vassert(arguments.size() == 2);
+
+    const NValue& first = arguments[0];
+    if (first.isNull()) {
+        return getNullValue(ValueType::tBIGINT);
+    }
+    const NValue& second = arguments[1];
+    if (second.isNull()) {
+        return getNullValue(ValueType::tBIGINT);
+    }
+    boost::posix_time::time_duration tsf;
+    boost::gregorian::date dsf;
+    micros_to_date_and_time(first.getTimestamp(), dsf, tsf);
+
+    boost::posix_time::time_duration tss;
+    boost::gregorian::date dss;
+    micros_to_date_and_time(second.getTimestamp(), dss, tss);
+
+    int64_t ret_val = (((dss.year() - dsf.year()) * 12) + (dss.month()-dsf.month()))/3;
+    return getBigIntValue(ret_val);
+}
+
+
+template<> inline NValue NValue::call<FUNC_VOLT_DATETIME_DIFF_MONTH>(const std::vector<NValue>& arguments) {
+    vassert(arguments.size() == 2);
+
+    const NValue& first = arguments[0];
+    if (first.isNull()) {
+        return getNullValue(ValueType::tBIGINT);
+    }
+    const NValue& second = arguments[1];
+    if (second.isNull()) {
+        return getNullValue(ValueType::tBIGINT);
+    }
+    boost::posix_time::time_duration tsf;
+    boost::gregorian::date dsf;
+    micros_to_date_and_time(first.getTimestamp(), dsf, tsf);
+
+    boost::posix_time::time_duration tss;
+    boost::gregorian::date dss;
+    micros_to_date_and_time(second.getTimestamp(), dss, tss);
+
+    int64_t ret_val = ((dss.year() - dsf.year()) * 12) + (dss.month()-dsf.month());
+    return getBigIntValue(ret_val);
+}
+
+template<> inline NValue NValue::call<FUNC_VOLT_DATETIME_DIFF_WEEK>(const std::vector<NValue>& arguments) {
+    vassert(arguments.size() == 2);
+
+    const NValue& first = arguments[0];
+    if (first.isNull()) {
+        return getNullValue(ValueType::tBIGINT);
+    }
+    const NValue& second = arguments[1];
+    if (second.isNull()) {
+        return getNullValue(ValueType::tBIGINT);
+    }
+    boost::posix_time::time_duration tsf;
+    boost::gregorian::date dsf;
+    micros_to_date_and_time(first.getTimestamp(), dsf, tsf);
+
+    boost::posix_time::time_duration tss;
+    boost::gregorian::date dss;
+    micros_to_date_and_time(second.getTimestamp(), dss, tss);
+
+    int64_t ret_val = (dss - dsf).days()/7;
+    return getBigIntValue(ret_val);
+}
+
+template<> inline NValue NValue::call<FUNC_VOLT_DATETIME_DIFF_DAY>(const std::vector<NValue>& arguments) {
+    vassert(arguments.size() == 2);
+
+    const NValue& first = arguments[0];
+    if (first.isNull()) {
+        return getNullValue(ValueType::tBIGINT);
+    }
+    boost::posix_time::time_duration tsf;
+    boost::gregorian::date dsf;
+    micros_to_date_and_time(first.getTimestamp(), dsf, tsf);
+
+    const NValue& second = arguments[1];
+    if (second.isNull()) {
+        return getNullValue(ValueType::tBIGINT);
+    }
+    boost::posix_time::time_duration tss;
+    boost::gregorian::date dss;
+    micros_to_date_and_time(second.getTimestamp(), dss, tss);
+
+    int64_t ret_val = (dss-dsf).days();
+    return getBigIntValue(ret_val);
+}
+
+template<> inline NValue NValue::call<FUNC_VOLT_DATETIME_DIFF_HOUR>(const std::vector<NValue>& arguments) {
+    vassert(arguments.size() == 2);
+
+    const NValue& first = arguments[0];
+    if (first.isNull()) {
+        return getNullValue(ValueType::tBIGINT);
+    }
+    boost::posix_time::time_duration tsf;
+    boost::gregorian::date dsf;
+    micros_to_date_and_time(first.getTimestamp(), dsf, tsf);
+
+    const NValue& second = arguments[1];
+    if (second.isNull()) {
+        return getNullValue(ValueType::tBIGINT);
+    }
+    boost::posix_time::time_duration tss;
+    boost::gregorian::date dss;
+    micros_to_date_and_time(second.getTimestamp(), dss, tss);
+
+    int64_t days = (dss-dsf).days();
+    int64_t hours = (tss - tsf).hours();
+
+    int64_t ret_val = (days * 24) + hours;
+    return getBigIntValue(ret_val);
+}
+
+template<> inline NValue NValue::call<FUNC_VOLT_DATETIME_DIFF_MINUTE>(const std::vector<NValue>& arguments) {
+    vassert(arguments.size() == 2);
+
+    const NValue& first = arguments[0];
+    if (first.isNull()) {
+        return getNullValue(ValueType::tBIGINT);
+    }
+    boost::posix_time::time_duration tsf;
+    boost::gregorian::date dsf;
+    micros_to_date_and_time(first.getTimestamp(), dsf, tsf);
+
+    const NValue& second = arguments[1];
+    if (second.isNull()) {
+        return getNullValue(ValueType::tBIGINT);
+    }
+    boost::posix_time::time_duration tss;
+    boost::gregorian::date dss;
+    micros_to_date_and_time(second.getTimestamp(), dss, tss);
+
+    int64_t days = (dss-dsf).days();
+    int64_t hours = (tss - tsf).hours();
+    int64_t minutes = (tss - tsf).minutes();
+
+    int64_t ret_val = 0;
+    ret_val = ((days * 24) + hours) * 60 + minutes;
+    return getBigIntValue(ret_val);
+}
+
+template<> inline NValue NValue::call<FUNC_VOLT_DATETIME_DIFF_SECOND>(const std::vector<NValue>& arguments) {
+    vassert(arguments.size() == 2);
+
+    const NValue& first = arguments[0];
+    if (first.isNull()) {
+        return getNullValue(ValueType::tBIGINT);
+    }
+    boost::posix_time::time_duration tsf;
+    boost::gregorian::date dsf;
+    micros_to_date_and_time(first.getTimestamp(), dsf, tsf);
+
+    const NValue& second = arguments[1];
+    if (second.isNull()) {
+        return getNullValue(ValueType::tBIGINT);
+    }
+    boost::posix_time::time_duration tss;
+    boost::gregorian::date dss;
+    micros_to_date_and_time(second.getTimestamp(), dss, tss);
+
+    int64_t days = (dss-dsf).days();
+    int64_t hours = (tss - tsf).hours();
+    int64_t minutes = (tss - tsf).minutes();
+    int64_t seconds = (tss - tsf).seconds();
+
+    int64_t ret_val = 0;
+    ret_val = ( ((days * 24) + hours) * 60 + minutes) * 60 + seconds;
+    return getBigIntValue(ret_val);
+}
+
+template<> inline NValue NValue::call<FUNC_VOLT_DATETIME_DIFF_MILLIS>(const std::vector<NValue>& arguments) {
+    vassert(arguments.size() == 2);
+
+    const NValue& first = arguments[0];
+    if (first.isNull()) {
+        return getNullValue(ValueType::tBIGINT);
+    }
+
+    const NValue& second = arguments[1];
+    if (second.isNull()) {
+        return getNullValue(ValueType::tBIGINT);
+    }
+    return getBigIntValue((second.getTimestamp() - first.getTimestamp())/1000);
+}
+
+template<> inline NValue NValue::call<FUNC_VOLT_DATETIME_DIFF_MICROS>(const std::vector<NValue>& arguments) {
+    vassert(arguments.size() == 2);
+
+    const NValue& first = arguments[0];
+    if (first.isNull()) {
+        return getNullValue(ValueType::tBIGINT);
+    }
+    const NValue& second = arguments[1];
+    if (second.isNull()) {
+        return getNullValue(ValueType::tBIGINT);
+    }
+    return getBigIntValue((second.getTimestamp() - first.getTimestamp()));
+}
 
 }

@@ -118,7 +118,7 @@ public class ExpressionTranslator {
             final String funName = operator.getName();
             final int funId = getSqlFunId(funName);
             assert funId > 0 : String.format("Unrecognized function %s", funName);
-            expr.setAttributes(funName, null, funId);
+            expr.setAttributes(funName, null, null, funId);
             expr.setArgs(call.getOperandList().stream().flatMap(node -> {
                 if (node instanceof SqlBasicCall) {
                     return Stream.of(translate((SqlBasicCall) node, t));

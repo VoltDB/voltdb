@@ -551,7 +551,7 @@ public class TestExpressionUtil extends TestCase {
 
        // C) a function of a column, ( functionName(T1.A) )
         FunctionExpression exprC = new FunctionExpression();
-        exprC.setAttributes("functionName", "yesFunctionName", 42);
+        exprC.setAttributes("functionName", "yesFunctionName", "optionalArg", 42);
         arguments = new ArrayList<AbstractExpression>();
         arguments.add(exprA);
         exprC.setArgs(arguments);
@@ -561,7 +561,7 @@ public class TestExpressionUtil extends TestCase {
 
         // E) a function of a column and constants, ( anotherFunctionName( T1.A, 42, 44 ) )
         FunctionExpression exprE = new FunctionExpression();
-        exprE.setAttributes("anotherFunctionName", "yesAnotherWhyNot", 44); // not 42, not that it much matters
+        exprE.setAttributes("anotherFunctionName", "yesAnotherWhyNot", "optionalArgs", 44); // not 42, not that it much matters
         arguments = new ArrayList<AbstractExpression>();
         arguments.add(exprA);
         arguments.add(constant);
@@ -775,7 +775,7 @@ public class TestExpressionUtil extends TestCase {
 
         // C) wrong function of a column
         FunctionExpression neitherFunction = new FunctionExpression();
-        neitherFunction.setAttributes("notTheFunctionName", "noNotTheFunctionName", 86); // 86 is neither 42 nor 44.
+        neitherFunction.setAttributes("notTheFunctionName", "noNotTheFunctionName", "noOptionalArg", 86); // 86 is neither 42 nor 44.
         arguments = new ArrayList<AbstractExpression>();
         arguments.add(exprA);
         neitherFunction.setArgs(arguments);

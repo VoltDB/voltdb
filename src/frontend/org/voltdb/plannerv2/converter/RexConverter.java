@@ -300,7 +300,7 @@ public class RexConverter {
             case OTHER:
                 if ("||".equals(call.op.getName())) {
                     // CONCAT
-                    ae = RexConverterHelper.createFunctionExpression(call.getType(), "concat", aeOperands, null);
+                    ae = RexConverterHelper.createFunctionExpression(call.getType(), "concat", aeOperands, null, null);
                     RexConverter.setType(ae, call.getType());
                 } else {
                     throw new CalcitePlanningException("Unsupported Calcite expression type? " +
@@ -320,7 +320,7 @@ public class RexConverter {
                     call.op.getName().toLowerCase(),
                     functionId,
                     aeOperands,
-                    null);
+                    null, null);
                 RexConverter.setType(ae, call.getType());
                 break;
             default:

@@ -252,7 +252,7 @@ public final class ExpressionUtil {
                 case "function": {
                     final FunctionExpression expr = new FunctionExpression();
                     expr.setAttributes(elm.getStringAttribute("name", ""),
-                            elm.getStringAttribute("argument", null),
+                            elm.getStringAttribute("argument", null), elm.getStringAttribute("optionalArgument", null),
                             elm.getIntAttribute("id", 0));
                     expr.setArgs(elm.children.stream().map(elem -> from(db, elem, typeHint)).collect(Collectors.toList()));
                     expr.setValueType(VoltType.typeFromString(elm.getStringAttribute("valuetype", "")));

@@ -130,7 +130,7 @@ public class DDLCompiler {
     private final MaterializedViewProcessor m_mvProcessor;
     private static final AbstractExpression NOT_MIGRATING =
             new OperatorExpression(ExpressionType.OPERATOR_NOT,
-                    new FunctionExpression("migrating", null,   // MIGRATING() function
+                    new FunctionExpression("migrating", null, null,   // MIGRATING() function
                             FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_MIGRATING),
                     null);
 

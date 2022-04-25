@@ -213,6 +213,39 @@ public class FunctionForVoltDB extends FunctionSQL {
         static final int FUNC_VOLT_FORMAT_TIMESTAMP             = 21025;    // Convert a timestamp to a String in a given timezone.
         public static final int FUNC_VOLT_MIGRATING             = 21026;    // Check if the row is migrating.
 
+        static final int FUNC_VOLT_DATETIME_DIFF                = 21027;
+        static final int FUNC_VOLT_DATETIME_DIFF_YEAR           = 21028;
+        static final int FUNC_VOLT_DATETIME_DIFF_QUARTER        = 21029;
+        static final int FUNC_VOLT_DATETIME_DIFF_MONTH          = 21030;
+        static final int FUNC_VOLT_DATETIME_DIFF_WEEK           = 21031;
+        static final int FUNC_VOLT_DATETIME_DIFF_DAY            = 21032;
+        static final int FUNC_VOLT_DATETIME_DIFF_HOUR           = 21033;
+        static final int FUNC_VOLT_DATETIME_DIFF_MINUTE         = 21034;
+        static final int FUNC_VOLT_DATETIME_DIFF_SECOND         = 21035;
+        static final int FUNC_VOLT_DATETIME_DIFF_MILLIS         = 21036;
+        static final int FUNC_VOLT_DATETIME_DIFF_MICROS         = 21037;
+
+        static final int FUNC_VOLT_TIME_WINDOW                       = 21038;
+        static final int FUNC_VOLT_TIME_WINDOW_YEAR_START            = 21039;
+        static final int FUNC_VOLT_TIME_WINDOW_QUARTER_START         = 21040;
+        static final int FUNC_VOLT_TIME_WINDOW_MONTH_START           = 21041;
+        static final int FUNC_VOLT_TIME_WINDOW_WEEK_START            = 21042;
+        static final int FUNC_VOLT_TIME_WINDOW_DAY_START             = 21043;
+        static final int FUNC_VOLT_TIME_WINDOW_HOUR_START            = 21044;
+        static final int FUNC_VOLT_TIME_WINDOW_MINUTE_START          = 21045;
+        static final int FUNC_VOLT_TIME_WINDOW_SECOND_START          = 21046;
+        static final int FUNC_VOLT_TIME_WINDOW_MILLIS_START          = 21047;
+
+        static final int FUNC_VOLT_TIME_WINDOW_YEAR_END            = 21048;
+        static final int FUNC_VOLT_TIME_WINDOW_QUARTER_END         = 21049;
+        static final int FUNC_VOLT_TIME_WINDOW_MONTH_END           = 21050;
+        static final int FUNC_VOLT_TIME_WINDOW_WEEK_END            = 21051;
+        static final int FUNC_VOLT_TIME_WINDOW_DAY_END             = 21052;
+        static final int FUNC_VOLT_TIME_WINDOW_HOUR_END            = 21053;
+        static final int FUNC_VOLT_TIME_WINDOW_MINUTE_END          = 21054;
+        static final int FUNC_VOLT_TIME_WINDOW_SECOND_END          = 21055;
+        static final int FUNC_VOLT_TIME_WINDOW_MILLIS_END          = 21056;
+
         /*
          * All VoltDB user-defined functions must have IDs in this range.
          */
@@ -446,6 +479,30 @@ public class FunctionForVoltDB extends FunctionSQL {
                     new Type[] {},
                     emptyParamList,
                     noParamList),
+            /**
+             * time_window has alternate params which allows us to not specify optional param.
+            */
+            new FunctionDescriptor("time_window", Type.SQL_TIMESTAMP, FUNC_VOLT_TIME_WINDOW, -1,
+                    new Type[] { Type.SQL_VARCHAR, Type.SQL_INTEGER, Type.SQL_TIMESTAMP, Type.SQL_VARCHAR },
+                    new short[] {  Tokens.OPENBRACKET,
+                            Tokens.X_KEYSET, 10, Tokens.YEAR, Tokens.QUARTER, Tokens.MONTH, Tokens.WEEK, Tokens.DAY, Tokens.HOUR, Tokens.MINUTE, Tokens.SECOND,
+                            Tokens.MILLIS, Tokens.MILLISECOND, Tokens.COMMA,
+                            Tokens.QUESTION, Tokens.COMMA,
+                            Tokens.QUESTION, Tokens.COMMA,
+                            Tokens.X_KEYSET, 2, Tokens.START, Tokens.END, Tokens.CLOSEBRACKET },
+                    new short[] {  Tokens.OPENBRACKET,
+                            Tokens.X_KEYSET, 10, Tokens.YEAR, Tokens.QUARTER, Tokens.MONTH, Tokens.WEEK, Tokens.DAY, Tokens.HOUR, Tokens.MINUTE, Tokens.SECOND,
+                            Tokens.MILLIS, Tokens.MILLISECOND, Tokens.COMMA,
+                            Tokens.QUESTION, Tokens.COMMA,
+                            Tokens.QUESTION, Tokens.CLOSEBRACKET }
+                    ),
+            new FunctionDescriptor("datediff", Type.SQL_BIGINT, FUNC_VOLT_DATETIME_DIFF, -1,
+                    new Type[] { Type.SQL_VARCHAR, Type.SQL_TIMESTAMP, Type.SQL_TIMESTAMP },
+                    new short[] {  Tokens.OPENBRACKET,
+                            Tokens.X_KEYSET, 12, Tokens.YEAR, Tokens.QUARTER, Tokens.MONTH, Tokens.WEEK, Tokens.DAY, Tokens.HOUR, Tokens.MINUTE, Tokens.SECOND,
+                            Tokens.MILLIS, Tokens.MILLISECOND, Tokens.MICROS, Tokens.MICROSECOND, Tokens.COMMA,
+                            Tokens.QUESTION, Tokens.COMMA,
+                            Tokens.QUESTION, Tokens.CLOSEBRACKET }),
         };
 
         /**

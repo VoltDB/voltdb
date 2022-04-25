@@ -159,6 +159,10 @@ namespace voltdb {
    static const int SQL_HOUR             = 126;
    static const int SQL_MINUTE           = 167;
    static const int SQL_SECOND           = 248;
+   static const int SQL_MILLIS           = 573;
+   static const int SQL_MILLISECOND      = 1002;
+   static const int SQL_MICROS           = 1000;
+   static const int SQL_MICROSECOND      = 1001;
    static const int SQL_DAY_OF_WEEK      = 560;
    static const int SQL_DAY_OF_MONTH     = 610;
    static const int SQL_DAY_OF_YEAR      = 611;
@@ -294,10 +298,45 @@ namespace voltdb {
    static const int FUNC_VOLT_MAKE_VALID_POLYGON          = 21024;     // Make a polygon valid if necessary.
    static const int FUNC_VOLT_FORMAT_TIMESTAMP            = 21025;     // Convert a timestamp to a String in a given timezone.
 
-   // From Tokens.java.
+   static const int FUNC_VOLT_DATETIME_DIFF               = 21027;
+   static const int FUNC_VOLT_DATETIME_DIFF_YEAR          = 21028;
+   static const int FUNC_VOLT_DATETIME_DIFF_QUARTER       = 21029;
+   static const int FUNC_VOLT_DATETIME_DIFF_MONTH         = 21030;
+   static const int FUNC_VOLT_DATETIME_DIFF_WEEK          = 21031;
+   static const int FUNC_VOLT_DATETIME_DIFF_DAY           = 21032;
+   static const int FUNC_VOLT_DATETIME_DIFF_HOUR          = 21033;
+   static const int FUNC_VOLT_DATETIME_DIFF_MINUTE        = 21034;
+   static const int FUNC_VOLT_DATETIME_DIFF_SECOND        = 21035;
+   static const int FUNC_VOLT_DATETIME_DIFF_MILLIS        = 21036;
+   static const int FUNC_VOLT_DATETIME_DIFF_MICROS        = 21037;
+
+   static const int FUNC_VOLT_TIME_WINDOW                       = 21038;
+   static const int FUNC_VOLT_TIME_WINDOW_YEAR_START            = 21039;
+   static const int FUNC_VOLT_TIME_WINDOW_QUARTER_START         = 21040;
+   static const int FUNC_VOLT_TIME_WINDOW_MONTH_START           = 21041;
+   static const int FUNC_VOLT_TIME_WINDOW_WEEK_START            = 21042;
+   static const int FUNC_VOLT_TIME_WINDOW_DAY_START             = 21043;
+   static const int FUNC_VOLT_TIME_WINDOW_HOUR_START            = 21044;
+   static const int FUNC_VOLT_TIME_WINDOW_MINUTE_START          = 21045;
+   static const int FUNC_VOLT_TIME_WINDOW_SECOND_START          = 21046;
+   static const int FUNC_VOLT_TIME_WINDOW_MILLIS_START          = 21047;
+
+   static const int FUNC_VOLT_TIME_WINDOW_YEAR_END            = 21048;
+   static const int FUNC_VOLT_TIME_WINDOW_QUARTER_END         = 21049;
+   static const int FUNC_VOLT_TIME_WINDOW_MONTH_END           = 21050;
+   static const int FUNC_VOLT_TIME_WINDOW_WEEK_END            = 21051;
+   static const int FUNC_VOLT_TIME_WINDOW_DAY_END             = 21052;
+   static const int FUNC_VOLT_TIME_WINDOW_HOUR_END            = 21053;
+   static const int FUNC_VOLT_TIME_WINDOW_MINUTE_END          = 21054;
+   static const int FUNC_VOLT_TIME_WINDOW_SECOND_END          = 21055;
+   static const int FUNC_VOLT_TIME_WINDOW_MILLIS_END          = 21056;
+
+    // From Tokens.java.
    static const int SQL_TRIM_LEADING                     = 149;
    static const int SQL_TRIM_TRAILING                    = 284;
    static const int SQL_TRIM_BOTH                        = 22;
+   static const int SQL_START                            = 265;
+   static const int SQL_END                              = 93;
 
    static const int FUNC_TRIM_LEADING_CHAR               = SQL_TRIM_VOLT_FUNC_OFFSET + SQL_TRIM_LEADING;
    static const int FUNC_TRIM_TRAILING_CHAR              = SQL_TRIM_VOLT_FUNC_OFFSET + SQL_TRIM_TRAILING;

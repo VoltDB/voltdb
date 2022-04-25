@@ -46,6 +46,37 @@ import org.hsqldb_voltpatches.types.Type;
 
 import java.util.NoSuchElementException;
 
+import static org.hsqldb_voltpatches.FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_DATETIME_DIFF;
+import static org.hsqldb_voltpatches.FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_DATETIME_DIFF_DAY;
+import static org.hsqldb_voltpatches.FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_DATETIME_DIFF_HOUR;
+import static org.hsqldb_voltpatches.FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_DATETIME_DIFF_MICROS;
+import static org.hsqldb_voltpatches.FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_DATETIME_DIFF_MILLIS;
+import static org.hsqldb_voltpatches.FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_DATETIME_DIFF_MINUTE;
+import static org.hsqldb_voltpatches.FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_DATETIME_DIFF_MONTH;
+import static org.hsqldb_voltpatches.FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_DATETIME_DIFF_QUARTER;
+import static org.hsqldb_voltpatches.FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_DATETIME_DIFF_SECOND;
+import static org.hsqldb_voltpatches.FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_DATETIME_DIFF_WEEK;
+import static org.hsqldb_voltpatches.FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_DATETIME_DIFF_YEAR;
+import static org.hsqldb_voltpatches.FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_TIME_WINDOW;
+import static org.hsqldb_voltpatches.FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_TIME_WINDOW_DAY_END;
+import static org.hsqldb_voltpatches.FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_TIME_WINDOW_DAY_START;
+import static org.hsqldb_voltpatches.FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_TIME_WINDOW_HOUR_END;
+import static org.hsqldb_voltpatches.FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_TIME_WINDOW_HOUR_START;
+import static org.hsqldb_voltpatches.FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_TIME_WINDOW_MILLIS_END;
+import static org.hsqldb_voltpatches.FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_TIME_WINDOW_MILLIS_START;
+import static org.hsqldb_voltpatches.FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_TIME_WINDOW_MINUTE_END;
+import static org.hsqldb_voltpatches.FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_TIME_WINDOW_MINUTE_START;
+import static org.hsqldb_voltpatches.FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_TIME_WINDOW_MONTH_END;
+import static org.hsqldb_voltpatches.FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_TIME_WINDOW_MONTH_START;
+import static org.hsqldb_voltpatches.FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_TIME_WINDOW_QUARTER_END;
+import static org.hsqldb_voltpatches.FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_TIME_WINDOW_QUARTER_START;
+import static org.hsqldb_voltpatches.FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_TIME_WINDOW_SECOND_END;
+import static org.hsqldb_voltpatches.FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_TIME_WINDOW_SECOND_START;
+import static org.hsqldb_voltpatches.FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_TIME_WINDOW_WEEK_END;
+import static org.hsqldb_voltpatches.FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_TIME_WINDOW_WEEK_START;
+import static org.hsqldb_voltpatches.FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_TIME_WINDOW_YEAR_END;
+import static org.hsqldb_voltpatches.FunctionForVoltDB.FunctionDescriptor.FUNC_VOLT_TIME_WINDOW_YEAR_START;
+
 /**
  * Implementation of SQL standard function calls
  *
@@ -152,7 +183,6 @@ public class FunctionSQL extends Expression {
     //
     static IntValueHashMap valueFuncMap   = new IntValueHashMap();
     public static IntValueHashMap regularFuncMap = new IntValueHashMap();
-
     static {
         regularFuncMap.put(Tokens.T_POSITION, FUNC_POSITION_CHAR);
         /*
@@ -2159,7 +2189,7 @@ public class FunctionSQL extends Expression {
     /**
      * VoltDB added method to get a non-catalog-dependent
      * representation of this HSQLDB object.
-     * @param session The current Session object may be needed to resolve
+     * @param exp The current Session object may be needed to resolve
      * some names.
      * @return XML, correctly indented, representing this object.
      * @throws HSQLParseException
@@ -2177,6 +2207,7 @@ public class FunctionSQL extends Expression {
         int volt_funcType = funcType;
 
         String implied_argument = null;
+        String optional_argument = null;
         int keywordConstant = 0;
 
         switch (funcType) {
@@ -2540,6 +2571,141 @@ public class FunctionSQL extends Expression {
             // Having accounted for the first argument, remove it from the child expression list.
             exp.children.remove(0);
             return exp;
+
+            case FUNC_VOLT_TIME_WINDOW:
+                boolean stardAndEndSpecified = false;
+                optional_argument = "START";
+                boolean isStart = true;
+                if (nodes.length == 4) {
+                    keywordConstant = ((Integer) nodes[3].valueData).intValue();
+                    switch (keywordConstant) {
+                        case Tokens.START:
+                            optional_argument = "START";
+                            break;
+                        case Tokens.END:
+                            optional_argument = "END";
+                            isStart = false;
+                            break;
+                        default:
+                            throw Error.runtimeError(ErrorCode.U_S0500, "DateTimeTypeForVoltDB: " + keywordConstant);
+                    }
+                    stardAndEndSpecified = true;
+                }
+                keywordConstant = ((Integer) nodes[0].valueData).intValue();
+                int timeslice_func = -1;
+                switch (keywordConstant) {
+                    case Tokens.YEAR :
+                        implied_argument = "YEAR";
+                        timeslice_func = isStart ? FUNC_VOLT_TIME_WINDOW_YEAR_START : FUNC_VOLT_TIME_WINDOW_YEAR_END;
+                        break;
+                    case Tokens.QUARTER :
+                        implied_argument = "QUARTER";
+                        timeslice_func = isStart ? FUNC_VOLT_TIME_WINDOW_QUARTER_START : FUNC_VOLT_TIME_WINDOW_QUARTER_END;
+                        break;
+                    case Tokens.MONTH :
+                        implied_argument = "MONTH";
+                        timeslice_func = isStart ? FUNC_VOLT_TIME_WINDOW_MONTH_START : FUNC_VOLT_TIME_WINDOW_MONTH_END;
+                        break;
+                    case Tokens.WEEK:
+                        implied_argument = "WEEK";
+                        timeslice_func = isStart ? FUNC_VOLT_TIME_WINDOW_WEEK_START : FUNC_VOLT_TIME_WINDOW_WEEK_END;
+                        break;
+                    case Tokens.DAY :
+                        implied_argument = "DAY";
+                        timeslice_func = isStart ? FUNC_VOLT_TIME_WINDOW_DAY_START : FUNC_VOLT_TIME_WINDOW_DAY_END;
+                        break;
+                    case Tokens.HOUR :
+                        implied_argument = "HOUR";
+                        timeslice_func = isStart ? FUNC_VOLT_TIME_WINDOW_HOUR_START : FUNC_VOLT_TIME_WINDOW_HOUR_END;
+                        break;
+                    case Tokens.MINUTE :
+                        implied_argument = "MINUTE";
+                        timeslice_func = isStart ? FUNC_VOLT_TIME_WINDOW_MINUTE_START : FUNC_VOLT_TIME_WINDOW_MINUTE_END;
+                        break;
+                    case Tokens.SECOND :
+                        implied_argument = "SECOND";
+                        timeslice_func = isStart ? FUNC_VOLT_TIME_WINDOW_SECOND_START : FUNC_VOLT_TIME_WINDOW_SECOND_END;
+                        break;
+                    case Tokens.MILLIS:
+                    case Tokens.MILLISECOND :
+                        implied_argument = "MILLISECOND";
+                        timeslice_func = isStart ? FUNC_VOLT_TIME_WINDOW_MILLIS_START : FUNC_VOLT_TIME_WINDOW_MILLIS_END;
+                        break;
+                    default:
+                        throw Error.runtimeError(ErrorCode.U_S0500, "DateTimeTypeForVoltDB: " + String.valueOf(keywordConstant));
+                }
+
+                assert(implied_argument != null);
+                assert(-1 != timeslice_func);
+                exp.attributes.put("function_id", String.valueOf(timeslice_func));
+                exp.attributes.put("implied_argument", implied_argument);
+                exp.attributes.put("optional_argument", optional_argument);
+
+                // Having accounted for the first and third argument, remove it from the child expression list.
+                exp.children.remove(0);
+                // If we were explicitely given optional argument remove it
+                if (stardAndEndSpecified) {
+                    exp.children.remove(2);
+                }
+                return exp;
+            case FUNC_VOLT_DATETIME_DIFF:
+                keywordConstant = ((Integer) nodes[0].valueData).intValue();
+                int datediff_func = -1;
+                switch (keywordConstant) {
+                    case Tokens.YEAR :
+                        implied_argument = "YEAR";
+                        datediff_func = FUNC_VOLT_DATETIME_DIFF_YEAR;
+                        break;
+                    case Tokens.QUARTER :
+                        implied_argument = "QUARTER";
+                        datediff_func = FUNC_VOLT_DATETIME_DIFF_QUARTER;
+                        break;
+                    case Tokens.MONTH :
+                        implied_argument = "MONTH";
+                        datediff_func = FUNC_VOLT_DATETIME_DIFF_MONTH;
+                        break;
+                    case Tokens.WEEK:
+                        implied_argument = "WEEK";
+                        datediff_func = FUNC_VOLT_DATETIME_DIFF_WEEK;
+                        break;
+                    case Tokens.DAY :
+                        implied_argument = "DAY";
+                        datediff_func = FUNC_VOLT_DATETIME_DIFF_DAY;
+                        break;
+                    case Tokens.HOUR :
+                        implied_argument = "HOUR";
+                        datediff_func = FUNC_VOLT_DATETIME_DIFF_HOUR;
+                        break;
+                    case Tokens.MINUTE :
+                        implied_argument = "MINUTE";
+                        datediff_func = FUNC_VOLT_DATETIME_DIFF_MINUTE;
+                        break;
+                    case Tokens.SECOND :
+                        implied_argument = "SECOND";
+                        datediff_func = FUNC_VOLT_DATETIME_DIFF_SECOND;
+                        break;
+                    case Tokens.MILLIS:
+                    case Tokens.MILLISECOND :
+                        implied_argument = "MILLISECOND";
+                        datediff_func = FUNC_VOLT_DATETIME_DIFF_MILLIS;
+                        break;
+                    case Tokens.MICROS:
+                    case Tokens.MICROSECOND :
+                        implied_argument = "MICROSECOND";
+                        datediff_func = FUNC_VOLT_DATETIME_DIFF_MICROS;
+                        break;
+                    default:
+                        throw Error.runtimeError(ErrorCode.U_S0500, "DateTimeTypeForVoltDB: " + String.valueOf(keywordConstant));
+                }
+
+                assert(implied_argument != null);
+                assert(-1 != datediff_func);
+                exp.attributes.put("function_id", String.valueOf(datediff_func));
+                exp.attributes.put("implied_argument", implied_argument);
+
+                // Having accounted for the first argument, remove it from the child expression list.
+                exp.children.remove(0);
+                return exp;
 
         default :
             if (voltDisabled != null) {

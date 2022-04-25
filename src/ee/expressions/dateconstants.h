@@ -29,6 +29,7 @@
  * and also other places.
  */
 static const boost::posix_time::ptime EPOCH(boost::gregorian::date(1970,1,1));
+static const boost::gregorian::date EPOCH_DATE(boost::gregorian::date(1970,1,1));
 static const int64_t GREGORIAN_EPOCH = -12212553600000000;  //  1583-01-01 00:00:00
 static const int64_t NYE9999         = 253402300799999999;  //  9999-12-31 23:59:59.999999
 

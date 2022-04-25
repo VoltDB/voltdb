@@ -148,7 +148,7 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
                 int id = Integer.parseInt(timeValue.split(":")[1]);
 
                 FunctionExpression funcExpr = new FunctionExpression();
-                funcExpr.setAttributes(name, null, id);
+                funcExpr.setAttributes(name, null, null, id);
 
                 funcExpr.setValueType(VoltType.TIMESTAMP);
                 funcExpr.setValueSize(VoltType.TIMESTAMP.getMaxLengthInBytes());

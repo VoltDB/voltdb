@@ -29,9 +29,10 @@ import org.voltdb.types.ExpressionType;
 public class FunctionExpression extends AbstractExpression {
     private enum Members {
         NAME,
-        IMPLIED_ARGUMENT,
+        IMPLIED_ARGUMENT, // implied argument is only one at the begining of function expression
         FUNCTION_ID,
         RESULT_TYPE_PARAM_IDX,
+        OPTIONAL_ARGUMENT, // Optional argument is only one at the end of the function expression
     }
 
     private final static int NOT_PARAMETERIZED = -1;
@@ -68,6 +69,10 @@ public class FunctionExpression extends AbstractExpression {
     /// TRIM(LEADING... |  LEADING
     private String m_impliedArgument;
 
+    /// Optional arguments string representation like "START", "END" in time_window
+    /// We only support 1 optional argument at the end
+    private String m_optionalArgument;
+
     /// The unique function (implementation) identifier for a named SQL
     /// function, assigned from constants defined in various HSQL frontend
     /// modules like Tokens.java, FunctionSQL.java, FunctionForVoltDB.java,
@@ -93,15 +98,16 @@ public class FunctionExpression extends AbstractExpression {
         setExpressionType(ExpressionType.FUNCTION);
     }
 
-    public FunctionExpression(String name, String impliedArgs, int id) {
+    public FunctionExpression(String name, String impliedArgs, String optionalArgs, int id) {
         this();
-        setAttributes(name, impliedArgs, id);
+        setAttributes(name, impliedArgs, optionalArgs, id);
     }
 
-    public void setAttributes(String name, String impliedArgument, int id) {
+    public void setAttributes(String name, String impliedArgument, String optionalArgument, int id) {
         assert(name != null);
         m_name = name;
         m_impliedArgument = impliedArgument;
+        m_optionalArgument = optionalArgument;
         m_functionId = id;
     }
 
@@ -209,6 +215,9 @@ public class FunctionExpression extends AbstractExpression {
         if (m_impliedArgument != null) {
             stringer.keySymbolValuePair(Members.IMPLIED_ARGUMENT.name(), m_impliedArgument);
         }
+        if (m_optionalArgument != null) {
+            stringer.keySymbolValuePair(Members.OPTIONAL_ARGUMENT.name(), m_optionalArgument);
+        }
         if (m_resultTypeParameterIndex != NOT_PARAMETERIZED) {
             stringer.keySymbolValuePair(Members.RESULT_TYPE_PARAM_IDX.name(), m_resultTypeParameterIndex);
         }
@@ -223,6 +232,9 @@ public class FunctionExpression extends AbstractExpression {
         m_impliedArgument = null;
         if (obj.has(Members.IMPLIED_ARGUMENT.name())) {
             m_impliedArgument = obj.getString(Members.IMPLIED_ARGUMENT.name());
+        }
+        if (obj.has(Members.OPTIONAL_ARGUMENT.name())) {
+            m_optionalArgument = obj.getString(Members.OPTIONAL_ARGUMENT.name());
         }
         if (obj.has(Members.RESULT_TYPE_PARAM_IDX.name())) {
             m_resultTypeParameterIndex = obj.getInt(Members.RESULT_TYPE_PARAM_IDX.name());
@@ -348,6 +360,11 @@ public class FunctionExpression extends AbstractExpression {
             for (AbstractExpression arg : m_args) {
                 result += connector + arg.explain(impliedTableName);
                 connector = ", ";
+            }
+            // Optional argument is only 1 at the end if need list modify this
+            // we can have a single optional argument
+            if (m_optionalArgument != null) {
+                result += connector + m_optionalArgument;
             }
             result += ")";
         } else {

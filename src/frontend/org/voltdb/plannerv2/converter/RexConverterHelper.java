@@ -38,7 +38,7 @@ import java.util.List;
 public class RexConverterHelper {
 
     public static AbstractExpression createFunctionExpression(
-            RelDataType relDataType, String funcName, List<AbstractExpression> operands, String impliedArg) {
+            RelDataType relDataType, String funcName, List<AbstractExpression> operands, String impliedArg, String optionalArgs) {
         int functionId = FunctionSQL.voltGetFunctionId(funcName);
         if (functionId == FunctionSQL.FUNC_VOLT_INVALID) {
             functionId = FunctionForVoltDB.getFunctionID(funcName);
@@ -46,16 +46,16 @@ public class RexConverterHelper {
         if (functionId == FunctionSQL.FUNC_VOLT_INVALID) {
             throw new CalcitePlanningException("Unsupported function:" + funcName);
         }
-        return createFunctionExpression(relDataType, funcName, functionId, operands, impliedArg);
+        return createFunctionExpression(relDataType, funcName, functionId, operands, impliedArg, optionalArgs);
     }
 
     public static AbstractExpression createFunctionExpression(
-            RelDataType relDataType, String funcName, int funcId, List<AbstractExpression> operands, String impliedArg) {
+            RelDataType relDataType, String funcName, int funcId, List<AbstractExpression> operands, String impliedArg, String optionalArgs) {
         if (funcId == FunctionSQL.FUNC_VOLT_INVALID) {
-            return createFunctionExpression(relDataType, funcName, operands, impliedArg);
+            return createFunctionExpression(relDataType, funcName, operands, impliedArg, optionalArgs);
         }
         FunctionExpression fe = new FunctionExpression();
-        fe.setAttributes(funcName, impliedArg, funcId);
+        fe.setAttributes(funcName, impliedArg, optionalArgs, funcId);
         fe.setArgs(operands);
         RexConverter.setType(fe, relDataType);
         return fe;
@@ -63,9 +63,9 @@ public class RexConverterHelper {
 
     public static AbstractExpression createFunctionExpression(
             VoltType voltType, String funcName, int funcId, List<AbstractExpression> operands,
-            String impliedArg) {
+            String impliedArg, String optionalArgs) {
         FunctionExpression fe = new FunctionExpression();
-        fe.setAttributes(funcName, impliedArg, funcId);
+        fe.setAttributes(funcName, impliedArg, optionalArgs, funcId);
         fe.setArgs(operands);
         RexConverter.setType(fe, voltType, voltType.getMaxLengthInBytes());
         return fe;
@@ -100,7 +100,7 @@ public class RexConverterHelper {
         String impliedArgMicrosecond = "MICROSECOND";
         AbstractExpression sinceEpochExpr = createFunctionExpression(
                 VoltType.BIGINT, "since_epoch", FunctionSQL.voltGetSinceEpochId(impliedArgMicrosecond),
-                epochOperands, impliedArgMicrosecond);
+                epochOperands, impliedArgMicrosecond, null);
 
         // Plus/Minus interval
         AbstractExpression plusExpr = new OperatorExpression(intervalOperatorType, sinceEpochExpr, interval);
@@ -111,7 +111,7 @@ public class RexConverterHelper {
         timestampOperands.add(plusExpr);
         AbstractExpression timestampExpr = createFunctionExpression(
                 relDataType, "to_timestamp", FunctionSQL.voltGetToTimestampId(impliedArgMicrosecond),
-                timestampOperands, impliedArgMicrosecond);
+                timestampOperands, impliedArgMicrosecond, null);
         RexConverter.setType(timestampExpr, relDataType);
 
         return timestampExpr;
