@@ -2401,45 +2401,42 @@ public class SQLParser extends SQLPatternFactory
         if ( ! matcher.lookingAt()) {
             return null;
         }
+
         String commandWordTerminator = matcher.group(1);
         if (OneWhitespace.matcher(commandWordTerminator).matches() ||
                 // Might as well accept a comma delimiter anywhere in the exec command,
                 // even near the start
                 commandWordTerminator.equals(",")) {
-        ExecuteCallResults results = new ExecuteCallResults();
-        String rawParams = statement.substring(matcher.end());
-        results.params = parseExecParameters(rawParams);
-        results.procedure = results.params.remove(0);
-        // TestSqlCmdInterface passes procedures==null because it
-        // doesn't need/want the param types.
-        if (procedures == null) {
-            results.paramTypes = null;
-            return results;
-        }
-        Map<Integer, List<String>> signature = procedures.get(results.procedure);
-        if (signature == null) {
-            throw new SQLParser.Exception("Undefined procedure: %s", results.procedure);
-        }
-
-        results.paramTypes = signature.get(results.params.size());
-        if (results.paramTypes == null || results.params.size() != results.paramTypes.size()) {
-            String expectedSizes = "";
-            for (Integer expectedSize : signature.keySet()) {
-                expectedSizes += expectedSize + ", ";
+            ExecuteCallResults results = new ExecuteCallResults();
+            String rawParams = statement.substring(matcher.end());
+            results.params = parseExecParameters(rawParams);
+            results.procedure = results.params.remove(0);
+            // TestSqlCmdInterface passes procedures==null because it
+            // doesn't need/want the param types.
+            if (procedures == null) {
+                results.paramTypes = null;
+                return results;
             }
-            throw new SQLParser.Exception(
-                    "Invalid parameter count for procedure: %s (expected: %s received: %d)",
-                    results.procedure, expectedSizes, results.params.size());
+            Map<Integer, List<String>> signature = procedures.get(results.procedure);
+            if (signature == null) {
+                throw new SQLParser.Exception("Undefined procedure: %s", results.procedure);
+            }
+            results.paramTypes = signature.get(results.params.size());
+            if (results.paramTypes == null || results.params.size() != results.paramTypes.size()) {
+                String expectedSizes = "";
+                for (Integer expectedSize : signature.keySet()) {
+                    expectedSizes += expectedSize + ", ";
+                }
+                throw new SQLParser.Exception("Invalid parameter count for procedure: %s (expected: %s received: %d)",
+                                              results.procedure, expectedSizes, results.params.size());
             }
             return results;
         }
         if (commandWordTerminator.equals(";")) {
             // EOL or ; reached before subcommand
-            throw new SQLParser.Exception(
-                    "Incomplete EXECUTE command. EXECUTE requires a procedure name argument.");
+            throw new SQLParser.Exception("Incomplete EXECUTE command. EXECUTE requires a procedure name argument.");
         }
-        throw new SQLParser.Exception(
-                "Invalid EXECUTE command. unexpected input: '" + commandWordTerminator + "'.");
+        throw new SQLParser.Exception("Invalid EXECUTE command. unexpected input: '" + commandWordTerminator + "'.");
     }
 
     /**
