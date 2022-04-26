@@ -31,68 +31,24 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
 
 import com.google_voltpatches.common.collect.ConcurrentHashMultiset;
 import com.google_voltpatches.common.collect.Multiset;
 
 public class DUSBenchmarkCallback implements ProcedureCallback {
 
-    private static Multiset<String> stats = ConcurrentHashMultiset.create();
-    private static Map<String,Integer> procedures = new ConcurrentHashMap<String,Integer>();
-    String procedureName;
-    long maxErrors;
-
-    public static int count(String procedureName, String event){
-        return stats.add(procedureName + event, 1);
+    final CountDownLatch m_latch;
+    public DUSBenchmarkCallback(CountDownLatch latch) {
+        m_latch = latch;
     }
-
-    public static int getCount(String procedureName, String event){
-        return stats.count(procedureName + event);
+    public DUSBenchmarkCallback() {
+        m_latch = null;
     }
-
-    public static void printProcedureResults(String procedureName) {
-        System.out.println("  " + procedureName);
-        System.out.println("        calls: " + getCount(procedureName, "call"));
-        System.out.println("      commits: " + getCount(procedureName, "commit"));
-        System.out.println("    rollbacks: " + getCount(procedureName, "rollback"));
-    }
-
-    public static void printAllResults() {
-        List<String> list = new ArrayList<String>(procedures.keySet());
-        Collections.sort(list);
-        for (String str : list) {
-            printProcedureResults(str);
-        }
-    }
-
-    public DUSBenchmarkCallback(String procedure, long maxErrors) {
-        super();
-        this.procedureName = procedure;
-        this.maxErrors = maxErrors;
-        procedures.putIfAbsent(procedure, 1);
-        DUSBenchmark.countProcResults(procedure);
-    }
-
-    public DUSBenchmarkCallback(String procedure) {
-        this(procedure, 5l);
-    }
-
     @Override
     public void clientCallback(ClientResponse cr) {
-
-        count(procedureName, "call");
-
-        if (cr.getStatus() == ClientResponse.SUCCESS) {
-            count(procedureName, "commit");
-        } else {
-            long totalErrors = count(procedureName,"rollback");
-
-            if (totalErrors > maxErrors) {
-                System.err.println("exceeded " + maxErrors + " maximum database errors - exiting client");
-                System.exit(-1);
-            }
-
-            System.err.println("DATABASE ERROR: " + cr.getStatusString());
+        if (m_latch != null) {
+            m_latch.countDown();
         }
     }
 }

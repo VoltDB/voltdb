@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2021 VoltDB Inc.
+ * Copyright (C) 2022 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,32 +23,37 @@
 
 package procedures;
 
-import client.benchmark.DUSBenchmark;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
 
-/** Version of UpdateOneValue Partitioned on column MOD_ID */
-public class UpdateOneValuePmodId extends UpdateOneValue {
+public class UpdateByBlock extends VoltProcedure {
 
-    // The run() method, as required for each VoltProcedure
-    public VoltTable[] run(long modidValue, String tableName, String inlineOrOutline)
-            throws VoltAbortException
-    {
-        // Check that the table is partitioned by MOD_ID
-        if (tableName == null || !DUSBenchmark.PARTITIONED_BY_MOD_ID.contains(tableName.toUpperCase())) {
-            throw new VoltAbortException("Illegal table name '"+tableName+"' for UpdateOneRowPmodid.");
-        }
+    static final String SET_INLINE = "SET "
+            +"TINY  = 88, "
+            +"SMALL = 8888, "
+            +"INTEG = 888888, "
+            +"BIG   = 888888888888, "
+            +"FLOT  = 888888.888888, "
+            +"DECML = 888888888888888888888888.888888888888, "
+            +"TIMESTMP = '1888-08-08 08:58:58.888888 ', "
+            +"VCHAR_INLINE     = 'Updated Row 88', "
+            +"VCHAR_INLINE_MAX = 'Updated Row 888'";
 
-        // Determine which SQLStmt to use
-        SQLStmt sqlStatement = getUpdateStatement(tableName, "MOD_ID", inlineOrOutline);
+    static final String SET_OUTLINE = SET_INLINE + ", "
+            +"VCHAR_OUTLINE_MIN = 'Outline update 8', "
+            +"VCHAR_OUTLINE     = 'Outline col update 8', "
+            +"VCHAR_DEFAULT     = 'Out-line (i.e., non-inline) columns updated; 888888' ";
 
-        // Queue the query
-        voltQueueSQL(sqlStatement, modidValue);
+    static final SQLStmt UPDATE_SQL_INLINE = new SQLStmt(
+            "UPDATE PARTITIONED " + SET_INLINE +" WHERE BLOCK_ID = ?;");
 
-        // Execute the query
+    static final SQLStmt UPDATE_SQL_OUTLINE = new SQLStmt(
+            "UPDATE PARTITIONED  " + SET_OUTLINE+" WHERE BLOCK_ID = ?;");
+
+    public VoltTable[] run(long blockId, int outline) throws VoltAbortException {
+        voltQueueSQL((outline ==1 ? UPDATE_SQL_OUTLINE : UPDATE_SQL_INLINE), blockId);
         return voltExecuteSQL(true);
     }
-
 }

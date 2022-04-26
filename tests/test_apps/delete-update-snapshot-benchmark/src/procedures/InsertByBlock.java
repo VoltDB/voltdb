@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2021 VoltDB Inc.
+ * Copyright (C) 2022 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -28,87 +28,44 @@ import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.VoltTypeException;
+import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
 
 import java.math.BigDecimal;
 
 
-public class InsertOneRow extends VoltProcedure {
+public class InsertByBlock extends VoltProcedure {
 
-    // We don't want to have to change these in more than one place (besides the DDL file)
-    final static String COLUMN_NAMES_NO_ID = "MOD_ID, TINY, SMALL, INTEG, BIG, FLOT, DECML, TIMESTMP,"
+    final static SQLStmt INSERT_SQL = new SQLStmt("INSERT INTO PARTITIONED (ID, BLOCK_ID, MOD_ID, TINY, SMALL, INTEG, BIG, FLOT, DECML, TIMESTMP,"
             + " VCHAR_INLINE,  VCHAR_INLINE_MAX,  VCHAR_OUTLINE_MIN,  VCHAR_OUTLINE,  VCHAR_DEFAULT, "
             + "VARBIN_INLINE, VARBIN_INLINE_MAX, VARBIN_OUTLINE_MIN, VARBIN_OUTLINE, VARBIN_DEFAULT, "
-            + "POINT, POLYGON";
-    private final static String COLUMN_NAME_LIST = "ID, BLOCK_ID, " + COLUMN_NAMES_NO_ID;
-    private final static String VALUES_LIST = "?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?";
-    private final static int NUM_PARAMETERS = 22;
+            + "POINT, POLYGON) "
+            + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
 
-    // Declare the SQL Statements to be used
-    private final static SQLStmt INSERT_VALUES_DUSB_R1 = new SQLStmt(
-            "INSERT INTO DUSB_R1 ( "+COLUMN_NAME_LIST+" ) VALUES ( "+VALUES_LIST+" );");
-    final static SQLStmt INSERT_VALUES_DUSB_P1 = new SQLStmt(
-            "INSERT INTO DUSB_P1 ( "+COLUMN_NAME_LIST+" ) VALUES ( "+VALUES_LIST+" );");
-
-
-    // The run() method, as required for each VoltProcedure
-    public VoltTable[] run(long id, long blockId, String tableName,
-            String[] columnNames, String[] columnValues)
+    public VoltTable[] run(long blockId, long id, String[] columnNames, String[] columnValues)
             throws VoltAbortException
     {
-        // Determine which SQLStmt to use
-        SQLStmt sqlStatement = getInsertStatement(tableName);
-
         // Get the query args, as an Object array
         Object[] args = getInsertArgs(id, blockId, columnNames, columnValues);
 
-        // Queue the query
-        voltQueueSQL(sqlStatement, args);
-
-        // Execute the query
+        voltQueueSQL(INSERT_SQL, args);
         return voltExecuteSQL(true);
     }
 
-
-    // Determine which SQLStmt to use, based on tableName
-    SQLStmt getInsertStatement(String tableName) {
-        SQLStmt sqlStatement = null;
-        if (tableName == null) {
-            throw new VoltAbortException("Illegal null table name ("+tableName+").");
-        } else if ( "DUSB_R1".equals(tableName.toUpperCase()) ) {
-            sqlStatement = INSERT_VALUES_DUSB_R1;
-        } else if ( "DUSB_P1".equals(tableName.toUpperCase()) ) {
-            sqlStatement = INSERT_VALUES_DUSB_P1;
-        } else {
-            throw new VoltAbortException("Unknown table name: '"+tableName+"'.");
-        }
-        return sqlStatement;
-    }
-
-
-    // Get the query args, as an Object array
     Object[] getInsertArgs(long id, long blockId,
             String[] columnNames, String[] columnValues) {
 
         int numColumns = columnNames.length;
-        if (numColumns != columnValues.length) {
-            throw new VoltAbortException("Different lengths for columnNames ("+numColumns
-                    + ") and columnValues ("+columnValues.length+") parameters.");
-        }
-
-        Object[] argsArray = new Object[NUM_PARAMETERS];
+        Object[] argsArray = new Object[22];
 
         // Initialize all column values as null, by default
         for (int i=0; i < numColumns; i++) {
             argsArray[i] = null;
         }
 
-        // A few special cases ...
-        // The first and third elements get the 'id' value (for columns ID and MOD_ID)
         argsArray[0] = id;
         argsArray[2] = id;
-        // And the second gets the 'blockId' value (for column BLOCK_ID)
         argsArray[1] = blockId;
 
         // Numerical columns whose types have a special null value in Volt
@@ -198,11 +155,8 @@ public class InsertOneRow extends VoltProcedure {
             } catch (IllegalArgumentException e) {
                 throw new VoltTypeException("Unable to convert value '"+columnValues[i]
                         +"', for column name '"+columnNames[i]+"'.", e);
-            } // end of try/catch
-
-        } // end of for loop
-
+            }
+        }
         return argsArray;
     }
-
 }
