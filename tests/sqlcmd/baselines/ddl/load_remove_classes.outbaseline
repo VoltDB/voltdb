@@ -116,6 +116,7 @@ Command succeeded.
 @SnapshotSave             	varchar
 @SnapshotSave             	varchar, varchar, bit
 @SnapshotScan             	varchar
+@Statistics               	statisticscomponent
 @Statistics               	statisticscomponent, bit
 @StopNode                 	int
 @SwapTables               	varchar, varchar
@@ -164,6 +165,7 @@ Command succeeded.
 @SnapshotSave             	varchar
 @SnapshotSave             	varchar, varchar, bit
 @SnapshotScan             	varchar
+@Statistics               	statisticscomponent
 @Statistics               	statisticscomponent, bit
 @StopNode                 	int
 @SwapTables               	varchar, varchar
@@ -280,6 +282,7 @@ Command succeeded.
 @SnapshotSave             	varchar
 @SnapshotSave             	varchar, varchar, bit
 @SnapshotScan             	varchar
+@Statistics               	statisticscomponent
 @Statistics               	statisticscomponent, bit
 @StopNode                 	int
 @SwapTables               	varchar, varchar
@@ -342,6 +345,7 @@ EMPLOYEE.upsert           	integer, varchar, varchar, varchar
 @SnapshotSave             	varchar
 @SnapshotSave             	varchar, varchar, bit
 @SnapshotScan             	varchar
+@Statistics               	statisticscomponent
 @Statistics               	statisticscomponent, bit
 @StopNode                 	int
 @SwapTables               	varchar, varchar
@@ -390,6 +394,7 @@ Command succeeded.
 @SnapshotSave             	varchar
 @SnapshotSave             	varchar, varchar, bit
 @SnapshotScan             	varchar
+@Statistics               	statisticscomponent
 @Statistics               	statisticscomponent, bit
 @StopNode                 	int
 @SwapTables               	varchar, varchar
@@ -512,6 +517,7 @@ Command succeeded.
 @SnapshotSave             	varchar
 @SnapshotSave             	varchar, varchar, bit
 @SnapshotScan             	varchar
+@Statistics               	statisticscomponent
 @Statistics               	statisticscomponent, bit
 @StopNode                 	int
 @SwapTables               	varchar, varchar
