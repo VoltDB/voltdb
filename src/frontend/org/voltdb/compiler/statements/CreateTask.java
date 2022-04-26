@@ -47,6 +47,8 @@ public class CreateTask extends StatementProcessor {
         super(ddlCompiler);
     }
 
+    public static final String DEFAULT_ACTION_GENERATOR = SingleProcGenerator.class.getName();
+
     @Override
     protected boolean processStatement(DDLStatement ddlStatement, Database db, DdlProceduresToLoad whichProcs)
             throws VoltCompilerException {
@@ -109,7 +111,7 @@ public class CreateTask extends StatementProcessor {
             int index = 0;
 
             if (generatorClass == null) {
-                task.setActiongeneratorclass(SingleProcGenerator.class.getName());
+                task.setActiongeneratorclass(DEFAULT_ACTION_GENERATOR);
                 addParameter(actionGeneratorParams, index++, matcher.group("procedure"));
             } else {
                 task.setActiongeneratorclass(generatorClass);

@@ -279,7 +279,7 @@ public class TestTasksEnd2End extends LocalClustersTestBase {
             fail("Should not have been able to drop: " + procName);
         } catch (ProcCallException e) {
             String status = e.getClientResponse().getStatusString();
-            assertTrue(status, status.contains("Procedure does not exist: " + procName));
+            assertTrue(status, status.contains("Invalid DROP PROCEDURE statement: " + procName));
         }
     }
 
