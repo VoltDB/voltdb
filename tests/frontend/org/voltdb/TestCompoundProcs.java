@@ -463,6 +463,23 @@ public class TestCompoundProcs {
         }
     }
 
+    // Sets application status
+    public static class AppStatusProc extends VoltCompoundProcedure {
+
+        public long run() {
+            System.out.println("== AppStatusProc.run ==");
+            newStageList(this::failFast)
+                .build();
+            return 0;
+        }
+
+        private void failFast(ClientResponse[] nil) {
+            setAppStatusCode((byte)53);
+            setAppStatusString("And my poor fool is hang'd!");
+            abortProcedure("He dies");
+        }
+    }
+
     // ==== initial schema ===
 
     final private static String SCHEMA =
@@ -481,6 +498,7 @@ public class TestCompoundProcs {
         "create compound procedure from class org.voltdb.TestCompoundProcs$ExcessiveProc;\n" +
         "create compound procedure from class org.voltdb.TestCompoundProcs$NastyNestyProc;\n" +
         "create compound procedure from class org.voltdb.TestCompoundProcs$LongProc;\n" +
+        "create compound procedure from class org.voltdb.TestCompoundProcs$AppStatusProc;\n" +
         "create procedure from class org.voltdb.TestCompoundProcs$WillFailMP;\n" +
         "create procedure partition on table dummy column intval from class org.voltdb.TestCompoundProcs$SayThreadSP;\n" +
         "" +
@@ -525,11 +543,11 @@ public class TestCompoundProcs {
 
     // ==== the actual tests follow ===
 
-    private void execTest(String proc, int expect, Object... args) throws Exception {
-        execTest(null, proc, expect, args);
+    private ClientResponse execTest(String proc, int expect, Object... args) throws Exception {
+        return execTest(null, proc, expect, args);
     }
 
-    private void execTest(Client2CallOptions opts, String proc, int expect, Object... args) throws Exception {
+    private ClientResponse execTest(Client2CallOptions opts, String proc, int expect, Object... args) throws Exception {
         ClientResponse response = null;
         try {
             response = client.callProcedureAsync(opts, "TestCompoundProcs$" + proc, args).get();
@@ -545,6 +563,7 @@ public class TestCompoundProcs {
         else
             System.out.printf("status %d, message \\\\%s\\\\\n", status, mess);
         assertEquals(expect, status);
+        return response;
     }
 
     @Test
@@ -610,6 +629,16 @@ public class TestCompoundProcs {
     @Test
     public void testNestedCompoundCall() throws Exception {
         execTest("NastyNestyProc", ClientResponse.UNEXPECTED_FAILURE);
+    }
+
+    @Test
+    public void testAppStatus() throws Exception {
+        ClientResponse resp = execTest("AppStatusProc", ClientResponse.COMPOUND_PROC_USER_ABORT);
+        int code = resp.getAppStatus();
+        String text = resp.getAppStatusString();
+        System.out.printf("app status %d, message \\\\%s\\\\\n", code, text);
+        assertEquals("app status code not set", 53, code);
+        assertEquals("app status string not set", "And my poor fool is hang'd!", text);
     }
 
     @Test

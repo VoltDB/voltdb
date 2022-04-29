@@ -112,7 +112,9 @@ public class VoltCompoundProcedure extends VoltNonTransactionalProcedure {
      * calls in any one stage.
      * <p>
      * When all calls have completed, the next stage will be
-     * entered, with the results of all calls.
+     * entered, with the results of all calls. The results
+     * will have the same order as calls issued to
+     * <code>queueProcedureCall</code>.
      * <p>
      * <code>queueProcedureCall</code> must only be called
      * in the context of a thread that is executing either
@@ -185,11 +187,39 @@ public class VoltCompoundProcedure extends VoltNonTransactionalProcedure {
      * If the current stage has queued any procedure calls
      * before calling <code>abortProcedure</code>, those
      * calls will not be issued: execution has concluded.
+     * <p>
+     * Throwing a <code>CompoundProcAbortException</code> can be
+     * used instead of calling <code>abortProcedure</code>, with
+     * the same effect.
      *
      * @param reason to be included in client response
      */
     public final void abortProcedure(String reason) {
         compoundProcRunner.abortProcedure(reason);
+    }
+
+    /**
+     * Set the application status code that will be returned to the
+     * client as part of the <code>ClientResponse</code>. This is
+     * distinct from the VoltDB-provided status code. The meaning
+     * is determined by your procedure and the application.
+     *
+     * @param status application-specific status code
+     */
+    public void setAppStatusCode(byte status) {
+        compoundProcRunner.setResponseAppStatusCode(status);
+    }
+
+    /**
+     * Set the application status string that will be returned to the
+     * client as part of the <code>ClientResponse</code>. This is
+     * distinct from the VoltDB-provided status string. The meaning
+     * is determined by your procedure and the application.
+     *
+     * @param message application-specific status string
+     */
+    public void setAppStatusString(String message) {
+        compoundProcRunner.setResponseAppStatusString(message);
     }
 
     /**

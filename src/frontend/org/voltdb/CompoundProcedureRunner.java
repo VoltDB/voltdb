@@ -382,6 +382,19 @@ public class CompoundProcedureRunner extends ProcedureRunnerNT {
     }
 
     /*
+     * Called from the compound procedure to set the application
+     * status code and string that will be returned to the
+     * client as part of the ClientResponse.
+     */
+    void setResponseAppStatusCode(byte status) {
+        super.setAppStatusCode(status);
+    }
+
+    void setResponseAppStatusString(String message) {
+        super.setAppStatusString(message);
+    }
+
+    /*
      * Logging. Non-debug logging is rate-limited. Since procedure runners
      * are ephemeral, this needs careful balance. The 'format' given to the
      * rate-limiting logger must include the procedure name (to avoid cross-
