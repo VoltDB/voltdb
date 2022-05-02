@@ -113,6 +113,20 @@ public class AdhocDDLTestBase extends JUnit4LocalClusterTest {
         return found;
     }
 
+    protected boolean findFunctionInSystemCatalog(String function) throws Exception
+    {
+        VoltTable functions = m_client.callProcedure("@SystemCatalog", "FUNCTIONS").getResults()[0];
+        boolean found = VoltTableTestHelpers.moveToMatchingRow(functions, "FUNCTION_NAME", function);
+        return found;
+    }
+
+    protected boolean findTaskInSystemCatalog(String task) throws Exception
+    {
+        VoltTable tasks = m_client.callProcedure("@SystemCatalog", "TASKS").getResults()[0];
+        boolean found = VoltTableTestHelpers.moveToMatchingRow(tasks, "TASK_NAME", task);
+        return found;
+    }
+
     protected boolean findProcedureInSystemCatalog(String proc) throws Exception
     {
         VoltTable procedures = m_client.callProcedure("@SystemCatalog", "PROCEDURES").getResults()[0];

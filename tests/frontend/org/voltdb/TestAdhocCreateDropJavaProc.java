@@ -128,8 +128,9 @@ public class TestAdhocCreateDropJavaProc extends AdhocDDLTestBase {
             }
             catch (ProcCallException pce) {
                 assertTrue(pce.getMessage(),
-                        pce.getMessage().contains("Classes not found in @UpdateClasses jar: "
-                                + "org.voltdb_testprocs.updateclasses.testImportProc"));
+                        pce.getMessage().contains("Invalid modification of classes: Class "
+                                + "org.voltdb_testprocs.updateclasses.testImportProc"
+                                + " cannot be removed, it is being used by procedure"));
             }
 
             // Make sure we didn't purge anything (even the extra dependency)

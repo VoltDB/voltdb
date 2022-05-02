@@ -43,6 +43,11 @@ import org.voltdb.VoltZK;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogDiffEngine;
 import org.voltdb.catalog.CatalogException;
+import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Function;
+import org.voltdb.catalog.Procedure;
+import org.voltdb.catalog.Task;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.CatalogChangeResult;
@@ -145,6 +150,9 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                         }
                     } catch (ClassNotFoundException e) {
                         retval.errorMsg = "Classes not found in @UpdateClasses jar: " + e.getMessage();
+                        return retval;
+                    } catch (IllegalArgumentException e) {
+                        retval.errorMsg = "Invalid modification of classes: " + e.getMessage();
                         return retval;
                     }
                     // Real deploymentString should be the current deployment, just set it to null
@@ -337,8 +345,22 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
         return jarfile;
     }
 
+
     /**
-     * @return NUll if no classes changed, otherwise return the update jar file.
+     * @return classname or top parent classname if a subclass
+     *
+     */
+    private static String classnameForMatching(String classname) {
+        int ix = classname.indexOf("$");
+        if (ix >=0) {
+            classname = classname.substring(0,ix);
+        }
+        return classname;
+    }
+
+
+    /**
+     * @return null if no classes changed, otherwise return the update jar file.
      *
      * @throws ClassNotFoundException
      * @throws VoltCompilerException
@@ -346,9 +368,9 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
      */
     private static InMemoryJarfile modifyCatalogClasses(Catalog catalog, InMemoryJarfile jarfile, String deletePatterns,
             InMemoryJarfile newJarfile, boolean isXDCR, HSQLInterface hsql)
-            throws IOException, ClassNotFoundException, VoltCompilerException {
-        // modify the old jar in place based on the @UpdateClasses inputs, and then
-        // recompile it if necessary
+        throws IOException, ClassNotFoundException, VoltCompilerException, IllegalArgumentException {
+
+        // find any classes in jar that match deletePatterns
         boolean deletedClasses = false, foundClasses = false;
         if (deletePatterns != null) {
             String[] patterns = deletePatterns.split(",");
@@ -366,8 +388,53 @@ public abstract class UpdateApplicationBase extends VoltNTSystemProcedure {
                 }
             }
 
-            for (String classname : matcher.getMatchedClassList()) {
-                jarfile.removeClassFromJar(classname);
+            for (String classToRemove : matcher.getMatchedClassList()) {
+
+                Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
+
+                // Check for procedures that use the class
+                CatalogMap<Procedure> procedures = db.getProcedures();
+                for (Procedure proc : procedures) {
+                    if (proc.getHasjava()) {
+                        String procedureClass = classnameForMatching(proc.getClassname());
+                        if (classToRemove.equals(procedureClass)) {
+                            throw new IllegalArgumentException(String.format("Class %s cannot be removed, it is being used by procedure %s", classToRemove, procedureClass));
+                        }
+                    }
+                }
+
+                // Check for tasks that use the class
+                CatalogMap<Task> tasks = db.getTasks();
+                for (Task task : tasks) {
+
+                    String actionGenerator = classnameForMatching(task.getActiongeneratorclass());
+                    if (classToRemove.equals(actionGenerator)) {
+                        throw new IllegalArgumentException(String.format("Class %s cannot be removed, it is the action generator for task %s", classToRemove, task.getName()));
+                    }
+
+                    String actionScheduler = classnameForMatching(task.getSchedulerclass());
+                    if (classToRemove.equals(actionScheduler)) {
+                        throw new IllegalArgumentException(String.format("Class %s cannot be removed, it is the action scheduler for task %s", classToRemove, task.getName()));
+                    }
+
+                    String intervalGenerator = classnameForMatching(task.getScheduleclass());
+                    if (classToRemove.equals(intervalGenerator)) {
+                        throw new IllegalArgumentException(String.format("Class %s cannot be removed, it is the interval generator for task %s", classToRemove, task.getName()));
+                    }
+                }
+
+                // Check for functions that use the class
+                CatalogMap<Function> functions = db.getFunctions();
+                for (Function function : functions) {
+                    String className = classnameForMatching(function.getClassname());
+                    if (classToRemove.equals(className)) {
+                        throw new IllegalArgumentException(String.format("Class %s cannot be removed, it is used by function %s", classToRemove, function.getFunctionname()));
+                    }
+                }
+
+                // Remove the class
+                compilerLog.info("Removing Class: " + classToRemove);
+                jarfile.removeClassFromJar(classToRemove);
             }
         }
         if (newJarfile != null) {
