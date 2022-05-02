@@ -60,6 +60,7 @@ public class TruncateTableLoader extends BenchmarkThread {
     long nSwaps = 0;
     float mpRatio;
     float swapRatio;
+    boolean swaptables;
 
     TruncateTableLoader(Client client, String tableName, long targetCount, int rowSize, int batchSize, Semaphore permits, float mpRatio, float swapRatio) {
         setName("TruncateTableLoader");
@@ -70,6 +71,7 @@ public class TruncateTableLoader extends BenchmarkThread {
         this.batchSize = batchSize;
         this.m_permits = permits;
         this.mpRatio = mpRatio;
+        this.swaptables = (swapRatio <= 0.0) ? false : true;
         this.swapRatio = swapRatio;
 
         if ("trup".equalsIgnoreCase(tableName)) {
@@ -336,7 +338,7 @@ public class TruncateTableLoader extends BenchmarkThread {
 
                 // maybe swap tables before truncating
                 // sinc @SwapTables is inherintly MP doesn't make much sense to do this in the MP thread
-                if (r.nextInt(100) < swapRatio * 100.) {
+                if ( swaptables && (r.nextInt(100) < swapRatio * 100.) ) {
                     shouldRollback = (byte) (r.nextInt(10) == 0 ? 1 : 0);
                     long[] rowCounts = swapTables(shouldRollback, sp);
                     currentRowCount = rowCounts[0];
