@@ -72,7 +72,9 @@ public class UpdateClassesThread extends BenchmarkThread {
                 log.info("UpdateClasses Num bytes read: " + totalBytesRead);
             } finally {
                 log.info("UpdateClasses Closing input stream.");
-                input.close();
+                if (input != null) {
+                    input.close();
+                }
             }
         } catch (FileNotFoundException ex) {
             log.error("UpdateClasses jar file not found.");

@@ -40,6 +40,7 @@ set -x
 [ -z "$ENABLEHASHMISMATCHGEN" ] && ENABLEHASHMISMATCHGEN=false
 [ -z "$CSVFILE" ] && CSVFILE=periodic.csv.gz
 [ -z "$TOPOLOGYAWARE" ] && TOPOLOGYAWARE=true
+[ -z "$DROPTASKS" ] && DROPTASKS=true
 [ -z "$LOG4J" ] && LOG4J=""
 [ -z "$VJAR" ] && VJAR=`ls -1t voltdb/voltdb/voltdbclient-*.jar | head -1`
 [ -z "$USERNAME" ] && USERNAME=""
@@ -164,6 +165,7 @@ CMD="$CMD txnIdSelfCheck.Benchmark $ARGS \
         --sslfile=$SSLFILE \
         --username=$USERNAME \
         --password=$PASSWORD \
+        --droptasks=$DROPTASKS \
         --enablehashmismatchgen=$ENABLEHASHMISMATCHGEN"
 
 $CMD

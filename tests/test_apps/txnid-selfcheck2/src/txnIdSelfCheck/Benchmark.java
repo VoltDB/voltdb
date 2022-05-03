@@ -219,6 +219,9 @@ public class Benchmark {
         @Option(desc = "password")
         String password = "";
 
+        @Option(desc = "Drop Tasks at the end default is true.")
+        boolean droptasks = true;
+
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
@@ -594,8 +597,10 @@ public class Benchmark {
         VoltTable t = cr.getResults()[0];
         log.info(String.format("%15s%15s%15s%15s",
                 "TASK NAME", "PARTITION ID", "INVOCATIONS", "FAILURES"));
+        List<String> tasks = new ArrayList<>();
         while (t.advanceRow()) {
             long f = t.getLong("PROCEDURE_FAILURES");
+            tasks.add(t.getString("TASK_NAME"));
             log.info(String.format("%15s%15s%15s%15s",
                     t.getString("TASK_NAME"), t.getLong("PARTITION_ID"), t.getLong("SCHEDULER_INVOCATIONS"), f));
             if (f > 0)
@@ -606,6 +611,34 @@ public class Benchmark {
         // if (failures > 0) {
         //     hardStop(failures + " unexpected TASK failures");
         // }
+    }
+
+    private void dropAllTasks() throws IOException, ProcCallException {
+        ClientResponse cr = client.callProcedure("@Statistics", "TASK", 0);
+
+        if (cr.getStatus() != ClientResponse.SUCCESS) {
+            log.error("Failed to call Statistics proc at shutdown. Exiting.");
+            printJStack();
+            hardStop(((ClientResponseImpl) cr).toJSONString());
+        }
+        VoltTable t = cr.getResults()[0];
+        List<String> tasks = new ArrayList<>();
+        while (t.advanceRow()) {
+            tasks.add(t.getString("TASK_NAME"));
+        }
+        for (String task : tasks) {
+            String dropSql = "DROP TASK " + task +";";
+            System.out.println(dropSql);
+
+            cr = client.callProcedure("@AdHoc", dropSql);
+
+            if (cr.getStatus() != ClientResponse.SUCCESS) {
+                log.error("Failed to call Drop task proc at shutdown. Exiting.");
+                printJStack();
+                hardStop(((ClientResponseImpl) cr).toJSONString());
+            }
+        }
+        tasks.clear();
     }
 
     private byte reportDeadThread(Thread th) {
@@ -1020,6 +1053,17 @@ public class Benchmark {
                         // in disaster recovery scenarios exceptions can be
                         // generated.  at shutdown, we don't really care
                         log.warn("@Statistics call failed during shutdown", e);
+                    }
+                }
+
+                if (config.droptasks) {
+                    log.info("Calling dropAllTasks");
+                    try {
+                        dropAllTasks();
+                    } catch (Exception e) {
+                        // in disaster recovery scenarios exceptions can be
+                        // generated.  at shutdown, we don't really care
+                        log.warn("dropAllTasks call failed during shutdown", e);
                     }
                 }
 
