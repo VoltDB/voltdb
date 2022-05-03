@@ -24,7 +24,6 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltDB;
 import org.voltdb.export.AdvertisedDataSource;
-import org.voltdb.export.ExportManagerInterface;
 import org.voltdb.export.ExportManagerInterface.ExportMode;
 
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
@@ -45,7 +44,7 @@ public class DiscardingExportClient extends ExportClientBase {
     // Using common executor service to avoid using {@code ExportDataSource} executor
     private static volatile ListeningExecutorService s_es;
 
-    private int m_ackDelaySeconds = 0;
+    private int m_ackDelayMs = 0;
 
     class DiscardDecoder extends ExportDecoderBase {
 
@@ -76,10 +75,9 @@ public class DiscardingExportClient extends ExportClientBase {
 
         @Override
         public boolean processRow(ExportRow row) {
-            if (m_ackDelaySeconds > 0) {
-                m_logger.info("Sleep " + m_ackDelaySeconds + " before processing row ...");
+            if (m_ackDelayMs > 0) {
                 try {
-                    Thread.sleep(m_ackDelaySeconds * 1000);
+                    Thread.sleep(m_ackDelayMs);
                 } catch (InterruptedException e) {
                 }
             }
@@ -110,10 +108,10 @@ public class DiscardingExportClient extends ExportClientBase {
 
         String sleepValue = config.getProperty("ackdelay");
         if (sleepValue != null) {
-            int ackDelaySeconds = 0;
+            int ackDelay = 0;
             try {
-                ackDelaySeconds = Integer.parseInt(sleepValue);
-                m_ackDelaySeconds = ackDelaySeconds;
+                ackDelay = Integer.parseInt(sleepValue);
+                m_ackDelayMs = ackDelay;
             } catch (Exception e) {
                 m_logger.error("Failed to decode ackdelay value \'" + sleepValue + "\': " + e);
             }
