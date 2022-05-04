@@ -541,6 +541,20 @@ public class CatalogContext {
     }
 
     /**
+     * Safe wrapper around the above. Various unit tests set up an
+     * empty m_deploymentBytes, which getDeployment cannot deal with.
+     * This variant does a precheck; it should be used only if the
+     * caller is prepared to handle a null return.
+     */
+    public DeploymentType getDeploymentSafely() {
+        byte[] b = m_catalogInfo.m_deploymentBytes;
+        if (b == null || b.length == 0) {
+            return null;
+        }
+        return getDeployment();
+    }
+
+    /**
      * Get the XML Deployment bytes
      */
     public byte[] getDeploymentBytes()

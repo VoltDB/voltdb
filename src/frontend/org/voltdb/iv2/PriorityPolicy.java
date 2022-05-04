@@ -195,14 +195,7 @@ public class PriorityPolicy {
         if (s_activePolicy == null) {
             // Don't care if this is done concurrently by multiple threads
             CatalogContext cata = VoltDB.instance().getCatalogContext();
-
-            // Work around MockVoltDB that creates a CatalogContext with no deployment
-            DeploymentType depl = null;
-            byte[] deplBytes = cata == null ? null : cata.getDeploymentBytes();
-            if (deplBytes != null && deplBytes.length > 0) {
-                depl = cata.getDeployment();
-            }
-
+            DeploymentType depl = cata != null ? cata.getDeploymentSafely() : null;
             s_activePolicy = getPolicyFromDeployment(depl);
 
             // Initialize old snapshot priority (will be deprecated)

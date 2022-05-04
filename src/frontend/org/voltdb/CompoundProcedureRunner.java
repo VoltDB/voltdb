@@ -40,6 +40,7 @@ import org.voltdb.VoltCompoundProcedure.CompoundProcAbortException;
 import org.voltdb.VoltCompoundProcedure.Stage;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ClientResponseWithPartitionKey;
+import org.voltdb.compiler.deploymentfile.CompoundProcPolicyType;
 
 /**
  * A variation on ProcedureRunnerNT, specialized
@@ -52,8 +53,9 @@ public class CompoundProcedureRunner extends ProcedureRunnerNT {
     // The default is 150s, which is slightly higher than the default timeout of the VoltDB client.
     private static final int COMPOUND_PROCEDURE_TIMEOUT = 150_000_000;
 
-    // Per-stage limit on queued procedure calls
-    private static final int QUEUED_PROC_LIMIT = 10;
+    // Per-stage limit on queued procedure calls. May be overridden at
+    // initialization time based on deployment file.
+    private static int QUEUED_PROC_LIMIT = 10;
 
     // Limit for rate-limited logging (user procedure failures are apt to
     // be repetitive in nature). Value in seconds.
@@ -109,6 +111,12 @@ public class CompoundProcedureRunner extends ProcedureRunnerNT {
     @Override
     final int getTimeout() {
         return COMPOUND_PROCEDURE_TIMEOUT;
+    }
+
+    static void setExecutionPolicy(CompoundProcPolicyType pol) {
+        if (pol.getCallsperstage() != null) {
+            QUEUED_PROC_LIMIT = pol.getCallsperstage();
+        }
     }
 
     /**

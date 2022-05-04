@@ -46,8 +46,8 @@
       <xs:element name="threadpools" minOccurs="0" maxOccurs="1" type="threadPoolsType"/>
       <xs:element name="users" minOccurs="0" maxOccurs="1" type="usersType"/>
       <xs:element name="commandlog" minOccurs="0" maxOccurs="1" type="commandLogType" />
-      <xs:element name="systemsettings" minOccurs="0" maxOccurs="1"
-                  type="systemSettingsType" />
+      <xs:element name="systemsettings" minOccurs="0" maxOccurs="1" type="systemSettingsType" />
+      <xs:element name="compoundproc" minOccurs="0" maxOccurs="1" type="compoundProcPolicyType"/>
       <xs:element name="security" minOccurs='0' maxOccurs='1' type="securityType"/>
       <xs:element name="dr" minOccurs='0' maxOccurs='1' type="drType" />
       <xs:element name="import" minOccurs="0" maxOccurs="1" type="importType"/>
@@ -505,7 +505,7 @@
   </xs:complexType>
 
   <xs:simpleType name="userRoleNameString">
-	<xs:restriction base="xs:string">
+    <xs:restriction base="xs:string">
       <xs:pattern value="[\S]+"/>
     </xs:restriction>
   </xs:simpleType>
@@ -626,7 +626,7 @@
       <xs:element name="property" type="PropertyType" minOccurs="0" maxOccurs="unbounded"/>
     </xs:sequence>
   </xs:complexType>
-  
+
   <xs:complexType name="topicType">
     <xs:sequence>
       <xs:element name="property" type="PropertyType" minOccurs="0" maxOccurs="unbounded"/>
@@ -639,7 +639,6 @@
     <xs:attribute name="allow" type="xs:string" default="" />
     <xs:attribute name="priority" type="PriorityType" default="4" />
   </xs:complexType>
-  
 
   <!--  Priority, 1 = highest, 8 = lowest -->
   <!--  Must match definitions in client/Priority.java -->
@@ -665,7 +664,7 @@
   </xs:simpleType>
 
   <!-- These parameters should be be set before starting the system and cannot be changed
-        while the system is running (voltadmin update will fail) 
+        while the system is running (voltadmin update will fail)
    -->
   <xs:complexType name="priorityPolicyType">
     <xs:all>
@@ -684,4 +683,18 @@
     <xs:attribute name="maxwait" type="PriorityMaxWaitType" default="1000" />
     <xs:attribute name="batchsize" type="PriorityBatchSizeType" default="25" />
   </xs:complexType>
+
+  <xs:complexType name="compoundProcPolicyType">
+    <xs:attribute name="threads" type="positiveInt"/>
+    <xs:attribute name="queuelimit" type="positiveInt"/>
+    <xs:attribute name="callsperstage" type="positiveInt"/>
+  </xs:complexType>
+
+  <!-- this differs from xs:positiveInt in that the base is xs:int -->
+  <xs:simpleType name="positiveInt">
+    <xs:restriction base="xs:int">
+      <xs:minInclusive value="1"/>
+    </xs:restriction>
+  </xs:simpleType>
+
 </xs:schema>

@@ -45,6 +45,9 @@ import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.messaging.InitiateResponseMessage;
 
+import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.compiler.deploymentfile.CompoundProcPolicyType;
+
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.util.concurrent.ThreadFactoryBuilder;
 
@@ -122,16 +125,16 @@ public class NTProcedureService {
     public static final String NTPROCEDURE_RUN_EVERYWHERE_TIMEOUT = "NTPROCEDURE_RUN_EVERYWHERE_TIMEOUT";
 
     // Parameters for threadpool executors
-    private static int NTPROC_THREADS = getThreadLimit("NTPROC_THREADS", "primary NT proc");
+    // (For the compound proc executor, these are now set by the deployment file)
+    private static int defaultThreadLimit = Math.max(CoreUtils.availableProcessors(), 4);
+    private static int NTPROC_THREADS = Integer.getInteger("NTPROC_THREADS", defaultThreadLimit);
     private static int NTPROC_QUEUEMAX = Integer.getInteger("NTPROC_QUEUEMAX", 10_000);
-    private static int COMPROC_THREADS = getThreadLimit("COMPROC_THREADS", "compound proc");
-    private static int COMPROC_QUEUEMAX = Integer.getInteger("COMPROC_QUEUEMAX", 10_000);
 
     // Runs the initial run() method of nt procs.
     //  (doesn't run nt procs if started by other nt procs).
     // Uses multiple threads, created on demand up to a limit.
     // After that there is a bounded queue.
-    // Threads will eventually idle out.
+    // Threads do not idle out, despite the timeout setting.
     private final ExecutorService m_primaryExecutorService = new ThreadPoolExecutor(
             NTPROC_THREADS, NTPROC_THREADS, 60, TimeUnit.SECONDS,
             new ArrayBlockingQueue<>(NTPROC_QUEUEMAX),
@@ -155,12 +158,7 @@ public class NTProcedureService {
     // from subprocs. Subprocs issued by the compound proc
     // will execute on the usual site thread. See primary
     // thread for other comments.
-    private final ExecutorService m_compoundProcExecutorService = new ThreadPoolExecutor(
-            COMPROC_THREADS, COMPROC_THREADS, 60, TimeUnit.SECONDS,
-            new ArrayBlockingQueue<>(COMPROC_QUEUEMAX),
-            new ThreadFactoryBuilder()
-                .setNameFormat(COMPROC_THREADPOOL_NAMEPREFIX + "%d")
-                .build());
+    private final ExecutorService m_compoundProcExecutorService;
 
     /**
      * All of the slow load-time stuff for each procedure is cached here.
@@ -242,16 +240,6 @@ public class NTProcedureService {
         }
     }
 
-    // Get or guess a thread limit for thread executor pools
-    private static int getThreadLimit(String property, String pool) {
-        int val = Integer.getInteger(property, 0);
-        if (val <= 0) {
-            val = Math.max(CoreUtils.availableProcessors(), 4);
-        }
-        LOG.infoFmt("Thread limit for %s pool is %d", pool, val);
-        return val;
-    }
-
     NTProcedureService(ClientInterface clientInterface, InvocationDispatcher dispatcher, Mailbox mailbox) {
         assert(clientInterface != null);
         assert(mailbox != null);
@@ -260,6 +248,7 @@ public class NTProcedureService {
         clientInterface.bindAdapter(m_internalNTClientAdapter, null);
         m_mailbox = mailbox;
         m_sysProcs = loadSystemProcedures(true);
+        m_compoundProcExecutorService = initCompoundProcExecution();
     }
 
     /**
@@ -552,5 +541,52 @@ public class NTProcedureService {
     boolean isCompoundProc(String procName) {
         ProcedureRunnerNTGenerator gen = m_procs.get(procName);
         return (gen != null && gen.m_isCompound);
+    }
+
+    /*
+     * Set up everything for compound proc execution using parameters
+     * from the deployment file.
+     *
+     * Note: iff the compoundproc element exists in the deployment,
+     * then we assume compound procedures will actively be used, and
+     * we prestart the threads for a reduction in latency of the
+     * initial requests.
+     */
+    private static ExecutorService initCompoundProcExecution() {
+        int threadLimit = defaultThreadLimit;
+        int queueLimit = 10_000;
+        boolean prestart = false;
+
+        CatalogContext cat = VoltDB.instance().getCatalogContext();
+        if (cat != null) {
+            DeploymentType dep = cat.getDeploymentSafely();
+            if (dep != null) {
+                CompoundProcPolicyType pol = dep.getCompoundproc();
+                if (pol != null) {
+                    if (pol.getThreads() != null) {
+                        threadLimit = pol.getThreads();
+                    }
+                    if (pol.getQueuelimit() != null) {
+                        queueLimit = pol.getQueuelimit();
+                    }
+                    CompoundProcedureRunner.setExecutionPolicy(pol);
+                    prestart = true;
+                }
+            }
+        }
+
+        LOG.infoFmt("Compound procedure execution: thread limit %,d, queue limit %,d, prestart %s",
+                    threadLimit, queueLimit, prestart);
+        ThreadPoolExecutor exec =
+            new ThreadPoolExecutor(threadLimit, threadLimit,
+                                   60, TimeUnit.SECONDS, // ineffective on fixed-size pool
+                                   new ArrayBlockingQueue<>(queueLimit),
+                                   new ThreadFactoryBuilder()
+                                   .setNameFormat(COMPROC_THREADPOOL_NAMEPREFIX + "%d")
+                                   .build());
+        if (prestart) {
+            exec.prestartAllCoreThreads();
+        }
+        return exec;
     }
 }

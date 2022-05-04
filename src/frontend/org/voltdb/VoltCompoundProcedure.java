@@ -108,8 +108,10 @@ public class VoltCompoundProcedure extends VoltNonTransactionalProcedure {
      * <p>
      * The system supports parallel initiation. You can code
      * several calls to <code>queueProcedureCall</code> in
-     * a single stage. There is a fixed limit of 10 such
-     * calls in any one stage.
+     * a single stage. There is a system limit on the number
+     * of calls that can be queued in any one stage; this
+     * limit defaults to 10, but can be changed in the VoltDB
+     * deployment file.
      * <p>
      * When all calls have completed, the next stage will be
      * entered, with the results of all calls. The results
