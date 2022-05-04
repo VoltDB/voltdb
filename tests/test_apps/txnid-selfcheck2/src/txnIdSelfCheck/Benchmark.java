@@ -627,7 +627,7 @@ public class Benchmark {
             tasks.add(t.getString("TASK_NAME"));
         }
         for (String task : tasks) {
-            String dropSql = "DROP TASK " + task +";";
+            String dropSql = "DROP TASK " + task +" IF EXISTS;";
             System.out.println(dropSql);
 
             cr = client.callProcedure("@AdHoc", dropSql);
