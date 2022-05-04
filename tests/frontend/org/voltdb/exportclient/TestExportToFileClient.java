@@ -726,4 +726,120 @@ public class TestExportToFileClient extends ExportClientTestBase {
                 + "\"" + GEOG_POINT.toWKT() + "\",\"" + GEOG.toWKT() + "\"", ts, ts, ts, ts, ts),
                 new String(Files.readAllBytes(f.toPath()), Charsets.UTF_8).trim());
     }
+
+    @Test
+    public void testRenameStrandedUnbatchedFiles() throws Exception {
+        // create some fake csv files
+        String[] times = { "20220101000000", "20220101010000", "20220101020000", "20220101030000" };
+        String[] tables = { "TABLE", "LISTE" };
+        String nonce = "FileExport";
+        int gen = 1000;
+        for (String time : times) {
+            for (String table : tables) {
+                String name = "active-" + nonce + "-" + String.format("%019d", gen) + "-" + table + "-" + time + ".csv";
+                File file = new File(m_dir, name);
+                boolean created = file.createNewFile();
+                assertTrue("collision on create", created);
+                gen++;
+            }
+        }
+
+        // check for files
+        File outdir = new File(m_dir);
+        File[] files = outdir.listFiles();
+        int found = 0;
+        for (File f : files) {
+            String filename = f.getName();
+            if (filename.startsWith("active-")) {
+                found++;
+            }
+        }
+        assertEquals("Didn't find expected files", 8, found);
+
+        // configure client
+        ExportToFileClient client = new ExportToFileClient();
+        Properties props = new Properties();
+        props.put("nonce", nonce);
+        props.put("type", "csv");
+        props.put("outdir", m_dir);
+        props.put("batched", "false");
+        client.configure(props);
+
+        // check the files were renamed
+        int foundActive = 0;
+        int foundInactive = 0;
+        files = outdir.listFiles();
+        for (File f : files) {
+            String filename = f.getName();
+            if (filename.startsWith("active-")) {
+                foundActive++;
+            } else {
+                foundInactive++;
+            }
+        }
+        assertEquals("stranded active file still there", 0, foundActive);
+        assertEquals("stranded active files not renamed", 8, foundInactive);
+
+    }
+
+    @Test
+    public void testRenameStrandedBatchedFiles() throws Exception {
+
+        // create some fake csv files
+        String[] times = { "20220101000000", "20220101010000", "20220101020000", "20220101030000" };
+        String[] tables = { "TABLE", "LISTE" };
+        String nonce = "FileExport";
+        int gen = 1000;
+        for (String time : times) {
+            String dirName = "active-" + nonce + "-" + time;
+            File dir = new File(m_dir, dirName);
+            boolean created = dir.mkdir();
+            assertTrue("collision on dir create", created);
+            for (String table : tables) {
+                String filename = String.format("%019d", gen) + "-" + table + ".csv";
+                File file = new File(dir, filename);
+                created = file.createNewFile();
+                assertTrue("collision on create", created);
+                gen++;
+            }
+        }
+
+        // check for files
+        File outdir = new File(m_dir);
+        File[] files = outdir.listFiles();
+        int found = 0;
+        for (File f : files) {
+            String filename = f.getName();
+            if (filename.startsWith("active-")) {
+                found++;
+            }
+        }
+        assertEquals("Didn't find expected stranded batch folders", 4, found);
+
+        // configure client
+        ExportToFileClient client = new ExportToFileClient();
+        Properties props = new Properties();
+        props.put("nonce", nonce);
+        props.put("type", "csv");
+        props.put("outdir", m_dir);
+        props.put("batched", "true");
+        client.configure(props);
+
+        // check the files were renamed
+        int foundActive = 0;
+        int foundInactive = 0;
+        files = outdir.listFiles();
+        for (File f : files) {
+            String filename = f.getName();
+            if (filename.startsWith("active-")) {
+                foundActive++;
+            } else {
+                foundInactive++;
+            }
+        }
+        assertEquals("new active folder not found", 1, foundActive);
+        assertEquals("Stranded folders not renamed", 4, foundInactive);
+
+    }
+
 }

@@ -77,8 +77,8 @@ public class ExportToFileClient extends ExportClientBase {
     private static final int EXPORT_DELIM_NUM_CHARACTERS = 4;
     private static final String DEFAULT_DATE_FORMAT = "yyyyMMddHHmmss";
 
-    // These get put in from of the batch folders
-    // active means the folder is being written to
+    // Prefix for the batch folders (or files if not batched) being written to.
+    // It is removed when the folder (or files) get rolled.
     private static final String ACTIVE_PREFIX = "active-";
 
     protected char m_delimiter;
@@ -994,6 +994,10 @@ public class ExportToFileClient extends ExportClientBase {
             return;
         }
         setRunEverywhere(Boolean.parseBoolean(conf.getProperty("replicated", "false")));
+
+        // Before any new active files or folders are created, rename any stranded active-* files or folders
+        renameStrandedOutputFiles(outdir);
+
         configureInternal(
                 delimiter,
                 nonce,
@@ -1082,6 +1086,34 @@ public class ExportToFileClient extends ExportClientBase {
         m_logger.infoFmt("File rotator for nonce %s will run every %s seconds", nonce, m_periodSecs);
         if (m_retentionSecs >= 0) {
             m_logger.infoFmt("Files older than %s seconds will be purged", m_retentionSecs);
+        }
+    }
+
+    /**
+     * Check the outdir for any child files or folders that begin with the ACTIVE_PREFIX
+     * These may have been stranded (left unrolled) by a previous crash.
+     * If found, rename without the ACTIVE_PREFIX.
+     *
+     * Only call this from configure() before configureInternal() to avoid renaming anything actually active.
+     */
+    private void renameStrandedOutputFiles(File outdir) {
+        File[] files = outdir.listFiles();
+        for (File f : files) {
+            String filename = f.getName();
+            if (filename.startsWith(ACTIVE_PREFIX)) {
+                String type = "file";
+                if (f.isDirectory()) {
+                    type = "folder";
+                }
+                String newName = filename.substring(ACTIVE_PREFIX.length());
+                File newFile = new File(outdir, newName);
+                boolean renamed = f.renameTo(newFile);
+                if (renamed) {
+                    m_logger.info(String.format("Renamed stranded export %s %s to %s", type, filename, newName));
+                } else {
+                    m_logger.warn(String.format("Could not rename stranded export %s %s to %s", type, filename, newName));
+                }
+            }
         }
     }
 }
