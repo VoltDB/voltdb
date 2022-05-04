@@ -348,40 +348,30 @@ public class TestCompoundProcs {
     }
 
     // Tests changing the stage list on-the-fly
+    // which is not allowed
     public static class SwitchProc extends VoltCompoundProcedure {
 
         public long run() {
             System.out.println("== SwitchProc.run ==");
-            newStageList(this::oneThing)
-                .then(this::nextThing)
+            newStageList(this::firstThing)
                 .then(this::lastThing)
                 .build();
             return 0;
         }
 
-        private void oneThing(ClientResponse[] nil) {
-            queueProcedureCall("MySpProc", 1);
-        }
-
-        private void nextThing(ClientResponse[] resp) {
-            queueProcedureCall("MySpProc", 1); // this is never executed
-            queueProcedureCall("MyOtherSpProc", 2); // this is never executed
+        private void firstThing(ClientResponse[] nil) {
+            queueProcedureCall("MySpProc", 1);  // this is never executed
             newStageList(this::newLastThing)
-                .build();
-            queueProcedureCall("MySpProc", 3); // this is executed
-       }
+                .build(); // fails
+        }
 
         private void lastThing(ClientResponse[] resp) {
             abortProcedure("Should never get here");
         }
 
         private void newLastThing(ClientResponse[] resp) {
-            assertEquals(1, resp.length);
-            String val = extractResult(resp[0]);
-            assertEquals("another thing", val);
-            completeProcedure(123L);
-            System.out.println("== SwitchProc.done ==");
-        }
+            abortProcedure("Should never get here either");
+       }
     }
 
     // Tests too many calls
@@ -618,7 +608,7 @@ public class TestCompoundProcs {
 
     @Test
     public void testSwitchStages() throws Exception {
-        execTest("SwitchProc", ClientResponse.SUCCESS);
+        execTest("SwitchProc", ClientResponse.UNEXPECTED_FAILURE);
     }
 
     @Test

@@ -23,6 +23,8 @@
 package server;
 
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.voltcore.logging.VoltLogger;
@@ -39,6 +41,7 @@ public class HandleHit extends VoltCompoundProcedure {
     String userName;
     Long accountId;
     boolean errorsReported;
+    List<String> errorMessages;
 
     static AtomicInteger failCount = new AtomicInteger(0);
 
@@ -49,12 +52,15 @@ public class HandleHit extends VoltCompoundProcedure {
         urlStr = str;
         fakeFailures = fails != 0;
 
-        // Build stages
+        // Build stages:
         newStageList(this::doLookups)
         .then(this::doUpdates)
         .then(this::doUpdateResults)
+        // following stages on error only
+        .then(this::saveReportedErrors)
+        .then(this::completeWithErrors)
         .build();
-        return 0L;
+        return 0;
     }
 
     // Invoke first stage procedures, lookups on different partitioning keys
@@ -77,7 +83,11 @@ public class HandleHit extends VoltCompoundProcedure {
 
     // Process results of first stage, i.e. lookups, and perform updates
     private void doUpdates(ClientResponse[] resp) {
-        boolean allGood = true;
+
+        // Do nothing here if we failed in a previous stage
+        if (errorsReported) {
+            return;
+        }
 
         // Process response 0 = username
         ClientResponse resp0 = resp[0];
@@ -93,7 +103,6 @@ public class HandleHit extends VoltCompoundProcedure {
         }
         else {
             reportError(String.format("No user match found for cookie %d", cookieId));
-            allGood = false;
         }
 
         // Process response 1 = account id
@@ -109,7 +118,6 @@ public class HandleHit extends VoltCompoundProcedure {
         }
         else {
             reportError(String.format("No account match found for domain %s", domain));
-            allGood = false;
         }
 
         // GENERATE FAILURES
@@ -124,15 +132,24 @@ public class HandleHit extends VoltCompoundProcedure {
             }
         }
 
-        // Did we get all we need?
-        if (allGood) {
-            queueProcedureCall("UpdateAccount", userName, domain);
-            queueProcedureCall("GetNextBestAction",userName, cookieId, accountId, urlStr);
+        // Do nothing more if we failed in this stage
+        if (errorsReported) {
+            return;
         }
-    }
+
+        // Otherwise we got all we needed
+        queueProcedureCall("UpdateAccount", userName, domain);
+        queueProcedureCall("GetNextBestAction",userName, cookieId, accountId, urlStr);
+     }
 
     // Last stage if all went well: just check the update results
     private void doUpdateResults(ClientResponse[] resp) {
+
+        // Do nothing here if we failed in a previous stage
+        if (errorsReported) {
+            return;
+        }
+
         if (resp[0].getStatus() != ClientResponse.SUCCESS) {
             abortProcedure(String.format("UpdateAccount returned: %d", resp[0].getStatus()));
         }
@@ -148,7 +165,15 @@ public class HandleHit extends VoltCompoundProcedure {
         }
 
         // We're done (this is ignored if we already called abort)
-        completeProcedure(0L);
+        completeProcedure(0);
+    }
+
+    // We only execute this stage if lookup errors were previously reported
+    // (otherwise we have executed completeProcedure or abortProcedure)
+    private void saveReportedErrors(ClientResponse[] nil) {
+        for (String message : errorMessages) {
+            queueProcedureCall("COOKIE_ERRORS.insert", cookieId, urlStr, message);
+        }
     }
 
     // Complete the procedure after reporting errors: check if we succeeded logging them
@@ -158,20 +183,17 @@ public class HandleHit extends VoltCompoundProcedure {
                 abortProcedure(String.format("Failed reporting errors: %s", r.getStatusString()));
             }
         }
-        completeProcedure(-1L);
+        completeProcedure(-1);
     }
 
-    // Report execution errors to special topic. We:
-    // 1.  Change the stage list so as to abandon all incomplete stages
-    //     and set up a new final stage
-    // 2.  Queue up a request, to be executed after the
-    //     current stage, to update the special topic
+    // Report execution errors. We save up error messages
+    // for later reporting to a special topic in the
+    // saveReportedErrors stage.
     private void reportError(String message) {
-        if (!errorsReported) {
-            newStageList(this::completeWithErrors)
-                          .build();
-            errorsReported = true;
+        errorsReported = true;
+        if (errorMessages == null) {
+            errorMessages = new ArrayList<>();
         }
-        queueProcedureCall("COOKIE_ERRORS.insert", cookieId, urlStr, message);
+        errorMessages.add(message);
     }
 }

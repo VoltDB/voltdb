@@ -163,12 +163,13 @@ public class CompoundProcedureRunner extends ProcedureRunnerNT {
 
     void setStageList(List<Stage> list) {
         synchronized (stages) {
-            stages.clear();
+            if (!stages.isEmpty()) {
+                throw new RuntimeException("Cannot change stage-list");
+            }
             stages.addAll(list); // copy so there's no funny stuff
             stageIterator = stages.iterator();
             stageNumber = 0;
         }
-        resetProcedureQueue();
     }
 
     /*

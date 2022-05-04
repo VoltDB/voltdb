@@ -141,7 +141,7 @@ public class VoltCompoundProcedure extends VoltNonTransactionalProcedure {
      *
      * @param result the result of the compound procedure
      */
-    public final void completeProcedure(Long result) {
+    public final void completeProcedure(long result) {
         compoundProcRunner.completeProcedure(Long.class, result);
     }
 
@@ -269,18 +269,10 @@ public class VoltCompoundProcedure extends VoltNonTransactionalProcedure {
      *    .then(STAGE)
      *    .build();
      * </code></pre>
-     * An stage list is created by the call to {@link #newStageList}, with
+     * A stage list is created by the call to {@link #newStageList}, with
      * the first stage to be executed. Additional stages can be added
-     * one-by-one as required by the application logic.
-     * <p>
-     * In order to simplify error handling, you can replace the stage list
-     * during execution of a stage. Typically, you will want to abandon
-     * the original sequence of stages, and execute a new sequence
-     * suitable for error processing.
-     * <p>
-     * Any procedure calls queued prior to replacing the stage
-     * list will be discarded. Procedure calls queued after replacing
-     * the stage list will be issued as usual when the stage exits.
+     * one-by-one as required by the application logic. Once built, the
+     * stage list cannot be changed.
      *
      * @see Stage
      */
