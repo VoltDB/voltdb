@@ -115,7 +115,9 @@ public class OrderProc extends VoltCompoundProcedure {
         VoltTable vt = null;
         if (resp.getStatus() == ClientResponse.SUCCESS) {
             vt = resp.getResults()[0];
-            vt.advanceRow();
+            if (!vt.advanceRow()) {
+                vt = null;
+            }
         }
         return vt;
     }
