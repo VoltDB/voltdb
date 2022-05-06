@@ -253,7 +253,7 @@ public class UserHitClient {
                     .exceptionally(th -> { exitWithException("Failed creating user", th, false); return null; })
                     .get();
                 batch.clear();
-                log.infoFmt("%d users created...", i);
+                log.infoFmt("%d users created...", i+1);
             }
         }
         CompletableFuture.allOf(batch.toArray(new CompletableFuture<?>[0]))
