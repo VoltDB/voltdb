@@ -22,8 +22,8 @@ import org.voltdb.client.ClientAuthScheme;
 public abstract class AuthenticationRequest {
 
     protected String m_authenticatedUser;
-    protected volatile boolean m_done = false;
-    protected Exception m_authenticationFailure = null;
+    protected Exception m_authException;
+    protected volatile boolean m_done;
 
     /**
      * Perform the authentication request.
@@ -32,23 +32,20 @@ public abstract class AuthenticationRequest {
      * of the request. It should be 'the same' for repeated requests
      * from the same source, so it is inadvisable to include a TCP
      * port number, for example.
+     * <p>
+     * The implementation handles logging of all successful and
+     * failed authentication attempts. Logging may however
+     * be rate-limited.
      *
-     * @param scheme is the type of Hash scheme
+     * @param scheme is the type of hash scheme
      * @param fromAddress is the remote IP address of this authentication request
      * @return true if authenticated, false if not
      * @throws {@link IllegalStateException} if this request was already made
      */
     public boolean authenticate(ClientAuthScheme scheme, String fromAddress) {
         if (m_done) throw new IllegalStateException("this authentication request has a result");
-        boolean authenticated = false;
-        try {
-            authenticated = authenticateImpl(scheme, fromAddress);
-        } catch (Exception ex) {
-            m_authenticationFailure = ex;
-        }
-        finally {
-            m_done = true;
-        }
+        boolean authenticated = authenticateImpl(scheme, fromAddress);
+        m_done = true;
         return authenticated;
     }
 
@@ -56,15 +53,22 @@ public abstract class AuthenticationRequest {
      * Authentication provider implementation of the request
      * <p>
      * See {@link #authenticate} for the use of <code>fromAddress</code>
+     * <p>
+     * The implementation must log authentication success or
+     * failure. Logging may be rate-limited, at the discretion of
+     * the implementation, possibly depending on expectations that
+     * a failure will recur on immediate retry by a client.
      *
      * @return true if authenticated, false if not
-     * @throws Exception raised by the provider (if any)
-     */
-    protected abstract boolean authenticateImpl(ClientAuthScheme scheme, String fromAddress) throws Exception;
+      */
+    protected abstract boolean authenticateImpl(ClientAuthScheme scheme, String fromAddress);
 
     /**
-     * if the request is successful it returns the authenticated user name
-     * @return if the request is successful it returns the authenticated user name null if not
+     * Following the completion of an <code>authenticate</code> call,
+     * returns the authenticated user name if authentication succeeded,
+     * otherwise returns null.
+     *
+     * @return authenticated user name, null if authentication failed
      */
     public final String getAuthenticatedUser() {
         if (!m_done) throw new IllegalStateException("this authentication request has not been made yet");
@@ -72,12 +76,16 @@ public abstract class AuthenticationRequest {
     }
 
     /**
-     * if the request fails it returns the underlying provider exception
-     * @return if the request fails it returns the underlying provider exception, null if it succeeded
+     * If the <code>authenicate</code> call failed because of some unexpected
+     * exception, then the call returns the underlying provider exception,
+     * otherwise it returns null.
+     * <p>
+     * Not all failures are reported via an exception.
+     *
+     * @return provider exception, null if none
      */
     public final Exception getAuthenticationFailureException() {
         if (!m_done) throw new IllegalStateException("this authentication request has not been made yet");
-        return m_authenticationFailure;
+        return m_authException;
     }
-
 }

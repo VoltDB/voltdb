@@ -75,13 +75,17 @@ import com.google_voltpatches.common.collect.ImmutableSet;
 
 
 /**
- * The AuthSystem parses authentication and permission information from the catalog and uses it to generate a representation
- * of the permissions assigned to users and groups.
+ * The AuthSystem parses authentication and permission information from the catalog
+ * and uses it to generate a representation of the permissions assigned to users and groups.
+ *
+ * It provides various implementations of the AuthenticationRequest base class
+ * in order to support authentication by various means.
  *
  */
 public class AuthSystem {
 
     private static final VoltLogger authLogger = new VoltLogger("AUTH");
+    private static final int LOG_INTERVAL = 60; // seconds
 
     /**
      * JASS Login configuration entry designator
@@ -543,7 +547,6 @@ public class AuthSystem {
         VoltDB.crashLocalVoltDB(sb.toString(), true, thrown);
     }
 
-    //Is security enabled?
     public boolean isSecurityEnabled() {
         return m_enabled;
     }
@@ -564,6 +567,9 @@ public class AuthSystem {
         return m_internalAdminUser;
     }
 
+    /**
+     * Used when security is disabled. Grants all access.
+     */
     public static class AuthDisabledUser extends AuthUser {
         public AuthDisabledUser() {
             super(null, null, null, null, null);
@@ -591,6 +597,9 @@ public class AuthSystem {
 
     }
 
+    /**
+     * Used for the importer; has permission to all procedures
+     */
     public static class InternalImporterUser extends AuthUser {
         final static private EnumSet<Permission> PERMS = EnumSet.<Permission>of(
                 Permission.ALLPROC, Permission.DEFAULTPROC
@@ -631,6 +640,9 @@ public class AuthSystem {
         }
     }
 
+    /**
+     * Admin user - grants all permissions.
+     */
     public static class InternalAdminUser extends AuthUser {
         final static private EnumSet<Permission> PERMS =
                 EnumSet.<Permission>allOf(Permission.class);
@@ -690,7 +702,7 @@ public class AuthSystem {
         return user.getGroupNames();
     }
 
-    //Get users permission list not god for permission checking.
+    // Get users permission list, not good for permission checking.
     public String[] getUserPermissionList(String userName) {
         if (!m_enabled) {
             return m_perm_list;
@@ -713,10 +725,63 @@ public class AuthSystem {
         return m_enabled;
     }
 
+    /////////////////////////////////////////
+    // AUTHENTICATION SUCCESS/FAIL LOGGING
+    // We want to do individual rate-limiting for each unique user/address
+    // pair, so we prepare a format string including the user and address,
+    // before calling the rate-limited logger with any further arguments.
+    ////////////////////////////////////////
+
+    private static final String RL_SUFFIX = "\n\tThis message is rate-limited to once every " + LOG_INTERVAL + " secs.";
+
+    private static void logAuthSuccess(String user, String fromAddress) {
+        String form = String.format("Authenticated user %s from %s. %%s", displayableUser(user), displayableAddress(fromAddress));
+        authLogger.rateLimitedInfo(LOG_INTERVAL, form, RL_SUFFIX);
+    }
+
+    private enum FailedBecause {
+        NOUSER("no user name was given"),
+        BADUSER("there is no such user"),
+        BADPASS("the password did not match the password in the database"),
+        PROVIDER("provider error"),
+        KERBFAIL("kerberos authentication failed");
+
+        final private String m_text;
+        FailedBecause(String t) { m_text = t; }
+        String text() { return m_text; }
+    }
+
+    private static void logAuthFails(FailedBecause why, String user, String fromAddress) {
+        String form = String.format("Authentication of user %s from %s failed because %%s. %%s",
+                                    displayableUser(user), displayableAddress(fromAddress));
+        if (why == FailedBecause.BADUSER && (user == null || user.isEmpty())) {
+            why = FailedBecause.NOUSER; // a slightly better wording for this case
+        }
+        authLogger.rateLimitedInfo(LOG_INTERVAL, form, why.text(), RL_SUFFIX);
+    }
+
+    private static void logAuthException(Exception ex, String user, String fromAddress) {
+        String form = String.format("Authentication of user %s from %s failed with an exception. %%s",
+                                    displayableUser(user), displayableAddress(fromAddress));
+        authLogger.rateLimitedLog(LOG_INTERVAL, Level.WARN, ex, form, RL_SUFFIX);
+    }
+
+    static String displayableUser(String user) {
+        return user != null && !user.isEmpty() ? user : "(none)";
+    }
+
+    static String displayableAddress(String addr) {
+        return addr != null && !addr.isEmpty() ? addr : "(unknown address)";
+    }
+
+    /////////////////////////////////////////
+    // USERNAME + PASSWORD AUTHENTICATION
+    ////////////////////////////////////////
+
     public class HashAuthenticationRequest extends AuthenticationRequest {
 
         private final String m_user;
-        private final byte [] m_password;
+        private final byte[] m_password;
 
         public HashAuthenticationRequest(final String user, final byte [] hash) {
             m_user = user;
@@ -724,24 +789,37 @@ public class AuthSystem {
         }
 
         @Override
-        protected boolean authenticateImpl(ClientAuthScheme scheme, String fromAddress) throws Exception {
+        protected boolean authenticateImpl(ClientAuthScheme scheme, String fromAddress) {
+            try {
+                return doAuthentication(scheme, fromAddress);
+            }
+            catch (Exception ex) {
+                m_authException = ex;
+                logAuthException(ex, m_user, fromAddress);
+                return false;
+            }
+        }
+
+        private boolean doAuthentication(ClientAuthScheme scheme, String fromAddress) throws Exception {
             if (!m_enabled) {
                 m_authenticatedUser = m_user;
                 return true;
             }
-            else if (m_authProvider != AuthProvider.HASH) {
+
+            if (m_authProvider != AuthProvider.HASH) {
+                logAuthFails(FailedBecause.PROVIDER, m_user, fromAddress);
                 return false;
             }
 
-            final AuthUser user = m_users.get(m_user);
+            AuthUser user = m_users.get(m_user);
             if (user == null) {
-                logAuthFails(LogKeys.auth_AuthSystem_NoSuchUser.name(), m_user, fromAddress);
+                logAuthFails(FailedBecause.BADUSER, m_user, fromAddress);
                 return false;
             }
 
             boolean matched = isPasswordMatch(user, scheme, m_password);
             if (!matched) {
-                logAuthFails(LogKeys.auth_AuthSystem_AuthFailedPasswordMistmatch.name(), m_user, fromAddress);
+                logAuthFails(FailedBecause.BADPASS, m_user, fromAddress);
                 return false;
             }
 
@@ -751,6 +829,7 @@ public class AuthSystem {
         }
     }
 
+    // 'public' because also called from topics code
     public boolean isPasswordMatch(AuthUser user, ClientAuthScheme scheme, byte[] password) {
         boolean matched = true;
         if (user.m_sha1ShadowPassword != null || user.m_sha2ShadowPassword != null) {
@@ -778,47 +857,33 @@ public class AuthSystem {
         return matched;
     }
 
-    /*
-     * Log authentication success. We want to do individual rate-limiting
-     * for each unique user/address pair, so we format the message before
-     * calling the rate-limited logger.
-     */
-    private static void logAuthSuccess(String user, String fromAddress) {
-        String message = String.format("Authenticated user %s from %s. This message is rate limited to once every 60 seconds.",
-                                       displayableUser(user), displayableAddress(fromAddress));
-        authLogger.rateLimitedInfo(60, message);
-    }
-
-    /*
-     * Log authentication failures. Not currently rate-limited.
-     * TODO: rate limit this?
-     */
-    private static void logAuthFails(String key, String user, String fromAddress) {
-        String[] args = { displayableUser(user), displayableAddress(fromAddress) };
-        authLogger.l7dlog(Level.INFO, key, args, null);
-    }
-
-    /*
-     * For making log messages readable, ONLY.
-     */
-    static String displayableUser(String user) {
-        return user != null && !user.isEmpty() ? user : "(none)";
-    }
-
-    static String displayableAddress(String addr) {
-        return addr != null && !addr.isEmpty() ? addr : "(unknown address)";
-    }
+    /////////////////////////////////////////
+    // SPNEGO PASSTHROUGH AUTHENTICATION
+    ////////////////////////////////////////
 
     public class SpnegoPassthroughRequest extends AuthenticationRequest {
         private final String m_authenticatedPrincipal;
+
         public SpnegoPassthroughRequest(final String authenticatedPrincipal) {
             m_authenticatedPrincipal = authenticatedPrincipal;
         }
+
         @Override
-        protected boolean authenticateImpl(ClientAuthScheme scheme, String fromAddress) throws Exception {
-            final AuthUser user = m_users.get(m_authenticatedPrincipal);
+        protected boolean authenticateImpl(ClientAuthScheme scheme, String fromAddress) {
+            try {
+                return doAuthentication(scheme, fromAddress);
+            }
+            catch (Exception ex) {
+                m_authException = ex;
+                logAuthException(ex, m_authenticatedPrincipal, fromAddress);
+                return false;
+            }
+        }
+
+        private boolean doAuthentication(ClientAuthScheme scheme, String fromAddress) throws Exception {
+            AuthUser user = m_users.get(m_authenticatedPrincipal);
             if (user == null) {
-                logAuthFails(LogKeys.auth_AuthSystem_NoSuchUser.name(), m_authenticatedPrincipal, fromAddress);
+                logAuthFails(FailedBecause.BADUSER, m_authenticatedPrincipal, fromAddress);
                 return false;
             }
             m_authenticatedUser = m_authenticatedPrincipal;
@@ -827,21 +892,46 @@ public class AuthSystem {
         }
     }
 
+    /////////////////////////////////////////
+    // KERBEROS AUTHENTICATION
+    ////////////////////////////////////////
+
     public class KerberosAuthenticationRequest extends AuthenticationRequest {
         private final MessagingChannel m_channel;
+
+        private class KrbException extends Exception {
+            KrbException(String fmt, Object... args) {
+                super(String.format(fmt, args));
+            }
+        }
 
         public KerberosAuthenticationRequest(final MessagingChannel channel) {
             m_channel = channel;
         }
+
         @Override
-        protected boolean authenticateImpl(ClientAuthScheme scheme, String fromAddress) throws Exception {
+        protected boolean authenticateImpl(ClientAuthScheme scheme, String fromAddress) {
+            try {
+                return doAuthentication(scheme, fromAddress);
+            }
+            catch (Exception ex) {
+                m_authException = ex;
+                logAuthException(ex, "(unknown)", fromAddress);
+                return false;
+            }
+        }
+
+        private boolean doAuthentication(ClientAuthScheme scheme, String fromAddress) throws Exception {
             if (!m_enabled) {
                 m_authenticatedUser = "_^_pinco_pallo_^_";
                 return true;
             }
-            else if (m_authProvider != AuthProvider.KERBEROS) {
+
+            if (m_authProvider != AuthProvider.KERBEROS) {
+                logAuthFails(FailedBecause.PROVIDER, "(unknown)", fromAddress);
                 return false;
             }
+
             int msgSize =
                       4 // message size header
                     + 1 // protocol version
@@ -864,6 +954,7 @@ public class AuthSystem {
             m_channel.writeMessage(writeBuffer);
 
             String authenticatedUser = Subject.doAs(m_loginCtx.getSubject(), new PrivilegedAction<String>() {
+
                 /**
                  * Establish an authenticated GSS security context
                  * For further information on GSS please refer to
@@ -884,14 +975,12 @@ public class AuthSystem {
 
                             byte version = readBuffer.get();
                             if (version != AUTH_HANDSHAKE_VERSION) {
-                                authLogger.warn("Encountered unexpected authentication protocol version " + version);
-                                return null;
+                                throw new KrbException("unexpected authentication protocol version %s", version);
                             }
 
                             byte tag = readBuffer.get();
                             if (tag != AUTH_HANDSHAKE) {
-                                authLogger.warn("Encountered unexpected authentication protocol tag " + tag);
-                                return null;
+                                throw new KrbException("unexpected authentication protocol tag %s", tag);
                             }
 
                             // process the initiator (client) context token. If it returns a non empty token
@@ -925,14 +1014,12 @@ public class AuthSystem {
 
                             byte version = readData.get();
                             if (version != AUTH_HANDSHAKE_VERSION) {
-                                authLogger.warn("Encountered unexpected authentication protocol version " + version);
-                                return null;
+                                throw new KrbException("unexpected authentication protocol version %s", version);
                             }
 
                             byte tag = readData.get();
                             if (tag != AUTH_HANDSHAKE) {
-                                authLogger.warn("Encountered unexpected authentication protocol tag " + tag);
-                                return null;
+                                throw new KrbException("unexpected authentication protocol tag %s", tag);
                             }
                             MessageProp mprop = new MessageProp(0, true);
                             DelegatePrincipal delegate = new DelegatePrincipal(
@@ -952,21 +1039,27 @@ public class AuthSystem {
                     } catch (IOException|GSSException ex) {
                         Throwables.throwIfUnchecked(ex);
                         throw new RuntimeException(ex);
+                    } catch (KrbException ex) {
+                        // Protocol problems, logged in addition to the "failed authentication" logging
+                        authLogger.rateLimitedWarn(LOG_INTERVAL, "Kerberos error: %s", ex.getMessage());
+                        return null;
                     } finally {
                         if (context != null) {
-                            try { context.dispose(); } catch (Exception ignoreIt) {}
+                            try { context.dispose(); } catch (Exception ignoreIt) { }
                         }
                     }
                 }
             });
 
             if (authenticatedUser == null) {
+                // TODO - figure out how to get the user name that failed authentication
+                logAuthFails(FailedBecause.KERBFAIL, "(unknown)", fromAddress);
                 return false;
             }
 
             final AuthUser user = m_users.get(authenticatedUser);
             if (user == null) {
-                logAuthFails(LogKeys.auth_AuthSystem_NoSuchUser.name(), authenticatedUser, fromAddress);
+                logAuthFails(FailedBecause.BADUSER, authenticatedUser, fromAddress);
                 return false;
             }
 

@@ -715,8 +715,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                  * Authenticate the user.
                  */
                 boolean authenticated = arq.authenticate(hashScheme, sourceIP);
-
                 if (!authenticated) {
+                    // Failure has already been logged by AuthSystem
+
                     long timestamp = System.currentTimeMillis();
                     ScheduledExecutorService es = VoltDB.instance().getSES(false);
                     if (es != null && !es.isShutdown()) {
@@ -729,21 +730,15 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         });
                     }
 
-                    Exception faex = arq.getAuthenticationFailureException();
-                    if (faex != null) {
-                        authLog.warnFmt(faex, "Failure to authenticate connection(%s) for user %s",
-                                        sourceNameAndIP, displayableUser);
-                    } else {
-                        authLog.warnFmt("Failure to authenticate connection(%s): user %s failed authentication.",
-                                        sourceNameAndIP, displayableUser);
-                    }
-
+                    // This seems iffy to me: any I/O error on anything anywhere
+                    // means we don't try to respond to the client?
                     boolean isItIo = false;
-                    for (Throwable cause = faex; faex != null && !isItIo; cause = cause.getCause()) {
+                    Exception faex = arq.getAuthenticationFailureException();
+                    for (Throwable cause = faex; cause != null && !isItIo; cause = cause.getCause()) {
                         isItIo = cause instanceof IOException;
                     }
 
-                    //Send negative response
+                    // Send negative response
                     if (!isItIo) {
                         responseBuffer.put(AUTHENTICATION_FAILURE).flip();
                         messagingChannel.writeMessage(responseBuffer);

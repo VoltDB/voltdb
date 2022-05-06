@@ -63,8 +63,6 @@ public enum LogKeys {
     auth_ClientInterface_LackingPermissionForProcedure,
     auth_ClientInterface_LackingPermissionForSql,
     auth_ClientInterface_LackingPermissionForSysproc,
-    auth_AuthSystem_NoSuchUser,
-    auth_AuthSystem_AuthFailedPasswordMistmatch,
 
     //SQL
     sql_Backend_DmlError,
