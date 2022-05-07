@@ -41,6 +41,7 @@ command_dir  = None
 command_name = None
 voltdb_jar   = None
 classpath    = None
+java_gc_opts = None
 
 # Location of third_party/python if available.
 third_party_python = None
@@ -102,6 +103,9 @@ if not [opt for opt in java_opts if opt.startswith('-Xmx')]:
         java_opts.append('-Xms2048m')
         java_opts.append('-XX:+AlwaysPreTouch')
 
+if 'VOLTDB_GC_OPTS' in os.environ:
+    java_gc_opts =shlex.split(os.environ.get('VOLTDB_GC_OPTS'))
+
 # Find the temp directory which is going to be used by java
 tmpDir = '/tmp'
 for opt in [o for o in java_opts if o.startswith('-Djava.io.tmpdir=')]:
@@ -122,17 +126,22 @@ java_opts.append('-Dsun.rmi.dgc.client.gcInterval=9223372036854775807')
 java_opts.append('-XX:+ExplicitGCInvokesConcurrent')
 
 if java_version=="17":
-    java_opts.append('-XX:+UseG1GC')
+    if java_gc_opts is None:
+        java_opts.append('-XX:+UseG1GC')
+    else:
+        java_opts.extend(java_gc_opts)
 else:
-    java_opts.append('-XX:+UseConcMarkSweepGC')
-    java_opts.append('-XX:+CMSParallelRemarkEnabled')
-    java_opts.append('-XX:CMSInitiatingOccupancyFraction=75')
-    java_opts.append('-XX:+UseCMSInitiatingOccupancyOnly')
-    java_opts.append('-XX:CMSWaitDuration=120000')
-    java_opts.append('-XX:CMSMaxAbortablePrecleanTime=120000')
-    java_opts.append('-XX:+CMSScavengeBeforeRemark')
-    java_opts.append('-XX:+CMSClassUnloadingEnabled')
-
+    if java_gc_opts is None:
+        java_opts.append('-XX:+UseConcMarkSweepGC')
+        java_opts.append('-XX:+CMSParallelRemarkEnabled')
+        java_opts.append('-XX:CMSInitiatingOccupancyFraction=75')
+        java_opts.append('-XX:+UseCMSInitiatingOccupancyOnly')
+        java_opts.append('-XX:CMSWaitDuration=120000')
+        java_opts.append('-XX:CMSMaxAbortablePrecleanTime=120000')
+        java_opts.append('-XX:+CMSScavengeBeforeRemark')
+        java_opts.append('-XX:+CMSClassUnloadingEnabled')
+    else:
+        java_opts.extend(java_gc_opts)
 
 # skip PermSize in Java 8 and above
 if java_version=="7":
