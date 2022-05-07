@@ -129,6 +129,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     static long TOPOLOGY_CHANGE_CHECK_MS = Long.getLong("TOPOLOGY_CHANGE_CHECK_MS", 5000);
     static long AUTH_TIMEOUT_MS = Long.getLong("AUTH_TIMEOUT_MS", 30000);
+    private static final int SSL_LOG_INTERVAL = 60; // seconds
 
     //Same as in Distributer.java
     public static final long ASYNC_TOPO_HANDLE = Long.MAX_VALUE - 1;
@@ -343,31 +344,32 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             @Override
             public void run() {
                 if (m_socket != null) {
-                    SocketAddress remoteAddr = m_socket.socket().getRemoteSocketAddress();
-
+                    final String remoteIP = ((InetSocketAddress)(m_socket.socket().getRemoteSocketAddress())).getAddress().getHostAddress();
                     SSLEngine sslEngine = null;
                     ByteBuffer remnant = ByteBuffer.wrap(new byte[0]);
 
+                    // Do TLS/SSL setup iff configured; client is expected to know whether
+                    // the server expects it.
                     if (m_sslContext != null) {
                         try {
                             sslEngine = m_sslContext.newEngine(ByteBufAllocator.DEFAULT);
                         } catch (Exception e) {
-                            networkLog.warn("Rejected accepting new connection, failed to create SSLEngine; " +
-                                    "indicates problem with SSL configuration: " + e.getMessage());
+                            networkLog.rateLimitedWarn(SSL_LOG_INTERVAL,
+                                                       "Rejected new connection, failed to create SSLEngine; " +
+                                                       "indicates problem with TLS/SSL configuration: %s", e.getMessage());
                             return;
                         }
                         // blocking needs to be false for handshaking.
 
-                        boolean handshakeStatus = false;
-                        String handshakeErr = null;
-
+                        String error = null;
+                        String detail = "";
                         try {
                             // m_socket.configureBlocking(false);
                             m_socket.socket().setTcpNoDelay(true);
                             TLSHandshaker handshaker = new TLSHandshaker(m_socket, sslEngine);
-                            handshakeStatus = handshaker.handshake();
+                            boolean handshakeStatus = handshaker.handshake();
                             /*
-                             * The JDK caches SSL sessions when the participants are the same (i.e.
+                             * The JDK caches TLS/SSL sessions when the participants are the same (i.e.
                              * multiple connection requests from the same peer). Once a session is cached
                              * the client side ends its handshake session quickly, and is able to send
                              * the login Volt message before the server finishes its handshake. This message
@@ -375,32 +377,30 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                              */
                             if (handshakeStatus) {
                                 remnant = handshaker.getRemnant();
+                            } else {
+                                error = "TLS/SSL handshake failed";
                             }
-
                         } catch (NotSslRecordException e) {
-                            handshakeErr = String.format("Rejected accepting new connection from %s, client not using TLS/SSL",
-                                                         remoteAddr);
+                            error = "client not using TLS/SSL";
                         } catch (SSLException e) {
-                            handshakeErr = String.format("Rejected accepting new connection from %s, SSL handshake failed: %s",
-                                                         remoteAddr, e.getMessage());
+                            error = "TLS/SSL handshake failed:";
+                            detail = e.getMessage();
                         } catch (IOException e) {
-                            handshakeErr = String.format("Rejected accepting new connection from %s, error during SSL handshake: %s",
-                                                         remoteAddr, e.getMessage());
+                            error =  "error during TLS/SSL handshake:";
+                            detail = e.getMessage();
                         }
-                        if (handshakeErr != null) {
+                        if (error != null) {
+                            // We want to rate-limit per client, so the remote IP address is part of the format.
+                            String format = String.format("Rejected new connection from %s, %%s %%s", remoteIP);
+                            networkLog.rateLimitedWarn(SSL_LOG_INTERVAL, format, error, detail);
                             closeSocket();
-                            networkLog.warn(handshakeErr);
                             return;
                         }
-                        if (!handshakeStatus) {
-                            closeSocket();
-                            networkLog.warn(String.format("Rejected accepting new connection from %s, SSL handshake failed",
-                                                          remoteAddr));
-                            return;
-                        }
-                        networkLog.info(String.format("SSL enabled on connection %s with protocol %s and with cipher %s",
-                                                      remoteAddr, sslEngine.getSession().getProtocol(),
-                                                      sslEngine.getSession().getCipherSuite()));
+                        // Here we want to log if the protocol/cipher changes, so the whole thing is the format
+                        String format = String.format("TLS/SSL enabled on connection %s with protocol %s and with cipher %s",
+                                                      remoteIP, sslEngine.getSession().getProtocol(),
+                                                      sslEngine.getSession().getCipherSuite());
+                        networkLog.rateLimitedInfo(SSL_LOG_INTERVAL, format);
                     }
 
                     boolean success = false;
@@ -413,10 +413,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                          */
                         if (m_clientConnectionsTracker.isConnectionsLimitReached()) {
                             m_clientConnectionsTracker.connectionDropped();
-                            networkLog.warnFmt(
-                                            "Rejected connection from %s because the connection limit of %s has been reached",
-                                            remoteAddr,
-                                            m_clientConnectionsTracker.getMaxNumberOfAllowedConnections()
+                            networkLog.warnFmt("Rejected connection from %s because the connection limit of %s has been reached",
+                                               remoteIP,
+                                               m_clientConnectionsTracker.getMaxNumberOfAllowedConnections()
                             );
                             try {
                             /*
@@ -556,7 +555,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
          * Attempt to authenticate the user associated with this socket connection
          * @param socket
          * @param timeoutRef Populated with error on timeout
-         * @param remnant The JDK caches SSL sessions when the participants are the same (i.e.
+         * @param remnant The JDK caches TLS/SSL sessions when the participants are the same (i.e.
          *   multiple connection requests from the same peer). Once a session is cached
          *   the client side ends its handshake session quickly, and is able to send
          *   the login Volt message before the server finishes its handshake. This message
@@ -588,7 +587,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
 
             if (remnant.hasRemaining() && (remnant.remaining() <= 4 || remnant.getInt() != remnant.remaining())) {
-                throw new IOException("SSL Handshake remnant is not a valid VoltDB message: " + remnant);
+                throw new IOException("TLS/SSL Handshake remnant is not a valid VoltDB message: " + remnant);
             }
 
             /*
