@@ -9,8 +9,8 @@ Undefined procedure: Trivial
 Expect to fail because we can't call "@SwapClasses" as a SQLStmt.
 [BadSwap.class]: Failed to plan for statement (badswap) "@SwapTables t1 t2;". Error: "Error in "@SwapTables t1 t2;" - unknown token"
 Expect to fail because of failure to "redefine" the Trivial proc with its
-    underlying class removed. The error message could be better here.
-Classes not found in @UpdateClasses jar: sqlcmdtest.Trivial
+    underlying class removed.
+Invalid modification of classes: Class sqlcmdtest.Trivial cannot be removed, it is being used by procedure sqlcmdtest.Trivial
 Expect to fail now that class has been successfully removed
 [Ad Hoc DDL Input]: VoltDB DDL Error: "Cannot load class for procedure: sqlcmdtest.Trivial
    caused by:

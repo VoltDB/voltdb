@@ -35,7 +35,7 @@ echoerror Expect to fail because we can't call "@SwapClasses" as a SQLStmt.
 create procedure from class sqlcmdtest.BadSwap;
 
 echoerror Expect to fail because of failure to "redefine" the Trivial proc with its
-echoerror     underlying class removed. The error message could be better here.
+echoerror     underlying class removed.
 remove classes sqlcmdtest.*;
 show classes;
 
