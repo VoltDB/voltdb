@@ -23,16 +23,13 @@ import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 
-public class StatsProcOutputTable
-{
-
+public class StatsProcOutputTable {
     // A table of ProcOutputRows: set of unique procedure names
-    TreeSet<ProcOutputRow> m_rowsTable = new TreeSet<ProcOutputRow>();
+    TreeSet<ProcOutputRow> m_rowsTable = new TreeSet<>();
 
     // A row for a procedure on a single host aggregating invocations and
     // min/max/avg bytes I/O across partitions
-    static class ProcOutputRow implements Comparable<ProcOutputRow>
-    {
+    static class ProcOutputRow implements Comparable<ProcOutputRow> {
         String procedure;
         long partition;
         long timestamp;
@@ -46,8 +43,7 @@ public class StatsProcOutputTable
         private final Set<Long> seenPartitions;
 
         public ProcOutputRow(String procedure, long partition, long timestamp,
-            long invocations, long minOUT, long maxOUT, long avgOUT)
-        {
+                             long invocations, long minOUT, long maxOUT, long avgOUT) {
             this.procedure = procedure;
             this.partition = partition;
             this.timestamp = timestamp;
@@ -62,17 +58,16 @@ public class StatsProcOutputTable
         }
 
         @Override
-        public int compareTo(ProcOutputRow other)
-        {
+        public int compareTo(ProcOutputRow other) {
             return procedure.compareTo(other.procedure);
 
         }
 
         // Augment this ProcOutputRow with a new input row
         // dedup flag indicates if we should dedup data based on partition for proc.
-        void updateWith(boolean dedup, ProcOutputRow in)        {
+        void updateWith(boolean dedup, ProcOutputRow in) {
             this.avgOUT = calculateAverage(this.avgOUT, this.invocations,
-                in.avgOUT, in.invocations);
+                                           in.avgOUT, in.invocations);
             this.minOUT = Math.min(this.minOUT, in.minOUT);
             this.maxOUT = Math.max(this.maxOUT, in.maxOUT);
 
@@ -92,8 +87,7 @@ public class StatsProcOutputTable
      * Given a running average and the running invocation total as well as a new
      * row's average and invocation total, return a new running average
      */
-    static long calculateAverage(long currAvg, long currInvoc, long rowAvg, long rowInvoc)
-    {
+    static long calculateAverage(long currAvg, long currInvoc, long rowAvg, long rowInvoc) {
         long currTtl = currAvg * currInvoc;
         long rowTtl = rowAvg * rowInvoc;
 
@@ -108,8 +102,7 @@ public class StatsProcOutputTable
     /**
      * Safe division that assumes x/0 = 100%
      */
-    static long calculatePercent(long num, long denom)
-    {
+    static long calculatePercent(long num, long denom) {
         if (denom == 0L) {
             return 100L;
         } else {
@@ -118,23 +111,15 @@ public class StatsProcOutputTable
     }
 
     // Sort by total bytes out
-    public int compareByOutput(ProcOutputRow r1, ProcOutputRow r2)
-    {
-        if (r1.avgOUT * r1.invocations > r2.avgOUT * r2.invocations) {
-            return 1;
-        } else if (r1.avgOUT * r1.invocations < r2.avgOUT * r2.invocations) {
-            return -1;
-        } else {
-            return 0;
-        }
+    public int compareByOutput(ProcOutputRow r1, ProcOutputRow r2) {
+        return Long.compare(r1.avgOUT * r1.invocations, r2.avgOUT * r2.invocations);
     }
 
     // Add or update the corresponding row. dedup flag indicates if we should dedup data based on partition for proc.
     public void updateTable(boolean dedup, String procedure, long partition, long timestamp,
-            long invocations, long minOUT, long maxOUT, long avgOUT)
-    {
+                            long invocations, long minOUT, long maxOUT, long avgOUT) {
         ProcOutputRow in = new ProcOutputRow(procedure, partition, timestamp,
-            invocations, minOUT, maxOUT, avgOUT);
+                                             invocations, minOUT, maxOUT, avgOUT);
         ProcOutputRow exists = m_rowsTable.ceiling(in);
         if (exists != null && in.procedure.equals(exists.procedure)) {
             exists.updateWith(dedup, in);
@@ -144,14 +129,10 @@ public class StatsProcOutputTable
     }
 
     // Return table ordered by total bytes out
-    public VoltTable sortByOutput(String tableName)
-    {
-        List<ProcOutputRow> sorted = new ArrayList<ProcOutputRow>(m_rowsTable);
-        Collections.sort(sorted, new Comparator<ProcOutputRow>() {
-            @Override
-            public int compare(ProcOutputRow r1, ProcOutputRow r2) {
-                return compareByOutput(r2, r1); // sort descending
-            }
+    public VoltTable sortByOutput(String tableName) {
+        List<ProcOutputRow> sorted = new ArrayList<>(m_rowsTable);
+        sorted.sort((r1, r2) -> {
+            return compareByOutput(r2, r1); // sort descending
         });
 
         long totalOutput = 0L;
@@ -163,8 +144,8 @@ public class StatsProcOutputTable
         int mB = 1024 * kB;
 
         VoltTable result = TableShorthand.tableFromShorthand(
-            tableName +
-            "(TIMESTAMP:BIGINT," +
+                tableName +
+                "(TIMESTAMP:BIGINT," +
                 "PROCEDURE:VARCHAR," +
                 "WEIGHTED_PERC:BIGINT," +
                 "INVOCATIONS:BIGINT," +
@@ -172,19 +153,19 @@ public class StatsProcOutputTable
                 "MAX_RESULT_SIZE:BIGINT," +
                 "AVG_RESULT_SIZE:BIGINT," +
                 "TOTAL_RESULT_SIZE_MB:BIGINT)"
-                );
+        );
 
         for (ProcOutputRow row : sorted) {
             result.addRow(
-                row.timestamp,
-                row.procedure,
-                calculatePercent((row.avgOUT * row.invocations), totalOutput), //% total out
-                row.invocations,
-                row.minOUT,
-                row.maxOUT,
-                row.avgOUT,
-                (row.avgOUT * row.invocations) / mB //total out
-                );
+                    row.timestamp,
+                    row.procedure,
+                    calculatePercent((row.avgOUT * row.invocations), totalOutput), //% total out
+                    row.invocations,
+                    row.minOUT,
+                    row.maxOUT,
+                    row.avgOUT,
+                    (row.avgOUT * row.invocations) / mB //total out
+            );
         }
         return result;
     }

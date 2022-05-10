@@ -26,11 +26,10 @@ import java.util.TreeSet;
 public class StatsProcProfTable {
 
     // A table of ProcProfRows: set of unique procedure names
-    TreeSet<ProcProfRow> m_table = new TreeSet<ProcProfRow>();
+    TreeSet<ProcProfRow> m_table = new TreeSet<>();
 
     // One row (procedure) of min/max/avg data aggregated across sites and hosts
-    static class ProcProfRow implements Comparable<ProcProfRow>
-    {
+    static class ProcProfRow implements Comparable<ProcProfRow> {
         long timestamp;
         String procedure;
         long invocations;
@@ -45,8 +44,7 @@ public class StatsProcProfTable {
         private final Set<Long> seenPartitions;
 
         public ProcProfRow(long timestamp, String procedure, long partition,
-                long invocations, long min, long max, long avg, long failures, long aborts)
-        {
+                           long invocations, long min, long max, long avg, long failures, long aborts) {
             this.timestamp = timestamp;
             this.procedure = procedure;
             this.partition = partition;
@@ -56,13 +54,14 @@ public class StatsProcProfTable {
             this.avg = avg;
             this.failures = failures;
             this.aborts = aborts;
-            seenPartitions = new TreeSet<Long>();
+
+            seenPartitions = new TreeSet<>();
             seenPartitions.add(partition);
         }
 
         // Augment this ProcProfRow with a new input row.
         // dedup flag indicates if we should dedup data based on partition for proc.
-        void updateWith(boolean dedup, ProcProfRow in)        {
+        void updateWith(boolean dedup, ProcProfRow in) {
             // adjust the min, max and avg across all replicas.
             this.avg = calculateAverage(
                     this.avg, this.invocations,
@@ -87,8 +86,7 @@ public class StatsProcProfTable {
         }
 
         @Override
-        public int compareTo(ProcProfRow other)
-        {
+        public int compareTo(ProcProfRow other) {
             return procedure.compareTo(other.procedure);
         }
     }
@@ -97,16 +95,14 @@ public class StatsProcProfTable {
      * Given a running average and the running invocation total as well as a new
      * row's average and invocation total, return a new running average
      */
-    static long calculateAverage(long currAvg, long currInvoc, long rowAvg, long rowInvoc)
-    {
+    static long calculateAverage(long currAvg, long currInvoc, long rowAvg, long rowInvoc) {
         long currTtl = currAvg * currInvoc;
         long rowTtl = rowAvg * rowInvoc;
 
         // If both are 0, then currTtl, rowTtl are also 0.
         if ((currInvoc + rowInvoc) == 0L) {
             return 0L;
-        }
-        else {
+        } else {
             return (currTtl + rowTtl) / (currInvoc + rowInvoc);
         }
     }
@@ -114,39 +110,33 @@ public class StatsProcProfTable {
     /**
      * Safe division that assumes x/0 = 100%
      */
-    static long calculatePercent(long nom, long denom)
-    {
+    static long calculatePercent(long nom, long denom) {
         if (denom == 0L) {
             return 100L;
         }
+
         return Math.round(100.0 * nom / denom);
     }
 
     // Add or update the corresponding row. dedup flag indicates if we should dedup data based on partition for proc.
     public void updateTable(boolean dedup, long timestamp, String procedure, long partition,
-            long invocations, long min, long max, long avg, long failures, long aborts)
-    {
+                            long invocations, long min, long max, long avg, long failures, long aborts) {
         ProcProfRow in = new ProcProfRow(timestamp, procedure, partition,
-                invocations,
-                min, max, avg, failures, aborts);
+                                         invocations,
+                                         min, max, avg, failures, aborts);
         ProcProfRow exists = m_table.ceiling(in);
         if (exists != null && in.procedure.equals(exists.procedure)) {
             exists.updateWith(dedup, in);
-        }
-        else {
+        } else {
             m_table.add(in);
         }
     }
 
     // Return table sorted by weighted avg
-    public VoltTable sortByAverage(String tableName)
-    {
-        List<ProcProfRow> sorted = new ArrayList<ProcProfRow>(m_table);
-        Collections.sort(sorted, new Comparator<ProcProfRow>() {
-            @Override
-            public int compare(ProcProfRow lhs, ProcProfRow rhs) {
-                return compareByAvg(rhs, lhs);  // sort desc
-            }
+    public VoltTable sortByAverage(String tableName) {
+        List<ProcProfRow> sorted = new ArrayList<>(m_table);
+        sorted.sort((lhs, rhs) -> {
+            return compareByAvg(rhs, lhs);  // sort desc
         });
 
         long sumOfAverage = 0L;
@@ -157,56 +147,16 @@ public class StatsProcProfTable {
         VoltTable result = TableShorthand.tableFromShorthand(
                 tableName + "(TIMESTAMP:BIGINT, PROCEDURE:VARCHAR, WEIGHTED_PERC:BIGINT, INVOCATIONS:BIGINT," +
                 "AVG:BIGINT, MIN:BIGINT, MAX:BIGINT, ABORTS:BIGINT, FAILURES:BIGINT)");
-        for (ProcProfRow row : sorted ) {
+        for (ProcProfRow row : sorted) {
             result.addRow(row.timestamp, row.procedure, calculatePercent(row.avg * row.invocations, sumOfAverage),
-                    row.invocations, row.avg, row.min, row.max, row.aborts, row.failures);
+                          row.invocations, row.avg, row.min, row.max, row.aborts, row.failures);
         }
 
         return result;
     }
 
     // Sort by average, weighting the sampled average by the real invocation count.
-    public int compareByAvg(ProcProfRow lhs, ProcProfRow rhs)
-    {
-        if (lhs.avg * lhs.invocations > rhs.avg * rhs.invocations) {
-            return 1;
-        } else if (lhs.avg * lhs.invocations < rhs.avg * rhs.invocations) {
-            return -1;
-        } else {
-            return 0;
-        }
+    public int compareByAvg(ProcProfRow lhs, ProcProfRow rhs) {
+        return Long.compare(lhs.avg * lhs.invocations, rhs.avg * rhs.invocations);
     }
-
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

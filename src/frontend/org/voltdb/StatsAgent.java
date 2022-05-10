@@ -27,29 +27,27 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.Connection;
 import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.VoltTable.ColumnInfo;
-import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.dr2.DRConsumerStatsBase.DRConsumerClusterStatsBase;
 import org.voltdb.dr2.DRProducerClusterStats;
+import org.voltdb.stats.procedure.ProcedureDetailAggregator;
 import org.voltdb.task.TaskStatsSource;
-
-import com.google_voltpatches.common.base.Supplier;
-import com.google_voltpatches.common.base.Suppliers;
-import com.google_voltpatches.common.collect.ImmutableMap;
 
 /**
  * Agent responsible for collecting stats on this host.
  */
-public class StatsAgent extends OpsAgent
-{
+public class StatsAgent extends OpsAgent {
     private final Map<StatsSelector, Map<Long, Set<StatsSource>>> m_registeredStatsSources = new NonBlockingHashMap<>();
+    private ProcedureDetailAggregator procedureDetailAggregator;
 
-    public StatsAgent()
-    {
+    public StatsAgent() {
         super("StatsAgent");
+
         for (StatsSelector selector : StatsSelector.values()) {
             m_registeredStatsSources.put(selector, new NonBlockingHashMap<>());
         }
+
+        procedureDetailAggregator = ProcedureDetailAggregator.create();
     }
 
     @Override
@@ -62,24 +60,20 @@ public class StatsAgent extends OpsAgent
         StatsSelector subselector = StatsSelector.valueOf(request.subselector);
         switch (subselector) {
         case PROCEDUREDETAIL:
-            request.aggregateTables = sortProcedureDetailStats(request.aggregateTables);
+            request.aggregateTables = procedureDetailAggregator.sortProcedureDetailStats(request.aggregateTables);
             break;
         // For PROCEDURE-series tables, they are all based on the procedure detail table.
         case PROCEDURE:
-            request.aggregateTables =
-            aggregateProcedureStats(request.aggregateTables);
+            request.aggregateTables = procedureDetailAggregator.aggregateProcedureStats(request.aggregateTables);
             break;
         case PROCEDUREPROFILE:
-            request.aggregateTables =
-            aggregateProcedureProfileStats(request.aggregateTables);
+            request.aggregateTables = procedureDetailAggregator.aggregateProcedureProfileStats(request.aggregateTables);
             break;
         case PROCEDUREINPUT:
-            request.aggregateTables =
-            aggregateProcedureInputStats(request.aggregateTables);
+            request.aggregateTables = procedureDetailAggregator.aggregateProcedureInputStats(request.aggregateTables);
             break;
         case PROCEDUREOUTPUT:
-            request.aggregateTables =
-            aggregateProcedureOutputStats(request.aggregateTables);
+            request.aggregateTables = procedureDetailAggregator.aggregateProcedureOutputStats(request.aggregateTables);
             break;
         case DRROLE:
             request.aggregateTables = aggregateDRRoleStats(request.aggregateTables);
@@ -100,213 +94,21 @@ public class StatsAgent extends OpsAgent
         }
     }
 
-    private VoltTable[] sortProcedureDetailStats(VoltTable[] baseStats) {
-        ProcedureDetailResultTable result = new ProcedureDetailResultTable(baseStats[0]);
-        return result.getSortedResultTable();
-    }
-
-    private Supplier<Map<String, Boolean>> m_procedureInfo = getProcedureInformationfoSupplier();
-
-    private Supplier<Map<String, Boolean>> getProcedureInformationfoSupplier() {
-        return Suppliers.memoize(() -> {
-            ImmutableMap.Builder<String, Boolean> b = ImmutableMap.builder();
-            CatalogContext ctx = VoltDB.instance().getCatalogContext();
-            for (Procedure p : ctx.procedures) {
-                b.put(p.getClassname(), p.getReadonly());
-            }
-            return b.build();
-        });
-    }
-
-    /**
-     * Check if procedure is readonly?
-     *
-     * @param name of procedure
-     * @return {@code true} when procedure is readonly
-     */
-    private boolean isReadOnlyProcedure(String name) {
-        final Boolean b = m_procedureInfo.get().get(name);
-        if (b == null) {
-            return false;
-        }
-        return b;
-    }
-
-    /**
-     * Produce PROCEDURE aggregation of PROCEDURE subselector
-     * Basically it leaves out the rows that were not labeled as "<ALL>".
-     */
-    private VoltTable[] aggregateProcedureStats(VoltTable[] baseStats)
-    {
-        VoltTable result = new VoltTable(
-            new ColumnInfo("TIMESTAMP", VoltType.BIGINT),
-            new ColumnInfo(VoltSystemProcedure.CNAME_HOST_ID, VoltSystemProcedure.CTYPE_ID),
-            new ColumnInfo("HOSTNAME", VoltType.STRING),
-            new ColumnInfo(VoltSystemProcedure.CNAME_SITE_ID, VoltSystemProcedure.CTYPE_ID),
-            new ColumnInfo("PARTITION_ID", VoltType.INTEGER),
-            new ColumnInfo("PROCEDURE", VoltType.STRING),
-            new ColumnInfo("INVOCATIONS", VoltType.BIGINT),
-            new ColumnInfo("TIMED_INVOCATIONS", VoltType.BIGINT),
-            new ColumnInfo("MIN_EXECUTION_TIME", VoltType.BIGINT),
-            new ColumnInfo("MAX_EXECUTION_TIME", VoltType.BIGINT),
-            new ColumnInfo("AVG_EXECUTION_TIME", VoltType.BIGINT),
-            new ColumnInfo("MIN_RESULT_SIZE", VoltType.INTEGER),
-            new ColumnInfo("MAX_RESULT_SIZE", VoltType.INTEGER),
-            new ColumnInfo("AVG_RESULT_SIZE", VoltType.INTEGER),
-            new ColumnInfo("MIN_PARAMETER_SET_SIZE", VoltType.INTEGER),
-            new ColumnInfo("MAX_PARAMETER_SET_SIZE", VoltType.INTEGER),
-            new ColumnInfo("AVG_PARAMETER_SET_SIZE", VoltType.INTEGER),
-            new ColumnInfo("ABORTS", VoltType.BIGINT),
-            new ColumnInfo("FAILURES", VoltType.BIGINT),
-            new ColumnInfo("TRANSACTIONAL", VoltType.TINYINT));
-        baseStats[0].resetRowPosition();
-        while (baseStats[0].advanceRow()) {
-            if (baseStats[0].getString("STATEMENT").equalsIgnoreCase("<ALL>")) {
-                result.addRow(
-                    baseStats[0].getLong("TIMESTAMP"),
-                    baseStats[0].getLong(VoltSystemProcedure.CNAME_HOST_ID),
-                    baseStats[0].getString("HOSTNAME"),
-                    baseStats[0].getLong(VoltSystemProcedure.CNAME_SITE_ID),
-                    baseStats[0].getLong("PARTITION_ID"),
-                    baseStats[0].getString("PROCEDURE"),
-                    baseStats[0].getLong("INVOCATIONS"),
-                    baseStats[0].getLong("TIMED_INVOCATIONS"),
-                    baseStats[0].getLong("MIN_EXECUTION_TIME"),
-                    baseStats[0].getLong("MAX_EXECUTION_TIME"),
-                    baseStats[0].getLong("AVG_EXECUTION_TIME"),
-                    baseStats[0].getLong("MIN_RESULT_SIZE"),
-                    baseStats[0].getLong("MAX_RESULT_SIZE"),
-                    baseStats[0].getLong("AVG_RESULT_SIZE"),
-                    baseStats[0].getLong("MIN_PARAMETER_SET_SIZE"),
-                    baseStats[0].getLong("MAX_PARAMETER_SET_SIZE"),
-                    baseStats[0].getLong("AVG_PARAMETER_SET_SIZE"),
-                    baseStats[0].getLong("ABORTS"),
-                    baseStats[0].getLong("FAILURES"),
-                    (byte) baseStats[0].getLong("TRANSACTIONAL"));
-            }
-        }
-        return new VoltTable[] { result };
-    }
-
-    /**
-     * Produce PROCEDUREPROFILE aggregation of PROCEDURE subselector
-     */
-    private VoltTable[] aggregateProcedureProfileStats(VoltTable[] baseStats)
-    {
-        StatsProcProfTable timeTable = new StatsProcProfTable();
-        baseStats[0].resetRowPosition();
-        while (baseStats[0].advanceRow()) {
-            // Skip non-transactional procedures for some of these rollups until
-            // we figure out how to make them less confusing.
-            // NB: They still show up in the raw PROCEDURE stata.
-            boolean transactional = baseStats[0].getLong("TRANSACTIONAL") == 1;
-            if (!transactional) {
-                continue;
-            }
-
-            if ( ! baseStats[0].getString("STATEMENT").equalsIgnoreCase("<ALL>")) {
-                continue;
-            }
-            String pname = baseStats[0].getString("PROCEDURE");
-
-            timeTable.updateTable(!isReadOnlyProcedure(pname),
-                    baseStats[0].getLong("TIMESTAMP"),
-                    pname,
-                    baseStats[0].getLong("PARTITION_ID"),
-                    baseStats[0].getLong("INVOCATIONS"),
-                    baseStats[0].getLong("MIN_EXECUTION_TIME"),
-                    baseStats[0].getLong("MAX_EXECUTION_TIME"),
-                    baseStats[0].getLong("AVG_EXECUTION_TIME"),
-                    baseStats[0].getLong("FAILURES"),
-                    baseStats[0].getLong("ABORTS"));
-        }
-        return new VoltTable[] { timeTable.sortByAverage("EXECUTION_TIME") };
-    }
-
-    /**
-     * Produce PROCEDUREINPUT aggregation of PROCEDURE subselector
-     */
-    private VoltTable[] aggregateProcedureInputStats(VoltTable[] baseStats)
-    {
-        StatsProcInputTable timeTable = new StatsProcInputTable();
-        baseStats[0].resetRowPosition();
-        while (baseStats[0].advanceRow()) {
-            // Skip non-transactional procedures for some of these rollups until
-            // we figure out how to make them less confusing.
-            // NB: They still show up in the raw PROCEDURE stata.
-            boolean transactional = baseStats[0].getLong("TRANSACTIONAL") == 1;
-            if (!transactional) {
-                continue;
-            }
-
-            if ( ! baseStats[0].getString("STATEMENT").equalsIgnoreCase("<ALL>")) {
-                continue;
-            }
-            String pname = baseStats[0].getString("PROCEDURE");
-            timeTable.updateTable(!isReadOnlyProcedure(pname),
-                    pname,
-                    baseStats[0].getLong("PARTITION_ID"),
-                    baseStats[0].getLong("TIMESTAMP"),
-                    baseStats[0].getLong("INVOCATIONS"),
-                    baseStats[0].getLong("MIN_PARAMETER_SET_SIZE"),
-                    baseStats[0].getLong("MAX_PARAMETER_SET_SIZE"),
-                    baseStats[0].getLong("AVG_PARAMETER_SET_SIZE")
-                    );
-        }
-        return new VoltTable[] { timeTable.sortByInput("PROCEDURE_INPUT") };
-    }
-
-    /**
-     * Produce PROCEDUREOUTPUT aggregation of PROCEDURE subselector
-     */
-
-    private VoltTable[] aggregateProcedureOutputStats(VoltTable[] baseStats)
-    {
-        StatsProcOutputTable timeTable = new StatsProcOutputTable();
-        baseStats[0].resetRowPosition();
-        while (baseStats[0].advanceRow()) {
-            // Skip non-transactional procedures for some of these rollups until
-            // we figure out how to make them less confusing.
-            // NB: They still show up in the raw PROCEDURE stata.
-            boolean transactional = baseStats[0].getLong("TRANSACTIONAL") == 1;
-            if (!transactional) {
-                continue;
-            }
-
-            if ( ! baseStats[0].getString("STATEMENT").equalsIgnoreCase("<ALL>")) {
-                continue;
-            }
-            String pname = baseStats[0].getString("PROCEDURE");
-            timeTable.updateTable(!isReadOnlyProcedure(pname),
-                    pname,
-                    baseStats[0].getLong("PARTITION_ID"),
-                    baseStats[0].getLong("TIMESTAMP"),
-                    baseStats[0].getLong("INVOCATIONS"),
-                    baseStats[0].getLong("MIN_RESULT_SIZE"),
-                    baseStats[0].getLong("MAX_RESULT_SIZE"),
-                    baseStats[0].getLong("AVG_RESULT_SIZE")
-                    );
-        }
-        return new VoltTable[] { timeTable.sortByOutput("PROCEDURE_OUTPUT") };
-    }
-
-
     /**
      * Please be noted that this function will be called from Site thread, where
      * most other functions in the class are from StatsAgent thread.
-     *
+     * <p>
      * Need to release references to catalog related stats sources
      * to avoid hoarding references to the catalog.
      */
     public void notifyOfCatalogUpdate() {
-        m_procedureInfo = getProcedureInformationfoSupplier();
+        procedureDetailAggregator = ProcedureDetailAggregator.create();
         m_registeredStatsSources.put(StatsSelector.PROCEDURE, new NonBlockingHashMap<>());
     }
 
     @Override
     protected void collectStatsImpl(Connection c, long clientHandle, OpsSelector selector,
-            ParameterSet params) throws Exception
-    {
+                                    ParameterSet params) throws Exception {
         JSONObject obj = new JSONObject();
         obj.put("selector", "STATISTICS");
         // parseParamsForStatistics has a clumsy contract, see definition
@@ -323,7 +125,7 @@ public class StatsAgent extends OpsAgent
         String subselector = obj.getString("subselector");
 
         PendingOpsRequest psr = new PendingOpsRequest(selector, subselector, c, clientHandle,
-                System.currentTimeMillis(), obj);
+                                                      System.currentTimeMillis(), obj);
 
         // Some selectors can provide a single answer based on global data.
         // Intercept them and respond before doing the distributed stuff.
@@ -332,7 +134,7 @@ public class StatsAgent extends OpsAgent
             // return true if interval == true (delta-flag == 1), indicate sent compressed json
             // otherwise return false, indicate sent original binary format
             boolean jsonConfig = obj.getBoolean("interval");
-            collectTopoStats(psr,jsonConfig);
+            collectTopoStats(psr, jsonConfig);
         } else if (subselector.equalsIgnoreCase("PARTITIONCOUNT")) {
             collectPartitionCount(psr);
         } else {
@@ -344,30 +146,28 @@ public class StatsAgent extends OpsAgent
     // Parse the provided parameter set object and fill in subselector and interval into
     // the provided JSONObject.  If there's an error, return that in the String, otherwise
     // return null.  Yes, ugly.  Bang it out, then refactor later.
-    private String parseParamsForStatistics(ParameterSet params, JSONObject obj) throws Exception
-    {
+    private String parseParamsForStatistics(ParameterSet params, JSONObject obj) throws Exception {
         if ((params.toArray().length < 1) || (params.toArray().length > 2)) {
             return "Incorrect number of arguments to @Statistics (expects 2, received " +
-                    params.toArray().length + ")";
+                   params.toArray().length + ")";
         }
         Object first = params.toArray()[0];
         if (!(first instanceof String)) {
             return "First argument to @Statistics must be a valid STRING selector, instead was " +
-                    first;
+                   first;
         }
-        String subselector = (String)first;
+        String subselector = (String) first;
         try {
             StatsSelector s = StatsSelector.valueOf(subselector.toUpperCase());
             subselector = s.name();
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             return "First argument to @Statistics must be a valid STRING selector, instead was " +
-                    first;
+                   first;
         }
 
         boolean interval = false;
         if (params.toArray().length == 2) {
-            interval = ((Number)(params.toArray()[1])).longValue() == 1L;
+            interval = ((Number) (params.toArray()[1])).longValue() == 1L;
         }
         obj.put("subselector", subselector);
         obj.put("interval", interval);
@@ -383,8 +183,7 @@ public class StatsAgent extends OpsAgent
             OpsSelector selector = OpsSelector.valueOf(obj.getString("selector").toUpperCase());
             if (selector == OpsSelector.STATISTICS) {
                 results = collectDistributedStats(obj);
-            }
-            else {
+            } else {
                 hostLog.warn("StatsAgent received a non-STATISTICS OPS selector: " + selector);
             }
 
@@ -397,8 +196,7 @@ public class StatsAgent extends OpsAgent
         }
     }
 
-    private void collectTopoStats(PendingOpsRequest psr, boolean jsonConfig)
-    {
+    private void collectTopoStats(PendingOpsRequest psr, boolean jsonConfig) {
         VoltTable[] tables = null;
         VoltTable topoStats = getStatsAggregate(StatsSelector.TOPO, false, psr.startTime);
         if (topoStats != null) {
@@ -426,8 +224,7 @@ public class StatsAgent extends OpsAgent
         }
     }
 
-    private void collectPartitionCount(PendingOpsRequest psr)
-    {
+    private void collectPartitionCount(PendingOpsRequest psr) {
         VoltTable[] tables = null;
         VoltTable pcStats = getStatsAggregate(StatsSelector.PARTITIONCOUNT, false, psr.startTime);
         if (pcStats != null) {
@@ -465,17 +262,17 @@ public class StatsAgent extends OpsAgent
     }
 
     private VoltTable[] aggregateDRRoleStats(VoltTable[] stats) {
-        return new VoltTable[] { DRRoleStats.aggregateStats(stats[0]) };
+        return new VoltTable[]{DRRoleStats.aggregateStats(stats[0])};
     }
 
     private VoltTable[] aggregateDRProducerClusterStats(VoltTable[] stats) {
         VoltTable clusterStats = DRProducerClusterStats.aggregateStats(stats[2]);
-        return new VoltTable[] { stats[0], stats[1], clusterStats };
+        return new VoltTable[]{stats[0], stats[1], clusterStats};
     }
 
     private VoltTable[] aggregateDRConsumerClusterStats(VoltTable[] stats) {
         VoltTable clusterStats = DRConsumerClusterStatsBase.aggregateStats(stats[2]);
-        return new VoltTable[] { stats[0], stats[1], clusterStats };
+        return new VoltTable[]{stats[0], stats[1], clusterStats};
     }
 
     public void registerStatsSource(StatsSelector selector, long siteId, StatsSource source) {
@@ -523,10 +320,10 @@ public class StatsAgent extends OpsAgent
      * selector with each siteId and then some other value for the node-level stats (PLANNER stats uses -1).
      * This call will automatically aggregate every StatsSource registered for every 'site'ID for that selector.
      *
-     * @param selector    @Statistics selector keyword
-     * @param interval    true if processing a reporting interval
-     * @param now         current timestamp
-     * @return  statistics VoltTable results
+     * @param selector @Statistics selector keyword
+     * @param interval true if processing a reporting interval
+     * @param now      current timestamp
+     * @return statistics VoltTable results
      */
     public VoltTable getStatsAggregate(
             final StatsSelector selector,
@@ -538,8 +335,7 @@ public class StatsAgent extends OpsAgent
     private VoltTable getStatsAggregateInternal(
             final StatsSelector selector,
             final boolean interval,
-            final Long now)
-    {
+            final Long now) {
         assert selector != null;
         Map<Long, Set<StatsSource>> siteIdToStatsSources = m_registeredStatsSources.get(selector);
 

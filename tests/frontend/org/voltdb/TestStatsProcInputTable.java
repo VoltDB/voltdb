@@ -22,13 +22,16 @@
  */
 package org.voltdb;
 
+import static org.junit.Assert.assertTrue;
+
+import org.junit.Assert;
 import org.junit.Test;
-import static org.junit.Assert.assertEquals;
 import org.voltdb.StatsProcInputTable.ProcInputRow;
 
 public class TestStatsProcInputTable {
 
-    long mB = 1024*1024;
+    long mB = 1024 * 1024;
+
     // result row in java form for test
     static class ResultRow {
         long timestamp;
@@ -40,10 +43,8 @@ public class TestStatsProcInputTable {
         long avgIN;
         long totalIN;
 
-
         public ResultRow(long timestamp, String procedure, long percent, long invocations,
-         long minIN, long maxIN, long avgIN, long totalIN)
-        {
+                         long minIN, long maxIN, long avgIN, long totalIN) {
             this.timestamp = timestamp;
             this.procedure = procedure;
             this.percent = percent;
@@ -52,136 +53,166 @@ public class TestStatsProcInputTable {
             this.maxIN = maxIN;
             this.avgIN = avgIN;
             this.totalIN = totalIN;
-
         }
     }
 
     // push rows from data in to the table.
-    void loadEmUp(StatsProcInputTable dut, ProcInputRow[] data) {
-        for (int ii = 0; ii < data.length; ++ii) {
+    void loadData(StatsProcInputTable dut, ProcInputRow[] data) {
+        for (ProcInputRow row : data) {
             dut.updateTable(true,
-                    data[ii].procedure,
-                data[ii].partition,
-                data[ii].timestamp,
-                data[ii].invocations,
-                data[ii].minIN,
-                data[ii].maxIN,
-                data[ii].avgIN);
+                            row.procedure,
+                            row.partition,
+                            row.timestamp,
+                            row.invocations,
+                            row.minIN,
+                            row.maxIN,
+                            row.avgIN);
         }
     }
 
-    void loadEmUpNoDedup(StatsProcInputTable dut, ProcInputRow[] data) {
-        for (int ii = 0; ii < data.length; ++ii) {
+    void loadDataNoDedup(StatsProcInputTable dut, ProcInputRow[] data) {
+        for (ProcInputRow row : data) {
             dut.updateTable(false,
-                    data[ii].procedure,
-                    data[ii].partition,
-                    data[ii].timestamp,
-                    data[ii].invocations,
-                    data[ii].minIN,
-                    data[ii].maxIN,
-                    data[ii].avgIN);
+                            row.procedure,
+                            row.partition,
+                            row.timestamp,
+                            row.invocations,
+                            row.minIN,
+                            row.maxIN,
+                            row.avgIN);
         }
     }
 
     // validate contents of sorted dut vs. expectation of ResultRow[]
-    void validateEmGood(String testname, StatsProcInputTable dut, ResultRow[] data) {
-        VoltTable vt = dut.sortByInput(testname);
-        assertEquals(testname + " has wrong number of result rows in test.",
-            vt.getRowCount(), data.length);
-        int ii = 0;
-        while (vt.advanceRow()) {
-            System.out.printf("%s: validating row %d\n", testname, ii);
-            assertEquals(data[ii].percent, vt.getLong("WEIGHTED_PERC"));
-            assertEquals(data[ii].timestamp, vt.getLong("TIMESTAMP"));
-            assertEquals(data[ii].procedure, vt.getString("PROCEDURE"));
-            assertEquals(data[ii].invocations, vt.getLong("INVOCATIONS"));
-            assertEquals(data[ii].minIN, vt.getLong("MIN_PARAMETER_SET_SIZE"));
-            assertEquals(data[ii].maxIN, vt.getLong("MAX_PARAMETER_SET_SIZE"));
-            assertEquals(data[ii].avgIN, vt.getLong("AVG_PARAMETER_SET_SIZE"));
-            assertEquals(data[ii].totalIN, vt.getLong("TOTAL_PARAMETER_SET_SIZE_MB"));
-            ++ii;
+    void assertEquals(String testname, StatsProcInputTable dut, ResultRow[] data) {
+        VoltTable actual = dut.sortByInput(testname);
+        Assert.assertEquals(
+                testname + " has wrong number of result rows in test.",
+                actual.getRowCount(),
+                data.length
+        );
+
+        for (ResultRow row : data) {
+            assertTrue(actual.advanceRow());
+            System.out.printf("%s: validating row %d\n", testname, actual.getActiveRowIndex());
+
+            Assert.assertEquals(row.percent, actual.getLong("WEIGHTED_PERC"));
+            Assert.assertEquals(row.timestamp, actual.getLong("TIMESTAMP"));
+            Assert.assertEquals(row.procedure, actual.getString("PROCEDURE"));
+            Assert.assertEquals(row.invocations, actual.getLong("INVOCATIONS"));
+            Assert.assertEquals(row.minIN, actual.getLong("MIN_PARAMETER_SET_SIZE"));
+            Assert.assertEquals(row.maxIN, actual.getLong("MAX_PARAMETER_SET_SIZE"));
+            Assert.assertEquals(row.avgIN, actual.getLong("AVG_PARAMETER_SET_SIZE"));
+            Assert.assertEquals(row.totalIN, actual.getLong("TOTAL_PARAMETER_SET_SIZE_MB"));
         }
     }
 
     @Test
     public void testBaseCase() throws Exception {
+        // Given
         // validate sensical round-trip of one row.
         ProcInputRow[] data = {
-                            //proc/part/time/invok/min/max/avg
-            new ProcInputRow("proc", 0L, 12345L, 100*mB, 2L, 4L, 3L)
+                //proc/part/time/invok/min/max/avg
+                new ProcInputRow("proc", 0L, 12345L, 100 * mB, 2L, 4L, 3L)
         };
 
         ResultRow[] result = {
-                            //time/proc/perc/inok/min/max/avg/tot
-            new ResultRow(12345L, "proc", 100L, 100*mB, 2L, 4L, 3L, 300L)
+                //time/proc/perc/inok/min/max/avg/tot
+                new ResultRow(12345L, "proc", 100L, 100 * mB, 2L, 4L, 3L, 300L)
         };
 
+        // When
         StatsProcInputTable dut = new StatsProcInputTable();
-        loadEmUp(dut, data);
-        validateEmGood("testBaseCase", dut, result);
+        loadData(dut, data);
+
+        // Then
+        assertEquals("testBaseCase", dut, result);
     }
 
     @Test
-    public void testAllZeros() throws Exception {
+    public void testAllZeros() {
+        // Given
         // validate paranoia about an all zero row - just in case.
-        ProcInputRow data[] = {     //proc/part/time/invok/min/max/avg
-            new ProcInputRow("proc", 0L, 0L, 0L, 0L, 0L, 0L)
+        ProcInputRow[] data = {     //proc/part/time/invok/min/max/avg
+                new ProcInputRow("proc", 0L, 0L, 0L, 0L, 0L, 0L)
 
         };
-        ResultRow result[] = {  //time/proc/perc/inok/min/max/avg/tot
-            new ResultRow(0L, "proc", 100L, 0L, 0L, 0L, 0L, 0L)
+        ResultRow[] result = {  //time/proc/perc/inok/min/max/avg/tot
+                new ResultRow(0L, "proc", 100L, 0L, 0L, 0L, 0L, 0L)
         };
+
+        // When
         StatsProcInputTable dut = new StatsProcInputTable();
-        loadEmUp(dut, data);
-        validateEmGood("testAllZeros", dut, result);
+        loadData(dut, data);
+
+        // Then
+        assertEquals("testAllZeros", dut, result);
     }
 
     @Test
-    public void testMultipleProcs() throws Exception {
-        ProcInputRow data[] = {     //proc/part/time/invok/min/max/avg
-            new ProcInputRow("A", 0L, 12345L, 300*mB, 3L, 5L, 4L),
-            new ProcInputRow("B", 0L, 12345L, 100*mB, 1L, 4L, 2L),
-            new ProcInputRow("B", 1L, 12345L, 100*mB, 1L, 3L, 2L)
+    public void testMultipleProcs() {
+        // Given
+        ProcInputRow[] data = {     //proc/part/time/invok/min/max/avg
+                new ProcInputRow("A", 0L, 12345L, 300 * mB, 3L, 5L, 4L),
+                new ProcInputRow("B", 0L, 12345L, 100 * mB, 1L, 4L, 2L),
+                new ProcInputRow("B", 1L, 12345L, 100 * mB, 1L, 3L, 2L)
         };
-        ResultRow result[] = {  //time/proc/perc/inok/min/max/avg/tot
-            new ResultRow(12345L, "A", 75L, 300*mB, 3L, 5L, 4L, 1200L),
-            new ResultRow(12345L, "B", 25L, 200*mB, 1L, 4L, 2L, 400L)
+
+        ResultRow[] result = {  //time/proc/perc/inok/min/max/avg/tot
+                new ResultRow(12345L, "A", 75L, 300 * mB, 3L, 5L, 4L, 1200L),
+                new ResultRow(12345L, "B", 25L, 200 * mB, 1L, 4L, 2L, 400L)
         };
+
+        // When
         StatsProcInputTable dut = new StatsProcInputTable();
-        loadEmUp(dut, data);
-        validateEmGood("testMulipleProcs", dut, result);
+        loadData(dut, data);
+
+        // Then
+        assertEquals("testMulipleProcs", dut, result);
     }
 
     @Test
-    public void testSiteDedupe() throws Exception {
+    public void testSiteDedupe() {
+        // Given
         // need to not double count invocations at replicas, but do look at
         // min, max, avg
-        ProcInputRow data[] = { //proc/part/time/invok/min/max/avg
-            new ProcInputRow("proc", 0L, 12345L, 200*mB, 4L, 10L, 6L),
-            new ProcInputRow("proc", 0L, 12345L, 100*mB, 4L, 25L, 10L),
-            new ProcInputRow("proc", 0L, 12345L, 100*mB, 1L, 4L, 2L),
-            new ProcInputRow("proc", 1L, 12345L, 400*mB, 2L, 8L, 4L)
+        ProcInputRow[] data = { //proc/part/time/invok/min/max/avg
+                new ProcInputRow("proc", 0L, 12345L, 200 * mB, 4L, 10L, 6L),
+                new ProcInputRow("proc", 0L, 12345L, 100 * mB, 4L, 25L, 10L),
+                new ProcInputRow("proc", 0L, 12345L, 100 * mB, 1L, 4L, 2L),
+                new ProcInputRow("proc", 1L, 12345L, 400 * mB, 2L, 8L, 4L)
         };
-        ResultRow result[] = { //time/proc/perc/inok/min/max/avg/tot
-            new ResultRow(12345L, "proc", 100L, 800 * mB, 1L, 25L, 4L, 3200L)
+
+        ResultRow[] result = { //time/proc/perc/inok/min/max/avg/tot
+                new ResultRow(12345L, "proc", 100L, 800 * mB, 1L, 25L, 4L, 3200L)
         };
+
+        // When
         StatsProcInputTable dut = new StatsProcInputTable();
-        loadEmUpNoDedup(dut, data);
-        validateEmGood("testSiteDedupe", dut, result);
+        loadDataNoDedup(dut, data);
+
+        // Then
+        assertEquals("testSiteDedupe", dut, result);
     }
 
     @Test
-    public void testRounding() throws Exception {
-        ProcInputRow data[] = {     //proc/part/time/invok/min/max/avg
-            new ProcInputRow("A", 0L, 12345L, 10000000*mB, 3L, 5L, 4L),
-            new ProcInputRow("B", 0L, 12345L, 1*mB, 1L, 4L, 2L)
+    public void testRounding() {
+        // Given
+        ProcInputRow[] data = {     //proc/part/time/invok/min/max/avg
+                new ProcInputRow("A", 0L, 12345L, 10000000 * mB, 3L, 5L, 4L),
+                new ProcInputRow("B", 0L, 12345L, 1 * mB, 1L, 4L, 2L)
         };
-        ResultRow result[] = {  //time/proc/perc/inok/min/max/avg/tot
-            new ResultRow(12345L, "A", 100L, 10000000*mB, 3L, 5L, 4L, 40000000L),
-            new ResultRow(12345L, "B", 0L, 1*mB, 1L, 4L, 2L, 2L)
+
+        ResultRow[] result = {  //time/proc/perc/inok/min/max/avg/tot
+                new ResultRow(12345L, "A", 100L, 10000000 * mB, 3L, 5L, 4L, 40000000L),
+                new ResultRow(12345L, "B", 0L, 1 * mB, 1L, 4L, 2L, 2L)
         };
+
+        // When
         StatsProcInputTable dut = new StatsProcInputTable();
-        loadEmUp(dut, data);
-        validateEmGood("testRounding", dut, result);
+        loadData(dut, data);
+
+        //Then
+        assertEquals("testRounding", dut, result);
     }
 }

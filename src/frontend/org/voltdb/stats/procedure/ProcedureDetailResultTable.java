@@ -14,24 +14,25 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-
-package org.voltdb;
+package org.voltdb.stats.procedure;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 
+import org.voltdb.VoltSystemProcedure;
+import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.VoltType;
 
 /**
  * This class is used to re-arrange the output of the PROCEDUREDETAIL selector.
  * It orders the output by:
- *     procedure_name, statement_name, host_id, site_id, partition_id, timestamp (descending);
+ * procedure_name, statement_name, host_id, site_id, partition_id, timestamp (descending);
  */
 public class ProcedureDetailResultTable {
 
-    private ArrayList<ProcedureDetailResultRow> m_rows;
-    private VoltTable m_sortedResultTable = new VoltTable(
+    private final VoltTable m_sortedResultTable = new VoltTable(
             new ColumnInfo("TIMESTAMP", VoltType.BIGINT),
             new ColumnInfo(VoltSystemProcedure.CNAME_HOST_ID, VoltSystemProcedure.CTYPE_ID),
             new ColumnInfo("HOSTNAME", VoltType.STRING),
@@ -54,38 +55,38 @@ public class ProcedureDetailResultTable {
             new ColumnInfo("FAILURES", VoltType.BIGINT));
 
     public ProcedureDetailResultTable(VoltTable table) {
-        assert(table != null);
-        m_rows = new ArrayList<ProcedureDetailResultRow>(table.getRowCount());
+        assert (table != null);
+
+        ArrayList<ProcedureDetailResultRow> m_rows = new ArrayList<>(table.getRowCount());
         table.resetRowPosition();
         while (table.advanceRow()) {
-            m_rows.add(new ProcedureDetailResultRow(
-                    table.getLong("TIMESTAMP"),
-                    table.getLong(VoltSystemProcedure.CNAME_HOST_ID),
-                    table.getString("HOSTNAME"),
-                    table.getLong(VoltSystemProcedure.CNAME_SITE_ID),
-                    table.getLong("PARTITION_ID"),
-                    table.getString("PROCEDURE"),
-                    table.getString("STATEMENT"),
-                    table.getLong("INVOCATIONS"),
-                    table.getLong("TIMED_INVOCATIONS"),
-                    table.getLong("MIN_EXECUTION_TIME"),
-                    table.getLong("MAX_EXECUTION_TIME"),
-                    table.getLong("AVG_EXECUTION_TIME"),
-                    table.getLong("MIN_RESULT_SIZE"),
-                    table.getLong("MAX_RESULT_SIZE"),
-                    table.getLong("AVG_RESULT_SIZE"),
-                    table.getLong("MIN_PARAMETER_SET_SIZE"),
-                    table.getLong("MAX_PARAMETER_SET_SIZE"),
-                    table.getLong("AVG_PARAMETER_SET_SIZE"),
-                    table.getLong("ABORTS"),
-                    table.getLong("FAILURES")));
+            m_rows.add(
+                    new ProcedureDetailResultRow(
+                            table.getLong("TIMESTAMP"),
+                            table.getLong(VoltSystemProcedure.CNAME_HOST_ID),
+                            table.getString("HOSTNAME"),
+                            table.getLong(VoltSystemProcedure.CNAME_SITE_ID),
+                            table.getLong("PARTITION_ID"),
+                            table.getString("PROCEDURE"),
+                            table.getString("STATEMENT"),
+                            table.getLong("INVOCATIONS"),
+                            table.getLong("TIMED_INVOCATIONS"),
+                            table.getLong("MIN_EXECUTION_TIME"),
+                            table.getLong("MAX_EXECUTION_TIME"),
+                            table.getLong("AVG_EXECUTION_TIME"),
+                            table.getLong("MIN_RESULT_SIZE"),
+                            table.getLong("MAX_RESULT_SIZE"),
+                            table.getLong("AVG_RESULT_SIZE"),
+                            table.getLong("MIN_PARAMETER_SET_SIZE"),
+                            table.getLong("MAX_PARAMETER_SET_SIZE"),
+                            table.getLong("AVG_PARAMETER_SET_SIZE"),
+                            table.getLong("ABORTS"),
+                            table.getLong("FAILURES")
+                    )
+            );
         }
-        Collections.sort(m_rows, new Comparator<ProcedureDetailResultRow>() {
-            @Override
-            public int compare(ProcedureDetailResultRow o1, ProcedureDetailResultRow o2) {
-                return o1.compareTo(o2);
-            }
-        });
+        m_rows.sort(ProcedureDetailResultRow::compareTo);
+
         for (ProcedureDetailResultRow row : m_rows) {
             m_sortedResultTable.addRow(row.m_timestamp,
                                        row.m_hostId,
@@ -111,7 +112,7 @@ public class ProcedureDetailResultTable {
     }
 
     public VoltTable[] getSortedResultTable() {
-        return new VoltTable[] { m_sortedResultTable };
+        return new VoltTable[]{m_sortedResultTable};
     }
 
     private static class ProcedureDetailResultRow implements Comparable<ProcedureDetailResultRow> {
@@ -154,22 +155,22 @@ public class ProcedureDetailResultTable {
         @Override
         public int compareTo(ProcedureDetailResultRow other) {
             long diff = m_procedure.compareTo(other.m_procedure);
-            if (diff != 0) return Long.signum(diff);
+            if (diff != 0) {return Long.signum(diff);}
 
             diff = m_statement.compareTo(other.m_statement);
-            if (diff != 0) return Long.signum(diff);
+            if (diff != 0) {return Long.signum(diff);}
 
             diff = m_hostId - other.m_hostId;
-            if (diff != 0) return Long.signum(diff);
+            if (diff != 0) {return Long.signum(diff);}
 
             diff = m_siteId - other.m_siteId;
-            if (diff != 0) return Long.signum(diff);
+            if (diff != 0) {return Long.signum(diff);}
 
             diff = m_partitionId - other.m_partitionId;
-            if (diff != 0) return Long.signum(diff);
+            if (diff != 0) {return Long.signum(diff);}
 
             diff = other.m_timestamp - m_timestamp;
-            if (diff != 0) return Long.signum(diff);
+            if (diff != 0) {return Long.signum(diff);}
 
             return 0;
         }

@@ -22,8 +22,10 @@
  */
 package org.voltdb;
 
+import static org.junit.Assert.assertTrue;
+
+import org.junit.Assert;
 import org.junit.Test;
-import static org.junit.Assert.assertEquals;
 import org.voltdb.StatsProcProfTable.ProcProfRow;
 
 public class TestStatsProcProfTable {
@@ -41,8 +43,8 @@ public class TestStatsProcProfTable {
         long failures;
 
         public ResultRow(long timestamp, String procedure, long weighted_perc,
-                long invocations, long avg, long min, long max, long aborts,
-                long failures) {
+                         long invocations, long avg, long min, long max, long aborts,
+                         long failures) {
             this.timestamp = timestamp;
             this.procedure = procedure;
             this.weighted_perc = weighted_perc;
@@ -56,166 +58,199 @@ public class TestStatsProcProfTable {
     }
 
     // push rows from data in to the table.
-    void loadEmUp(StatsProcProfTable dut, ProcProfRow[] data) {
-        for (int ii = 0; ii < data.length; ++ii) {
+    void loadData(StatsProcProfTable dut, ProcProfRow[] data) {
+        for (ProcProfRow row : data) {
             dut.updateTable(true,
-                    data[ii].timestamp,
-                    data[ii].procedure,
-                    data[ii].partition,
-                    data[ii].invocations,
-                    data[ii].min,
-                    data[ii].max,
-                    data[ii].avg,
-                    data[ii].failures,
-                    data[ii].aborts);
+                            row.timestamp,
+                            row.procedure,
+                            row.partition,
+                            row.invocations,
+                            row.min,
+                            row.max,
+                            row.avg,
+                            row.failures,
+                            row.aborts);
         }
     }
 
     // push rows from data in to the table.
-    void loadEmUpNoDedup(StatsProcProfTable dut, ProcProfRow[] data) {
-        for (int ii = 0; ii < data.length; ++ii) {
+    void loadDataNoDedup(StatsProcProfTable dut, ProcProfRow[] data) {
+        for (ProcProfRow row : data) {
             dut.updateTable(false,
-                    data[ii].timestamp,
-                    data[ii].procedure,
-                    data[ii].partition,
-                    data[ii].invocations,
-                    data[ii].min,
-                    data[ii].max,
-                    data[ii].avg,
-                    data[ii].failures,
-                    data[ii].aborts);
+                            row.timestamp,
+                            row.procedure,
+                            row.partition,
+                            row.invocations,
+                            row.min,
+                            row.max,
+                            row.avg,
+                            row.failures,
+                            row.aborts);
         }
     }
 
     // validate contents of sorted dut vs. expectation of ResultRow[]
-    void validateEmGood(String testname, StatsProcProfTable dut, ResultRow[] data) {
-        VoltTable vt = dut.sortByAverage(testname);
-        assertEquals(testname + " has wrong number of result rows in test.",
-                vt.getRowCount(), data.length);
-        int ii = 0;
-        while (vt.advanceRow()) {
-            System.out.printf("%s: validating row %d\n", testname, ii);
-            assertEquals(data[ii].timestamp, vt.getLong("TIMESTAMP"));
-            assertEquals(data[ii].procedure, vt.getString("PROCEDURE"));
-            assertEquals(data[ii].weighted_perc, vt.getLong("WEIGHTED_PERC"));
-            assertEquals(data[ii].invocations, vt.getLong("INVOCATIONS"));
-            assertEquals(data[ii].avg, vt.getLong("AVG"));
-            assertEquals(data[ii].min, vt.getLong("MIN"));
-            assertEquals(data[ii].max, vt.getLong("MAX"));
-            assertEquals(data[ii].aborts, vt.getLong("ABORTS"));
-            assertEquals(data[ii].failures, vt.getLong("FAILURES"));
-            ++ii;
+    void assertEquals(String testname, StatsProcProfTable dut, ResultRow[] data) {
+        VoltTable actual = dut.sortByAverage(testname);
+        Assert.assertEquals(testname + " has wrong number of result rows in test.",
+                            actual.getRowCount(), data.length);
+
+        for (ResultRow row : data) {
+            assertTrue(actual.advanceRow());
+            System.out.printf("%s: validating row %d\n", testname, actual.getActiveRowIndex());
+
+            Assert.assertEquals(row.timestamp, actual.getLong("TIMESTAMP"));
+            Assert.assertEquals(row.procedure, actual.getString("PROCEDURE"));
+            Assert.assertEquals(row.weighted_perc, actual.getLong("WEIGHTED_PERC"));
+            Assert.assertEquals(row.invocations, actual.getLong("INVOCATIONS"));
+            Assert.assertEquals(row.avg, actual.getLong("AVG"));
+            Assert.assertEquals(row.min, actual.getLong("MIN"));
+            Assert.assertEquals(row.max, actual.getLong("MAX"));
+            Assert.assertEquals(row.aborts, actual.getLong("ABORTS"));
+            Assert.assertEquals(row.failures, actual.getLong("FAILURES"));
         }
     }
 
     @Test
-    public void testBaseCase() throws Exception {
+    public void testBaseCase() {
+        // Given
         // validate sensical round-trip of one row.
         ProcProfRow[] data = {
-            new ProcProfRow(1371587140278L, "A", 0L, 100L, 1L, 2L, 3L, 4L, 5L)
+                new ProcProfRow(1371587140278L, "A", 0L, 100L, 1L, 2L, 3L, 4L, 5L)
         };
 
         ResultRow[] result = {
-            new ResultRow(1371587140278L, "A", 100L, 100L, 3L, 1L, 2L, 5L, 4L)
+                new ResultRow(1371587140278L, "A", 100L, 100L, 3L, 1L, 2L, 5L, 4L)
         };
 
+        // When
         StatsProcProfTable dut = new StatsProcProfTable();
-        loadEmUp(dut, data);
-        validateEmGood("testBaseCase", dut, result);
+        loadData(dut, data);
+
+        // Then
+        assertEquals("testBaseCase", dut, result);
     }
 
     @Test
-    public void testAllZeros() throws Exception {
+    public void testAllZeros() {
+        // Given
         // validate paranoia about an all zero row - just in case.
-        ProcProfRow data[] = {
-            new ProcProfRow(1371587140278L, "B", 0L, 0L, 0L, 0L, 0L, 0L, 0L)
+        ProcProfRow[] data = {
+                new ProcProfRow(1371587140278L, "B", 0L, 0L, 0L, 0L, 0L, 0L, 0L)
         };
-        ResultRow result[] = {
-            new ResultRow(1371587140278L, "B", 100L, 0L, 0L, 0L, 0L, 0L, 0L)
+
+        ResultRow[] result = {
+                new ResultRow(1371587140278L, "B", 100L, 0L, 0L, 0L, 0L, 0L, 0L)
         };
+
+        // When
         StatsProcProfTable dut = new StatsProcProfTable();
-        loadEmUp(dut, data);
-        validateEmGood("testAllZeros", dut, result);
+        loadData(dut, data);
+
+        // Then
+        assertEquals("testAllZeros", dut, result);
     }
 
     @Test
-    public void testMultipleProcs() throws Exception {
+    public void testMultipleProcs() {
+        // Given
         // 2 procs, 2 partitions - make sure min,max,avg,wtd works
-        ProcProfRow data[] = {
-            //                          TS/Proc/Part/invok/min/max/avg/fail/abort
-            new ProcProfRow(1371587140278L, "B", 0L, 100L, 2L, 5L, 4L, 17L, 18L),
-            new ProcProfRow(1371587140278L, "A", 1L, 1L,  10L, 20L, 30L, 0L, 18L),
-            new ProcProfRow(1371587140278L, "B", 1L, 100L,  1L, 2L, 3L, 17L, 18L)
+        ProcProfRow[] data = {
+                //                          TS/Proc/Part/invok/min/max/avg/fail/abort
+                new ProcProfRow(1371587140278L, "B", 0L, 100L, 2L, 5L, 4L, 17L, 18L),
+                new ProcProfRow(1371587140278L, "A", 1L, 1L, 10L, 20L, 30L, 0L, 18L),
+                new ProcProfRow(1371587140278L, "B", 1L, 100L, 1L, 2L, 3L, 17L, 18L)
         };
-        ResultRow result[] = {
-            //                         TS/Proc/wtd/invok/avg/min/max/abort/fail
-            new ResultRow(1371587140278L, "B", 95L, 200L, 3L, 1L, 5L, 36L, 34L),
-            new ResultRow(1371587140278L, "A", 5L, 1L, 30L, 10L, 20L, 18L, 0L)
-        };
-        StatsProcProfTable dut = new StatsProcProfTable();
-        loadEmUp(dut, data);
-        validateEmGood("testMultipleProcs", dut, result);
-    }
 
+        ResultRow[] result = {
+                //                         TS/Proc/wtd/invok/avg/min/max/abort/fail
+                new ResultRow(1371587140278L, "B", 95L, 200L, 3L, 1L, 5L, 36L, 34L),
+                new ResultRow(1371587140278L, "A", 5L, 1L, 30L, 10L, 20L, 18L, 0L)
+        };
 
-    @Test
-    public void testSiteDedupe() throws Exception {
-        // need to not double count invocations at replicas, but do look at
-        // min, max, avg, fail, abort
-        ProcProfRow data[] = {
-            //                          TS/Proc/Part/invok/min/max/avg/fail/abort
-            new ProcProfRow(1371587140278L, "B", 0L, 100L, 2L, 5L, 4L, 17L, 18L),
-            new ProcProfRow(1371587140278L, "A", 1L, 1L,  10L, 20L, 30L, 0L, 18L),
-            new ProcProfRow(1371587140278L, "B", 0L, 100L, 1L, 2L, 2L, 17L, 18L),
-            new ProcProfRow(1371587140278L, "B", 1L, 100L,  4L, 4L, 3L, 17L, 18L)
-        };
-        ResultRow result[] = {
-            //                         TS/Proc/wtd/invok/avg/min/max/abort/fail
-            new ResultRow(1371587140278L, "B", 95L, 200L, 3L, 1L, 5L, 36L, 34L),
-            new ResultRow(1371587140278L, "A", 5L, 1L, 30L, 10L, 20L, 18L, 0L)
-        };
+        // When
         StatsProcProfTable dut = new StatsProcProfTable();
-        loadEmUp(dut, data);
-        validateEmGood("testSiteDedupe", dut, result);
+        loadData(dut, data);
+
+        // Then
+        assertEquals("testMultipleProcs", dut, result);
     }
 
     @Test
-    public void testSiteNoDedupe() throws Exception {
+    public void testSiteDedupe() {
+        // Given
         // need to not double count invocations at replicas, but do look at
         // min, max, avg, fail, abort
-        ProcProfRow data[] = {
-            //                          TS/Proc/Part/invok/min/max/avg/fail/abort
-            new ProcProfRow(1371587140278L, "B", 0L, 100L, 2L, 5L, 4L, 17L, 18L),
-            new ProcProfRow(1371587140278L, "A", 1L, 1L, 10L, 20L, 30L, 0L, 18L),
-            new ProcProfRow(1371587140278L, "B", 0L, 100L, 1L, 2L, 2L, 17L, 18L),
-            new ProcProfRow(1371587140278L, "B", 1L, 100L, 4L, 4L, 3L, 17L, 18L)
+        ProcProfRow[] data = {
+                //                          TS/Proc/Part/invok/min/max/avg/fail/abort
+                new ProcProfRow(1371587140278L, "B", 0L, 100L, 2L, 5L, 4L, 17L, 18L),
+                new ProcProfRow(1371587140278L, "A", 1L, 1L, 10L, 20L, 30L, 0L, 18L),
+                new ProcProfRow(1371587140278L, "B", 0L, 100L, 1L, 2L, 2L, 17L, 18L),
+                new ProcProfRow(1371587140278L, "B", 1L, 100L, 4L, 4L, 3L, 17L, 18L)
         };
-        ResultRow result[] = {
-            //               TS/         Proc /wtd/ invok/avg/ min/max/abort/fail
-            new ResultRow(1371587140278L, "B", 97L, 300L, 3L, 1L, 5L, 54L, 51L),
-            new ResultRow(1371587140278L, "A", 3L, 1L, 30L, 10L, 20L, 18L, 0L)
+
+        ResultRow[] result = {
+                //                         TS/Proc/wtd/invok/avg/min/max/abort/fail
+                new ResultRow(1371587140278L, "B", 95L, 200L, 3L, 1L, 5L, 36L, 34L),
+                new ResultRow(1371587140278L, "A", 5L, 1L, 30L, 10L, 20L, 18L, 0L)
         };
+
+        // When
         StatsProcProfTable dut = new StatsProcProfTable();
-        loadEmUpNoDedup(dut, data);
-        validateEmGood("testSiteNoDedupe", dut, result);
+        loadData(dut, data);
+
+        // Then
+        assertEquals("testSiteDedupe", dut, result);
     }
 
     @Test
-    public void testRounding() throws Exception {
+    public void testSiteNoDedupe() {
+        // Given
         // need to not double count invocations at replicas, but do look at
         // min, max, avg, fail, abort
-        ProcProfRow data[] = {
-            //                          TS/Proc/Part/invok/min/max/avg/fail/abort
-            new ProcProfRow(1371587140278L, "B", 0L, 10000000L, 2L, 5L, 4L, 17L, 18L),
-            new ProcProfRow(1371587140278L, "A", 0L, 1L, 10L, 20L, 30L, 0L, 18L)
+        ProcProfRow[] data = {
+                //                          TS/Proc/Part/invok/min/max/avg/fail/abort
+                new ProcProfRow(1371587140278L, "B", 0L, 100L, 2L, 5L, 4L, 17L, 18L),
+                new ProcProfRow(1371587140278L, "A", 1L, 1L, 10L, 20L, 30L, 0L, 18L),
+                new ProcProfRow(1371587140278L, "B", 0L, 100L, 1L, 2L, 2L, 17L, 18L),
+                new ProcProfRow(1371587140278L, "B", 1L, 100L, 4L, 4L, 3L, 17L, 18L)
         };
-        ResultRow result[] = {
-            //               TS/         Proc /wtd/ invok/avg/ min/max/fail/abort
-            new ResultRow(1371587140278L, "B", 100L, 10000000L, 4L, 2L, 5L, 18L, 17L),
-            new ResultRow(1371587140278L, "A", 0L, 1L, 30L, 10L, 20L, 18L, 0L)
+        ResultRow[] result = {
+                //               TS/         Proc /wtd/ invok/avg/ min/max/abort/fail
+                new ResultRow(1371587140278L, "B", 97L, 300L, 3L, 1L, 5L, 54L, 51L),
+                new ResultRow(1371587140278L, "A", 3L, 1L, 30L, 10L, 20L, 18L, 0L)
         };
+
+        // When
         StatsProcProfTable dut = new StatsProcProfTable();
-        loadEmUp(dut, data);
-        validateEmGood("testRounding", dut, result);
+        loadDataNoDedup(dut, data);
+
+        // Then
+        assertEquals("testSiteNoDedupe", dut, result);
+    }
+
+    @Test
+    public void testRounding() {
+        // Given
+        // need to not double count invocations at replicas, but do look at
+        // min, max, avg, fail, abort
+        ProcProfRow[] data = {
+                //                          TS/Proc/Part/invok/min/max/avg/fail/abort
+                new ProcProfRow(1371587140278L, "B", 0L, 10000000L, 2L, 5L, 4L, 17L, 18L),
+                new ProcProfRow(1371587140278L, "A", 0L, 1L, 10L, 20L, 30L, 0L, 18L)
+        };
+
+        ResultRow[] result = {
+                //               TS/         Proc /wtd/ invok/avg/ min/max/fail/abort
+                new ResultRow(1371587140278L, "B", 100L, 10000000L, 4L, 2L, 5L, 18L, 17L),
+                new ResultRow(1371587140278L, "A", 0L, 1L, 30L, 10L, 20L, 18L, 0L)
+        };
+
+        // When
+        StatsProcProfTable dut = new StatsProcProfTable();
+        loadData(dut, data);
+
+        // Then
+        assertEquals("testRounding", dut, result);
     }
 }
