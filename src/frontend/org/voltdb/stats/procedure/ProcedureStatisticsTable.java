@@ -43,7 +43,7 @@ public abstract class ProcedureStatisticsTable {
 
         long min;
         long max;
-        long avg;
+        double avg;
         long failures;
         long aborts;
 
@@ -115,27 +115,27 @@ public abstract class ProcedureStatisticsTable {
      * Given a running average and the running invocation total as well as a new
      * row's average and invocation total, return a new running average
      */
-    static long calculateAverage(
-            long currentAverage,
+    static double calculateAverage(
+            double currentAverage,
             long currentInvocations,
-            long rowAverage,
+            double rowAverage,
             long rowInvocations
     ) {
-        long currentTotal = currentAverage * currentInvocations;
-        long rowTotal = rowAverage * rowInvocations;
+        double currentTotal = currentAverage * currentInvocations;
+        double rowTotal = rowAverage * rowInvocations;
 
         // If both are 0, then currentTotal, rowTotal are also 0.
         if ((currentInvocations + rowInvocations) == 0L) {
             return 0L;
-        } else {
-            return (currentTotal + rowTotal) / (currentInvocations + rowInvocations);
         }
+
+        return (currentTotal + rowTotal) / (currentInvocations + rowInvocations);
     }
 
     /**
      * Safe division that assumes x/0 = 100%
      */
-    static long calculatePercent(long numerator, long denominator) {
+    static long calculatePercent(double numerator, long denominator) {
         if (denominator == 0L) {
             return 100L;
         }
@@ -145,7 +145,7 @@ public abstract class ProcedureStatisticsTable {
 
     // Sort by average, weighting the sampled average by the real invocation count.
     public int compare(StatisticRow lhs, StatisticRow rhs) {
-        return Long.compare(lhs.avg * lhs.invocations, rhs.avg * rhs.invocations);
+        return Double.compare(lhs.avg * lhs.invocations, rhs.avg * rhs.invocations);
     }
 
     public abstract void updateTable(boolean shouldDeduplicate, String procedureName, VoltTableRow row);

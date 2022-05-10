@@ -68,7 +68,7 @@ public class TestProcedureProfileProcedureStatisticsTable {
                     row.invocations,
                     row.min,
                     row.max,
-                    row.avg,
+                    (long) row.avg,
                     row.failures,
                     row.aborts
             );
@@ -86,7 +86,7 @@ public class TestProcedureProfileProcedureStatisticsTable {
                     row.invocations,
                     row.min,
                     row.max,
-                    row.avg,
+                    (long) row.avg,
                     row.failures,
                     row.aborts
             );
@@ -168,8 +168,8 @@ public class TestProcedureProfileProcedureStatisticsTable {
 
         ResultRow[] result = {
                 //                         TS/Proc/wtd/invok/avg/min/max/abort/fail
-                new ResultRow(1371587140278L, "B", 95L, 200L, 3L, 1L, 5L, 36L, 34L),
-                new ResultRow(1371587140278L, "A", 5L, 1L, 30L, 10L, 20L, 18L, 0L)
+                new ResultRow(1371587140278L, "B", 96L, 200L, 3L, 1L, 5L, 36L, 34L),
+                new ResultRow(1371587140278L, "A", 4L, 1L, 30L, 10L, 20L, 18L, 0L)
         };
 
         // When

@@ -16,16 +16,9 @@
  */
 package org.voltdb.stats.procedure;
 
-import java.util.Map;
-import com.google.common.base.Supplier;
-import com.google.common.base.Suppliers;
-import com.google_voltpatches.common.collect.ImmutableMap;
-import org.voltdb.CatalogContext;
-import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.Procedure;
 
 public class ProcedureDetailAggregator {
 

@@ -67,7 +67,7 @@ public class TestInputProcedureProcedureStatisticsTable {
                     row.invocations,
                     row.min,
                     row.max,
-                    row.avg,
+                    (long) row.avg,
                     0,
                     0
             );
@@ -84,7 +84,7 @@ public class TestInputProcedureProcedureStatisticsTable {
                     row.invocations,
                     row.min,
                     row.max,
-                    row.avg,
+                    (long) row.avg,
                     0,
                     0
             );
@@ -192,7 +192,7 @@ public class TestInputProcedureProcedureStatisticsTable {
         };
 
         ResultRow[] result = { //time/proc/perc/inok/min/max/avg/tot
-                new ResultRow(12345L, "proc", 100L, 800 * mB, 1L, 25L, 4L, 3200L)
+                new ResultRow(12345L, "proc", 100L, 800 * mB, 1L, 25L, 5L, 4000L)
         };
 
         // When
