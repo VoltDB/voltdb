@@ -141,7 +141,9 @@ public class ProcedureDetailAggregatorAggregateProcedureStatsTest {
     public void shouldAcceptEmptyTable() {
         // Given
         ProcedureDetailAggregator aggregator = new ProcedureDetailAggregator(
-                Suppliers.ofInstance(Collections.emptyMap())
+                new ReadOnlyProcedureInformation(
+                        Suppliers.ofInstance(Collections.emptyMap())
+                )
         );
 
         // When
@@ -157,7 +159,9 @@ public class ProcedureDetailAggregatorAggregateProcedureStatsTest {
     public void shouldFilterOutNonAggregatesAndReturnEmptyTable() {
         // Given
         ProcedureDetailAggregator aggregator = new ProcedureDetailAggregator(
-                Suppliers.ofInstance(Collections.emptyMap())
+                new ReadOnlyProcedureInformation(
+                        Suppliers.ofInstance(Collections.emptyMap())
+                )
         );
 
         MockRow row1 = MockRow.with(
@@ -196,7 +200,9 @@ public class ProcedureDetailAggregatorAggregateProcedureStatsTest {
     public void shouldFilterOutNonAggregates() {
         // Given
         ProcedureDetailAggregator aggregator = new ProcedureDetailAggregator(
-                Suppliers.ofInstance(Collections.emptyMap())
+                new ReadOnlyProcedureInformation(
+                        Suppliers.ofInstance(Collections.emptyMap())
+                )
         );
 
         MockRow row1 = MockRow.with(

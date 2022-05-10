@@ -27,9 +27,8 @@ import static org.junit.Assert.assertTrue;
 import org.junit.Assert;
 import org.junit.Test;
 import org.voltdb.VoltTable;
-import org.voltdb.stats.procedure.StatsProcInputTable.ProcInputRow;
 
-public class TestStatsProcInputTable {
+public class TestInputProcedureProcedureStatisticsTable {
 
     long mB = 1024 * 1024;
 
@@ -58,35 +57,43 @@ public class TestStatsProcInputTable {
     }
 
     // push rows from data in to the table.
-    void loadData(StatsProcInputTable dut, ProcInputRow[] data) {
-        for (ProcInputRow row : data) {
-            dut.updateTable(true,
-                            row.procedure,
-                            row.partition,
-                            row.timestamp,
-                            row.invocations,
-                            row.minIN,
-                            row.maxIN,
-                            row.avgIN);
+    void loadData(InputProcedureStatisticsTable dut, ProcedureStatisticsTable.StatisticRow[] data) {
+        for (ProcedureStatisticsTable.StatisticRow row : data) {
+            dut.updateTable(
+                    true,
+                    row.procedure,
+                    row.partition,
+                    row.timestamp,
+                    row.invocations,
+                    row.min,
+                    row.max,
+                    row.avg,
+                    0,
+                    0
+            );
         }
     }
 
-    void loadDataNoDedup(StatsProcInputTable dut, ProcInputRow[] data) {
-        for (ProcInputRow row : data) {
-            dut.updateTable(false,
-                            row.procedure,
-                            row.partition,
-                            row.timestamp,
-                            row.invocations,
-                            row.minIN,
-                            row.maxIN,
-                            row.avgIN);
+    void loadDataNoDedup(InputProcedureStatisticsTable dut, ProcedureStatisticsTable.StatisticRow[] data) {
+        for (ProcedureStatisticsTable.StatisticRow row : data) {
+            dut.updateTable(
+                    false,
+                    row.procedure,
+                    row.partition,
+                    row.timestamp,
+                    row.invocations,
+                    row.min,
+                    row.max,
+                    row.avg,
+                    0,
+                    0
+            );
         }
     }
 
     // validate contents of sorted dut vs. expectation of ResultRow[]
-    void assertEquals(String testname, StatsProcInputTable dut, ResultRow[] data) {
-        VoltTable actual = dut.sortByInput(testname);
+    void assertEquals(String testname, InputProcedureStatisticsTable dut, ResultRow[] data) {
+        VoltTable actual = dut.getSortedTable();
         Assert.assertEquals(
                 testname + " has wrong number of result rows in test.",
                 actual.getRowCount(),
@@ -112,9 +119,9 @@ public class TestStatsProcInputTable {
     public void testBaseCase() throws Exception {
         // Given
         // validate sensical round-trip of one row.
-        ProcInputRow[] data = {
+        ProcedureStatisticsTable.StatisticRow[] data = {
                 //proc/part/time/invok/min/max/avg
-                new ProcInputRow("proc", 0L, 12345L, 100 * mB, 2L, 4L, 3L)
+                new ProcedureStatisticsTable.StatisticRow("proc", 0L, 12345L, 100 * mB, 2L, 4L, 3L, 0L, 0L)
         };
 
         ResultRow[] result = {
@@ -123,7 +130,7 @@ public class TestStatsProcInputTable {
         };
 
         // When
-        StatsProcInputTable dut = new StatsProcInputTable();
+        InputProcedureStatisticsTable dut = new InputProcedureStatisticsTable();
         loadData(dut, data);
 
         // Then
@@ -134,8 +141,8 @@ public class TestStatsProcInputTable {
     public void testAllZeros() {
         // Given
         // validate paranoia about an all zero row - just in case.
-        ProcInputRow[] data = {     //proc/part/time/invok/min/max/avg
-                new ProcInputRow("proc", 0L, 0L, 0L, 0L, 0L, 0L)
+        ProcedureStatisticsTable.StatisticRow[] data = {     //proc/part/time/invok/min/max/avg
+                new ProcedureStatisticsTable.StatisticRow("proc", 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L)
 
         };
         ResultRow[] result = {  //time/proc/perc/inok/min/max/avg/tot
@@ -143,7 +150,7 @@ public class TestStatsProcInputTable {
         };
 
         // When
-        StatsProcInputTable dut = new StatsProcInputTable();
+        InputProcedureStatisticsTable dut = new InputProcedureStatisticsTable();
         loadData(dut, data);
 
         // Then
@@ -153,10 +160,10 @@ public class TestStatsProcInputTable {
     @Test
     public void testMultipleProcs() {
         // Given
-        ProcInputRow[] data = {     //proc/part/time/invok/min/max/avg
-                new ProcInputRow("A", 0L, 12345L, 300 * mB, 3L, 5L, 4L),
-                new ProcInputRow("B", 0L, 12345L, 100 * mB, 1L, 4L, 2L),
-                new ProcInputRow("B", 1L, 12345L, 100 * mB, 1L, 3L, 2L)
+        ProcedureStatisticsTable.StatisticRow[] data = {     //proc/part/time/invok/min/max/avg
+                new ProcedureStatisticsTable.StatisticRow("A", 0L, 12345L, 300 * mB, 3L, 5L, 4L, 0L, 0L),
+                new ProcedureStatisticsTable.StatisticRow("B", 0L, 12345L, 100 * mB, 1L, 4L, 2L, 0L, 0L),
+                new ProcedureStatisticsTable.StatisticRow("B", 1L, 12345L, 100 * mB, 1L, 3L, 2L, 0L, 0L)
         };
 
         ResultRow[] result = {  //time/proc/perc/inok/min/max/avg/tot
@@ -165,7 +172,7 @@ public class TestStatsProcInputTable {
         };
 
         // When
-        StatsProcInputTable dut = new StatsProcInputTable();
+        InputProcedureStatisticsTable dut = new InputProcedureStatisticsTable();
         loadData(dut, data);
 
         // Then
@@ -177,11 +184,11 @@ public class TestStatsProcInputTable {
         // Given
         // need to not double count invocations at replicas, but do look at
         // min, max, avg
-        ProcInputRow[] data = { //proc/part/time/invok/min/max/avg
-                new ProcInputRow("proc", 0L, 12345L, 200 * mB, 4L, 10L, 6L),
-                new ProcInputRow("proc", 0L, 12345L, 100 * mB, 4L, 25L, 10L),
-                new ProcInputRow("proc", 0L, 12345L, 100 * mB, 1L, 4L, 2L),
-                new ProcInputRow("proc", 1L, 12345L, 400 * mB, 2L, 8L, 4L)
+        ProcedureStatisticsTable.StatisticRow[] data = { //proc/part/time/invok/min/max/avg
+                new ProcedureStatisticsTable.StatisticRow("proc", 0L, 12345L, 200 * mB, 4L, 10L, 6L, 0L, 0L),
+                new ProcedureStatisticsTable.StatisticRow("proc", 0L, 12345L, 100 * mB, 4L, 25L, 10L, 0L, 0L),
+                new ProcedureStatisticsTable.StatisticRow("proc", 0L, 12345L, 100 * mB, 1L, 4L, 2L, 0L, 0L),
+                new ProcedureStatisticsTable.StatisticRow("proc", 1L, 12345L, 400 * mB, 2L, 8L, 4L, 0L, 0L)
         };
 
         ResultRow[] result = { //time/proc/perc/inok/min/max/avg/tot
@@ -189,7 +196,7 @@ public class TestStatsProcInputTable {
         };
 
         // When
-        StatsProcInputTable dut = new StatsProcInputTable();
+        InputProcedureStatisticsTable dut = new InputProcedureStatisticsTable();
         loadDataNoDedup(dut, data);
 
         // Then
@@ -199,9 +206,9 @@ public class TestStatsProcInputTable {
     @Test
     public void testRounding() {
         // Given
-        ProcInputRow[] data = {     //proc/part/time/invok/min/max/avg
-                new ProcInputRow("A", 0L, 12345L, 10000000 * mB, 3L, 5L, 4L),
-                new ProcInputRow("B", 0L, 12345L, 1 * mB, 1L, 4L, 2L)
+        ProcedureStatisticsTable.StatisticRow[] data = {     //proc/part/time/invok/min/max/avg
+                new ProcedureStatisticsTable.StatisticRow("A", 0L, 12345L, 10000000 * mB, 3L, 5L, 4L, 0L, 0L),
+                new ProcedureStatisticsTable.StatisticRow("B", 0L, 12345L, 1 * mB, 1L, 4L, 2L, 0L, 0L)
         };
 
         ResultRow[] result = {  //time/proc/perc/inok/min/max/avg/tot
@@ -210,7 +217,7 @@ public class TestStatsProcInputTable {
         };
 
         // When
-        StatsProcInputTable dut = new StatsProcInputTable();
+        InputProcedureStatisticsTable dut = new InputProcedureStatisticsTable();
         loadData(dut, data);
 
         //Then

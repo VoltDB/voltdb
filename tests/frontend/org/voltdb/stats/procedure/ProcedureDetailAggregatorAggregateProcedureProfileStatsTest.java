@@ -119,7 +119,9 @@ public class ProcedureDetailAggregatorAggregateProcedureProfileStatsTest {
     public void shouldAcceptEmptyTable() {
         // Given
         ProcedureDetailAggregator aggregator = new ProcedureDetailAggregator(
-                Suppliers.ofInstance(Collections.emptyMap())
+                new ReadOnlyProcedureInformation(
+                        Suppliers.ofInstance(Collections.emptyMap())
+                )
         );
 
         // When
@@ -135,7 +137,9 @@ public class ProcedureDetailAggregatorAggregateProcedureProfileStatsTest {
     public void shouldFilterOutNonAggregatesNonTransactionalAndReturnEmptyTable() {
         // Given
         ProcedureDetailAggregator aggregator = new ProcedureDetailAggregator(
-                Suppliers.ofInstance(Collections.emptyMap())
+                new ReadOnlyProcedureInformation(
+                        Suppliers.ofInstance(Collections.emptyMap())
+                )
         );
 
         MockRow row1 = MockRow.with(
@@ -182,7 +186,9 @@ public class ProcedureDetailAggregatorAggregateProcedureProfileStatsTest {
     public void shouldFilterOutNonAggregates() {
         // Given
         ProcedureDetailAggregator aggregator = new ProcedureDetailAggregator(
-                Suppliers.ofInstance(Collections.emptyMap())
+                new ReadOnlyProcedureInformation(
+                        Suppliers.ofInstance(Collections.emptyMap())
+                )
         );
 
         MockRow row1 = MockRow.with(
@@ -231,7 +237,9 @@ public class ProcedureDetailAggregatorAggregateProcedureProfileStatsTest {
     public void shouldSortByAverageExecutionTime() {
         // Given
         ProcedureDetailAggregator aggregator = new ProcedureDetailAggregator(
-                Suppliers.ofInstance(Collections.emptyMap())
+                new ReadOnlyProcedureInformation(
+                        Suppliers.ofInstance(Collections.emptyMap())
+                )
         );
 
         MockRow row1 = MockRow.with(
@@ -300,9 +308,11 @@ public class ProcedureDetailAggregatorAggregateProcedureProfileStatsTest {
     public void shouldDeduplicateNonReadOnlyProcedures() {
         // Given
         ProcedureDetailAggregator aggregator = new ProcedureDetailAggregator(
-                Suppliers.ofInstance(
-                        ImmutableMap.of(
-                                "Order66", false
+                new ReadOnlyProcedureInformation(
+                        Suppliers.ofInstance(
+                                ImmutableMap.of(
+                                        "Order66", false
+                                )
                         )
                 )
         );
@@ -362,9 +372,11 @@ public class ProcedureDetailAggregatorAggregateProcedureProfileStatsTest {
     public void shouldNotDeduplicateReadOnlyProcedures() {
         // Given
         ProcedureDetailAggregator aggregator = new ProcedureDetailAggregator(
-                Suppliers.ofInstance(
-                        ImmutableMap.of(
-                                "Order66", true
+                new ReadOnlyProcedureInformation(
+                        Suppliers.ofInstance(
+                                ImmutableMap.of(
+                                        "Order66", true
+                                )
                         )
                 )
         );
@@ -424,7 +436,9 @@ public class ProcedureDetailAggregatorAggregateProcedureProfileStatsTest {
     public void shouldAssumeMissingProcedureIsNotReadOnly() {
         // Given
         ProcedureDetailAggregator aggregator = new ProcedureDetailAggregator(
-                Suppliers.ofInstance(Collections.emptyMap())
+                new ReadOnlyProcedureInformation(
+                        Suppliers.ofInstance(Collections.emptyMap())
+                )
         );
 
         MockRow row1 = MockRow.with(

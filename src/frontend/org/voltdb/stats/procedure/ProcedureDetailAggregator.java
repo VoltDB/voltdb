@@ -24,21 +24,19 @@ import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltTableRow;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Procedure;
 
 public class ProcedureDetailAggregator {
 
-    // We need to use Supplier to break circular dependency during initialziation of VoltDB.
-    private final Supplier<Map<String, Boolean>> m_procedureInfo;
+    private final ReadOnlyProcedureInformation readOnlyProcedureInformation;
 
     public static ProcedureDetailAggregator create() {
-        return new ProcedureDetailAggregator(getProcedureInformation());
+        return new ProcedureDetailAggregator(new ReadOnlyProcedureInformation());
     }
 
-    public ProcedureDetailAggregator(Supplier<Map<String, Boolean>> m_procedureInfo) {
-        this.m_procedureInfo = m_procedureInfo;
+    public ProcedureDetailAggregator(ReadOnlyProcedureInformation readOnlyProcedureInformation) {
+        this.readOnlyProcedureInformation = readOnlyProcedureInformation;
     }
 
     public VoltTable[] sortProcedureDetailStats(VoltTable[] baseStats) {
@@ -105,62 +103,33 @@ public class ProcedureDetailAggregator {
      * Produce PROCEDUREPROFILE aggregation of PROCEDURE subselector
      */
     public VoltTable[] aggregateProcedureProfileStats(VoltTable[] baseStats) {
-        StatsProcProfTable statisticsTable = new StatsProcProfTable();
-        aggregateProcedureStats(baseStats[0], (shouldDeduplicate, procedureName, row) -> statisticsTable.updateTable(
-                shouldDeduplicate,
-                row.getLong("TIMESTAMP"),
-                procedureName,
-                row.getLong("PARTITION_ID"),
-                row.getLong("INVOCATIONS"),
-                row.getLong("MIN_EXECUTION_TIME"),
-                row.getLong("MAX_EXECUTION_TIME"),
-                row.getLong("AVG_EXECUTION_TIME"),
-                row.getLong("FAILURES"),
-                row.getLong("ABORTS")
-        ));
+        ProcedureProfileStatisticsTable statisticsTable = new ProcedureProfileStatisticsTable();
+        aggregateProcedureStats(statisticsTable, baseStats[0]);
 
-        return new VoltTable[]{statisticsTable.sortByAverage("EXECUTION_TIME")};
+        return new VoltTable[]{statisticsTable.getSortedTable()};
     }
 
     /**
      * Produce PROCEDUREINPUT aggregation of PROCEDURE subselector
      */
     public VoltTable[] aggregateProcedureInputStats(VoltTable[] baseStats) {
-        StatsProcInputTable statisticsTable = new StatsProcInputTable();
-        aggregateProcedureStats(baseStats[0], (shouldDeduplicate, procedureName, row) -> statisticsTable.updateTable(
-                shouldDeduplicate,
-                procedureName,
-                row.getLong("PARTITION_ID"),
-                row.getLong("TIMESTAMP"),
-                row.getLong("INVOCATIONS"),
-                row.getLong("MIN_PARAMETER_SET_SIZE"),
-                row.getLong("MAX_PARAMETER_SET_SIZE"),
-                row.getLong("AVG_PARAMETER_SET_SIZE")
-        ));
+        InputProcedureStatisticsTable statisticsTable = new InputProcedureStatisticsTable();
+        aggregateProcedureStats(statisticsTable, baseStats[0]);
 
-        return new VoltTable[]{statisticsTable.sortByInput("PROCEDURE_INPUT")};
+        return new VoltTable[]{statisticsTable.getSortedTable()};
     }
 
     /**
      * Produce PROCEDUREOUTPUT aggregation of PROCEDURE subselector
      */
     public VoltTable[] aggregateProcedureOutputStats(VoltTable[] baseStats) {
-        StatsProcOutputTable statisticsTable = new StatsProcOutputTable();
-        aggregateProcedureStats(baseStats[0], (shouldDeduplicate, procedureName, row) -> statisticsTable.updateTable(
-                shouldDeduplicate,
-                procedureName,
-                row.getLong("PARTITION_ID"),
-                row.getLong("TIMESTAMP"),
-                row.getLong("INVOCATIONS"),
-                row.getLong("MIN_RESULT_SIZE"),
-                row.getLong("MAX_RESULT_SIZE"),
-                row.getLong("AVG_RESULT_SIZE")
-        ));
+        OutputProcedureStatisticsTable statisticsTable = new OutputProcedureStatisticsTable();
+        aggregateProcedureStats(statisticsTable, baseStats[0]);
 
-        return new VoltTable[]{statisticsTable.sortByOutput("PROCEDURE_OUTPUT")};
+        return new VoltTable[]{statisticsTable.getSortedTable()};
     }
 
-    public void aggregateProcedureStats(VoltTable baseStats, StatisticsTable statisticsTable) {
+    public void aggregateProcedureStats(ProcedureStatisticsTable procedureStatisticsTable, VoltTable baseStats) {
         baseStats.resetRowPosition();
         while (baseStats.advanceRow()) {
             // Skip non-transactional procedures for some of these rollups until
@@ -176,35 +145,14 @@ public class ProcedureDetailAggregator {
             }
 
             String pname = baseStats.getString("PROCEDURE");
-            boolean shouldDeduplicate = !isReadOnlyProcedure(pname);
+            boolean shouldDeduplicate = !readOnlyProcedureInformation.isReadOnlyProcedure(pname);
 
-            statisticsTable.updateTable(shouldDeduplicate,
-                                        pname,
-                                        baseStats.fetchRow(baseStats.getActiveRowIndex())
+            procedureStatisticsTable.updateTable(
+                    shouldDeduplicate,
+                    pname,
+                    baseStats.fetchRow(baseStats.getActiveRowIndex()
+                    )
             );
         }
-    }
-
-    interface StatisticsTable {
-
-        void updateTable(boolean shouldDeduplicate, String procedureName, VoltTableRow row);
-    }
-
-    private static Supplier<Map<String, Boolean>> getProcedureInformation() {
-        return Suppliers.memoize(() -> {
-            CatalogContext ctx = VoltDB.instance().getCatalogContext();
-
-            ImmutableMap.Builder<String, Boolean> builder = ImmutableMap.builder();
-            for (Procedure p : ctx.procedures) {
-                builder.put(p.getClassname(), p.getReadonly());
-            }
-
-            return builder.build();
-        });
-    }
-
-    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
-    private boolean isReadOnlyProcedure(String name) {
-        return m_procedureInfo.get().getOrDefault(name, false);
     }
 }

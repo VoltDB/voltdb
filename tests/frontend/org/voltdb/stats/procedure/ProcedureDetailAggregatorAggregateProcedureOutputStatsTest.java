@@ -103,7 +103,7 @@ public class ProcedureDetailAggregatorAggregateProcedureOutputStatsTest {
 
     MockRow baseOutput = MockRow.of(
             outputSchemaTemplate,
-            42L,
+            42L, // TIMESTAMP
             "org.voltdb.stats.procedure.ProcedureDetailResultTableTest",
             50L, // WEIGHTED_PERC
             2345L, // INVOCATIONS
@@ -117,9 +117,10 @@ public class ProcedureDetailAggregatorAggregateProcedureOutputStatsTest {
     public void shouldAcceptEmptyTable() {
         // Given
         ProcedureDetailAggregator aggregator = new ProcedureDetailAggregator(
-                Suppliers.ofInstance(Collections.emptyMap())
+                new ReadOnlyProcedureInformation(
+                        Suppliers.ofInstance(Collections.emptyMap())
+                )
         );
-
         // When
         VoltTable[] voltTables = aggregator.aggregateProcedureOutputStats(new VoltTable[]{inputSchemaTemplate});
 
@@ -133,7 +134,9 @@ public class ProcedureDetailAggregatorAggregateProcedureOutputStatsTest {
     public void shouldFilterOutNonAggregatesNonTransactionalAndReturnEmptyTable() {
         // Given
         ProcedureDetailAggregator aggregator = new ProcedureDetailAggregator(
-                Suppliers.ofInstance(Collections.emptyMap())
+                new ReadOnlyProcedureInformation(
+                        Suppliers.ofInstance(Collections.emptyMap())
+                )
         );
 
         MockRow row1 = MockRow.with(
@@ -180,7 +183,9 @@ public class ProcedureDetailAggregatorAggregateProcedureOutputStatsTest {
     public void shouldFilterOutNonAggregates() {
         // Given
         ProcedureDetailAggregator aggregator = new ProcedureDetailAggregator(
-                Suppliers.ofInstance(Collections.emptyMap())
+                new ReadOnlyProcedureInformation(
+                        Suppliers.ofInstance(Collections.emptyMap())
+                )
         );
 
         MockRow row1 = MockRow.with(
@@ -229,7 +234,9 @@ public class ProcedureDetailAggregatorAggregateProcedureOutputStatsTest {
     public void shouldSortByParametersSize() {
         // Given
         ProcedureDetailAggregator aggregator = new ProcedureDetailAggregator(
-                Suppliers.ofInstance(Collections.emptyMap())
+                new ReadOnlyProcedureInformation(
+                        Suppliers.ofInstance(Collections.emptyMap())
+                )
         );
 
         MockRow row1 = MockRow.with(
@@ -298,9 +305,11 @@ public class ProcedureDetailAggregatorAggregateProcedureOutputStatsTest {
     public void shouldDeduplicateNonReadOnlyProcedures() {
         // Given
         ProcedureDetailAggregator aggregator = new ProcedureDetailAggregator(
-                Suppliers.ofInstance(
-                        ImmutableMap.of(
-                                "Order66", false
+                new ReadOnlyProcedureInformation(
+                        Suppliers.ofInstance(
+                                ImmutableMap.of(
+                                        "Order66", false
+                                )
                         )
                 )
         );
@@ -358,9 +367,11 @@ public class ProcedureDetailAggregatorAggregateProcedureOutputStatsTest {
     public void shouldNotDeduplicateReadOnlyProcedures() {
         // Given
         ProcedureDetailAggregator aggregator = new ProcedureDetailAggregator(
-                Suppliers.ofInstance(
-                        ImmutableMap.of(
-                                "Order66", true
+                new ReadOnlyProcedureInformation(
+                        Suppliers.ofInstance(
+                                ImmutableMap.of(
+                                        "Order66", true
+                                )
                         )
                 )
         );
@@ -418,7 +429,9 @@ public class ProcedureDetailAggregatorAggregateProcedureOutputStatsTest {
     public void shouldAssumeMissingProcedureIsNotReadOnly() {
         // Given
         ProcedureDetailAggregator aggregator = new ProcedureDetailAggregator(
-                Suppliers.ofInstance(Collections.emptyMap())
+                new ReadOnlyProcedureInformation(
+                        Suppliers.ofInstance(Collections.emptyMap())
+                )
         );
 
         MockRow row1 = MockRow.with(

@@ -27,9 +27,8 @@ import static org.junit.Assert.assertTrue;
 import org.junit.Assert;
 import org.junit.Test;
 import org.voltdb.VoltTable;
-import org.voltdb.stats.procedure.StatsProcProfTable.ProcProfRow;
 
-public class TestStatsProcProfTable {
+public class TestProcedureProfileProcedureStatisticsTable {
 
     // result row in java form for test
     static class ResultRow {
@@ -59,40 +58,44 @@ public class TestStatsProcProfTable {
     }
 
     // push rows from data in to the table.
-    void loadData(StatsProcProfTable dut, ProcProfRow[] data) {
-        for (ProcProfRow row : data) {
-            dut.updateTable(true,
-                            row.timestamp,
-                            row.procedure,
-                            row.partition,
-                            row.invocations,
-                            row.min,
-                            row.max,
-                            row.avg,
-                            row.failures,
-                            row.aborts);
+    void loadData(ProcedureProfileStatisticsTable dut, ProcedureStatisticsTable.StatisticRow[] data) {
+        for (ProcedureStatisticsTable.StatisticRow row : data) {
+            dut.updateTable(
+                    true,
+                    row.procedure,
+                    row.partition,
+                    row.timestamp,
+                    row.invocations,
+                    row.min,
+                    row.max,
+                    row.avg,
+                    row.failures,
+                    row.aborts
+            );
         }
     }
 
     // push rows from data in to the table.
-    void loadDataNoDedup(StatsProcProfTable dut, ProcProfRow[] data) {
-        for (ProcProfRow row : data) {
-            dut.updateTable(false,
-                            row.timestamp,
-                            row.procedure,
-                            row.partition,
-                            row.invocations,
-                            row.min,
-                            row.max,
-                            row.avg,
-                            row.failures,
-                            row.aborts);
+    void loadDataNoDedup(ProcedureProfileStatisticsTable dut, ProcedureStatisticsTable.StatisticRow[] data) {
+        for (ProcedureStatisticsTable.StatisticRow row : data) {
+            dut.updateTable(
+                    false,
+                    row.procedure,
+                    row.partition,
+                    row.timestamp,
+                    row.invocations,
+                    row.min,
+                    row.max,
+                    row.avg,
+                    row.failures,
+                    row.aborts
+            );
         }
     }
 
     // validate contents of sorted dut vs. expectation of ResultRow[]
-    void assertEquals(String testname, StatsProcProfTable dut, ResultRow[] data) {
-        VoltTable actual = dut.sortByAverage(testname);
+    void assertEquals(String testname, ProcedureProfileStatisticsTable dut, ResultRow[] data) {
+        VoltTable actual = dut.getSortedTable();
         Assert.assertEquals(testname + " has wrong number of result rows in test.",
                             actual.getRowCount(), data.length);
 
@@ -116,8 +119,8 @@ public class TestStatsProcProfTable {
     public void testBaseCase() {
         // Given
         // validate sensical round-trip of one row.
-        ProcProfRow[] data = {
-                new ProcProfRow(1371587140278L, "A", 0L, 100L, 1L, 2L, 3L, 4L, 5L)
+        ProcedureStatisticsTable.StatisticRow[] data = {
+                new ProcedureStatisticsTable.StatisticRow("A", 0L, 1371587140278L, 100L, 1L, 2L, 3L, 4L, 5L)
         };
 
         ResultRow[] result = {
@@ -125,7 +128,7 @@ public class TestStatsProcProfTable {
         };
 
         // When
-        StatsProcProfTable dut = new StatsProcProfTable();
+        ProcedureProfileStatisticsTable dut = new ProcedureProfileStatisticsTable();
         loadData(dut, data);
 
         // Then
@@ -136,8 +139,8 @@ public class TestStatsProcProfTable {
     public void testAllZeros() {
         // Given
         // validate paranoia about an all zero row - just in case.
-        ProcProfRow[] data = {
-                new ProcProfRow(1371587140278L, "B", 0L, 0L, 0L, 0L, 0L, 0L, 0L)
+        ProcedureStatisticsTable.StatisticRow[] data = {
+                new ProcedureStatisticsTable.StatisticRow("B", 0L, 1371587140278L, 0L, 0L, 0L, 0L, 0L, 0L)
         };
 
         ResultRow[] result = {
@@ -145,7 +148,7 @@ public class TestStatsProcProfTable {
         };
 
         // When
-        StatsProcProfTable dut = new StatsProcProfTable();
+        ProcedureProfileStatisticsTable dut = new ProcedureProfileStatisticsTable();
         loadData(dut, data);
 
         // Then
@@ -156,11 +159,11 @@ public class TestStatsProcProfTable {
     public void testMultipleProcs() {
         // Given
         // 2 procs, 2 partitions - make sure min,max,avg,wtd works
-        ProcProfRow[] data = {
+        ProcedureStatisticsTable.StatisticRow[] data = {
                 //                          TS/Proc/Part/invok/min/max/avg/fail/abort
-                new ProcProfRow(1371587140278L, "B", 0L, 100L, 2L, 5L, 4L, 17L, 18L),
-                new ProcProfRow(1371587140278L, "A", 1L, 1L, 10L, 20L, 30L, 0L, 18L),
-                new ProcProfRow(1371587140278L, "B", 1L, 100L, 1L, 2L, 3L, 17L, 18L)
+                new ProcedureStatisticsTable.StatisticRow("B", 0L, 1371587140278L, 100L, 2L, 5L, 4L, 17L, 18L),
+                new ProcedureStatisticsTable.StatisticRow("A", 1L, 1371587140278L, 1L, 10L, 20L, 30L, 0L, 18L),
+                new ProcedureStatisticsTable.StatisticRow("B", 1L, 1371587140278L, 100L, 1L, 2L, 3L, 17L, 18L)
         };
 
         ResultRow[] result = {
@@ -170,7 +173,7 @@ public class TestStatsProcProfTable {
         };
 
         // When
-        StatsProcProfTable dut = new StatsProcProfTable();
+        ProcedureProfileStatisticsTable dut = new ProcedureProfileStatisticsTable();
         loadData(dut, data);
 
         // Then
@@ -182,12 +185,12 @@ public class TestStatsProcProfTable {
         // Given
         // need to not double count invocations at replicas, but do look at
         // min, max, avg, fail, abort
-        ProcProfRow[] data = {
+        ProcedureStatisticsTable.StatisticRow[] data = {
                 //                          TS/Proc/Part/invok/min/max/avg/fail/abort
-                new ProcProfRow(1371587140278L, "B", 0L, 100L, 2L, 5L, 4L, 17L, 18L),
-                new ProcProfRow(1371587140278L, "A", 1L, 1L, 10L, 20L, 30L, 0L, 18L),
-                new ProcProfRow(1371587140278L, "B", 0L, 100L, 1L, 2L, 2L, 17L, 18L),
-                new ProcProfRow(1371587140278L, "B", 1L, 100L, 4L, 4L, 3L, 17L, 18L)
+                new ProcedureStatisticsTable.StatisticRow("B", 0L, 1371587140278L, 100L, 2L, 5L, 4L, 17L, 18L),
+                new ProcedureStatisticsTable.StatisticRow("A", 1L, 1371587140278L, 1L, 10L, 20L, 30L, 0L, 18L),
+                new ProcedureStatisticsTable.StatisticRow("B", 0L, 1371587140278L, 100L, 1L, 2L, 2L, 17L, 18L),
+                new ProcedureStatisticsTable.StatisticRow("B", 1L, 1371587140278L, 100L, 4L, 4L, 3L, 17L, 18L)
         };
 
         ResultRow[] result = {
@@ -197,7 +200,7 @@ public class TestStatsProcProfTable {
         };
 
         // When
-        StatsProcProfTable dut = new StatsProcProfTable();
+        ProcedureProfileStatisticsTable dut = new ProcedureProfileStatisticsTable();
         loadData(dut, data);
 
         // Then
@@ -209,12 +212,12 @@ public class TestStatsProcProfTable {
         // Given
         // need to not double count invocations at replicas, but do look at
         // min, max, avg, fail, abort
-        ProcProfRow[] data = {
+        ProcedureStatisticsTable.StatisticRow[] data = {
                 //                          TS/Proc/Part/invok/min/max/avg/fail/abort
-                new ProcProfRow(1371587140278L, "B", 0L, 100L, 2L, 5L, 4L, 17L, 18L),
-                new ProcProfRow(1371587140278L, "A", 1L, 1L, 10L, 20L, 30L, 0L, 18L),
-                new ProcProfRow(1371587140278L, "B", 0L, 100L, 1L, 2L, 2L, 17L, 18L),
-                new ProcProfRow(1371587140278L, "B", 1L, 100L, 4L, 4L, 3L, 17L, 18L)
+                new ProcedureStatisticsTable.StatisticRow("B", 0L, 1371587140278L, 100L, 2L, 5L, 4L, 17L, 18L),
+                new ProcedureStatisticsTable.StatisticRow("A", 1L, 1371587140278L, 1L, 10L, 20L, 30L, 0L, 18L),
+                new ProcedureStatisticsTable.StatisticRow("B", 0L, 1371587140278L, 100L, 1L, 2L, 2L, 17L, 18L),
+                new ProcedureStatisticsTable.StatisticRow("B", 1L, 1371587140278L, 100L, 4L, 4L, 3L, 17L, 18L)
         };
         ResultRow[] result = {
                 //               TS/         Proc /wtd/ invok/avg/ min/max/abort/fail
@@ -223,7 +226,7 @@ public class TestStatsProcProfTable {
         };
 
         // When
-        StatsProcProfTable dut = new StatsProcProfTable();
+        ProcedureProfileStatisticsTable dut = new ProcedureProfileStatisticsTable();
         loadDataNoDedup(dut, data);
 
         // Then
@@ -235,10 +238,10 @@ public class TestStatsProcProfTable {
         // Given
         // need to not double count invocations at replicas, but do look at
         // min, max, avg, fail, abort
-        ProcProfRow[] data = {
+        ProcedureStatisticsTable.StatisticRow[] data = {
                 //                          TS/Proc/Part/invok/min/max/avg/fail/abort
-                new ProcProfRow(1371587140278L, "B", 0L, 10000000L, 2L, 5L, 4L, 17L, 18L),
-                new ProcProfRow(1371587140278L, "A", 0L, 1L, 10L, 20L, 30L, 0L, 18L)
+                new ProcedureStatisticsTable.StatisticRow("B", 0L, 1371587140278L, 10000000L, 2L, 5L, 4L, 17L, 18L),
+                new ProcedureStatisticsTable.StatisticRow("A", 0L, 1371587140278L, 1L, 10L, 20L, 30L, 0L, 18L)
         };
 
         ResultRow[] result = {
@@ -248,7 +251,7 @@ public class TestStatsProcProfTable {
         };
 
         // When
-        StatsProcProfTable dut = new StatsProcProfTable();
+        ProcedureProfileStatisticsTable dut = new ProcedureProfileStatisticsTable();
         loadData(dut, data);
 
         // Then
