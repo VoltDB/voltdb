@@ -17,9 +17,6 @@
 package org.voltdb.stats.procedure;
 
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;

@@ -21,12 +21,10 @@ import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import org.voltdb.CatalogContext;
-import org.voltdb.StatsProcInputTable;
-import org.voltdb.StatsProcOutputTable;
-import org.voltdb.StatsProcProfTable;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltTableRow;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Procedure;
 
@@ -107,99 +105,89 @@ public class ProcedureDetailAggregator {
      * Produce PROCEDUREPROFILE aggregation of PROCEDURE subselector
      */
     public VoltTable[] aggregateProcedureProfileStats(VoltTable[] baseStats) {
-        StatsProcProfTable timeTable = new StatsProcProfTable();
-        baseStats[0].resetRowPosition();
-        while (baseStats[0].advanceRow()) {
-            // Skip non-transactional procedures for some of these rollups until
-            // we figure out how to make them less confusing.
-            // NB: They still show up in the raw PROCEDURE stata.
-            boolean transactional = baseStats[0].getLong("TRANSACTIONAL") == 1;
-            if (!transactional) {
-                continue;
-            }
+        StatsProcProfTable statisticsTable = new StatsProcProfTable();
+        aggregateProcedureStats(baseStats[0], (shouldDeduplicate, procedureName, row) -> statisticsTable.updateTable(
+                shouldDeduplicate,
+                row.getLong("TIMESTAMP"),
+                procedureName,
+                row.getLong("PARTITION_ID"),
+                row.getLong("INVOCATIONS"),
+                row.getLong("MIN_EXECUTION_TIME"),
+                row.getLong("MAX_EXECUTION_TIME"),
+                row.getLong("AVG_EXECUTION_TIME"),
+                row.getLong("FAILURES"),
+                row.getLong("ABORTS")
+        ));
 
-            if (!baseStats[0].getString("STATEMENT").equalsIgnoreCase("<ALL>")) {
-                continue;
-            }
-            String pname = baseStats[0].getString("PROCEDURE");
-
-            timeTable.updateTable(!isReadOnlyProcedure(pname),
-                                  baseStats[0].getLong("TIMESTAMP"),
-                                  pname,
-                                  baseStats[0].getLong("PARTITION_ID"),
-                                  baseStats[0].getLong("INVOCATIONS"),
-                                  baseStats[0].getLong("MIN_EXECUTION_TIME"),
-                                  baseStats[0].getLong("MAX_EXECUTION_TIME"),
-                                  baseStats[0].getLong("AVG_EXECUTION_TIME"),
-                                  baseStats[0].getLong("FAILURES"),
-                                  baseStats[0].getLong("ABORTS"));
-        }
-        return new VoltTable[]{timeTable.sortByAverage("EXECUTION_TIME")};
+        return new VoltTable[]{statisticsTable.sortByAverage("EXECUTION_TIME")};
     }
 
     /**
      * Produce PROCEDUREINPUT aggregation of PROCEDURE subselector
      */
     public VoltTable[] aggregateProcedureInputStats(VoltTable[] baseStats) {
-        StatsProcInputTable timeTable = new StatsProcInputTable();
-        baseStats[0].resetRowPosition();
-        while (baseStats[0].advanceRow()) {
-            // Skip non-transactional procedures for some of these rollups until
-            // we figure out how to make them less confusing.
-            // NB: They still show up in the raw PROCEDURE stata.
-            boolean transactional = baseStats[0].getLong("TRANSACTIONAL") == 1;
-            if (!transactional) {
-                continue;
-            }
+        StatsProcInputTable statisticsTable = new StatsProcInputTable();
+        aggregateProcedureStats(baseStats[0], (shouldDeduplicate, procedureName, row) -> statisticsTable.updateTable(
+                shouldDeduplicate,
+                procedureName,
+                row.getLong("PARTITION_ID"),
+                row.getLong("TIMESTAMP"),
+                row.getLong("INVOCATIONS"),
+                row.getLong("MIN_PARAMETER_SET_SIZE"),
+                row.getLong("MAX_PARAMETER_SET_SIZE"),
+                row.getLong("AVG_PARAMETER_SET_SIZE")
+        ));
 
-            if (!baseStats[0].getString("STATEMENT").equalsIgnoreCase("<ALL>")) {
-                continue;
-            }
-            String pname = baseStats[0].getString("PROCEDURE");
-            timeTable.updateTable(!isReadOnlyProcedure(pname),
-                                  pname,
-                                  baseStats[0].getLong("PARTITION_ID"),
-                                  baseStats[0].getLong("TIMESTAMP"),
-                                  baseStats[0].getLong("INVOCATIONS"),
-                                  baseStats[0].getLong("MIN_PARAMETER_SET_SIZE"),
-                                  baseStats[0].getLong("MAX_PARAMETER_SET_SIZE"),
-                                  baseStats[0].getLong("AVG_PARAMETER_SET_SIZE")
-            );
-        }
-        return new VoltTable[]{timeTable.sortByInput("PROCEDURE_INPUT")};
+        return new VoltTable[]{statisticsTable.sortByInput("PROCEDURE_INPUT")};
     }
 
     /**
      * Produce PROCEDUREOUTPUT aggregation of PROCEDURE subselector
      */
     public VoltTable[] aggregateProcedureOutputStats(VoltTable[] baseStats) {
-        StatsProcOutputTable timeTable = new StatsProcOutputTable();
-        baseStats[0].resetRowPosition();
-        while (baseStats[0].advanceRow()) {
+        StatsProcOutputTable statisticsTable = new StatsProcOutputTable();
+        aggregateProcedureStats(baseStats[0], (shouldDeduplicate, procedureName, row) -> statisticsTable.updateTable(
+                shouldDeduplicate,
+                procedureName,
+                row.getLong("PARTITION_ID"),
+                row.getLong("TIMESTAMP"),
+                row.getLong("INVOCATIONS"),
+                row.getLong("MIN_RESULT_SIZE"),
+                row.getLong("MAX_RESULT_SIZE"),
+                row.getLong("AVG_RESULT_SIZE")
+        ));
+
+        return new VoltTable[]{statisticsTable.sortByOutput("PROCEDURE_OUTPUT")};
+    }
+
+    public void aggregateProcedureStats(VoltTable baseStats, StatisticsTable statisticsTable) {
+        baseStats.resetRowPosition();
+        while (baseStats.advanceRow()) {
             // Skip non-transactional procedures for some of these rollups until
             // we figure out how to make them less confusing.
             // NB: They still show up in the raw PROCEDURE stata.
-            boolean transactional = baseStats[0].getLong("TRANSACTIONAL") == 1;
+            boolean transactional = baseStats.getLong("TRANSACTIONAL") == 1;
             if (!transactional) {
                 continue;
             }
 
-            if (!baseStats[0].getString("STATEMENT").equalsIgnoreCase("<ALL>")) {
+            if (!baseStats.getString("STATEMENT").equalsIgnoreCase("<ALL>")) {
                 continue;
             }
-            String pname = baseStats[0].getString("PROCEDURE");
-            timeTable.updateTable(!isReadOnlyProcedure(pname),
-                                  pname,
-                                  baseStats[0].getLong("PARTITION_ID"),
-                                  baseStats[0].getLong("TIMESTAMP"),
-                                  baseStats[0].getLong("INVOCATIONS"),
-                                  baseStats[0].getLong("MIN_RESULT_SIZE"),
-                                  baseStats[0].getLong("MAX_RESULT_SIZE"),
-                                  baseStats[0].getLong("AVG_RESULT_SIZE")
+
+            String pname = baseStats.getString("PROCEDURE");
+            boolean shouldDeduplicate = !isReadOnlyProcedure(pname);
+
+            statisticsTable.updateTable(shouldDeduplicate,
+                                        pname,
+                                        baseStats.fetchRow(baseStats.getActiveRowIndex())
             );
         }
+    }
 
-        return new VoltTable[]{timeTable.sortByOutput("PROCEDURE_OUTPUT")};
+    interface StatisticsTable {
+
+        void updateTable(boolean shouldDeduplicate, String procedureName, VoltTableRow row);
     }
 
     private static Supplier<Map<String, Boolean>> getProcedureInformation() {

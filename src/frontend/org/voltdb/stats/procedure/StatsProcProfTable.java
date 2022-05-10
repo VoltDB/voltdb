@@ -14,14 +14,14 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.voltdb;
+package org.voltdb.stats.procedure;
 
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
+import org.voltdb.TableShorthand;
+import org.voltdb.VoltTable;
 
 public class StatsProcProfTable {
 

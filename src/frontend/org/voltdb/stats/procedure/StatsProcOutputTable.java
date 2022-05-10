@@ -14,61 +14,62 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.voltdb;
+package org.voltdb.stats.procedure;
 
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
+import org.voltdb.TableShorthand;
+import org.voltdb.VoltTable;
 
-public class StatsProcInputTable {
-    // A table of ProcInputRows: set of unique procedure names
-    TreeSet<ProcInputRow> m_rowsTable = new TreeSet<>();
+public class StatsProcOutputTable {
+    // A table of ProcOutputRows: set of unique procedure names
+    TreeSet<ProcOutputRow> m_rowsTable = new TreeSet<>();
 
     // A row for a procedure on a single host aggregating invocations and
     // min/max/avg bytes I/O across partitions
-    static class ProcInputRow implements Comparable<ProcInputRow> {
+    static class ProcOutputRow implements Comparable<ProcOutputRow> {
         String procedure;
         long partition;
         long timestamp;
         long invocations;
 
-        long minIN;
-        long maxIN;
-        long avgIN;
+        long minOUT;
+        long maxOUT;
+        long avgOUT;
 
         // track which partitions and hosts have been witnessed.
         private final Set<Long> seenPartitions;
 
-        public ProcInputRow(String procedure, long partition, long timestamp,
-                            long invocations, long minIN, long maxIN, long avgIN) {
+        public ProcOutputRow(String procedure, long partition, long timestamp,
+                             long invocations, long minOUT, long maxOUT, long avgOUT) {
             this.procedure = procedure;
             this.partition = partition;
             this.timestamp = timestamp;
             this.invocations = invocations;
-            this.minIN = minIN;
-            this.maxIN = maxIN;
-            this.avgIN = avgIN;
+            this.minOUT = minOUT;
+            this.maxOUT = maxOUT;
+            this.avgOUT = avgOUT;
 
             seenPartitions = new TreeSet<Long>();
             seenPartitions.add(partition);
+
         }
 
         @Override
-        public int compareTo(ProcInputRow other) {
+        public int compareTo(ProcOutputRow other) {
             return procedure.compareTo(other.procedure);
+
         }
 
-        // Augment this ProcInputRow with a new input row
+        // Augment this ProcOutputRow with a new input row
         // dedup flag indicates if we should dedup data based on partition for proc.
-        void updateWith(boolean dedup, ProcInputRow in) {
-            // adjust the avg across all replicas.
-            this.avgIN = calculateAverage(this.avgIN, this.invocations,
-                                          in.avgIN, in.invocations);
-            this.minIN = Math.min(this.minIN, in.minIN);
-            this.maxIN = Math.max(this.maxIN, in.maxIN);
+        void updateWith(boolean dedup, ProcOutputRow in) {
+            this.avgOUT = calculateAverage(this.avgOUT, this.invocations,
+                                           in.avgOUT, in.invocations);
+            this.minOUT = Math.min(this.minOUT, in.minOUT);
+            this.maxOUT = Math.max(this.maxOUT, in.maxOUT);
 
             if (!dedup) {
                 //Not deduping so add up all values.
@@ -110,16 +111,16 @@ public class StatsProcInputTable {
     }
 
     // Sort by total bytes out
-    public int compareByInput(ProcInputRow r1, ProcInputRow r2) {
-        return Long.compare(r1.avgIN * r1.invocations, r2.avgIN * r2.invocations);
+    public int compareByOutput(ProcOutputRow r1, ProcOutputRow r2) {
+        return Long.compare(r1.avgOUT * r1.invocations, r2.avgOUT * r2.invocations);
     }
 
     // Add or update the corresponding row. dedup flag indicates if we should dedup data based on partition for proc.
     public void updateTable(boolean dedup, String procedure, long partition, long timestamp,
-                            long invocations, long minIN, long maxIN, long avgIN) {
-        ProcInputRow in = new ProcInputRow(procedure, partition, timestamp,
-                                           invocations, minIN, maxIN, avgIN);
-        ProcInputRow exists = m_rowsTable.ceiling(in);
+                            long invocations, long minOUT, long maxOUT, long avgOUT) {
+        ProcOutputRow in = new ProcOutputRow(procedure, partition, timestamp,
+                                             invocations, minOUT, maxOUT, avgOUT);
+        ProcOutputRow exists = m_rowsTable.ceiling(in);
         if (exists != null && in.procedure.equals(exists.procedure)) {
             exists.updateWith(dedup, in);
         } else {
@@ -128,15 +129,15 @@ public class StatsProcInputTable {
     }
 
     // Return table ordered by total bytes out
-    public VoltTable sortByInput(String tableName) {
-        List<ProcInputRow> sorted = new ArrayList<>(m_rowsTable);
+    public VoltTable sortByOutput(String tableName) {
+        List<ProcOutputRow> sorted = new ArrayList<>(m_rowsTable);
         sorted.sort((r1, r2) -> {
-            return compareByInput(r2, r1); // sort descending
+            return compareByOutput(r2, r1); // sort descending
         });
 
-        long totalInput = 0L;
-        for (ProcInputRow row : sorted) {
-            totalInput += (row.avgIN * row.invocations);
+        long totalOutput = 0L;
+        for (ProcOutputRow row : sorted) {
+            totalOutput += (row.avgOUT * row.invocations);
         }
 
         int kB = 1024;
@@ -148,22 +149,22 @@ public class StatsProcInputTable {
                 "PROCEDURE:VARCHAR," +
                 "WEIGHTED_PERC:BIGINT," +
                 "INVOCATIONS:BIGINT," +
-                "MIN_PARAMETER_SET_SIZE:BIGINT," +
-                "MAX_PARAMETER_SET_SIZE:BIGINT," +
-                "AVG_PARAMETER_SET_SIZE:BIGINT," +
-                "TOTAL_PARAMETER_SET_SIZE_MB:BIGINT)"
+                "MIN_RESULT_SIZE:BIGINT," +
+                "MAX_RESULT_SIZE:BIGINT," +
+                "AVG_RESULT_SIZE:BIGINT," +
+                "TOTAL_RESULT_SIZE_MB:BIGINT)"
         );
 
-        for (ProcInputRow row : sorted) {
+        for (ProcOutputRow row : sorted) {
             result.addRow(
                     row.timestamp,
                     row.procedure,
-                    calculatePercent((row.avgIN * row.invocations), totalInput), //% total in
+                    calculatePercent((row.avgOUT * row.invocations), totalOutput), //% total out
                     row.invocations,
-                    row.minIN,
-                    row.maxIN,
-                    row.avgIN,
-                    (row.avgIN * row.invocations) / mB //total in
+                    row.minOUT,
+                    row.maxOUT,
+                    row.avgOUT,
+                    (row.avgOUT * row.invocations) / mB //total out
             );
         }
         return result;
