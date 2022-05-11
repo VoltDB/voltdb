@@ -130,6 +130,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     static long TOPOLOGY_CHANGE_CHECK_MS = Long.getLong("TOPOLOGY_CHANGE_CHECK_MS", 5000);
     static long AUTH_TIMEOUT_MS = Long.getLong("AUTH_TIMEOUT_MS", 30000);
     private static final int SSL_LOG_INTERVAL = 60; // seconds
+    private static final int FD_LOG_INTERVAL = 600; // seconds
 
     //Same as in Distributer.java
     public static final long ASYNC_TOPO_HANDLE = Long.MAX_VALUE - 1;
@@ -407,20 +408,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     MessagingChannel messagingChannel = MessagingChannel.get(m_socket, sslEngine);
                     AtomicReference<String> timeoutRef = null;
                     try {
-
-                        /*
-                         * Enforce a limit on the maximum number of connections
-                         */
+                        // Enforce a limit on the maximum number of connections
                         if (m_clientConnectionsTracker.isConnectionsLimitReached()) {
                             m_clientConnectionsTracker.connectionDropped();
-                            networkLog.warnFmt("Rejected connection from %s because the connection limit of %s has been reached",
-                                               remoteIP,
-                                               m_clientConnectionsTracker.getMaxNumberOfAllowedConnections()
-                            );
+                            networkLog.rateLimitedWarn(FD_LOG_INTERVAL, "Rejected connection from %s because the connection limit of %s has been reached",
+                                                       remoteIP, m_clientConnectionsTracker.getMaxNumberOfAllowedConnections());
                             try {
-                            /*
-                             * Send rejection message with reason code
-                             */
+                                // Send rejection message with reason code
                                 ByteBuffer b = ByteBuffer.allocate(1);
                                 b.put(MAX_CONNECTIONS_LIMIT_ERROR);
                                 b.flip();
@@ -431,7 +425,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                     messagingChannel.writeMessage(b);
                                 }
                                 m_socket.close();
-                            } catch (IOException e) {}//don't care keep running
+                            } catch (IOException e) {
+                                // ignore
+                            }
                             return;
                         }
 
@@ -498,22 +494,16 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             try {
                 do {
                     final SocketChannel socket;
-                    try
-                    {
+                    try {
                         socket = m_serverSocket.accept();
                     }
-                    catch (IOException ioe)
-                    {
+                    catch (IOException ioe) {
                         if (ioe.getMessage() != null &&
-                            ioe.getMessage().contains("Too many open files"))
-                        {
-                            networkLog.warn("Rejected accepting new connection due to too many open files");
+                            ioe.getMessage().contains("Too many open files")) {
+                            networkLog.rateLimitedWarn(FD_LOG_INTERVAL, "Rejected new connection due to too many open files");
                             continue;
                         }
-                        else
-                        {
-                            throw ioe;
-                        }
+                        throw ioe;
                     }
 
                     final AuthRunnable authRunnable = new AuthRunnable(socket);
