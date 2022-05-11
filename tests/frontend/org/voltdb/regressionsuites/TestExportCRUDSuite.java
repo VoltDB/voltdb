@@ -24,6 +24,7 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
+import java.util.Properties;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
@@ -31,6 +32,7 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 
 public class TestExportCRUDSuite extends RegressionSuite {
 
@@ -72,8 +74,18 @@ public class TestExportCRUDSuite extends RegressionSuite {
 
         final VoltProjectBuilder project = new VoltProjectBuilder();
 
+        final ServerExportEnum exportType;
+
         try {
-            project.addExport(true);
+            // These settings are the VoltProjectBuilder.addExport() defaults, except no outdir is specified so
+            // it will default outdir to a voltdbroot subfolder, preventing interference between nodes.
+            Properties p = new Properties();
+            p.put("type","tsv");
+            p.put("batched","true");
+            p.put("with-schema","true");
+            p.put("nonce","zorag");
+            project.addExport(true, ServerExportEnum.FILE, p);
+
             project.addLiteralSchema(
                     "CREATE STREAM e1 partition on column x (x INTEGER NOT NULL); " +
                     "CREATE VIEW ev1 (x, c) AS SELECT x, COUNT(*) FROM e1 GROUP BY x;"

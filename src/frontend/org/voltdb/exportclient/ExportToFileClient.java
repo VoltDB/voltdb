@@ -39,6 +39,7 @@ import java.util.Set;
 import java.util.TimeZone;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -80,6 +81,9 @@ public class ExportToFileClient extends ExportClientBase {
     // Prefix for the batch folders (or files if not batched) being written to.
     // It is removed when the folder (or files) get rolled.
     private static final String ACTIVE_PREFIX = "active-";
+
+    // Set of active files currently in use, that should not be renamed
+    private static final Set<String> m_activeFiles = ConcurrentHashMap.newKeySet();
 
     protected char m_delimiter;
     protected char[] m_fullDelimiters;
@@ -366,6 +370,7 @@ public class ExportToFileClient extends ExportClientBase {
                     m_logger.error("Error: Unable to create batch directory at path: " + m_dirContainingFiles.getPath());
                     throw new RuntimeException("Unable to create batch directory.");
                 }
+                m_activeFiles.add(m_dirContainingFiles.getPath());
             }
             else {
                 start = new Date();
@@ -466,6 +471,7 @@ public class ExportToFileClient extends ExportClientBase {
                     m_logger.warn(String.format("Failed to delete export directory %s", oldPath));
                 }
             }
+            m_activeFiles.remove(oldDir.getPath());
 
             // Prune by age of batch directory.
             if (m_retentionSecs >= 0) {
@@ -501,6 +507,7 @@ public class ExportToFileClient extends ExportClientBase {
                     m_logger.error("Failed to rename export file from " + oldPath
                             + " to any revisions of " + handle.getPath(""));
                 }
+                m_activeFiles.remove(oldFile.getPath());
             }
 
             // Pruning by age: process all files regardless of table name and
@@ -572,6 +579,7 @@ public class ExportToFileClient extends ExportClientBase {
 
             }
             m_writers.put(handle, writer);
+            m_activeFiles.add(newFile.getPath());
             return writer;
         }
 
@@ -995,7 +1003,7 @@ public class ExportToFileClient extends ExportClientBase {
         }
         setRunEverywhere(Boolean.parseBoolean(conf.getProperty("replicated", "false")));
 
-        // Before any new active files or folders are created, rename any stranded active-* files or folders
+        // rename any stranded active-* files or folders
         renameStrandedOutputFiles(outdir);
 
         configureInternal(
@@ -1090,17 +1098,17 @@ public class ExportToFileClient extends ExportClientBase {
     }
 
     /**
-     * Check the outdir for any child files or folders that begin with the ACTIVE_PREFIX
-     * These may have been stranded (left unrolled) by a previous crash.
-     * If found, rename without the ACTIVE_PREFIX.
+     * During configure, check the outdir for any stranded ACTIVE_PREFIX-ed files or folders
+     * which may have been left behind after a crash. If found, check to ensure the file is not
+     * currently in use by any other instances, then rename the file without the ACTIVE_PREFIX.
      *
-     * Only call this from configure() before configureInternal() to avoid renaming anything actually active.
      */
     private void renameStrandedOutputFiles(File outdir) {
         File[] files = outdir.listFiles();
         for (File f : files) {
             String filename = f.getName();
-            if (filename.startsWith(ACTIVE_PREFIX)) {
+            if (filename.startsWith(ACTIVE_PREFIX) && !m_activeFiles.contains(filename)) {
+                // rename file
                 String type = "file";
                 if (f.isDirectory()) {
                     type = "folder";
