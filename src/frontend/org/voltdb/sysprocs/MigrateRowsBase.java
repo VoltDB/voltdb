@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -98,8 +98,8 @@ public class MigrateRowsBase extends VoltSystemProcedure {
             }
         }
         if (!hasMigratingIndex) {
-            String msg = String.format("Could not find migrating index, example: \"CREATE INDEX myindex ON %s() WHERE NOT MIGRATING\"",
-                    table.getTypeName());
+            String msg = String.format("Could not find migrating index for column %s.%s, example: \"CREATE INDEX myindex ON %s(%s) WHERE NOT MIGRATING\"",
+                    table.getTypeName(), column.getTypeName(), table.getTypeName(), column.getTypeName());
             throw new VoltAbortException(msg);
         }
         // error no index found

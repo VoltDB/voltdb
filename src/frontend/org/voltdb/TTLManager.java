@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2021 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -32,6 +32,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.commons.lang3.StringUtils;
+import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.TimeToLiveVoltDB;
 import org.hsqldb_voltpatches.lib.StringUtil;
 import org.json_voltpatches.JSONObject;
@@ -276,6 +277,11 @@ public class TTLManager extends StatsSource{
     private boolean checkTTLIndex(Table table, Column column) {
         boolean migrate = TableType.isPersistentMigrate(table.getTabletype());
         for (Index index : table.getIndexes()) {
+            if (index.getTypeName().equals(HSQLInterface.AUTO_GEN_MATVIEW_IDX)) {
+                // skip the views auto-generated index, which never has the migrate qualifiers
+                continue;
+            }
+
             for (ColumnRef colRef : index.getColumns()) {
                 if (column.equals(colRef.getColumn())){
                     if (migrate && !index.getMigrating()) {
@@ -291,7 +297,7 @@ public class TTLManager extends StatsSource{
 
         if (migrate) {
             hostLog.warnFmt("An index is missing on column %s.%s for migrating."
-                    + " It must be declared as \"CREATE INDEX myIndex ON %s (%s) WHERE NOT MIGRATING\""
+                    + " It must be declared as \"CREATE INDEX myIndex ON %s (%s) WHERE NOT MIGRATING\"."
                     + " Until this is corrected, no records will be migrated.",
                     table.getTypeName(), column.getName(), table.getTypeName(), column.getName());
         } else {
