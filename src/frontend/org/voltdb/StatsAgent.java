@@ -75,6 +75,12 @@ public class StatsAgent extends OpsAgent {
         case PROCEDUREOUTPUT:
             request.aggregateTables = procedureDetailAggregator.aggregateProcedureOutputStats(request.aggregateTables);
             break;
+        case COMPOUNDPROCSUMMARY:
+            request.aggregateTables = procedureDetailAggregator.aggregateCompoundProcSummary(request.aggregateTables);
+            break;
+        case COMPOUNDPROCBYHOST:
+            request.aggregateTables = procedureDetailAggregator.aggregateCompoundProcByHost(request.aggregateTables);
+            break;
         case DRROLE:
             request.aggregateTables = aggregateDRRoleStats(request.aggregateTables);
             break;

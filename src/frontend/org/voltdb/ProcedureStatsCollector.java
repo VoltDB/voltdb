@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -64,7 +64,7 @@ public class ProcedureStatsCollector extends SiteStatsSource {
     // Mapping from the variable name of the user-defined SQLStmts to its stats.
     private final Map<String, StatementStats> m_stmtStatsMap;
     private final StatsData m_procStatsData;
-    private final boolean m_isTransactional;
+    private final ProcType m_procType;
     private final boolean m_isUAC;
 
     public enum ProcedureColumns {
@@ -84,19 +84,21 @@ public class ProcedureStatsCollector extends SiteStatsSource {
         AVG_PARAMETER_SET_SIZE  (VoltType.INTEGER),
         ABORTS                  (VoltType.BIGINT),
         FAILURES                (VoltType.BIGINT),
-        TRANSACTIONAL           (VoltType.TINYINT);
+        TRANSACTIONAL           (VoltType.TINYINT),
+        COMPOUND                (VoltType.TINYINT);
 
         public final VoltType m_type;
         ProcedureColumns(VoltType type) { m_type = type; }
     }
 
+    public enum ProcType { TRANS, NONTRANS, COMPOUND };
+
     public ProcedureStatsCollector(long siteId,
                                    int partitionId,
                                    Procedure catProc,
                                    ArrayList<String> stmtNames,
-                                   boolean isTransactional)
-    {
-        this(siteId, partitionId, catProc.getClassname(), catProc.getSinglepartition(), stmtNames, isTransactional);
+                                   ProcType procType) {
+        this(siteId, partitionId, catProc.getClassname(), catProc.getSinglepartition(), stmtNames, procType);
     }
 
     public ProcedureStatsCollector(long siteId,
@@ -104,8 +106,7 @@ public class ProcedureStatsCollector extends SiteStatsSource {
                                    String procName,
                                    boolean singlePartition,
                                    ArrayList<String> stmtNames,
-                                   boolean isTransactional)
-    {
+                                   ProcType procType) {
         super(siteId, false);
         m_partitionId = partitionId;
         m_procName = procName;
@@ -126,7 +127,7 @@ public class ProcedureStatsCollector extends SiteStatsSource {
                 m_stmtStatsMap.put(stmtName, new StatementStats(stmtName, hasCoordinatorTask));
             }
         }
-        m_isTransactional = isTransactional;
+        m_procType = procType;
 
         // check if this proc is UpdateCore for 100% sampling rate
         m_isUAC = (m_procName != null) && (m_procName.startsWith(UpdateCore.class.getName()));
@@ -363,7 +364,8 @@ public class ProcedureStatsCollector extends SiteStatsSource {
         rowValues[offset + ProcedureColumns.MAX_RESULT_SIZE.ordinal()] = maxResultSize;
         rowValues[offset + ProcedureColumns.MIN_PARAMETER_SET_SIZE.ordinal()] = minParameterSetSize;
         rowValues[offset + ProcedureColumns.MAX_PARAMETER_SET_SIZE.ordinal()] = maxParameterSetSize;
-        rowValues[offset + ProcedureColumns.TRANSACTIONAL.ordinal()] = (byte) (m_isTransactional ? 1 : 0);
+        rowValues[offset + ProcedureColumns.TRANSACTIONAL.ordinal()] = (byte) (m_procType == ProcType.TRANS ? 1 : 0);
+        rowValues[offset + ProcedureColumns.COMPOUND.ordinal()] = (byte) (m_procType == ProcType.COMPOUND ? 1 : 0);
 
         return offset + ProcedureColumns.values().length;
     }

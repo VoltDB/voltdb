@@ -62,7 +62,8 @@ public class ProcedureDetailAggregator {
                 new VoltTable.ColumnInfo("AVG_PARAMETER_SET_SIZE", VoltType.INTEGER),
                 new VoltTable.ColumnInfo("ABORTS", VoltType.BIGINT),
                 new VoltTable.ColumnInfo("FAILURES", VoltType.BIGINT),
-                new VoltTable.ColumnInfo("TRANSACTIONAL", VoltType.TINYINT));
+                new VoltTable.ColumnInfo("TRANSACTIONAL", VoltType.TINYINT),
+                new VoltTable.ColumnInfo("COMPOUND", VoltType.TINYINT));
         baseStats[0].resetRowPosition();
         while (baseStats[0].advanceRow()) {
             if (baseStats[0].getString("STATEMENT").equalsIgnoreCase("<ALL>")) {
@@ -86,7 +87,8 @@ public class ProcedureDetailAggregator {
                         baseStats[0].getLong("AVG_PARAMETER_SET_SIZE"),
                         baseStats[0].getLong("ABORTS"),
                         baseStats[0].getLong("FAILURES"),
-                        (byte) baseStats[0].getLong("TRANSACTIONAL"));
+                        (byte) baseStats[0].getLong("TRANSACTIONAL"),
+                        (byte) baseStats[0].getLong("COMPOUND"));
             }
         }
         return new VoltTable[]{result};
@@ -147,5 +149,55 @@ public class ProcedureDetailAggregator {
                     )
             );
         }
+    }
+
+    /**
+     * Produce COMPOUNDPROCSUMMARY aggregation of PROCEDURE subselector.
+     * Combines rows from multiple hosts into a single row per procedure.
+     */
+    public VoltTable[] aggregateCompoundProcSummary(VoltTable[] baseStatsArray){
+        CompoundProcStatisticsTable statisticsTable = new CompoundProcStatisticsTable();
+        VoltTable baseStats = baseStatsArray[0];
+        baseStats.resetRowPosition();
+        while (baseStats.advanceRow()) {
+            if (baseStats.getLong("COMPOUND") != 0) {
+                statisticsTable.updateTable(baseStats.fetchRow(baseStats.getActiveRowIndex()));
+            }
+        }
+        return new VoltTable[] { statisticsTable.getSortedTable() };
+    }
+
+    /**
+     * Produce COMPOUNDPROCBYHOST subset of PROCEDURE subselector.
+     * Selects only those rows applicable to compound procedures.
+     */
+    public VoltTable[] aggregateCompoundProcByHost(VoltTable[] baseStatsArray){
+        VoltTable result = new VoltTable(new VoltTable.ColumnInfo("TIMESTAMP", VoltType.BIGINT),
+                                         new VoltTable.ColumnInfo(VoltSystemProcedure.CNAME_HOST_ID, VoltSystemProcedure.CTYPE_ID),
+                                         new VoltTable.ColumnInfo("HOSTNAME", VoltType.STRING),
+                                         new VoltTable.ColumnInfo("PROCEDURE", VoltType.STRING),
+                                         new VoltTable.ColumnInfo("INVOCATIONS", VoltType.BIGINT),
+                                         new VoltTable.ColumnInfo("AVG_ELAPSED", VoltType.BIGINT),
+                                         new VoltTable.ColumnInfo("MIN_ELAPSED", VoltType.BIGINT),
+                                         new VoltTable.ColumnInfo("MAX_ELAPSED", VoltType.BIGINT),
+                                         new VoltTable.ColumnInfo("ABORTS", VoltType.BIGINT),
+                                         new VoltTable.ColumnInfo("FAILURES", VoltType.BIGINT));
+        VoltTable baseStats = baseStatsArray[0];
+        baseStats.resetRowPosition();
+        while (baseStats.advanceRow()) {
+            if (baseStats.getLong("COMPOUND") != 0) {
+                result.addRow(baseStats.getLong("TIMESTAMP"),
+                              baseStats.getLong(VoltSystemProcedure.CNAME_HOST_ID),
+                              baseStats.getString("HOSTNAME"),
+                              baseStats.getString("PROCEDURE"),
+                              baseStats.getLong("INVOCATIONS"),
+                              baseStats.getLong("AVG_EXECUTION_TIME"),
+                              baseStats.getLong("MIN_EXECUTION_TIME"),
+                              baseStats.getLong("MAX_EXECUTION_TIME"),
+                              baseStats.getLong("ABORTS"),
+                              baseStats.getLong("FAILURES"));
+            }
+        }
+        return new VoltTable[] { result };
     }
 }

@@ -201,18 +201,21 @@ public class NTProcedureService {
 
             // make any stats sources for this proc
             int siteId = CoreUtils.getSiteIdFromHSId(m_mailbox.getHSId());
+            ProcedureStatsCollector.ProcType procType = m_isCompound
+                ? ProcedureStatsCollector.ProcType.COMPOUND
+                :  ProcedureStatsCollector.ProcType.NONTRANS;
             StatsAgent sa = VoltDB.instance().getStatsAgent();
             m_statsCollector = new ProcedureStatsCollector(siteId,
                                                            -1, // no partition
-                                                           m_procClz.getName(),
+                                                           m_procClz.getName(), // full class name
                                                            false, // not single partition
                                                            null, // no statement list
-                                                           false); // not transactional
+                                                           procType);
             sa.registerStatsSource(StatsSelector.PROCEDURE, siteId, m_statsCollector);
 
             if (m_isCompound) {
                 m_compoundCallStats = new CompoundProcCallStats(m_procedureName);
-                sa.registerStatsSource(StatsSelector.COMPOUNDPROC, -1, m_compoundCallStats);
+                sa.registerStatsSource(StatsSelector.COMPOUNDPROCCALL, -1, m_compoundCallStats);
             }
             else {
                 m_compoundCallStats = null;

@@ -53,7 +53,7 @@ public class CompoundProcCallStats extends StatsSource {
     // Statisics reporting, called from StatsAgent
 
     public enum CompoundProcColumn {
-        PROCEDURE        (VoltType.STRING),
+        PROCEDURE_NAME   (VoltType.STRING),
         CALLED_PROCEDURE (VoltType.STRING),
         INVOCATIONS      (VoltType.BIGINT);
         final VoltType m_type; // required by StatsSource
@@ -91,7 +91,7 @@ public class CompoundProcCallStats extends StatsSource {
     @Override
     protected int updateStatsRow(Object rowKey, Object rowValues[]) {
         int offset = super.updateStatsRow(rowKey, rowValues);
-        rowValues[offset + CompoundProcColumn.PROCEDURE.ordinal()] = procName;
+        rowValues[offset + CompoundProcColumn.PROCEDURE_NAME.ordinal()] = procName;
         RowInfo ri = (RowInfo)rowKey;
         rowValues[offset + CompoundProcColumn.CALLED_PROCEDURE.ordinal()] = ri.name;
         rowValues[offset + CompoundProcColumn.INVOCATIONS.ordinal()] = ri.calls;
