@@ -215,7 +215,7 @@ public class NTProcedureService {
 
             if (m_isCompound) {
                 m_compoundCallStats = new CompoundProcCallStats(m_procedureName);
-                sa.registerStatsSource(StatsSelector.COMPOUNDPROCCALL, -1, m_compoundCallStats);
+                sa.registerStatsSource(StatsSelector.COMPOUNDPROCCALLS, -1, m_compoundCallStats);
             }
             else {
                 m_compoundCallStats = null;

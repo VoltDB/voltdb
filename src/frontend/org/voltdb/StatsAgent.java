@@ -78,7 +78,7 @@ public class StatsAgent extends OpsAgent {
         case COMPOUNDPROCSUMMARY:
             request.aggregateTables = procedureDetailAggregator.aggregateCompoundProcSummary(request.aggregateTables);
             break;
-        case COMPOUNDPROCBYHOST:
+        case COMPOUNDPROC:
             request.aggregateTables = procedureDetailAggregator.aggregateCompoundProcByHost(request.aggregateTables);
             break;
         case DRROLE:

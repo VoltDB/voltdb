@@ -90,8 +90,8 @@ public enum StatsSelector {
 
     CLOCKSKEW,
     COMPOUNDPROCSUMMARY(PROCEDURE),
-    COMPOUNDPROCBYHOST(PROCEDURE),
-    COMPOUNDPROCCALL;
+    COMPOUNDPROC(PROCEDURE),
+    COMPOUNDPROCCALLS;
 
     /** Whether or not this stat supports interval collection */
     private final boolean m_supportsInterval;

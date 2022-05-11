@@ -168,7 +168,7 @@ public class ProcedureDetailAggregator {
     }
 
     /**
-     * Produce COMPOUNDPROCBYHOST subset of PROCEDURE subselector.
+     * Produce COMPOUNDPROC subset of PROCEDURE subselector.
      * Selects only those rows applicable to compound procedures.
      */
     public VoltTable[] aggregateCompoundProcByHost(VoltTable[] baseStatsArray){
