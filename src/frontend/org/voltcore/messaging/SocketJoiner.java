@@ -1089,14 +1089,14 @@ public class SocketJoiner {
 
         if (overallSkew > MAX_CLOCKSKEW) {
             org.voltdb.VoltDB.crashLocalVoltDB("Clock skew is " + overallSkew +
-                    " which is > than the " + MAX_CLOCKSKEW + " millisecond limit. Make sure NTP is running.", false, null);
+                    "ms which is > than the " + MAX_CLOCKSKEW + "ms limit. Make sure NTP is running.", false, null);
         } else if (overallSkew > CRITICAL_CLOCKSKEW) {
             final String msg = "Clock skew is " + overallSkew +
-                    " which is high. Ideally it should be sub-millisecond. Make sure NTP is running.";
+                    "ms which is high. Ideally it should be sub-millisecond. Make sure NTP is running.";
             hostLog.warn(msg);
             consoleLog.warn(msg);
         } else {
-            hostLog.info("Clock skew to across all nodes in the cluster is " + overallSkew);
+            hostLog.infoFmt("Clock skew across all nodes in the cluster is %dms", overallSkew);
         }
     }
 
