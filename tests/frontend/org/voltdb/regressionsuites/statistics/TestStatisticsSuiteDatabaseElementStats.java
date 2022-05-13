@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -168,7 +168,7 @@ public class TestStatisticsSuiteDatabaseElementStats extends StatisticsTestSuite
         System.out.println("\n\nTESTING PROCEDURE STATS\n\n\n");
         Client client  = getFullyConnectedClient();
 
-        ColumnInfo[] expectedSchema = new ColumnInfo[20];
+        ColumnInfo[] expectedSchema = new ColumnInfo[21];
         expectedSchema[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
         expectedSchema[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
         expectedSchema[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
@@ -189,6 +189,7 @@ public class TestStatisticsSuiteDatabaseElementStats extends StatisticsTestSuite
         expectedSchema[17] = new ColumnInfo("ABORTS", VoltType.BIGINT);
         expectedSchema[18] = new ColumnInfo("FAILURES", VoltType.BIGINT);
         expectedSchema[19] = new ColumnInfo("TRANSACTIONAL", VoltType.TINYINT);
+        expectedSchema[20] = new ColumnInfo("COMPOUND", VoltType.TINYINT);
         VoltTable expectedTable = new VoltTable(expectedSchema);
 
         VoltTable[] results = null;

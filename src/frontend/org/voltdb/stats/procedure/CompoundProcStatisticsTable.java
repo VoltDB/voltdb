@@ -33,7 +33,7 @@ public class CompoundProcStatisticsTable {
 
     private static final VoltTable TABLE_TEMPLATE =
         TableShorthand.tableFromShorthand("COMPOUND_PROC_STATS" +
-                                          " (TIMESTAMP:BIGINT, PROCEDURE:VARCHAR, INVOCATIONS:BIGINT," +
+                                          " (TIMESTAMP:BIGINT, PROCEDURE_NAME:VARCHAR, INVOCATIONS:BIGINT," +
                                           " AVG_ELAPSED:BIGINT, MIN_ELAPSED:BIGINT, MAX_ELAPSED:BIGINT," +
                                           " ABORTS:BIGINT, FAILURES:BIGINT)");
 
@@ -43,7 +43,7 @@ public class CompoundProcStatisticsTable {
     // One row (procedure) of min/max/avg data aggregated across hosts
     static class ProcRow {
         long timestamp;
-        String procedure;
+        String procedure; // short name
         long invocations;
         long min = Long.MAX_VALUE;
         long max = Long.MIN_VALUE;
@@ -86,9 +86,10 @@ public class CompoundProcStatisticsTable {
                     row.getLong("ABORTS"));
     }
 
-    private void updateTable(long timestamp, String procedure, long invocations,
+    private void updateTable(long timestamp, String procClass, long invocations,
                              long min, long max, long avg, long failures, long aborts) {
-        ProcRow row = rowMap.computeIfAbsent(procedure, k -> new ProcRow(timestamp, procedure));
+        String proc = ProcedureDetailAggregator.getShortProcedureName(procClass);
+        ProcRow row = rowMap.computeIfAbsent(proc, k -> new ProcRow(timestamp, proc));
         row.update(invocations, min, max, avg, failures, aborts);
     }
 

@@ -19,6 +19,7 @@ package org.voltdb.stats.procedure;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
+import org.voltdb.compiler.ProcedureCompiler;
 
 public class ProcedureDetailAggregator {
 
@@ -175,7 +176,7 @@ public class ProcedureDetailAggregator {
         VoltTable result = new VoltTable(new VoltTable.ColumnInfo("TIMESTAMP", VoltType.BIGINT),
                                          new VoltTable.ColumnInfo(VoltSystemProcedure.CNAME_HOST_ID, VoltSystemProcedure.CTYPE_ID),
                                          new VoltTable.ColumnInfo("HOSTNAME", VoltType.STRING),
-                                         new VoltTable.ColumnInfo("PROCEDURE", VoltType.STRING),
+                                         new VoltTable.ColumnInfo("PROCEDURE_NAME", VoltType.STRING),
                                          new VoltTable.ColumnInfo("INVOCATIONS", VoltType.BIGINT),
                                          new VoltTable.ColumnInfo("AVG_ELAPSED", VoltType.BIGINT),
                                          new VoltTable.ColumnInfo("MIN_ELAPSED", VoltType.BIGINT),
@@ -189,7 +190,7 @@ public class ProcedureDetailAggregator {
                 result.addRow(baseStats.getLong("TIMESTAMP"),
                               baseStats.getLong(VoltSystemProcedure.CNAME_HOST_ID),
                               baseStats.getString("HOSTNAME"),
-                              baseStats.getString("PROCEDURE"),
+                              getShortProcedureName(baseStats.getString("PROCEDURE")),
                               baseStats.getLong("INVOCATIONS"),
                               baseStats.getLong("AVG_EXECUTION_TIME"),
                               baseStats.getLong("MIN_EXECUTION_TIME"),
@@ -199,5 +200,13 @@ public class ProcedureDetailAggregator {
             }
         }
         return new VoltTable[] { result };
+    }
+
+    /**
+     * Utility routine to compute short procedure name from class name.
+     * Uses same algorithm as when procedure was added to catalog.
+     */
+    static String getShortProcedureName(String className) {
+        return ProcedureCompiler.deriveShortProcedureName(className);
     }
 }
