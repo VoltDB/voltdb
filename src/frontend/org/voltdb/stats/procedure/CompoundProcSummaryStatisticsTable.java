@@ -27,12 +27,12 @@ import org.voltdb.TableShorthand;
 
 /**
  * Helper class for aggregation of compound procedure
- * profile statistics.
+ * summary statistics.
  */
-public class CompoundProcStatisticsTable {
+public class CompoundProcSummaryStatisticsTable {
 
     private static final VoltTable TABLE_TEMPLATE =
-        TableShorthand.tableFromShorthand("COMPOUND_PROC_STATS" +
+        TableShorthand.tableFromShorthand("COMPOUND_PROC_SUMMARY" +
                                           " (TIMESTAMP:BIGINT, PROCEDURE_NAME:VARCHAR, INVOCATIONS:BIGINT," +
                                           " AVG_ELAPSED:BIGINT, MIN_ELAPSED:BIGINT, MAX_ELAPSED:BIGINT," +
                                           " ABORTS:BIGINT, FAILURES:BIGINT)");
@@ -86,8 +86,9 @@ public class CompoundProcStatisticsTable {
                     row.getLong("ABORTS"));
     }
 
-    private void updateTable(long timestamp, String procClass, long invocations,
-                             long min, long max, long avg, long failures, long aborts) {
+    // Package access for unit test
+    void updateTable(long timestamp, String procClass, long invocations,
+                     long min, long max, long avg, long failures, long aborts) {
         String proc = ProcedureDetailAggregator.getShortProcedureName(procClass);
         ProcRow row = rowMap.computeIfAbsent(proc, k -> new ProcRow(timestamp, proc));
         row.update(invocations, min, max, avg, failures, aborts);

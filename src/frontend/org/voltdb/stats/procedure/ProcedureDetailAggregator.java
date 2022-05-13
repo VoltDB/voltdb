@@ -157,7 +157,7 @@ public class ProcedureDetailAggregator {
      * Combines rows from multiple hosts into a single row per procedure.
      */
     public VoltTable[] aggregateCompoundProcSummary(VoltTable[] baseStatsArray){
-        CompoundProcStatisticsTable statisticsTable = new CompoundProcStatisticsTable();
+        CompoundProcSummaryStatisticsTable statisticsTable = new CompoundProcSummaryStatisticsTable();
         VoltTable baseStats = baseStatsArray[0];
         baseStats.resetRowPosition();
         while (baseStats.advanceRow()) {
