@@ -152,25 +152,16 @@ You may edit the **run.sh** script to change the test parameters: the command-li
 # Testing AVRO with the Confluent schema registry
 This chapter describes how to test AVRO with the Confluent schema registry. It assumes the Confluent platform is accessible from the test system and the CONFLUENT_HOME variable set in the environment.
 
-This version of TopicBenchmark2 was tested with confluent-6.0.0. Some adjustments may be needed if another version of the Confluent platform is used.
+This version of TopicBenchmark2 was tested with confluent-6.0.0, confluent-7.0.0, and confluent-7.1.0. Some adjustments may be needed if another version of the Confluent platform is used.
 
 ## Confluent operation
-This section describes how to start, stop, and cleanup the minimal Confluent applications required for the TopicBenchmark2 tests:
-* zookeeper
-* Apache Kafka (used by schema registry to store its internal state)
-* Confluent schema registry
+This section describes how to start, stop, and cleanup the Confluent applications required for the TopicBenchmark2 tests.
 
 Start the Confluent applications as follows:
 
-    zookeeper-server-start ~/confluent/confluent-6.0.0/etc/kafka/zookeeper.properties >/dev/null 2>&1 &
-    kafka-server-start ~/confluent/confluent-6.0.0/etc/kafka/server.properties >/dev/null 2>&1 &
-    schema-registry-start ~/confluent/confluent-6.0.0/etc/schema-registry/schema-registry.properties >/dev/null 2>&1 &
+    confluent local start
 
-    [1] 35048
-    [2] 35049
-    [3] 35050
-
-The test will create different versions of the schema for the topic, so the schema registry **MUST** be configured to disable the compatibility checks; this is done with a PUT operation to the REST API:
+The TopicBenchmark2 test will create different versions of the schema for the topic, so the schema registry **MUST** be configured to disable the compatibility checks; this is done with a PUT operation to the REST API:
 
     curl -X PUT -H "Content-Type: application/vnd.schemaregistry.v1+json" \
     --data '{"compatibility": "NONE"}' \
@@ -186,38 +177,30 @@ Once the tests are complete, or if a brand new test sequence is desired, the Con
 
 The Confluent applications are stopped as follows:
 
-    schema-registry-stop
-    kafka-server-stop
-    sleep 3
-    zookeeper-server-stop
+    confluent local stop
 
-    [3]  + 35050 exit 143   schema-registry-start  > /dev/null 2>&1
-    [1]  - 35048 exit 143   zookeeper-server-start  > /dev/null 2>&1
-    [2]  + 35049 exit 143   kafka-server-start ~/confluent/confluent-6.0.0/etc/kafka/server.properties >
+If the confluent tools are restarted at this point, they will re-use the state stored by a previous test execution. This may be useful if we want to use one of the subscriber-only options of the test. However, if a new test sequence is desired, state created by the Confluent applications must be wioed out as follows:
 
-The files created by the Confluent applications must be deleted in order to wipe out the state of the previous test executions:
+    confluent local destroy
 
-    rm -rf /tmp/zookeeper
-    rm -rf /tmp/kafka-logs
-
-At this point the Confluent applications might be restarted to support another round of testing.
+At this point the Confluent applications might be restarted to support another round of testing. Note that this 'destroy' option can also be invoked when the confluent platform is running: it will stop the components and clean up the state.
 
 ## Avro test scenarios
 This section describes how to run the avro test scenarios.
 
 Prior to running the test scenarios, the Confluent applications must be started as explained in the previous section.
 
-The VoltDB server must be started with the 'server' option:
+The VoltDB server must be started with the 'server_avro' option (VoltDB will use port 9095 to avoid conflicting with kafka):
 
-    ./run.sh server
+    ./run.sh server_avro
     server
     (...)
     Server Operational State is: NORMAL
     Server completed initialization.
     ^Z
-    [1]  + 32810 suspended  ./run.sh server
+    [1]  + 32810 suspended  ./run.sh server_avro
     bg
-    [1]  + 32810 continued  ./run.sh server
+    [1]  + 32810 continued  ./run.sh server_avro
 
 Instead of using the 'init' option, the 'init_avro' option must be used to load an alternate DDL defined in **topicAvroTable.sql**. This DDL creates test topics using avro and inline encoding:
 

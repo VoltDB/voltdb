@@ -94,6 +94,7 @@ function srccompile-ifneeded() {
 function server() {
     srccompile-ifneeded
     voltdb init --force --config=deployment.xml
+    TOPICSPORT=9092
     server_common
 }
 
@@ -101,6 +102,7 @@ function server() {
 function server_avro() {
     srccompile-ifneeded
     voltdb init --force --config=deployment_avro.xml
+    TOPICSPORT=9095
     server_common
 }
 
@@ -146,7 +148,7 @@ function server_common() {
     echo
     echo "LOG4J=\"${LOG4J}\""
     echo
-    VOLTDB_OPTS="${VOLTDB_OPTS}" ${VOLTDB} start -H $HOST -l ${LICENSE}
+    VOLTDB_OPTS="${VOLTDB_OPTS}" ${VOLTDB} start -H $HOST -l ${LICENSE} --topicsport=${TOPICSPORT}
 }
 
 # start voltdb impersonating kafka for kafka_imports test case
@@ -261,6 +263,7 @@ function run_avro_benchmark() {
     java -classpath topicbenchmark2-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file:${LOG4J} \
         topicbenchmark2.TopicBenchmark2 \
         --servers=localhost \
+        --topicPort=9095 \
         --count=500000 \
         --insertrate=10000 \
         --useavro=true \

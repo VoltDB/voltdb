@@ -78,7 +78,7 @@
         <include name='jaxb-api-2.3.0.jar' />
         <include name='netty-all-4.1.53.Final.jar' />
         <include name='netty-tcnative-boringssl-static-2.0.34.Final.jar' />
-        <include name='kafka-clients-2.3.1.jar' />
+        <include name='kafka-clients-3.1.0.jar' />
     </fileset>
     <pathelement path="${java.class.path}"/>
 </path>

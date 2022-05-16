@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -61,7 +61,7 @@ import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 
 import io.confluent.kafka.serializers.KafkaAvroSerializer;
-import io.confluent.kafka.serializers.KafkaAvroSerializerConfig;
+
 
 public class KafkaExportClient extends ExportClientBase {
 
@@ -79,6 +79,8 @@ public class KafkaExportClient extends ExportClientBase {
     private final static String ACKS_TIMEOUT = "acks.retry.timeout";
     private final static String LEGACY_ACKS = "request.required.acks";
     public final static String ENCODE_FORMAT = "type";
+
+    static final String SCHEMA_REGISTRY_URL_CONFIG = "schema.registry.url";
 
     private final static String MAX_BLOCK_MS_DEFAULT = "60000";
 
@@ -266,13 +268,12 @@ public class KafkaExportClient extends ExportClientBase {
         if (m_encodeFormat == EncodeFormat.AVRO) {
             m_producerConfig.setProperty(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, KafkaAvroSerializer.class.getName());
 
-            String schemaRegistryUrl = config.getProperty(KafkaAvroSerializerConfig.SCHEMA_REGISTRY_URL_CONFIG, "").trim();
+            String schemaRegistryUrl = config.getProperty(SCHEMA_REGISTRY_URL_CONFIG, "").trim();
             if (StringUtil.isEmpty(schemaRegistryUrl)) {
                 throw new IllegalArgumentException("Property \"schema.registry.url\" cannot be empty.");
             }
 
-            m_producerConfig.setProperty(KafkaAvroSerializerConfig.SCHEMA_REGISTRY_URL_CONFIG,
-                    schemaRegistryUrl);
+            m_producerConfig.setProperty(SCHEMA_REGISTRY_URL_CONFIG, schemaRegistryUrl);
         } else {
             String vSerializer = config.getProperty(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, "").trim();
             if (vSerializer.isEmpty()) {

@@ -39,7 +39,10 @@
 	<classpathentry kind="lib" path="third_party/java/jars/objenesis-3.0.1.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/make-it-easy-3.1.0.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/javaee-api-7.0.jar"/>
-	<classpathentry kind="lib" path="lib/kafka-clients-2.3.1.jar"/>
+	<classpathentry kind="lib" path="lib/kafka-clients-3.1.0.jar"/>
+	<classpathentry kind="lib" path="lib/kafka-avro-serializer-7.1.0.jar"/>
+	<classpathentry kind="lib" path="lib/kafka-schema-registry-client-7.1.0.jar"/>
+	<classpathentry kind="lib" path="lib/kafka-schema-serializer-7.1.0.jar" />
 	<classpathentry kind="lib" path="lib/lz4-java-1.6.0.jar"/>
 	<classpathentry kind="lib" path="lib/zstd-jni-1.4.4-2.jar"/>
 	<classpathentry kind="lib" path="lib/metrics-core-2.2.0.jar"/>
@@ -87,8 +90,6 @@
 	<classpathentry kind="lib" path="lib/netty-all-4.1.53.Final.jar"/>
 	<classpathentry kind="lib" path="lib/cron-java8-1.7.jar"/>
 	<classpathentry kind="lib" path="lib/jsch-0.1.55.jar"/>
-	<classpathentry kind="lib" path="lib/kafka-avro-serializer-3.0.0.jar"/>
-	<classpathentry kind="lib" path="lib/kafka-schema-registry-client-5.3.2.jar"/>
 	<classpathentry kind="lib" path="lib/jaxb-api-2.3.0.jar"/>
 	<classpathentry kind="lib" path="lib/jaxb-core-2.3.0.1.jar"/>
 	<classpathentry kind="lib" path="lib/jaxb-runtime-2.3.0.1.jar"/>

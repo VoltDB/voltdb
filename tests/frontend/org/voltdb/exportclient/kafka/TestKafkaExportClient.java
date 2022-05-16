@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -29,13 +29,13 @@ import static org.junit.Assert.fail;
 
 import java.util.Properties;
 
-import io.confluent.kafka.serializers.KafkaAvroSerializer;
-import io.confluent.kafka.serializers.KafkaAvroSerializerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.junit.Test;
 import org.voltdb.exportclient.ExportClientTestBase;
 import org.voltdb.exportclient.ExportDecoderBase.BinaryEncoding;
+
+import io.confluent.kafka.serializers.KafkaAvroSerializer;
 
 public class TestKafkaExportClient extends ExportClientTestBase {
     @Test
@@ -109,6 +109,6 @@ public class TestKafkaExportClient extends ExportClientTestBase {
         assertEquals("fakehost1", client.m_producerConfig.getProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG));
         assertEquals(KafkaAvroSerializer.class.getName(), client.m_producerConfig.getProperty(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG));
         assertEquals(StringSerializer.class.getName(), client.m_producerConfig.getProperty(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG));
-        assertEquals("fakehost2", client.m_producerConfig.getProperty(KafkaAvroSerializerConfig.SCHEMA_REGISTRY_URL_CONFIG));
+        assertEquals("fakehost2", client.m_producerConfig.getProperty(KafkaExportClient.SCHEMA_REGISTRY_URL_CONFIG));
     }
 }
