@@ -173,33 +173,15 @@ public class ProcedureDetailAggregator {
      * Selects only those rows applicable to compound procedures.
      */
     public VoltTable[] aggregateCompoundProcByHost(VoltTable[] baseStatsArray){
-        VoltTable result = new VoltTable(new VoltTable.ColumnInfo("TIMESTAMP", VoltType.BIGINT),
-                                         new VoltTable.ColumnInfo(VoltSystemProcedure.CNAME_HOST_ID, VoltSystemProcedure.CTYPE_ID),
-                                         new VoltTable.ColumnInfo("HOSTNAME", VoltType.STRING),
-                                         new VoltTable.ColumnInfo("PROCEDURE_NAME", VoltType.STRING),
-                                         new VoltTable.ColumnInfo("INVOCATIONS", VoltType.BIGINT),
-                                         new VoltTable.ColumnInfo("AVG_ELAPSED", VoltType.BIGINT),
-                                         new VoltTable.ColumnInfo("MIN_ELAPSED", VoltType.BIGINT),
-                                         new VoltTable.ColumnInfo("MAX_ELAPSED", VoltType.BIGINT),
-                                         new VoltTable.ColumnInfo("ABORTS", VoltType.BIGINT),
-                                         new VoltTable.ColumnInfo("FAILURES", VoltType.BIGINT));
+        CompoundProcStatisticsTable statisticsTable = new CompoundProcStatisticsTable();
         VoltTable baseStats = baseStatsArray[0];
         baseStats.resetRowPosition();
         while (baseStats.advanceRow()) {
             if (baseStats.getLong("COMPOUND") != 0) {
-                result.addRow(baseStats.getLong("TIMESTAMP"),
-                              baseStats.getLong(VoltSystemProcedure.CNAME_HOST_ID),
-                              baseStats.getString("HOSTNAME"),
-                              getShortProcedureName(baseStats.getString("PROCEDURE")),
-                              baseStats.getLong("INVOCATIONS"),
-                              baseStats.getLong("AVG_EXECUTION_TIME"),
-                              baseStats.getLong("MIN_EXECUTION_TIME"),
-                              baseStats.getLong("MAX_EXECUTION_TIME"),
-                              baseStats.getLong("ABORTS"),
-                              baseStats.getLong("FAILURES"));
+                 statisticsTable.updateTable(baseStats.fetchRow(baseStats.getActiveRowIndex()));
             }
         }
-        return new VoltTable[] { result };
+        return new VoltTable[] { statisticsTable.getSortedTable() };
     }
 
     /**
