@@ -75,9 +75,9 @@ public class CompoundProcStatisticsTable {
                       row.getString("HOSTNAME"),
                       ProcedureDetailAggregator.getShortProcedureName(row.getString("PROCEDURE")),
                       row.getLong("INVOCATIONS"),
+                      row.getLong("AVG_EXECUTION_TIME"),
                       row.getLong("MIN_EXECUTION_TIME"),
                       row.getLong("MAX_EXECUTION_TIME"),
-                      row.getLong("AVG_EXECUTION_TIME"),
                       row.getLong("ABORTS"),
                       row.getLong("FAILURES"));
     }
