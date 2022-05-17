@@ -33,8 +33,8 @@ public class CompoundProcSummaryStatisticsTable {
 
     private static final VoltTable TABLE_TEMPLATE =
         TableShorthand.tableFromShorthand("COMPOUND_PROC_SUMMARY" +
-                                          " (TIMESTAMP:BIGINT, PROCEDURE_NAME:VARCHAR, INVOCATIONS:BIGINT," +
-                                          " AVG_ELAPSED:BIGINT, MIN_ELAPSED:BIGINT, MAX_ELAPSED:BIGINT," +
+                                          " (TIMESTAMP:BIGINT, PROCEDURE:VARCHAR, INVOCATIONS:BIGINT," +
+                                          " MIN_ELAPSED:BIGINT, MAX_ELAPSED:BIGINT, AVG_ELAPSED:BIGINT," +
                                           " ABORTS:BIGINT, FAILURES:BIGINT)");
 
     // ProcRows keyed by procedure name
@@ -43,26 +43,26 @@ public class CompoundProcSummaryStatisticsTable {
     // One row (procedure) of min/max/avg data aggregated across hosts
     static class ProcRow {
         long timestamp;
-        String procedure; // short name
+        String procedure;
         long invocations;
         long min = Long.MAX_VALUE;
         long max = Long.MIN_VALUE;
         double avg;
-        long failures;
         long aborts;
+        long failures;
 
         ProcRow(long ts, String proc) {
             timestamp = ts;
             procedure = proc;
         }
 
-        void update(long invocations, long min, long max, long avg, long failures, long aborts) {
+        void update(long invocations, long min, long max, long avg, long aborts,  long failures) {
             this.avg = updatedAverage(avg, invocations); // before other updates!
             this.invocations += invocations;
             this.min = Math.min(this.min, min);
             this.max = Math.max(this.max, max);
-            this.failures += failures;
             this.aborts += aborts;
+            this.failures += failures;
         }
 
         private double updatedAverage(double avg, long invocations) {
@@ -82,16 +82,15 @@ public class CompoundProcSummaryStatisticsTable {
                     row.getLong("MIN_EXECUTION_TIME"),
                     row.getLong("MAX_EXECUTION_TIME"),
                     row.getLong("AVG_EXECUTION_TIME"),
-                    row.getLong("FAILURES"),
-                    row.getLong("ABORTS"));
+                    row.getLong("ABORTS"),
+                    row.getLong("FAILURES"));
     }
 
     // Package access for unit test
-    void updateTable(long timestamp, String procClass, long invocations,
-                     long min, long max, long avg, long failures, long aborts) {
-        String proc = ProcedureDetailAggregator.getShortProcedureName(procClass);
+    void updateTable(long timestamp, String proc, long invocations,
+                     long min, long max, long avg, long aborts, long failures) {
         ProcRow row = rowMap.computeIfAbsent(proc, k -> new ProcRow(timestamp, proc));
-        row.update(invocations, min, max, avg, failures, aborts);
+        row.update(invocations, min, max, avg, aborts, failures);
     }
 
     // Return table sorted by average elapsed time
@@ -101,7 +100,7 @@ public class CompoundProcSummaryStatisticsTable {
         VoltTable result = TABLE_TEMPLATE.clone(0);
         for (ProcRow row : sorted) {
             result.addRow(row.timestamp, row.procedure, row.invocations,
-                          row.avg, row.min, row.max, row.aborts, row.failures);
+                          row.min, row.max, row.avg, row.aborts, row.failures);
         }
         return result;
     }

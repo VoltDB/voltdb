@@ -80,18 +80,18 @@ public class TestCompoundProcSummaryStatisticsTable {
         long timestamp;
         String procedure; // input: class; result: short name
         long invocations;
-        long avg, min, max;
+        long min, max, avg;
         long aborts, failures;
 
         Row(long timestamp, String procedure, long invocations,
-            long avg, long min, long max,
+            long min, long max, long avg,
             long aborts, long failures) {
             this.timestamp = timestamp;
             this.procedure = procedure;
             this.invocations = invocations;
-            this.avg = avg;
             this.min = min;
             this.max = max;
+            this.avg = avg;
             this.aborts = aborts;
             this.failures = failures;
         }
@@ -101,10 +101,9 @@ public class TestCompoundProcSummaryStatisticsTable {
     void loadData(CompoundProcSummaryStatisticsTable dut, Row[] inputTable) {
         for (Row in : inputTable) {
             dut.updateTable(in.timestamp, in.procedure, in.invocations,
-                            in.min, in.max, in.avg, in.failures, in.aborts);
+                            in.min, in.max, in.avg, in.aborts, in.failures);
         }
     }
-
 
     // validate contents of sorted dut vs. expectation of ResultRow[]
     void assertEquals(CompoundProcSummaryStatisticsTable dut, Row[] data) {
@@ -116,11 +115,11 @@ public class TestCompoundProcSummaryStatisticsTable {
             assertTrue(actual.advanceRow());
             System.out.printf("%s: validating row %d\n", test, actual.getActiveRowIndex());
             Assert.assertEquals(row.timestamp, actual.getLong("TIMESTAMP"));
-            Assert.assertEquals(row.procedure, actual.getString("PROCEDURE_NAME"));
+            Assert.assertEquals(row.procedure, actual.getString("PROCEDURE"));
             Assert.assertEquals(row.invocations, actual.getLong("INVOCATIONS"));
-            Assert.assertEquals(row.avg, actual.getLong("AVG_ELAPSED"));
             Assert.assertEquals(row.min, actual.getLong("MIN_ELAPSED"));
             Assert.assertEquals(row.max, actual.getLong("MAX_ELAPSED"));
+            Assert.assertEquals(row.avg, actual.getLong("AVG_ELAPSED"));
             Assert.assertEquals(row.aborts, actual.getLong("ABORTS"));
             Assert.assertEquals(row.failures, actual.getLong("FAILURES"));
         }
@@ -134,7 +133,7 @@ public class TestCompoundProcSummaryStatisticsTable {
             new Row(1371587140278L, "org.banana.A", 100L, 1L, 2L, 3L, 4L, 5L)
         };
         Row[] result = {
-            new Row(1371587140278L, "A", 100L, 1L, 2L, 3L, 4L, 5L)
+            new Row(1371587140278L, "org.banana.A", 100L, 1L, 2L, 3L, 4L, 5L)
         };
 
         // When
@@ -154,7 +153,7 @@ public class TestCompoundProcSummaryStatisticsTable {
         };
 
         Row[] result = {
-            new Row(1371587140278L, "B", 0L, 0L, 0L, 0L, 0L, 0L)
+            new Row(1371587140278L, "org.banana.B", 0L, 0L, 0L, 0L, 0L, 0L)
         };
 
         // When
@@ -170,16 +169,16 @@ public class TestCompoundProcSummaryStatisticsTable {
         // Given
         // 2 procs, 2 partitions - make sure min,max,avg works
         Row[] input = {
-            //                                      inv   avg  min  max  abo  err
-            new Row(1371587140278L, "org.banana.B", 100L, 4L,  2L,  5L,  17L, 18L),
-            new Row(1371587140279L, "org.banana.A", 1L,   10L, 20L, 30L, 0L,  18L),
-            new Row(1371587140280L, "org.banana.B", 100L, 2L,  1L,  3L,  17L, 18L)
+            //                                      inv   min  max  avg  abo  err
+            new Row(1371587140278L, "org.banana.B", 100L, 2L,  5L,  4L,  17L, 18L),
+            new Row(1371587140279L, "org.banana.A", 1L,   20L, 30L, 10L, 0L,  18L),
+            new Row(1371587140280L, "org.banana.B", 100L, 1L,  3L,  2L,  17L, 18L)
         };
 
         Row[] result = {
-            //                           inv   avg  min  max  abo  err
-            new Row(1371587140278L, "B", 200L, 3L,  1L,  5L,  34L, 36L),
-            new Row(1371587140279L, "A", 1L,   10L, 20L, 30L, 0L,  18L)
+            //                                      inv   min  max  avg  abo  err
+            new Row(1371587140278L, "org.banana.B", 200L, 1L,  5L,  3L,  34L, 36L),
+            new Row(1371587140279L, "org.banana.A", 1L,   20L, 30L, 10L, 0L,  18L)
         };
 
         // When
@@ -196,15 +195,15 @@ public class TestCompoundProcSummaryStatisticsTable {
         // paranoia about overflow when computing average of big numbers
         long yuge = 2_000_000_000_000_000_000L; // Long.MAX_VALUE is 9_223_372_036_854_775_807
         Row[] input = {
-            //                                      inv   avg     min  max  abo  err
-            new Row(1371587140278L, "org.banana.Y", yuge, yuge+1, 1L,  yuge+10,  0L, 0L),
-            new Row(1371587140279L, "org.banana.Y", yuge, yuge+2, 1L,  yuge+20,  0L, 0L),
-            new Row(1371587140280L, "org.banana.Y", yuge, yuge+1, 1L,  yuge+30,  0L, 0L),
-            new Row(1371587140281L, "org.banana.Y", yuge, yuge+4, 1L,  yuge+40,  0L, 0L),
+            //                                      inv   min  max      avg     abo  err
+            new Row(1371587140278L, "org.banana.Y", yuge, 1L,  yuge+10, yuge+1, 0L,  0L),
+            new Row(1371587140279L, "org.banana.Y", yuge, 1L,  yuge+20, yuge+2, 0L,  0L),
+            new Row(1371587140280L, "org.banana.Y", yuge, 1L,  yuge+30, yuge+1, 0L,  0L),
+            new Row(1371587140281L, "org.banana.Y", yuge, 1L,  yuge+40, yuge+4, 0L,  0L),
          };
         Row[] result = {
-            //                           inv     avg   min  max      abo  err
-            new Row(1371587140278L, "Y", yuge*4, yuge, 1L,  yuge+40, 0L, 0L)
+            //                                      inv     min  max      avg   abo  err
+            new Row(1371587140278L, "org.banana.Y", yuge*4, 1L,  yuge+40, yuge, 0L,  0L)
             // average is reported as yuge, not yuge+2, because double-precision has
             // only 15 to 16 decimal digits of significance. once your average latency
             // has exceeded 2 years, though, I don't think you'll care about rounding.

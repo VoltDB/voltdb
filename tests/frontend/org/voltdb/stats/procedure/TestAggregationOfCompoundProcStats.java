@@ -74,11 +74,11 @@ public class TestAggregationOfCompoundProcStats {
             "TIMESTAMP:BIGINT," +
             "HOST_ID:INTEGER," +
             "HOSTNAME:STRING," +
-            "PROCEDURE_NAME:STRING," +
+            "PROCEDURE:STRING," +
             "INVOCATIONS:BIGINT," +
-            "AVG_ELAPSED:BIGINT," +
             "MIN_ELAPSED:BIGINT," +
             "MAX_ELAPSED:BIGINT," +
+            "AVG_ELAPSED:BIGINT," +
             "ABORTS:BIGINT," +
             "FAILURES:BIGINT" +
             ")"
@@ -115,11 +115,11 @@ public class TestAggregationOfCompoundProcStats {
             11111L,
             1,
             "volt-node-1",
-            "CompoundProcTestCase",
+            "org.voltdb.stats.procedure.CompoundProcTestCase",
             2345L,
-            TimeUnit.MILLISECONDS.toNanos(42),
             TimeUnit.MILLISECONDS.toNanos(22),
             TimeUnit.MILLISECONDS.toNanos(123),
+            TimeUnit.MILLISECONDS.toNanos(42),
             3421L,
             567L
      );
@@ -155,11 +155,11 @@ public class TestAggregationOfCompoundProcStats {
             22222L,
             2,
             "volt-node-2",
-            "CompoundProcTestCase",
+            "org.voltdb.stats.procedure.CompoundProcTestCase",
             2345L,
-            TimeUnit.MILLISECONDS.toNanos(42),
             TimeUnit.MILLISECONDS.toNanos(22),
             TimeUnit.MILLISECONDS.toNanos(123),
+            TimeUnit.MILLISECONDS.toNanos(42),
             3421L,
             567L
     );

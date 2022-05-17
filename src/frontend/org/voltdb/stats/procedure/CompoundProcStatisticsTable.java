@@ -40,11 +40,11 @@ public class CompoundProcStatisticsTable {
     // This must match the template below, and is used by
     // the prometheus agent to get column names.
     public enum CompoundProcColumns {
-        PROCEDURE_NAME  (VoltType.STRING),
+        PROCEDURE       (VoltType.STRING),
         INVOCATIONS     (VoltType.BIGINT),
-        AVG_ELAPSED     (VoltType.BIGINT),
         MIN_ELAPSED     (VoltType.BIGINT),
         MAX_ELAPSED     (VoltType.BIGINT),
+        AVG_ELAPSED     (VoltType.BIGINT),
         ABORTS          (VoltType.BIGINT),
         FAILURES        (VoltType.BIGINT);
 
@@ -58,8 +58,8 @@ public class CompoundProcStatisticsTable {
     private static final VoltTable TABLE_TEMPLATE =
         TableShorthand.tableFromShorthand("COMPOUND_PROC_STATS" +
                                           " (TIMESTAMP:BIGINT, HOST_ID:INTEGER, HOSTNAME:STRING," +
-                                          " PROCEDURE_NAME:VARCHAR, INVOCATIONS:BIGINT," +
-                                          " AVG_ELAPSED:BIGINT, MIN_ELAPSED:BIGINT, MAX_ELAPSED:BIGINT," +
+                                          " PROCEDURE:VARCHAR, INVOCATIONS:BIGINT," +
+                                          " MIN_ELAPSED:BIGINT, MAX_ELAPSED:BIGINT, AVG_ELAPSED:BIGINT," +
                                           " ABORTS:BIGINT, FAILURES:BIGINT)");
 
     // The statistics table we are constructing.
@@ -73,11 +73,11 @@ public class CompoundProcStatisticsTable {
         result.addRow(row.getLong("TIMESTAMP"),
                       (int) row.getLong("HOST_ID"),
                       row.getString("HOSTNAME"),
-                      ProcedureDetailAggregator.getShortProcedureName(row.getString("PROCEDURE")),
+                      row.getString("PROCEDURE"),
                       row.getLong("INVOCATIONS"),
-                      row.getLong("AVG_EXECUTION_TIME"),
                       row.getLong("MIN_EXECUTION_TIME"),
                       row.getLong("MAX_EXECUTION_TIME"),
+                      row.getLong("AVG_EXECUTION_TIME"),
                       row.getLong("ABORTS"),
                       row.getLong("FAILURES"));
     }
