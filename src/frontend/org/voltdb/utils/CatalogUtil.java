@@ -1078,11 +1078,7 @@ public abstract class CatalogUtil {
             if (m_jc == null || m_schema == null) {
                 throw new RuntimeException("Error schema validation.");
             }
-            Unmarshaller unmarshaller = m_jc.createUnmarshaller();
-            unmarshaller.setSchema(m_schema);
-            JAXBElement<DeploymentType> result =
-                (JAXBElement<DeploymentType>) unmarshaller.unmarshal(deployIS);
-            DeploymentType deployment = result.getValue();
+            DeploymentType deployment = unmarshalDeployment(deployIS);
             populateDefaultDeployment(deployment);
             return deployment;
         } catch (JAXBException e) {
@@ -1097,6 +1093,20 @@ public abstract class CatalogUtil {
                 throw new RuntimeException(e);
             }
         }
+    }
+
+    /**
+     * Get a reference to the root <deployment> element from the deployment.xml file.
+     * @param deployIS
+     * @return Returns a reference to the root <deployment> element.
+     */
+    public static DeploymentType unmarshalDeployment(InputStream deployIS) throws JAXBException {
+            Unmarshaller unmarshaller = m_jc.createUnmarshaller();
+            unmarshaller.setSchema(m_schema);
+            JAXBElement<DeploymentType> result =
+                (JAXBElement<DeploymentType>) unmarshaller.unmarshal(deployIS);
+            DeploymentType deployment = result.getValue();
+            return deployment;
     }
 
     public static void populateDefaultDeployment(DeploymentType deployment) {

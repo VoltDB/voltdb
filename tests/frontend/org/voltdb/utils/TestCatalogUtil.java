@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2021 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,10 +23,13 @@
 
 package org.voltdb.utils;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.SortedSet;
+import javax.xml.bind.JAXBException;
 
 import org.voltdb.RealVoltDB;
 import org.voltdb.VoltDB;
@@ -1539,7 +1542,7 @@ public class TestCatalogUtil extends TestCase {
 
         final File tmpDuplicateWithoutCase = VoltProjectBuilder.writeStringToTempFile(duplicateWithoutCase);
         msg = CatalogUtil.compileDeployment(catalog, tmpDuplicateWithoutCase.getPath(), false);
-        assertTrue(msg.contains("Multiple connectors can not be assigned to single export target"));
+        assertTrue(msg, msg.contains("Error parsing deployment file"));
 
         final String duplicateWithCase =
                 "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n" +
@@ -1667,7 +1670,7 @@ public class TestCatalogUtil extends TestCase {
 
         final File tmpNameDuplicate = VoltProjectBuilder.writeStringToTempFile(nameDuplicate);
         msg = CatalogUtil.compileDeployment(catalog, tmpNameDuplicate.getPath(), false);
-        assertTrue(msg.contains("Thread pool name: tp2 is not unique"));
+        assertTrue(msg, msg.contains("Error parsing deployment file"));
 
 
         final String poolSizeOverFlow =
@@ -1716,5 +1719,190 @@ public class TestCatalogUtil extends TestCase {
         final File tmpSharedThreadPool = VoltProjectBuilder.writeStringToTempFile(sharedThreadPool);
         msg = CatalogUtil.compileDeployment(catalog, tmpSharedThreadPool.getPath(), false);
         assertNull(msg);
+    }
+
+    public void testDeploymentUniqueRestrictionsInXSD() {
+
+        // simple positive test
+        final String dep00 =
+            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+            "<deployment>" +
+            "   <cluster hostcount='1' kfactor='0' sitesperhost='2'/>" +
+            "</deployment>";
+
+        try {
+            DeploymentType dt00 = CatalogUtil.unmarshalDeployment(new ByteArrayInputStream(dep00.getBytes(StandardCharsets.UTF_8)));
+            assertNotNull(dt00);
+        } catch (JAXBException e) {
+            fail("simple deployment example should succeed");
+        }
+
+        // simple failure
+        final String dep01 =
+            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+            "<deplooment>" +
+            "   <cluster hostcount='1' kfactor='0' sitesperhost='2'/>" +
+            "</deplooment>";
+
+        try {
+            DeploymentType dt01 = CatalogUtil.unmarshalDeployment(new ByteArrayInputStream(dep01.getBytes(StandardCharsets.UTF_8)));
+        } catch (JAXBException je) {
+            String msg = je.getLinkedException().getMessage();
+            assertTrue(msg, msg.contains("Cannot find the declaration of element 'deplooment'."));
+        }
+
+        // duplicate user name
+        final String dep02 =
+            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+            "<deployment>" +
+            "   <cluster hostcount='1' kfactor='0' sitesperhost='2'/>" +
+            "   <security enabled=\"true\"/>" +
+            "   <users>" +
+            "      <user name=\"joe\" password=\"aaa\"/>" +
+            "      <user name=\"joe\" password=\"aaa\"/>" +
+            "   </users>" +
+            "</deployment>";
+
+        try {
+            DeploymentType dt02 = CatalogUtil.unmarshalDeployment(new ByteArrayInputStream(dep02.getBytes(StandardCharsets.UTF_8)));
+        } catch (JAXBException je) {
+            String msg = je.getLinkedException().getMessage();
+            assertTrue(msg, msg.contains("Duplicate unique value") && msg.contains("user_name_must_be_unique"));
+        }
+
+        // duplicate export config target
+        final String dep03 =
+            "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n" +
+            "<deployment>\n" +
+            "    <cluster hostcount=\"1\"/>\n" +
+            "    <export>\n" +
+            "        <configuration enabled=\"true\" target=\"test1\" type=\"kafka\">\n" +
+            "            <property name=\"bootstrap.servers\">localhost:9092</property>\n" +
+            "            <property name=\"topic.key\">Customer_final.test</property>\n" +
+            "            <property name=\"skipinternals\">true</property>\n" +
+            "        </configuration>\n" +
+            "        <configuration enabled=\"true\" target=\"test1\" type=\"kafka\">\n" +
+            "            <property name=\"bootstrap.servers\">localhost:9092</property>\n" +
+            "            <property name=\"topic.key\">Customer_final.test</property>\n" +
+            "            <property name=\"skipinternals\">true</property>\n" +
+            "        </configuration>\n" +
+            "        <configuration enabled=\"true\" target=\"test3\" type=\"kafka\">\n" +
+            "            <property name=\"bootstrap.servers\">localhost:9092</property>\n" +
+            "            <property name=\"topic.key\">Customer_final.test</property>\n" +
+            "            <property name=\"skipinternals\">true</property>\n" +
+            "        </configuration>\n" +
+            "    </export>\n" +
+            "</deployment>";
+
+        try {
+            DeploymentType dt03 = CatalogUtil.unmarshalDeployment(new ByteArrayInputStream(dep03.getBytes(StandardCharsets.UTF_8)));
+        } catch (JAXBException je) {
+            String msg = je.getLinkedException().getMessage();
+            assertTrue(msg, msg.contains("Duplicate unique value") && msg.contains("configuration_target_must_be_unique"));
+        }
+
+        // duplicate export config property name
+        final String dep04 =
+            "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n" +
+            "<deployment>\n" +
+            "    <cluster hostcount=\"1\"/>\n" +
+            "    <export>\n" +
+            "        <configuration enabled=\"true\" target=\"test1\" type=\"kafka\">\n" +
+            "            <property name=\"bootstrap.servers\">localhost:9092</property>\n" +
+            "            <property name=\"bootstrap.servers\">localhost:9092</property>\n" +
+            "            <property name=\"topic.key\">Customer_final.test</property>\n" +
+            "            <property name=\"skipinternals\">true</property>\n" +
+            "        </configuration>\n" +
+            "    </export>\n" +
+            "</deployment>";
+        try {
+            DeploymentType dt04 = CatalogUtil.unmarshalDeployment(new ByteArrayInputStream(dep04.getBytes(StandardCharsets.UTF_8)));
+        } catch (JAXBException je) {
+            String msg = je.getLinkedException().getMessage();
+            assertTrue(msg, msg.contains("Duplicate unique value") && msg.contains("export_configuration_property_names_can_only_be_set_once"));
+        }
+
+        // duplicate import config property name
+        final String dep05 =
+            "<?xml version='1.0'?>"
+            + "<deployment>"
+            + "<cluster hostcount='1' kfactor='0' sitesperhost='2'/>"
+            + "    <import>"
+            + "        <configuration type=\"kafka\" enabled=\"true\"> "
+            + "            <property name=\"brokers\">localhost:9092</property>"
+            + "            <property name=\"topics\">employees</property>"
+            + "            <property name=\"groupid\">voltdb1</property>"
+            + "            <property name=\"procedure\">insertE</property>"
+            + "        </configuration>"
+            + "        <configuration type=\"kafka\" enabled=\"true\">"
+            + "            <property name=\"brokers\">localhost:9092</property>"
+            + "            <property name=\"topics\">managers</property>"
+            + "            <property name=\"groupid\">voltdb2</property>"
+            + "            <property name=\"procedure\">insertM</property>"
+            + "        </configuration>"
+            + "    </import>"
+            + "</deployment>";
+        try {
+            DeploymentType dt05 = CatalogUtil.unmarshalDeployment(new ByteArrayInputStream(dep05.getBytes(StandardCharsets.UTF_8)));
+        } catch (JAXBException je) {
+            String msg = je.getLinkedException().getMessage();
+            assertTrue(msg, msg.contains("Duplicate unique value") && msg.contains("import_configuration_property_names_can_only_be_set_once"));
+        }
+
+
+        // duplicate threadpool pool name
+        final String dep06 =
+            "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>\n" +
+            "<deployment>\n" +
+            "    <cluster hostcount=\"1\"/>\n" +
+            "    <threadpools>\n" +
+            "        <pool name=\"tp1\" size=\"2\"/>\n" +
+            "        <pool name=\"tp1\" size=\"3\"/>\n" +
+            "    </threadpools>\n" +
+            "</deployment>";
+        try {
+            DeploymentType dt06 = CatalogUtil.unmarshalDeployment(new ByteArrayInputStream(dep06.getBytes(StandardCharsets.UTF_8)));
+        } catch (JAXBException je) {
+            String msg = je.getLinkedException().getMessage();
+            assertTrue(msg, msg.contains("Duplicate unique value") && msg.contains("pool_name_must_be_unique"));
+        }
+
+        // duplicate topic name
+        final String dep07 =
+            "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>\n" +
+            "<deployment>\n" +
+            "    <cluster hostcount=\"1\"/>\n" +
+            "    <topics>\n" +
+            "        <topic name=\"mytopic\" procedure=\"ProcessSessions\"/>\n" +
+            "        <topic name=\"mytopic\" opaque=\"true\"/> <!-- duplicate topic name -->\n" +
+            "    </topics>\n" +
+            "</deployment>";
+        try {
+            DeploymentType dt07 = CatalogUtil.unmarshalDeployment(new ByteArrayInputStream(dep07.getBytes(StandardCharsets.UTF_8)));
+        } catch (JAXBException je) {
+            String msg = je.getLinkedException().getMessage();
+            assertTrue(msg, msg.contains("Duplicate unique value") && msg.contains("topic_name_must_be_unique"));
+        }
+
+        // duplicate topic propery name
+        final String dep08 =
+            "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>\n" +
+            "<deployment>\n" +
+            "    <cluster hostcount=\"1\"/>\n" +
+            "    <topics>\n" +
+            "        <topic name=\"eventLogs\">\n" +
+            "            <property name=\"consumer.format\">avro</property>\n" +
+            "            <property name=\"consumer.format\">avro</property> <!-- duplicate property -->\n" +
+            "            <property name=\"producer.format\">avro</property>\n" +
+            "        </topic>\n" +
+            "    </topics>\n" +
+            "</deployment>";
+        try {
+            DeploymentType dt08 = CatalogUtil.unmarshalDeployment(new ByteArrayInputStream(dep08.getBytes(StandardCharsets.UTF_8)));
+        } catch (JAXBException je) {
+            String msg = je.getLinkedException().getMessage();
+            assertTrue(msg, msg.contains("Duplicate unique value") && msg.contains("topic_property_names_can_only_be_set_once"));
+        }
+
     }
 }

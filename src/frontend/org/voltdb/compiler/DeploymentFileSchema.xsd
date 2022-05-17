@@ -42,9 +42,24 @@
       <xs:element name="ssl" minOccurs="0" maxOccurs="1" type="sslType"/>
       <xs:element name="httpd" minOccurs="0" maxOccurs="1" type="httpdType"/>
       <xs:element name="snapshot" type="snapshotType" minOccurs="0" maxOccurs="1" />
-      <xs:element name="export" minOccurs="0" maxOccurs="1" type="exportType"/>
-      <xs:element name="threadpools" minOccurs="0" maxOccurs="1" type="threadPoolsType"/>
-      <xs:element name="users" minOccurs="0" maxOccurs="1" type="usersType"/>
+      <xs:element name="export" minOccurs="0" maxOccurs="1" type="exportType">
+          <xs:unique name="configuration_target_must_be_unique">
+              <xs:selector xpath="configuration"/>
+              <xs:field xpath="@target"/>
+          </xs:unique>
+      </xs:element>
+      <xs:element name="threadpools" minOccurs="0" maxOccurs="1" type="threadPoolsType">
+          <xs:unique name="pool_name_must_be_unique">
+              <xs:selector xpath="pool"/>
+              <xs:field xpath="@name"/>
+          </xs:unique>
+      </xs:element>
+      <xs:element name="users" minOccurs="0" maxOccurs="1" type="usersType">
+          <xs:unique name="user_name_must_be_unique">
+              <xs:selector xpath="user"/>
+              <xs:field xpath="@name"/>
+          </xs:unique>
+      </xs:element>
       <xs:element name="commandlog" minOccurs="0" maxOccurs="1" type="commandLogType" />
       <xs:element name="systemsettings" minOccurs="0" maxOccurs="1" type="systemSettingsType" />
       <xs:element name="compoundproc" minOccurs="0" maxOccurs="1" type="compoundProcPolicyType"/>
@@ -54,7 +69,12 @@
       <xs:element name="snmp" minOccurs="0" type="snmpType"/>
       <xs:element name="features" minOccurs="0" type="featuresType"/>
       <xs:element name="task" minOccurs="0" maxOccurs="1" type="taskSettingsType"/>
-      <xs:element name="topics" minOccurs="0" maxOccurs="1" type="topicsType" />
+      <xs:element name="topics" minOccurs="0" maxOccurs="1" type="topicsType">
+          <xs:unique name="topic_name_must_be_unique">
+              <xs:selector xpath="topic"/>
+              <xs:field xpath="@name"/>
+          </xs:unique>
+      </xs:element>
       <xs:element name="avro" minOccurs="0" maxOccurs="1" type="avroType" />
     </xs:all>
   </xs:complexType>
@@ -419,7 +439,12 @@
   <!-- <export> -->
   <xs:complexType name="exportType">
     <xs:sequence>
-      <xs:element name="configuration" type="ExportConfigurationType" minOccurs="0" maxOccurs="unbounded"/>
+        <xs:element name="configuration" type="ExportConfigurationType" minOccurs="0" maxOccurs="unbounded">
+          <xs:unique name="export_configuration_property_names_can_only_be_set_once">
+              <xs:selector xpath="property"/>
+              <xs:field xpath="@name"/>
+          </xs:unique>
+        </xs:element>
     </xs:sequence>
     <xs:attribute name="defaultpoolsize" type="threadPoolSize"/>
   </xs:complexType>
@@ -438,7 +463,12 @@
   <!-- <import> -->
   <xs:complexType name="importType">
     <xs:sequence>
-      <xs:element name="configuration" type="ImportConfigurationType" minOccurs="0" maxOccurs="unbounded"/>
+      <xs:element name="configuration" type="ImportConfigurationType" minOccurs="0" maxOccurs="unbounded">
+        <xs:unique name="import_configuration_property_names_can_only_be_set_once">
+          <xs:selector xpath="property"/>
+          <xs:field xpath="@name"/>
+        </xs:unique>
+      </xs:element>
     </xs:sequence>
   </xs:complexType>
 
@@ -614,8 +644,18 @@
   <!-- <topics> -->
   <xs:complexType name="topicsType">
     <xs:sequence>
-      <xs:element name="broker" type="PropertiesType" minOccurs="0" maxOccurs="1"/>
-      <xs:element name="topic" type="topicType" minOccurs="0" maxOccurs="unbounded"/>
+      <xs:element name="broker" type="PropertiesType" minOccurs="0" maxOccurs="1">
+        <xs:unique name="broker_property_names_can_only_be_set_once">
+          <xs:selector xpath="property"/>
+          <xs:field xpath="@name"/>
+        </xs:unique>
+      </xs:element>
+      <xs:element name="topic" type="topicType" minOccurs="0" maxOccurs="unbounded">
+        <xs:unique name="topic_property_names_can_only_be_set_once">
+          <xs:selector xpath="property"/>
+          <xs:field xpath="@name"/>
+        </xs:unique>
+      </xs:element>
     </xs:sequence>
     <xs:attribute name="enabled" type="xs:boolean" default="true" />
     <xs:attribute name="threadpool" type="xs:string" default="" />
