@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -34,6 +34,7 @@ import java.util.Collections;
 import org.json_voltpatches.JSONObject;
 import org.junit.Test;
 import org.voltdb.LocalClustersTestBase;
+import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
@@ -49,6 +50,7 @@ public class TestRestoreSchema extends LocalClustersTestBase {
      */
     @Test
     public void restoreFromNoCatalogFirst() throws Exception {
+        cleanupAfterTest();
         int tableCount = 2, sitesPerHost = 4;
         configureClustersAndClients(Collections.singletonList(new ClusterConfiguration(sitesPerHost)), tableCount,
                 tableCount);
@@ -100,6 +102,44 @@ public class TestRestoreSchema extends LocalClustersTestBase {
         }
     }
 
+    @SuppressWarnings("deprecation")
+    @Test
+    public void testRestoreCSVFormat() throws Exception {
+        cleanupAfterTest();
+        int tableCount = 2, sitesPerHost = 4;
+        configureClustersAndClients(Collections.singletonList(new ClusterConfiguration(sitesPerHost)), tableCount,
+                tableCount);
+        for (int i = 0; i < tableCount; ++i) {
+            insertRandomRows(getClient(0), i, TableType.PARTITIONED, 100);
+            insertRandomRows(getClient(0), i, TableType.REPLICATED, 100);
+        }
+
+        String snapshotPath = m_temporaryFolder.newFolder().getPath();
+        JSONObject snapshotConfig = new JSONObject()
+                .put(SnapshotUtil.JSON_URIPATH, "file://" + snapshotPath)
+                .put(SnapshotUtil.JSON_NONCE, getMethodName())
+                .put(SnapshotUtil.JSON_BLOCK, true)
+                .put(SnapshotUtil.JSON_FORMAT, "CSV");
+        ClientResponse response = getClient(0).callProcedure("@SnapshotSave", snapshotConfig.toString());
+        System.out.println(response.getResults()[0]);
+        shutdownCluster(0);
+
+        // Clear the catalog jar so that we start with an empty catalog
+        getCluster(0).getTemplateCommandLine().jarFileName(null);
+
+        startCluster(0, true, false);
+        snapshotConfig.remove(SnapshotUtil.JSON_FORMAT);
+        snapshotConfig.put(SnapshotUtil.JSON_PATH, snapshotPath);
+        try {
+            response = getClient(0).callProcedure("@SnapshotRestore", snapshotConfig.toString());
+        } catch (ProcCallException e) {
+            response = e.getClientResponse();
+            fail(response.getStatusString() + '\n' + Arrays.toString(response.getResults()));
+        }
+        VoltTable result = response.getResults()[0];
+        result.advanceRow();
+        assertTrue("cannot recover/restore csv snapshots".equals(result.getString("ERR_MSG")));
+    }
     private long getCount(String table) throws NoConnectionsException, IOException, ProcCallException {
         return getClient(0).callProcedure("@AdHoc", "SELECT count(*) FROM " + table).getResults()[0].asScalarLong();
     }

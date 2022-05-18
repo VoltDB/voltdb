@@ -509,7 +509,7 @@ public class SnapshotRestore extends VoltSystemProcedure {
                     TRACE_LOG.trace("Checking saved table state for restore of: "
                             + m_filePath + ", " + m_fileNonce);
                 }
-                File[] savefiles = SnapshotUtil.retrieveRelevantFiles(m_filePath, m_filePathType, m_fileNonce);
+                File[] savefiles = SnapshotUtil.retrieveRelevantFiles(m_filePath, m_filePathType, m_fileNonce, ".vpt");
                 if (savefiles == null) {
                     return new DependencyPair.TableDependencyPair(SysProcFragmentId.PF_restoreScan, result);
                 }
@@ -983,10 +983,20 @@ public class SnapshotRestore extends VoltSystemProcedure {
         path = SnapshotUtil.getRealPath(SnapshotPathType.valueOf(pathType), path);
         final long startTime = System.currentTimeMillis();
         CONSOLE_LOG.info("Restoring from path: " + path + " with nonce: " + nonce + " Path Type: " + pathType);
-
         // Fetch all the savefile metadata from the cluster
         VoltTable[] savefile_data;
         savefile_data = performRestoreScanWork(path, pathType, nonce, dupsPath);
+
+        //No tables are found, check if the nonce is in csv format.
+        if (savefile_data[0].getRowCount() == 0) {
+            File [] csvFiles = SnapshotUtil.retrieveRelevantFiles(m_filePath, m_filePathType, m_fileNonce, ".csv");
+            if (csvFiles != null && csvFiles.length > 0) {
+                VoltTable[] results = constructFailureResultsTable();
+                results[0].addRow( "FAILURE", "cannot recover/restore csv snapshots");
+                return results;
+            }
+        }
+
         List<String> includeList = tableOptParser(tableNames);
         List<String> excludeList = tableOptParser(skiptableNames);
 

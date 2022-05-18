@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -1423,7 +1423,7 @@ public class SnapshotUtil {
     }
 
     public static File[] retrieveRelevantFiles(String filePath, String filePathType,
-                                               final String fileNonce)
+                                               final String fileNonce, String fileExtension)
     {
         String matchNonce = fileNonce + "-";
         FilenameFilter has_nonce = new FilenameFilter()
@@ -1431,7 +1431,7 @@ public class SnapshotUtil {
             @Override
             public boolean accept(File dir, String file)
             {
-                return file.startsWith(matchNonce) && file.endsWith(".vpt");
+                return file.startsWith(matchNonce) && file.endsWith(fileExtension);
             }
         };
 
@@ -1439,6 +1439,7 @@ public class SnapshotUtil {
         File[] save_files = save_dir.listFiles(has_nonce);
         return save_files;
     }
+
 
     public static String didSnapshotRequestFailWithErr(VoltTable results[]) {
         if (results.length < 1) {
