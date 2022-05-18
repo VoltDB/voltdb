@@ -1509,7 +1509,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             statsAgent.registerStatsSource(StatsSelector.COMMANDLOG, 0, m_commandLogStats);
 
             skewStats = new ClockSkewStats(Clock.systemUTC(), VoltDB.instance(), hostLog);
-            getStatsAgent().registerStatsSource(StatsSelector.CLOCKSKEW, 0, skewStats);
+            statsAgent.registerStatsSource(StatsSelector.CLOCKSKEW, 0, skewStats);
+
+            CompoundProcCallStats.initStats(statsAgent);
 
             // Dummy DRCONSUMER stats
             replaceDRConsumerStatsWithDummy();

@@ -110,6 +110,8 @@ public class StatsAgent extends OpsAgent {
     public void notifyOfCatalogUpdate() {
         procedureDetailAggregator = ProcedureDetailAggregator.create();
         m_registeredStatsSources.put(StatsSelector.PROCEDURE, new NonBlockingHashMap<>());
+        m_registeredStatsSources.put(StatsSelector.COMPOUNDPROCCALLS, new NonBlockingHashMap<>());
+        CompoundProcCallStats.initStats(this);
     }
 
     @Override

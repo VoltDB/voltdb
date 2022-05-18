@@ -102,4 +102,19 @@ public class CompoundProcCallStats extends StatsSource {
     public String toString() {
         return procName;
     }
+
+    // This kludgery ensures we always have at least one stats
+    // source registered. The dummy entry automatically produces
+    // no statistics, since it has not called any transactions.
+
+    private static CompoundProcCallStats dummyStats;
+
+    static void initStats(StatsAgent sa) {
+        synchronized (CompoundProcCallStats.class) {
+            if (dummyStats == null) {
+                dummyStats = new CompoundProcCallStats("<<dummy>>");
+            }
+        }
+        sa.registerStatsSource(StatsSelector.COMPOUNDPROCCALLS, -1, dummyStats);
+    }
 }
