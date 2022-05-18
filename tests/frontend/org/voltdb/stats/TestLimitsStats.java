@@ -40,7 +40,7 @@ import static org.mockito.Mockito.when;
 import static org.voltdb.StatsSource.StatsCommon.*;
 import static org.voltdb.stats.LimitsStats.Column.*;
 
-public class LimitsStatsTest {
+public class TestLimitsStats {
 
     private static final int HOST_ID = 42;
     private static final String HOST_NAME = "answer";

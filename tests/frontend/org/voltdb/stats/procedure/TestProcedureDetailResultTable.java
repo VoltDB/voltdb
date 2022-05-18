@@ -33,7 +33,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.assertions.VoltTablesAssertion;
 
 //  procedure_name, statement_name, host_id, site_id, partition_id, timestamp (descending);
-public class ProcedureDetailResultTableTest {
+public class TestProcedureDetailResultTable {
     VoltTable schemaTemplate = TableShorthand.tableFromShorthand(
             "PROCEDUREDETAIL(" +
             "TIMESTAMP:BIGINT," +

@@ -35,7 +35,7 @@ import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.assertions.VoltTablesAssertion;
 
-public class ProcedureDetailAggregatorAggregateProcedureProfileStatsTest {
+public class TestProcedureDetailAggregator_AggregateProcedureInputStats {
 
     VoltTable inputSchemaTemplate = TableShorthand.tableFromShorthand(
             "PROCEDUREDETAIL(" +
@@ -69,11 +69,10 @@ public class ProcedureDetailAggregatorAggregateProcedureProfileStatsTest {
             "PROCEDURE:STRING," +
             "WEIGHTED_PERC:BIGINT," +
             "INVOCATIONS:BIGINT," +
-            "AVG:BIGINT," +
-            "MIN:BIGINT," +
-            "MAX:BIGINT," +
-            "ABORTS:BIGINT," +
-            "FAILURES:BIGINT" +
+            "MIN_PARAMETER_SET_SIZE:BIGINT," +
+            "MAX_PARAMETER_SET_SIZE:BIGINT," +
+            "AVG_PARAMETER_SET_SIZE:BIGINT," +
+            "TOTAL_PARAMETER_SET_SIZE_MB:BIGINT" +
             ")"
     );
 
@@ -88,31 +87,30 @@ public class ProcedureDetailAggregatorAggregateProcedureProfileStatsTest {
             "<ALL>",
             2345L,
             100L,
-            TimeUnit.MILLISECONDS.toNanos(22), // MIN_EXECUTION_TIME
-            TimeUnit.MILLISECONDS.toNanos(123), // MAX_EXECUTION_TIME
-            TimeUnit.MILLISECONDS.toNanos(42), // AVG_EXECUTION_TIME
+            TimeUnit.MILLISECONDS.toNanos(22),
+            TimeUnit.MILLISECONDS.toNanos(123),
+            TimeUnit.MILLISECONDS.toNanos(42),
             32,
             123452,
             433,
-            12,
-            15,
-            14,
-            3421L,
-            5L,
-            (byte) 1
+            12, // MIN_PARAMETER_SET_SIZE
+            15, // MAX_PARAMETER_SET_SIZE
+            14, // AVG_PARAMETER_SET_SIZE
+            3421L, // ABORTS
+            5L, // FAILURES
+            (byte) 1 // TRANSACTIONAL
     );
 
     MockRow baseOutput = MockRow.of(
             outputSchemaTemplate,
-            42L,
-            "org.voltdb.stats.procedure.ProcedureDetailResultTableTest",
+            42L, // TIMESTAMP
+            "org.voltdb.stats.procedure.ProcedureDetailResultTableTest", // PROCEDURE
             50L, // WEIGHTED_PERC
             2345L, // INVOCATIONS
-            42000000L, // AVG
-            22000000L, // MIN
-            123000000L, // MAX
-            3421L, // ABORTS
-            5L // FAILURES
+            12L, // MIN_PARAMETER_SET_SIZE
+            15L, // MAX_PARAMETER_SET_SIZE
+            14L, // AVG_PARAMETER_SET_SIZE
+            0L // TOTAL_PARAMETER_SET_SIZE_MB
     );
 
     @Test
@@ -125,7 +123,7 @@ public class ProcedureDetailAggregatorAggregateProcedureProfileStatsTest {
         );
 
         // When
-        VoltTable[] voltTables = aggregator.aggregateProcedureProfileStats(new VoltTable[]{inputSchemaTemplate});
+        VoltTable[] voltTables = aggregator.aggregateProcedureInputStats(new VoltTable[]{inputSchemaTemplate});
 
         // Then
         VoltTablesAssertion.assertThat(voltTables)
@@ -174,7 +172,7 @@ public class ProcedureDetailAggregatorAggregateProcedureProfileStatsTest {
         row4.insertInto(voltTable);
 
         // When
-        VoltTable[] voltTables = aggregator.aggregateProcedureProfileStats(new VoltTable[]{voltTable});
+        VoltTable[] voltTables = aggregator.aggregateProcedureInputStats(new VoltTable[]{voltTable});
 
         // Then
         VoltTablesAssertion.assertThat(voltTables)
@@ -225,7 +223,7 @@ public class ProcedureDetailAggregatorAggregateProcedureProfileStatsTest {
         row3.insertInto(voltTable);
 
         // When
-        VoltTable[] voltTables = aggregator.aggregateProcedureProfileStats(new VoltTable[]{voltTable});
+        VoltTable[] voltTables = aggregator.aggregateProcedureInputStats(new VoltTable[]{voltTable});
 
         // Then
         VoltTablesAssertion.assertThat(voltTables)
@@ -234,7 +232,7 @@ public class ProcedureDetailAggregatorAggregateProcedureProfileStatsTest {
     }
 
     @Test
-    public void shouldSortByAverageExecutionTime() {
+    public void shouldSortByParametersSize() {
         // Given
         ProcedureDetailAggregator aggregator = new ProcedureDetailAggregator(
                 new ReadOnlyProcedureInformation(
@@ -246,7 +244,7 @@ public class ProcedureDetailAggregatorAggregateProcedureProfileStatsTest {
                 baseInputRowWithStatement,
                 entry("PROCEDURE", "Order66"),
                 entry("STATEMENT", "<ALL>"),
-                entry("AVG_EXECUTION_TIME", 10),
+                entry("AVG_PARAMETER_SET_SIZE", 10),
                 entry("INVOCATIONS", 1000)
         );
 
@@ -254,7 +252,7 @@ public class ProcedureDetailAggregatorAggregateProcedureProfileStatsTest {
                 baseInputRowWithStatement,
                 entry("PROCEDURE", "WillLandLast"),
                 entry("STATEMENT", "<ALL>"),
-                entry("AVG_EXECUTION_TIME", 2),
+                entry("AVG_PARAMETER_SET_SIZE", 2),
                 entry("INVOCATIONS", 1)
         );
 
@@ -262,7 +260,7 @@ public class ProcedureDetailAggregatorAggregateProcedureProfileStatsTest {
                 baseInputRowWithStatement,
                 entry("PROCEDURE", "AAArdvark"),
                 entry("STATEMENT", "<ALL>"),
-                entry("AVG_EXECUTION_TIME", 456),
+                entry("AVG_PARAMETER_SET_SIZE", 456),
                 entry("INVOCATIONS", 1000)
         );
 
@@ -270,7 +268,7 @@ public class ProcedureDetailAggregatorAggregateProcedureProfileStatsTest {
                 baseOutput,
                 entry("PROCEDURE", "AAArdvark"),
                 entry("WEIGHTED_PERC", 98L),
-                entry("AVG", 456L),
+                entry("AVG_PARAMETER_SET_SIZE", 456L),
                 entry("INVOCATIONS", 1000L)
         );
 
@@ -278,7 +276,7 @@ public class ProcedureDetailAggregatorAggregateProcedureProfileStatsTest {
                 baseOutput,
                 entry("PROCEDURE", "Order66"),
                 entry("WEIGHTED_PERC", 2L),
-                entry("AVG", 10L),
+                entry("AVG_PARAMETER_SET_SIZE", 10L),
                 entry("INVOCATIONS", 1000L)
         );
 
@@ -286,7 +284,7 @@ public class ProcedureDetailAggregatorAggregateProcedureProfileStatsTest {
                 baseOutput,
                 entry("PROCEDURE", "WillLandLast"),
                 entry("WEIGHTED_PERC", 0L),
-                entry("AVG", 2L),
+                entry("AVG_PARAMETER_SET_SIZE", 2L),
                 entry("INVOCATIONS", 1L)
         );
 
@@ -296,7 +294,7 @@ public class ProcedureDetailAggregatorAggregateProcedureProfileStatsTest {
         row3.insertInto(voltTable);
 
         // When
-        VoltTable[] voltTables = aggregator.aggregateProcedureProfileStats(new VoltTable[]{voltTable});
+        VoltTable[] voltTables = aggregator.aggregateProcedureInputStats(new VoltTable[]{voltTable});
 
         // Then
         VoltTablesAssertion.assertThat(voltTables)
@@ -322,7 +320,7 @@ public class ProcedureDetailAggregatorAggregateProcedureProfileStatsTest {
                 entry("PROCEDURE", "Order66"),
                 entry("STATEMENT", "<ALL>"),
                 entry("PARTITION_ID", 33),
-                entry("AVG_EXECUTION_TIME", 2L),
+                entry("AVG_PARAMETER_SET_SIZE", 2),
                 entry("INVOCATIONS", 1000)
         );
 
@@ -331,7 +329,7 @@ public class ProcedureDetailAggregatorAggregateProcedureProfileStatsTest {
                 entry("PROCEDURE", "Order66"),
                 entry("STATEMENT", "<ALL>"),
                 entry("PARTITION_ID", 33),
-                entry("AVG_EXECUTION_TIME", 4L),
+                entry("AVG_PARAMETER_SET_SIZE", 4),
                 entry("INVOCATIONS", 100)
         );
 
@@ -340,7 +338,7 @@ public class ProcedureDetailAggregatorAggregateProcedureProfileStatsTest {
                 entry("PROCEDURE", "Order66"),
                 entry("STATEMENT", "<ALL>"),
                 entry("PARTITION_ID", 12),
-                entry("AVG_EXECUTION_TIME", 4L),
+                entry("AVG_PARAMETER_SET_SIZE", 4),
                 entry("INVOCATIONS", 1)
         );
 
@@ -348,10 +346,8 @@ public class ProcedureDetailAggregatorAggregateProcedureProfileStatsTest {
                 baseOutput,
                 entry("PROCEDURE", "Order66"),
                 entry("WEIGHTED_PERC", 100L),
-                entry("AVG", 2L),
-                entry("INVOCATIONS", 1001L),
-                entry("ABORTS", 6842L),
-                entry("FAILURES", 10L)
+                entry("AVG_PARAMETER_SET_SIZE", 2L),
+                entry("INVOCATIONS", 1001L)
         );
 
         VoltTable voltTable = inputSchemaTemplate.clone(0);
@@ -360,7 +356,7 @@ public class ProcedureDetailAggregatorAggregateProcedureProfileStatsTest {
         row3.insertInto(voltTable);
 
         // When
-        VoltTable[] voltTables = aggregator.aggregateProcedureProfileStats(new VoltTable[]{voltTable});
+        VoltTable[] voltTables = aggregator.aggregateProcedureInputStats(new VoltTable[]{voltTable});
 
         // Then
         VoltTablesAssertion.assertThat(voltTables)
@@ -386,7 +382,7 @@ public class ProcedureDetailAggregatorAggregateProcedureProfileStatsTest {
                 entry("PROCEDURE", "Order66"),
                 entry("STATEMENT", "<ALL>"),
                 entry("PARTITION_ID", 33),
-                entry("AVG_EXECUTION_TIME", 2),
+                entry("AVG_PARAMETER_SET_SIZE", 2),
                 entry("INVOCATIONS", 1000)
         );
 
@@ -395,7 +391,7 @@ public class ProcedureDetailAggregatorAggregateProcedureProfileStatsTest {
                 entry("PROCEDURE", "Order66"),
                 entry("STATEMENT", "<ALL>"),
                 entry("PARTITION_ID", 33),
-                entry("AVG_EXECUTION_TIME", 4),
+                entry("AVG_PARAMETER_SET_SIZE", 4),
                 entry("INVOCATIONS", 100)
         );
 
@@ -404,7 +400,7 @@ public class ProcedureDetailAggregatorAggregateProcedureProfileStatsTest {
                 entry("PROCEDURE", "Order66"),
                 entry("STATEMENT", "<ALL>"),
                 entry("PARTITION_ID", 12),
-                entry("AVG_EXECUTION_TIME", 4),
+                entry("AVG_PARAMETER_SET_SIZE", 4),
                 entry("INVOCATIONS", 1)
         );
 
@@ -412,10 +408,8 @@ public class ProcedureDetailAggregatorAggregateProcedureProfileStatsTest {
                 baseOutput,
                 entry("PROCEDURE", "Order66"),
                 entry("WEIGHTED_PERC", 100L),
-                entry("AVG", 2L),
-                entry("INVOCATIONS", 1101L),
-                entry("ABORTS", 10263L),
-                entry("FAILURES", 15L)
+                entry("AVG_PARAMETER_SET_SIZE", 2L),
+                entry("INVOCATIONS", 1101L)
         );
 
         VoltTable voltTable = inputSchemaTemplate.clone(0);
@@ -424,7 +418,7 @@ public class ProcedureDetailAggregatorAggregateProcedureProfileStatsTest {
         row3.insertInto(voltTable);
 
         // When
-        VoltTable[] voltTables = aggregator.aggregateProcedureProfileStats(new VoltTable[]{voltTable});
+        VoltTable[] voltTables = aggregator.aggregateProcedureInputStats(new VoltTable[]{voltTable});
 
         // Then
         VoltTablesAssertion.assertThat(voltTables)
@@ -437,7 +431,9 @@ public class ProcedureDetailAggregatorAggregateProcedureProfileStatsTest {
         // Given
         ProcedureDetailAggregator aggregator = new ProcedureDetailAggregator(
                 new ReadOnlyProcedureInformation(
-                        Suppliers.ofInstance(Collections.emptyMap())
+                        Suppliers.ofInstance(
+                                Collections.emptyMap()
+                        )
                 )
         );
 
@@ -446,7 +442,7 @@ public class ProcedureDetailAggregatorAggregateProcedureProfileStatsTest {
                 entry("PROCEDURE", "Order66"),
                 entry("STATEMENT", "<ALL>"),
                 entry("PARTITION_ID", 33),
-                entry("AVG_EXECUTION_TIME", 2),
+                entry("AVG_PARAMETER_SET_SIZE", 2),
                 entry("INVOCATIONS", 1000)
         );
 
@@ -455,7 +451,7 @@ public class ProcedureDetailAggregatorAggregateProcedureProfileStatsTest {
                 entry("PROCEDURE", "Order66"),
                 entry("STATEMENT", "<ALL>"),
                 entry("PARTITION_ID", 33),
-                entry("AVG_EXECUTION_TIME", 4),
+                entry("AVG_PARAMETER_SET_SIZE", 4),
                 entry("INVOCATIONS", 100)
         );
 
@@ -464,7 +460,7 @@ public class ProcedureDetailAggregatorAggregateProcedureProfileStatsTest {
                 entry("PROCEDURE", "Order66"),
                 entry("STATEMENT", "<ALL>"),
                 entry("PARTITION_ID", 12),
-                entry("AVG_EXECUTION_TIME", 4),
+                entry("AVG_PARAMETER_SET_SIZE", 4),
                 entry("INVOCATIONS", 1)
         );
 
@@ -472,10 +468,8 @@ public class ProcedureDetailAggregatorAggregateProcedureProfileStatsTest {
                 baseOutput,
                 entry("PROCEDURE", "Order66"),
                 entry("WEIGHTED_PERC", 100L),
-                entry("AVG", 2L),
-                entry("INVOCATIONS", 1001L),
-                entry("ABORTS", 6842L),
-                entry("FAILURES", 10L)
+                entry("AVG_PARAMETER_SET_SIZE", 2L),
+                entry("INVOCATIONS", 1001L)
         );
 
         VoltTable voltTable = inputSchemaTemplate.clone(0);
@@ -484,7 +478,7 @@ public class ProcedureDetailAggregatorAggregateProcedureProfileStatsTest {
         row3.insertInto(voltTable);
 
         // When
-        VoltTable[] voltTables = aggregator.aggregateProcedureProfileStats(new VoltTable[]{voltTable});
+        VoltTable[] voltTables = aggregator.aggregateProcedureInputStats(new VoltTable[]{voltTable});
 
         // Then
         VoltTablesAssertion.assertThat(voltTables)

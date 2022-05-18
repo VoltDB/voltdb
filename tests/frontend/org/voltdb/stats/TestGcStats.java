@@ -38,7 +38,7 @@ import org.junit.Test;
 import org.voltdb.StatsSource;
 import org.voltdb.VoltTable;
 
-public class GcStatsTest {
+public class TestGcStats {
 
     @Test
     public void shouldPopulateSchemaWithGenericAndSpecificColumns() {

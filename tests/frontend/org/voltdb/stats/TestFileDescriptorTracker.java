@@ -35,7 +35,7 @@ import java.util.concurrent.TimeUnit;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 
-public class FileDescriptorTrackerTest {
+public class TestFileDescriptorTracker {
 
     private VoltDBInterface m_testInstance;
 

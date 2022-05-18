@@ -39,7 +39,7 @@ import static org.mockito.Mockito.when;
 import static org.voltdb.StatsSource.StatsCommon.*;
 import static org.voltdb.stats.LiveClientsStats.LiveClients.*;
 
-public class LiveClientsStatsTest {
+public class TestLiveClientsStats {
 
     private static final MapEntry<Long, Pair<String, long[]>> ENTRY_1 = MapEntry.entry(0L, Pair.of("host1", new long[]{1, 2, 3, 4}));
     private static final MapEntry<Long, Pair<String, long[]>> ENTRY_2 = MapEntry.entry(1L, Pair.of("host2", new long[]{5, 6, 7, 8}));

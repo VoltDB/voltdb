@@ -35,7 +35,7 @@ import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.entry;
 
-public class ProcedureDetailAggregatorAggregateProcedureStatsTest {
+public class TestProcedureDetailAggregator_AggregateProcedureStats {
 
     VoltTable inputSchemaTemplate = TableShorthand.tableFromShorthand(
             "PROCEDUREDETAIL(" +
@@ -59,7 +59,8 @@ public class ProcedureDetailAggregatorAggregateProcedureStatsTest {
             "AVG_PARAMETER_SET_SIZE:INTEGER," +
             "ABORTS:BIGINT," +
             "FAILURES:BIGINT," +
-            "TRANSACTIONAL:TINYINT" +
+            "TRANSACTIONAL:TINYINT," +
+            "COMPOUND:TINYINT" +
             ")"
     );
 
@@ -84,7 +85,8 @@ public class ProcedureDetailAggregatorAggregateProcedureStatsTest {
             "AVG_PARAMETER_SET_SIZE:INTEGER," +
             "ABORTS:BIGINT," +
             "FAILURES:BIGINT," +
-            "TRANSACTIONAL:TINYINT" +
+            "TRANSACTIONAL:TINYINT," +
+            "COMPOUND:TINYINT" +
             ")"
     );
 
@@ -110,7 +112,8 @@ public class ProcedureDetailAggregatorAggregateProcedureStatsTest {
             14,
             3421L,
             5L,
-            (byte) 0
+            (byte) 0,
+            (byte) 1
     );
 
     MockRow baseOutput = MockRow.of(
@@ -134,7 +137,8 @@ public class ProcedureDetailAggregatorAggregateProcedureStatsTest {
             14,
             3421L,
             5L,
-            (byte) 0
+            (byte) 0,
+            (byte) 1
     );
 
     @Test
