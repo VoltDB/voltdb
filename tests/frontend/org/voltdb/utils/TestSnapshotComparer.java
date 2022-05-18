@@ -43,12 +43,16 @@ import org.junit.Test;
 import org.junit.contrib.java.lang.system.ExpectedSystemExit;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
 import org.voltdb.regressionsuites.LocalCluster;
+
+import com.google_voltpatches.common.collect.Lists;
 
 public class TestSnapshotComparer extends JUnit4LocalClusterTest {
     protected static final String TMPDIR = "Backup";
@@ -363,5 +367,50 @@ public class TestSnapshotComparer extends JUnit4LocalClusterTest {
             }
             assertTrue(deleted);
         }
+    }
+    @Test
+    public void testComparer() {
+        List<VoltTable> ftr = Lists.newArrayList();
+        List<VoltTable> ftc = Lists.newArrayList();
+        List<String>  diff = Lists.newArrayList();
+        final int tupleCount = 1000;
+        final int tableCount = 10;
+        ColumnInfo[] schema = new ColumnInfo[] {
+             new ColumnInfo("STATUS", VoltType.BIGINT)
+        };
+        int ftcCount=0, ftrCount = 0;
+        Random rn = new Random();
+        for (int i = 0; i < tableCount; i++) {
+            //create random number of rows for reference
+            int trCount = (rn.nextInt(tupleCount) + 1);
+            int tcCount = (rn.nextInt(tupleCount) + 1);
+            int trBatchRowLimit = ftrCount + trCount;
+            int tcBatchRowLimit = ftcCount + tcCount;
+            if (i == (tableCount -1)) {
+                int maxLimit = Math.max(trBatchRowLimit, tcBatchRowLimit);
+                //normalize the count
+                trBatchRowLimit = maxLimit;
+                tcBatchRowLimit = maxLimit;
+            }
+            VoltTable trTable = new VoltTable(schema);
+            ftr.add(trTable);
+            for (int m = ftrCount; m < trBatchRowLimit; m++) {
+                trTable.addRow(ftrCount);
+                ftrCount++;
+            }
+
+            //create random number of rows for compared
+            VoltTable tcTable = new VoltTable(schema);
+            ftc.add(tcTable);
+            for (int m = ftcCount; m < tcBatchRowLimit; m++) {
+                tcTable.addRow(ftcCount);
+                ftcCount++;
+            }
+
+            SnapshotComparer.compare(ftr, ftc, diff);
+        }
+        SnapshotComparer.compare(ftr, ftc, diff);
+        System.out.println(diff);
+        assertTrue(diff.isEmpty());
     }
 }
