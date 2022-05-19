@@ -178,14 +178,13 @@ public class ProcedureStatsCollector extends SiteStatsSource {
         final long endTime = System.nanoTime();
         final long duration = endTime - statsToken.startTimeNanos;
         if (duration < 0) {
-            if (Math.abs(duration) > 1000000000) {
+            if (duration < -1000000000) {
                 log.info("Procedure: " + m_procName +
                          " recorded a negative execution time larger than one second: " + duration);
             }
             return;
         }
 
-        m_procStatsData.m_timedInvocations++;
         // sampled timings
         m_procStatsData.m_totalTimedExecutionTime += duration;
         m_procStatsData.m_minExecutionTime = Math.min(duration, m_procStatsData.m_minExecutionTime);
@@ -204,6 +203,10 @@ public class ProcedureStatsCollector extends SiteStatsSource {
         m_procStatsData.m_maxParameterSetSize = Math.max(statsToken.parameterSetSize, m_procStatsData.m_maxParameterSetSize);
         m_procStatsData.m_incrMinParameterSetSize = Math.min(statsToken.parameterSetSize, m_procStatsData.m_incrMinParameterSetSize);
         m_procStatsData.m_incrMaxParameterSetSize = Math.max(statsToken.parameterSetSize, m_procStatsData.m_incrMaxParameterSetSize);
+
+        // update this after the above, in the hope that the unsynchronized stats row
+        // iterator will tend to skip rows that have no valid min/max
+        m_procStatsData.m_timedInvocations++;
 
         // stop here if no statements
         if (statsToken.stmtStats == null) {
@@ -265,7 +268,7 @@ public class ProcedureStatsCollector extends SiteStatsSource {
         // This is a sampled invocation.
         // Update timings and size statistics below.
         if (duration < 0) {
-            if (Math.abs(duration) > 1000000000) {
+            if (duration < -1000000000) {
                 log.info("Statement: " + stmtStats.m_stmtName + " in procedure: " + m_procName +
                          " recorded a negative execution time larger than one second: " +
                          duration);
@@ -273,7 +276,6 @@ public class ProcedureStatsCollector extends SiteStatsSource {
             return;
         }
 
-        dataToUpdate.m_timedInvocations++;
         // sampled timings
         dataToUpdate.m_totalTimedExecutionTime += duration;
         dataToUpdate.m_minExecutionTime = Math.min(duration, dataToUpdate.m_minExecutionTime);
@@ -293,6 +295,10 @@ public class ProcedureStatsCollector extends SiteStatsSource {
         dataToUpdate.m_maxParameterSetSize = Math.max(parameterSetSize, dataToUpdate.m_maxParameterSetSize);
         dataToUpdate.m_incrMinParameterSetSize = Math.min(parameterSetSize, dataToUpdate.m_incrMinParameterSetSize);
         dataToUpdate.m_incrMaxParameterSetSize = Math.max(parameterSetSize, dataToUpdate.m_incrMaxParameterSetSize);
+
+        // update this after the above, in the hope that the unsynchronized stats row
+        // iterator will tend to skip rows that have no valid min/max
+        dataToUpdate.m_timedInvocations++;
     }
 
     /**
@@ -343,7 +349,6 @@ public class ProcedureStatsCollector extends SiteStatsSource {
             invocations -= currRow.getLastInvocationsAndReset();
             timedInvocations -= currRow.getLastTimedInvocationsAndReset();
         }
-
 
         rowValues[offset + ProcedureColumns.INVOCATIONS.ordinal()] = invocations;
         rowValues[offset + ProcedureColumns.TIMED_INVOCATIONS.ordinal()] = timedInvocations;
@@ -399,13 +404,11 @@ public class ProcedureStatsCollector extends SiteStatsSource {
                     if (m_incremental) {
                         if (nextToReturn.getTimedInvocations() - nextToReturn.getLastTimedInvocations() == 0) {
                             nextToReturn = null;
-                            continue;
                         }
                     }
                     else {
                         if (nextToReturn.getTimedInvocations() == 0) {
                             nextToReturn = null;
-                            continue;
                         }
                     }
                 } while (nextToReturn == null && iter.hasNext());
