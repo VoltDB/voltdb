@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,11 +18,14 @@
 package org.voltdb.elastic;
 
 import java.util.Collection;
+import java.util.List;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.CatalogContext;
+
+import com.google_voltpatches.common.collect.ImmutableList;
 
 public interface ElasticService {
     /**
@@ -64,4 +67,25 @@ public interface ElasticService {
      * @param listener to be added
      */
     void addBalancePartitionsListener(BalancePartitionsListener listener);
+
+
+    /**
+     * Return a list of prefixes for the snapshots created by elastic operations.
+     * <p>
+     * Must match how snapshot nonces are built in {@code SnapshotUtil.makeSnapshotNonce(String, long)}
+     *
+     * @return  list of elastic snapshot none prefixes
+     */
+    static public List<String> getSnapshotPrefixes() {
+        return ImmutableList.of(
+                ElasticOperation.JOIN + "_" + getSnapshotHsid(),
+                ElasticOperation.REMOVE + "_" + getSnapshotHsid());
+    }
+
+    /**
+     * Return the hsid to use for building the elastic snapshot nonces
+     */
+    static public int getSnapshotHsid() {
+        return 0;
+    }
 }

@@ -79,22 +79,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import com.google_voltpatches.common.base.Charsets;
-import com.google_voltpatches.common.base.Joiner;
-import com.google_voltpatches.common.base.Supplier;
-import com.google_voltpatches.common.base.Suppliers;
-import com.google_voltpatches.common.collect.ImmutableList;
-import com.google_voltpatches.common.collect.ImmutableMap;
-import com.google_voltpatches.common.collect.Lists;
-import com.google_voltpatches.common.collect.Maps;
-import com.google_voltpatches.common.collect.Ordering;
-import com.google_voltpatches.common.collect.Sets;
-import com.google_voltpatches.common.hash.Hashing;
-import com.google_voltpatches.common.net.HostAndPort;
-import com.google_voltpatches.common.util.concurrent.ListenableFuture;
-import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
-import com.google_voltpatches.common.util.concurrent.SettableFuture;
-import io.netty.handler.ssl.OpenSsl;
+
 import org.aeonbits.owner.ConfigFactory;
 import org.apache.cassandra_voltpatches.GCInspector;
 import org.apache.commons.lang3.StringUtils;
@@ -234,6 +219,24 @@ import org.voltdb.utils.ProClass;
 import org.voltdb.utils.SystemStatsCollector;
 import org.voltdb.utils.TopologyZKUtils;
 import org.voltdb.utils.VoltSampler;
+
+import com.google_voltpatches.common.base.Charsets;
+import com.google_voltpatches.common.base.Joiner;
+import com.google_voltpatches.common.base.Supplier;
+import com.google_voltpatches.common.base.Suppliers;
+import com.google_voltpatches.common.collect.ImmutableList;
+import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.Lists;
+import com.google_voltpatches.common.collect.Maps;
+import com.google_voltpatches.common.collect.Ordering;
+import com.google_voltpatches.common.collect.Sets;
+import com.google_voltpatches.common.hash.Hashing;
+import com.google_voltpatches.common.net.HostAndPort;
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
+import com.google_voltpatches.common.util.concurrent.SettableFuture;
+
+import io.netty.handler.ssl.OpenSsl;
 
 /**
  * RealVoltDB initializes global server components, like the messaging
@@ -1211,6 +1214,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             clusterSettings.store();
             m_clusterSettings.set(clusterSettings, 1);
+
+            // Before building the mesh, clean up any lingering snapshots left by elastic operations
+            cleanElasticSnapshots(readDepl);
 
             // Potential wait here as mesh is built.
             MeshProber.Determination determination = buildClusterMesh(readDepl);
@@ -3124,6 +3130,46 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
     void setBare(boolean flag) {
         m_isBare = flag;
+    }
+
+    private void cleanElasticSnapshots(ReadDeploymentResults readDepl) {
+        if (!m_config.m_isEnterprise) {
+            return;
+        }
+
+        PathsType paths = readDepl.deployment.getPaths();
+        String clSnapshotpath = getCommandLogSnapshotPath(paths.getCommandlogsnapshot());
+        String voltDbRoot = getVoltDBRootPath(paths.getVoltdbroot());
+
+        File managedPath = new File(clSnapshotpath);
+        if (!managedPath.isAbsolute()) {
+            managedPath = new File(voltDbRoot, clSnapshotpath);
+        }
+        if (!managedPath.canRead()) {
+            return; // this is logged elsewhere...
+        }
+        String absPath = managedPath.getAbsolutePath();
+
+        List<String> snapshotPrefixes = ElasticService.getSnapshotPrefixes();
+        String[] content = managedPath.list((dir,name) -> snapshotPrefixes.stream().anyMatch(p -> name.startsWith(p)));
+        if (content.length == 0) { // nothing we care about
+            return;
+        }
+
+        List<String> deletion = Arrays.asList(content);
+        hostLog.infoFmt("Deleting elastic snapshot files: %s", deletion);
+        try {
+            for (String delete : deletion) {
+                File file = new File(absPath, delete);
+                if (!file.delete()) {
+                    VoltDB.crashLocalVoltDB("Failed to delete " + file.getAbsolutePath());
+                }
+            }
+        }
+        catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Failed to delete elastic snapshot file", true, e);
+        }
+        hostLog.infoFmt("Deleted %d elastic snapshot files", deletion.size());
     }
 
     /**
