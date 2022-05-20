@@ -52,7 +52,7 @@
 	<classpathentry kind="lib" path="lib/httpcore-4.4.15.jar"/>
 	<classpathentry kind="lib" path="lib/commons-logging-1.1.3.jar"/>
 	<classpathentry kind="lib" path="lib/tomcat-jdbc-10.0.12.jar"/>
-	<classpathentry kind="lib" path="lib/jackson-databind-2.12.6.jar"/>
+	<classpathentry kind="lib" path="lib/jackson-databind-2.12.6.1.jar"/>
 	<classpathentry kind="lib" path="lib/jackson-core-2.12.6.jar"/>
 	<classpathentry kind="lib" path="lib/jackson-annotations-2.12.6.jar"/>
 	<classpathentry kind="lib" path="lib/failureaccess-1.0.1.jar"/>
