@@ -186,6 +186,10 @@ public:
             retval += offset.unpack();
         } else {
             retval = &(m_storage[m_tupleLength * m_nextFreeTuple]);
+            if(m_nextFreeTuple >= m_tuplesPerBlock)
+            {
+                return std::pair<char*, int>(NULL, -1);
+            }
             m_nextFreeTuple++;
         }
         m_activeTuples++;

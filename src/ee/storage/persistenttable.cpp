@@ -225,29 +225,46 @@ void PersistentTable::nextFreeTuple(TableTuple* tuple) {
         }
         std::pair<char*, int> retval = block->nextFreeTuple();
 
+        std::vector<TBPtr> fullBlocks;
+        while (retval.first == NULL) {
+            if (!block->hasFreeTuples())
+                fullBlocks.emplace_back(block);
+            if (++begin == m_blocksWithSpace.end())
+                break;
+            block = (*begin);
+            retval = block->nextFreeTuple();
+        }
+        for (auto& bk : fullBlocks) {
+            m_blocksWithSpace.erase(bk);
+        }
+
+        // We have a block which has space we want to use.
+        if (retval.first != NULL) {
+         
         /**
          * Check to see if the block needs to move to a new bucket
          */
-        if (retval.second != NO_NEW_BUCKET_INDEX) {
-            //Check if if the block is currently pending snapshot
-            if (m_blocksNotPendingSnapshot.find(block) != m_blocksNotPendingSnapshot.end()) {
-                block->swapToBucket(m_blocksNotPendingSnapshotLoad[retval.second]);
-            //Check if the block goes into the pending snapshot set of buckets
-            } else if (m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end()) {
-                block->swapToBucket(m_blocksPendingSnapshotLoad[retval.second]);
-            } else {
-                //In this case the block is actively being snapshotted and isn't eligible for merge operations at all
-                //do nothing, once the block is finished by the iterator, the iterator will return it
+            if (retval.second != NO_NEW_BUCKET_INDEX) {
+                //Check if if the block is currently pending snapshot
+                if (m_blocksNotPendingSnapshot.find(block) != m_blocksNotPendingSnapshot.end()) {
+                    block->swapToBucket(m_blocksNotPendingSnapshotLoad[retval.second]);
+                //Check if the block goes into the pending snapshot set of buckets
+                } else if (m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end()) {
+                    block->swapToBucket(m_blocksPendingSnapshotLoad[retval.second]);
+                } else {
+                    //In this case the block is actively being snapshotted and isn't eligible for merge operations at all
+                    //do nothing, once the block is finished by the iterator, the iterator will return it
+                }
             }
-        }
 
-        tuple->moveAndInitialize(retval.first);
-        ++m_tupleCount;
-        if (!block->hasFreeTuples()) {
-            m_blocksWithSpace.erase(block);
+            tuple->moveAndInitialize(retval.first);
+            ++m_tupleCount;
+            if (!block->hasFreeTuples()) {
+                m_blocksWithSpace.erase(block);
+            }
+            vassert(m_columnCount == tuple->columnCount());
+            return;
         }
-        vassert(m_columnCount == tuple->columnCount());
-        return;
     }
 
     // if there are no tuples free, we need to grab another chunk of memory
