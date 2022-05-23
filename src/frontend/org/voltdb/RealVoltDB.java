@@ -42,6 +42,7 @@ import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.time.Clock;
+import java.time.Instant;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -1737,11 +1738,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         true, null);
             }
 
+            // Write a bunch of useful system info to the host log
+            DailyLogging.logInfo();
+
+            // And schedule repeating tasks (including daily logging)
             schedulePeriodicWorks();
             m_clientInterface.schedulePeriodicWorks();
-
-            // print out a bunch of useful system info
-            logDebuggingInfo(m_config, m_httpPortExtraLogMessage, m_jsonEnabled);
 
             // warn the user on the console if k=0 or if no command logging
             if (m_configuredReplicationFactor == 0) {
@@ -2038,15 +2040,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     class DailyLogTask implements Runnable {
         @Override
         public void run() {
-            m_licensing.logLicensingInfo();
-            m_myHostId = m_messenger.getHostId();
-            hostLog.infoFmt("Host id of this node is: %d", m_myHostId);
-            hostLog.infoFmt("URL of deployment info: %s", m_config.m_pathToDeployment);
-            hostLog.infoFmt("Cluster uptime: %s", MiscUtils.formatUptime(getClusterUptime()));
-            logDebuggingInfo(m_config, m_httpPortExtraLogMessage, m_jsonEnabled);
-            // log system setting information
-            logSystemSettingFromCatalogContext();
-
+            m_myHostId = m_messenger.getHostId(); // TODO : why are we resetting this?
+            DailyLogging.logInfo();
             scheduleDailyLoggingWorkInNextCheckTime();
 
             // daily maintenance
@@ -3318,160 +3313,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return determination;
     }
 
-    void logDebuggingInfo(VoltDB.Configuration config, String httpPortExtraLogMessage, boolean jsonEnabled) {
-        String startAction = m_config.m_startAction.toString();
-        String startActionLog = "Database start action is " + (startAction.substring(0, 1).toUpperCase() +
-                startAction.substring(1).toLowerCase()) + ".";
-        if (!m_rejoining) {
-            hostLog.info(startActionLog);
-        }
-
-        // print out awesome network stuff
-        hostLog.infoFmt("Listening for native wire protocol clients on port %d.", m_config.m_port);
-        hostLog.infoFmt("Listening for admin wire protocol clients on port %d.", config.m_adminPort);
-
-        if (m_startMode == OperationMode.PAUSED) {
-            hostLog.infoFmt("Started in admin mode. Clients on port %d will be rejected in admin mode.", m_config.m_port);
-        }
-
-        if (getReplicationRole() == ReplicationRole.REPLICA) {
-            consoleLog.infoFmt("Started as %s cluster. Clients can only call read-only procedures.",
-                               getReplicationRole().toString().toLowerCase());
-        }
-        if (httpPortExtraLogMessage != null) {
-            hostLog.info(httpPortExtraLogMessage);
-        }
-        if (config.m_httpPort != -1) {
-            hostLog.infoFmt("Local machine HTTP monitoring is listening on port %d.", config.m_httpPort);
-        }
-        else {
-            hostLog.infoFmt("Local machine HTTP monitoring is disabled.");
-        }
-        if (jsonEnabled) {
-            hostLog.infoFmt("Json API over HTTP enabled at path /api/1.0/, listening on port %d.",
-                            config.m_httpPort);
-        }
-        else {
-            hostLog.info("Json API disabled.");
-        }
-        if (config.m_sslEnable) {
-            hostLog.info("OpenSsl is " + (OpenSsl.isAvailable() ? "enabled" : "disabled"));
-        }
-
-        // java heap size
-        long javamaxheapmem = ManagementFactory.getMemoryMXBean().getHeapMemoryUsage().getMax();
-        javamaxheapmem /= (1024 * 1024);
-        hostLog.infoFmt("Maximum usable Java heap set to %d MB.", javamaxheapmem);
-
-        // Computed minimum heap requirement
-        long minRqt = computeMinimumHeapRqt(m_catalogContext.tables.size(),
-                (getLocalPartitionCount()), m_configuredReplicationFactor);
-        hostLog.info("Minimum required Java heap for catalog and server config is " + minRqt + " MB.");
-
-        SortedMap<String, String> dbgMap = m_catalogContext.getDebuggingInfoFromCatalog(true);
-        for (String line : dbgMap.values()) {
-            hostLog.info(line);
-        }
-
-        // print out a bunch of useful system info
-        PlatformProperties pp = PlatformProperties.getPlatformProperties();
-        String[] lines = pp.toLogLines(getVersionString()).split("\n");
-        for (String line : lines) {
-            hostLog.info(line.trim());
-        }
-
-        if (m_catalogContext.cluster.getDrconsumerenabled() || m_catalogContext.cluster.getDrproducerenabled()) {
-            hostLog.info("DR initializing with Cluster Id " +  m_catalogContext.cluster.getDrclusterid() +
-                    ". The DR cluster was first started at " + new Date(m_clusterCreateTime).toString() + ".");
-        }
-
-        final ZooKeeper zk = m_messenger.getZK();
-        ZKUtil.ByteArrayCallback operationModeFuture = new ZKUtil.ByteArrayCallback();
-        /*
-         * Publish our cluster metadata, and then retrieve the metadata
-         * for the rest of the cluster
-         */
-        try {
-            zk.create(
-                    VoltZK.cluster_metadata + "/" + m_messenger.getHostId(),
-                    getLocalMetadata().getBytes("UTF-8"),
-                    Ids.OPEN_ACL_UNSAFE,
-                    CreateMode.EPHEMERAL,
-                    new ZKUtil.StringCallback(),
-                    null);
-            zk.getData(VoltZK.operationMode, false, operationModeFuture, null);
-        } catch (Exception e) {
-            VoltDB.crashLocalVoltDB("Error creating \"/cluster_metadata\" node in ZK", true, e);
-        }
-
-        Map<Integer, String> clusterMetadata = new HashMap<>(0);
-        /*
-         * Spin and attempt to retrieve cluster metadata for all nodes in the cluster.
-         */
-        Set<Integer> metadataToRetrieve = new HashSet<>(m_messenger.getLiveHostIds());
-        metadataToRetrieve.remove(m_messenger.getHostId());
-        while (!metadataToRetrieve.isEmpty()) {
-            Map<Integer, ZKUtil.ByteArrayCallback> callbacks = new HashMap<>();
-            for (Integer hostId : metadataToRetrieve) {
-                ZKUtil.ByteArrayCallback cb = new ZKUtil.ByteArrayCallback();
-                zk.getData(VoltZK.cluster_metadata + "/" + hostId, false, cb, null);
-                callbacks.put(hostId, cb);
-            }
-
-            for (Map.Entry<Integer, ZKUtil.ByteArrayCallback> entry : callbacks.entrySet()) {
-                try {
-                    ZKUtil.ByteArrayCallback cb = entry.getValue();
-                    Integer hostId = entry.getKey();
-                    clusterMetadata.put(hostId, new String(cb.get(), "UTF-8"));
-                    metadataToRetrieve.remove(hostId);
-                } catch (KeeperException.NoNodeException e) {}
-                catch (Exception e) {
-                    VoltDB.crashLocalVoltDB("Error retrieving cluster metadata", true, e);
-                }
-            }
-
-        }
-
-        // print out cluster membership
-        hostLog.info("About to list cluster interfaces for all nodes with format [ip1 ip2 ... ipN] client-port,admin-port,http-port");
-        for (int hostId : m_messenger.getLiveHostIds()) {
-            if (hostId == m_messenger.getHostId()) {
-                hostLog.info(
-                        String.format(
-                                "  Host id: %d with interfaces: %s [SELF]",
-                                hostId,
-                                MiscUtils.formatHostMetadataFromJSON(getLocalMetadata())));
-            }
-            else {
-                String hostMeta = clusterMetadata.get(hostId);
-                hostLog.info(
-                        String.format(
-                                "  Host id: %d with interfaces: %s [PEER]",
-                                hostId,
-                                MiscUtils.formatHostMetadataFromJSON(hostMeta)));
-            }
-        }
-
-        final String drRole = m_catalogContext.getCluster().getDrrole();
-        if (m_producerDRGateway != null && (DrRoleType.MASTER.value().equals(drRole) || DrRoleType.XDCR.value().equals(drRole))) {
-            m_producerDRGateway.logActiveConversations();
-        }
-        if (m_consumerDRGateway != null) {
-            m_consumerDRGateway.logActiveConversations();
-        }
-
-        try {
-            if (operationModeFuture.get() != null) {
-                String operationModeStr = new String(operationModeFuture.get(), "UTF-8");
-                m_startMode = OperationMode.valueOf(operationModeStr);
-            }
-        } catch (KeeperException.NoNodeException e) {}
-        catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-
     public static String[] extractBuildInfo(VoltLogger logger) {
         StringBuilder sb = new StringBuilder(64);
         try {
@@ -3523,33 +3364,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         // the software 'edition' is not the same as the license type
         String edition = MiscUtils.isPro() ? "Enterprise Edition" : "Community Edition";
         consoleLog.infoFmt("Build: %s %s %s", m_versionString, buildString, edition);
-    }
-
-    void logSystemSettingFromCatalogContext() {
-        if (m_catalogContext == null) {
-            return;
-        }
-        Deployment deploy = m_catalogContext.cluster.getDeployment().get("deployment");
-        Systemsettings sysSettings = deploy.getSystemsettings().get("systemsettings");
-
-        if (sysSettings == null) {
-            return;
-        }
-
-        hostLog.info("Elastic duration set to " + sysSettings.getElasticduration() + " milliseconds");
-        hostLog.info("Elastic throughput set to " + sysSettings.getElasticthroughput() + " mb/s");
-        hostLog.info("Max temptable size set to " + sysSettings.getTemptablemaxsize() + " mb");
-        hostLog.info("Snapshot priority set to " + sysSettings.getSnapshotpriority() + " (if > 0, delays snapshot tasks)");
-
-        if (sysSettings.getQuerytimeout() > 0) {
-            hostLog.info("Query timeout set to " + sysSettings.getQuerytimeout() + " milliseconds");
-            m_config.m_queryTimeout = sysSettings.getQuerytimeout();
-        }
-        else if (sysSettings.getQuerytimeout() == 0) {
-            hostLog.info("Query timeout set to unlimited");
-            m_config.m_queryTimeout = 0;
-        }
-
     }
 
     /**
@@ -4173,7 +3987,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
         // log system setting information if the deployment config has changed
         if (!Arrays.equals(oldDeployHash, m_catalogContext.getDeploymentHash())) {
-            logSystemSettingFromCatalogContext();
+            DailyLogging.logSystemSettingFromCatalogContext();
         }
         //Before starting resource monitor update any Snmp configuration changes.
         if (m_snmp != null) {
@@ -5158,6 +4972,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             consoleLog.warn(builder.toString());
         }
 
+    }
+
+    // Compute the minimum required heap to run this configuration.
+    long computeMinimumHeapRqt() {
+        return computeMinimumHeapRqt(m_catalogContext.tables.size(),
+                                     getLocalPartitionCount(),
+                                     m_configuredReplicationFactor);
     }
 
     // Compute the minimum required heap to run this configuration.  This comes from the documentation,

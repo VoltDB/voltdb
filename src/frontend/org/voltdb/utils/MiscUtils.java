@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2021 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -680,6 +680,9 @@ public class MiscUtils {
 
     public static String formatUptime(long uptimeInMs)
     {
+        if (uptimeInMs < 0) {
+            return "unknown";
+        }
         long remainingMs = uptimeInMs;
         long days = TimeUnit.MILLISECONDS.toDays(remainingMs);
         remainingMs -= TimeUnit.DAYS.toMillis(days);
