@@ -137,6 +137,7 @@ import org.voltdb.compiler.AdHocCompilerCache;
 import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.deploymentfile.ClusterType;
+import org.voltdb.compiler.deploymentfile.CommandLogType;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.compiler.deploymentfile.DrType;
@@ -3140,8 +3141,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (!m_config.m_isEnterprise) {
             return;
         }
+        DeploymentType deployment = readDepl.deployment;
+        CommandLogType cl = deployment.getCommandlog();
 
-        PathsType paths = readDepl.deployment.getPaths();
+        // No cleanup if my deployment has command logs enabled
+        if (cl != null && cl.isEnabled()) {
+            return;
+        }
+
+        PathsType paths = deployment.getPaths();
         String clSnapshotpath = getCommandLogSnapshotPath(paths.getCommandlogsnapshot());
         String voltDbRoot = getVoltDBRootPath(paths.getVoltdbroot());
 
