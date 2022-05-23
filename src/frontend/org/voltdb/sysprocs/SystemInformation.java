@@ -439,6 +439,8 @@ public class SystemInformation extends VoltSystemProcedure
         vt.addRow(hostId, "STARTTIME", Long.toString(startTimeMs));
         long createTimeMs = VoltDB.instance().getClusterCreateTime();
         vt.addRow(hostId, "CREATIONTIME", Long.toString(createTimeMs));
+        long hostStartTimeMs = VoltDB.instance().getHostStartTime().toEpochMilli();
+        vt.addRow(hostId, "HOSTSTARTTIME", Long.toString(hostStartTimeMs));
         vt.addRow(hostId, "UPTIME", MiscUtils.formatUptime(VoltDB.instance().getClusterUptime()));
 
         vt.addRow(hostId, "LAST_UPDATECORE_DURATION",

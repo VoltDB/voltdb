@@ -24,6 +24,7 @@ package org.voltdb;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.Calendar;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -96,6 +97,7 @@ public class MockVoltDB implements VoltDBInterface
     OperationMode m_startMode = OperationMode.RUNNING;
     ReplicationRole m_replicationRole = ReplicationRole.NONE;
     long m_clusterCreateTime = 0;
+    private Instant m_hostStartTime = Instant.now();
     VoltDB.Configuration voltconfig = null;
     private final ListeningExecutorService m_es = MoreExecutors.listeningDecorator(CoreUtils.getSingleThreadExecutor("Mock Computation Service"));
     private ScheduledThreadPoolExecutor m_periodicWorkThread = CoreUtils.getScheduledThreadPoolExecutor("Periodic Work", 1, CoreUtils.SMALL_STACK_SIZE);;
@@ -792,6 +794,11 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public void setClusterCreateTime(long clusterCreateTime) {
         m_clusterCreateTime = clusterCreateTime;
+    }
+
+    @Override
+    public Instant getHostStartTime() {
+        return m_hostStartTime;
     }
 
     @Override

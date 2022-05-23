@@ -18,6 +18,7 @@ package org.voltdb;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ScheduledExecutorService;
@@ -236,6 +237,11 @@ public interface VoltDBInterface
      * create time that was preserved in the snapshot.
      */
     public void setClusterCreateTime(long clusterCreateTime);
+
+    /**
+     * @return The time this host started
+     */
+    public Instant getHostStartTime();
 
     /**
      * Notify RealVoltDB that recovery is complete

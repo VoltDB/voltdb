@@ -43,6 +43,7 @@ import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -264,6 +265,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
     private VoltDB.Configuration m_config = new VoltDB.Configuration();
+    private final Clock m_clock = Clock.systemUTC();
     int m_configuredNumberOfPartitions;
     int m_configuredReplicationFactor;
     // CatalogContext is immutable, just make sure that accessors see a consistent version
@@ -351,12 +353,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private boolean m_preparingShuttingdown = false;
 
     long m_clusterCreateTime;
+    private Instant m_hostStartTime;
     AtomicBoolean m_replicationActive = new AtomicBoolean(false);
     private ProducerDRGateway m_producerDRGateway = null;
     private ConsumerDRGateway m_consumerDRGateway = null;
     // Separate class to manage dr catalog commands, which are needed during recovery
     private final DrProducerCatalogCommands m_drCatalogCommands = new DrProducerCatalogCommands();
-    private final DRConflictsTracker m_drConflictsTracker = new DRConflictsTracker(Clock.systemUTC());
+    private final DRConflictsTracker m_drConflictsTracker = new DRConflictsTracker(m_clock);
 
     //Only restrict recovery completion during test
     static Semaphore m_testBlockRecoveryCompletion = new Semaphore(Integer.MAX_VALUE);
@@ -1158,6 +1161,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_pathToStartupCatalog = m_config.m_pathToCatalog;
             m_replicationActive = new AtomicBoolean(false);
             m_configLogger = null;
+            m_hostStartTime = m_clock.instant();
             ActivePlanRepository.clear();
             updateMaxThreadsLimit();
 
@@ -1514,7 +1518,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_commandLogStats = new CommandLogStats(m_commandLog);
             statsAgent.registerStatsSource(StatsSelector.COMMANDLOG, 0, m_commandLogStats);
 
-            skewStats = new ClockSkewStats(Clock.systemUTC(), VoltDB.instance(), hostLog);
+            skewStats = new ClockSkewStats(m_clock, VoltDB.instance(), hostLog);
             statsAgent.registerStatsSource(StatsSelector.CLOCKSKEW, 0, skewStats);
 
             CompoundProcCallStats.initStats(statsAgent);
@@ -5250,6 +5254,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             hostLog.info("Restoring DR with Cluster Id " +  m_catalogContext.cluster.getDrclusterid() +
                     ". The DR cluster was first started at " + new Date(m_clusterCreateTime).toString() + ".");
         }
+    }
+
+    @Override
+    public Instant getHostStartTime() {
+        return m_hostStartTime;
     }
 
     @Override
