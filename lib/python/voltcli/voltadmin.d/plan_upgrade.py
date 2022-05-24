@@ -36,6 +36,7 @@ except ImportError as e:
 @VOLT.Command(
     bundles=VOLT.AdminBundle(),
     description="Generate a checklist before performing online upgrade.",
+    description2="This command is deprecated, and will be removed in a future version of VoltDB.",
     arguments=(
             VOLT.PathArgument('newKit', 'path to new VoltDB kit directory', absolute=True, optional=False),
             VOLT.PathArgument('newRoot', 'path to the parent of new VoltDB root directory', absolute=True, optional=False),
@@ -45,6 +46,7 @@ except ImportError as e:
 )
 
 def plan_upgrade(runner):
+    runner.warning("This command is deprecated, and will be removed in a future version of VoltDB.")
     hosts, kfactor, clusterIds = basicCheck(runner)
 
     generateCommands(runner,
