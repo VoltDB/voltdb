@@ -430,10 +430,10 @@ class VoltNetwork implements Runnable, IOStatsIntf
                     e instanceof AsynchronousCloseException ||
                     e instanceof ClosedChannelException ||
                     e instanceof ClosedByInterruptException) {
-                m_logger.debug( "VoltPort died, probably of natural causes", e);
+                m_logger.debug( "Connection closed", e);
             } else {
                 e.printStackTrace();
-                networkLog.error( "VoltPort died due to an unexpected exception", e);
+                networkLog.warn( "Connection closed unexpectedly", e);
             }
         } finally {
             installInterests(port);
