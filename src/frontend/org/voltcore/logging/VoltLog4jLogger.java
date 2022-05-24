@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2020 VoltDB Inc.
+ * Copyright (C) 2008-2022 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -22,6 +22,7 @@ import static com.google_voltpatches.common.base.Preconditions.checkArgument;
 import java.io.File;
 import java.io.IOException;
 import java.io.StringReader;
+import java.lang.reflect.Field;
 import java.util.Enumeration;
 import java.util.MissingResourceException;
 import java.util.ResourceBundle;
@@ -290,5 +291,56 @@ public class VoltLog4jLogger implements CoreVoltLogger {
                 lgr.addAppender(nap);
             }
         }
+    }
+
+    /**
+     * For a log4j rolling file appender, get an estimate of the next
+     * rollover time. We do this by looking at the implementation's
+     * internals.
+     *
+     * This code was originally in RealVoltDB. I moved it here when
+     * making it work with the DailyMaxRollingFileAppender as well as
+     * with the DailyRollingFileAppender. I did not write this code.
+     * It's not my fault.
+     *
+     * There are two really bad things about this: (1) the whole thing
+     * about diddling around in the internals, and (2) it's an estimate
+     * of when to check for rollover, and we treat it as when rollover
+     * will occur.
+     *
+     * @return time (msec past epoch) of next check for rollover,
+     * or -1 if anything goes wrong.
+     */
+    public static long getNextCheckTime() {
+
+        // Find first (only) file appender of whatever kind
+        FileAppender dailyAppender = null;
+        Enumeration<?> appenders = Logger.getRootLogger().getAllAppenders();
+        while (appenders.hasMoreElements()) {
+            Appender appender = (Appender) appenders.nextElement();
+            if (appender instanceof DailyMaxRollingFileAppender) {
+                dailyAppender = (FileAppender)appender;
+                break;
+            }
+            if (appender instanceof DailyRollingFileAppender) {
+                dailyAppender = (FileAppender)appender;
+                break;
+            }
+        }
+        if (dailyAppender == null) {
+            return -1;
+        }
+
+        // Grant ourselves access to the private field and then read its value
+        long nextCheck;
+        try {
+            Field field = dailyAppender.getClass().getDeclaredField("nextCheck");
+            field.setAccessible(true);
+            nextCheck = field.getLong(dailyAppender);
+        }
+        catch (NoSuchFieldException | IllegalAccessException ex) {
+            nextCheck = -1;
+        }
+        return nextCheck;
     }
 }

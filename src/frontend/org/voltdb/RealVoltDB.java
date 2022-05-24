@@ -35,7 +35,6 @@ import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.UnsupportedEncodingException;
 import java.lang.management.ManagementFactory;
-import java.lang.reflect.Field;
 import java.net.Inet4Address;
 import java.net.Inet6Address;
 import java.net.InetAddress;
@@ -101,6 +100,7 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.Level;
+import org.voltcore.logging.VoltLog4jLogger;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.HostMessenger.HostInfo;
@@ -2051,43 +2051,26 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     /**
-     * Get the next check time for a private member in log4j library, which is not a reliable idea.
-     * It adds 30 seconds for the initial delay and uses a periodical thread to schedule the daily logging work
-     * with this delay.
-     * @return
+     * Schedule the next execution of the DailyLogTask. This is
+     * timed for 30 secs after estimated log rolloever. If for
+     * some reason we cannot determine the rolloever time, we'll
+     * arbitrarily schedule the task for 12 hours from now.
+     * (We don't want to run the task frequently, too much
+     *  spam in the logs).
      */
     void scheduleDailyLoggingWorkInNextCheckTime() {
-        DailyRollingFileAppender dailyAppender = null;
-        Enumeration<?> appenders = Logger.getRootLogger().getAllAppenders();
-        while (appenders.hasMoreElements()) {
-            Appender appender = (Appender) appenders.nextElement();
-            if (appender instanceof DailyRollingFileAppender){
-                dailyAppender = (DailyRollingFileAppender) appender;
-            }
+        long delta; TimeUnit unit;
+        long nextCheck = VoltLog4jLogger.getNextCheckTime();
+        if (nextCheck >= 0) {
+            delta = Math.max(nextCheck - System.currentTimeMillis(), 0) + 30_000;
+            unit = TimeUnit.MILLISECONDS;
         }
-        final DailyRollingFileAppender dailyRollingFileAppender = dailyAppender;
-
-        Field field = null;
-        if (dailyRollingFileAppender != null) {
-            try {
-                field = dailyRollingFileAppender.getClass().getDeclaredField("nextCheck");
-                field.setAccessible(true);
-            } catch (NoSuchFieldException e) {
-                hostLog.error("Failed to set daily system info logging: " + e.getMessage());
-            }
+        else {
+            hostLog.warn("Failed to determine log rollover time");
+            delta = 12;
+            unit = TimeUnit.HOURS;
         }
-        final Field nextCheckField = field;
-        long nextCheck = System.currentTimeMillis();
-        // the next part may throw exception, current time is the default value
-        if (dailyRollingFileAppender != null && nextCheckField != null) {
-            try {
-                nextCheck = nextCheckField.getLong(dailyRollingFileAppender);
-                scheduleWork(new DailyLogTask(),
-                        nextCheck - System.currentTimeMillis() + 30 * 1000, 0, TimeUnit.MILLISECONDS);
-            } catch (Exception e) {
-                hostLog.error("Failed to set daily system info logging: " + e.getMessage());
-            }
-        }
+        scheduleWork(new DailyLogTask(), delta, 0, unit);
     }
 
     class StartActionWatcher implements Watcher {
