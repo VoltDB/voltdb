@@ -552,6 +552,12 @@ int VoltDBEngine::executePlanFragments(
                 sizeof(int32_t) - sizeof(int32_t) - sizeof(int8_t));
 
     }
+    else {
+        if (hasDRBinaryLog) {
+            VOLT_DEBUG("VoltDBEngine::executePlanFragments() P%d  mpId=%d  failed transactions n_failures=%d",
+                       this->m_partitionId, uniqueId, failures );
+        }
+    }
     m_perFragmentStatsOutput.writeIntAt(succeededFragmentsCountOffset, m_currentIndexInBatch);
     m_currentIndexInBatch = -1;
     // If we were expanding the UDF buffer too much, shrink it back a little bit.
@@ -2777,6 +2783,8 @@ bool VoltDBEngine::deleteMigratedRows(
         setUndoToken(undoToken);
         m_executorContext->setupForPlanFragments(getCurrentUndoQuantum(), txnId,
                 spHandle, -1, uniqueId, false);
+
+        /*bool hasDRBinaryLog = */ m_executorContext->checkTransactionForDR();
 
         ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory
                 (table->isReplicatedTable(), isLowestSite(), []() {

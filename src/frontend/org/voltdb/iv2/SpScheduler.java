@@ -1256,6 +1256,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             //Async command logging has to offer the task immediately with a Future for backpressure
             if (m_cl.canOfferTask()) {
                 m_pendingTasks.offer(task.setDurabilityBackpressureFuture(durabilityBackpressureFuture));
+                if( hostLog.isTraceEnabled() ) {
+                    hostLog.trace("SpScheduler.doLocalFragmentOffer() add " + (msg.isSysProcTask() ? "SysprocFragmentTask" : "FragmentTask")  +
+                            " with sync logging P" + this.m_partitionId + " mpId=" + msg.getUniqueId());
+                }
+
             } else {
                 /* Getting here means that the task is the first fragment of an MP txn and
                  * synchronous command logging is on, so create a backlog for future tasks of
@@ -1266,9 +1271,17 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                  */
                 assert !m_mpsPendingDurability.containsKey(task.getTxnId());
                 m_mpsPendingDurability.put(task.getTxnId(), new ArrayDeque<TransactionTask>());
+                if( hostLog.isTraceEnabled() ) {
+                    hostLog.trace("SpScheduler.doLocalFragmentOffer() add " + (msg.isSysProcTask() ? "SysprocFragmentTask" : "FragmentTask") +
+                            " with async logging P" + this.m_partitionId + " mpId=" + msg.getUniqueId());
+                }
             }
         } else {
             queueOrOfferMPTask(task);
+            if( hostLog.isTraceEnabled() ) {
+                hostLog.trace("SpScheduler.doLocalFragmentOffer() add " + (msg.isSysProcTask() ? "SysprocFragmentTask" : "FragmentTask") +
+                        " P" + this.m_partitionId + " mpId=" + msg.getUniqueId());
+            }
         }
     }
 
