@@ -1,5 +1,5 @@
 /* Copyright (c) 2001-2009, The HSQL Development Group
- * Copyright (c) 2010-2022, VoltDB Inc.
+ * Copyright (c) 2010-2022, Volt Active Data Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without

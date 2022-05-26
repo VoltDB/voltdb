@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2021 VoltDB Inc.
+# Copyright (C) 2008-2022 Volt Active Data Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -15,7 +15,7 @@
 # along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
 
 # This file contains original code and/or modifications of original code.
-# Any modifications made by VoltDB Inc. are licensed under the following
+# Any modifications made by Volt Active Data Inc. are licensed under the following
 # terms and conditions:
 #
 # Permission is hereby granted, free of charge, to any person obtaining

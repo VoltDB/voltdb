@@ -1,5 +1,5 @@
 -- This file is part of VoltDB.
--- Copyright (C) 2008-2015 VoltDB Inc.
+-- Copyright (C) 2008-2022 Volt Active Data Inc.
 --
 -------------------- EXAMPLE SQL -----------------------------------------------
 -- CREATE TABLE example_of_types (
