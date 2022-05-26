@@ -28,6 +28,8 @@ import java.util.stream.Collectors;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
+import org.voltdb.OperationMode;
+import org.voltdb.VoltDB;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.CatalogType;
 import org.voltdb.catalog.Column;
@@ -151,7 +153,6 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
      * execution.
      * @param theTable the catalog definition of the 1st table swap argument
      * @param otherTable the catalog definition of the 2nd table swap argument
-     * @throws PlannerErrorException if one or more compatibility validations fail
      */
     public void initializeSwapTablesPlanNode(Table theTable, Table otherTable) {
         String theName = theTable.getTypeName();
@@ -418,7 +419,6 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
     /**
      * @param theIndex candidate match for otherIndex on the target table
      * @param otherIndex candidate match for theIndex on the other target table
-     * @param candidateIndexSet set of otherTable indexes as yet unmatched
      */
     private static boolean indexesCanBeSwapped(Index theIndex, Index otherIndex) {
         // Pairs of matching indexes must agree on type (int hash, etc.).
@@ -500,6 +500,11 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
             failureMessage.addReason("To swap table " + theName + " with table " + otherName +
             " both tables must be DR enabled or both tables must not be DR enabled.");
         }
+        else if (theTable.getIsdred() && otherTable.getIsdred() &&
+                 VoltDB.instance().getMode() != OperationMode.PAUSED ) {
+            failureMessage.addReason("You cannot use @SwapTables on DRed tables while DR is active. " +
+                                     "To swap tables, first pause all clusters, invoke @SwapTables, then resume.");
+        }
 
         if (theTable.getIsreplicated() != otherTable.getIsreplicated()) {
             failureMessage.addReason("one table is partitioned and the other is not");
@@ -524,7 +529,7 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
     }
 
     /**
-     * @param theTable
+     * @param
      * @return
      */
     private static boolean viewsDependOn(Table aTable, StringBuilder viewNames) {
