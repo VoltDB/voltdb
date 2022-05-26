@@ -92,7 +92,7 @@ def test_os_release(output):
             if osId == 'ubuntu':
                 supported = osVersion in ['16.04', '18.04', '20.04']
                 note = 'needs 16.04/18.04/20.04'
-            elif osId in ['centos', 'redhat', 'rhel']:
+            elif osId in ['centos', 'redhat', 'rhel', 'rocky']:
                 supported = version_number(osVersion, 0) >= 7
                 note = 'needs 7.0 or later'
             elif osId == 'alpine':
