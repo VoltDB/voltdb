@@ -69,6 +69,7 @@ public interface Settings extends Accessible {
     default void store(File settingsFH, String comment) {
         try (FileOutputStream fos = new FileOutputStream(settingsFH)){
             asProperties().store(fos, comment);
+            fos.getFD().sync(); // fsync to ensure file is persisted
         } catch (IOException e) {
             throw new SettingsException("failed to write properties to " + settingsFH, e);
         }

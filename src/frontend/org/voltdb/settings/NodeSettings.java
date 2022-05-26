@@ -62,7 +62,7 @@ public interface NodeSettings extends Settings {
     public File getCommandLogSnapshot();
 
     @Key(SNAPSHOT_PATH_KEY)
-    public File getSnapshoth();
+    public File getSnapshot();
 
     @Key(EXPORT_OVERFLOW_PATH_KEY)
     public File getExportOverflow();
@@ -94,6 +94,49 @@ public interface NodeSettings extends Settings {
         return ConfigFactory.create(NodeSettings.class, imports);
     }
 
+    // check properties that don't have a default value were set from path.properties
+    default void checkKeys() {
+        File f;
+        String key = VOLTDBROOT_PATH_KEY;
+        try {
+            f = getVoltDBRoot();
+            if (f == null)
+                throw new SettingsException("Missing property " + key + " in path.properties");
+
+            key = CL_PATH_KEY;
+            f = getCommandLog();
+            if (f == null)
+                throw new SettingsException("Missing property " + key + " in path.properties");
+
+            key = CL_SNAPSHOT_PATH_KEY;
+            f = getCommandLogSnapshot();
+            if (f == null)
+                throw new SettingsException("Missing property " + key + " in path.properties");
+
+            key = SNAPSHOT_PATH_KEY;
+            f = getSnapshot();
+            if (f == null)
+                throw new SettingsException("Missing property " + key + " in path.properties");
+
+            key = EXPORT_OVERFLOW_PATH_KEY;
+            f = getExportOverflow();
+            if (f == null)
+                throw new SettingsException("Missing property " + key + " in path.properties");
+
+            key = DR_OVERFLOW_PATH_KEY;
+            f = getDROverflow();
+            if (f == null)
+                throw new SettingsException("Missing property " + key + " in path.properties");
+
+        } catch (NullPointerException npe) {
+            throw new SettingsException("Missing property " + key + " in path.properties");
+        }
+    }
+
+
+
+
+
     default File resolve(File path) {
         return path.isAbsolute() ? path : new File(getVoltDBRoot(), path.getPath());
     }
@@ -114,7 +157,7 @@ public interface NodeSettings extends Settings {
         return ImmutableSortedMap.<String, File>naturalOrder()
                 .put(CL_PATH_KEY, resolve(getCommandLog()))
                 .put(CL_SNAPSHOT_PATH_KEY, resolve(getCommandLogSnapshot()))
-                .put(SNAPSHOT_PATH_KEY, resolve(getSnapshoth()))
+                .put(SNAPSHOT_PATH_KEY, resolve(getSnapshot()))
                 .put(EXPORT_OVERFLOW_PATH_KEY, resolve(getExportOverflow()))
                 .put(DR_OVERFLOW_PATH_KEY, resolve(getDROverflow()))
                 .put(LARGE_QUERY_SWAP_PATH_KEY, resolve(getLargeQuerySwap()))
@@ -171,16 +214,6 @@ public interface NodeSettings extends Settings {
     default Properties asProperties() {
         ImmutableMap.Builder<String, String> mb = ImmutableMap.builder();
         try {
-            /*
-             * Check if the VoltDBRoot exists to avoid NullPointerException
-             * Note that the VoltDB root directory info may not exist in path.properties file
-             * or the path.properties file can be empty
-             */
-            if (getVoltDBRoot() == null) {
-                // The exception will be handled and printed out in RealVoltDB.java
-                throw new SettingsException("Missing VoltDB root " +
-                                            "information in path.properties file.");
-            }
             // Voltdbroot path is always absolute
             File voltdbroot = getVoltDBRoot().getCanonicalFile();
             mb.put(VOLTDBROOT_PATH_KEY, voltdbroot.getCanonicalPath());
@@ -197,7 +230,7 @@ public interface NodeSettings extends Settings {
             mb.put(LOCAL_SITES_COUNT_KEY, Integer.toString(getLocalSitesCount()));
             mb.put(LOCAL_ACTIVE_SITES_COUNT_KEY, Integer.toString(getLocalActiveSitesCount()));
         } catch (IOException e) {
-            throw new SettingsException("failed to canonicalize" + this);
+            throw new SettingsException("Failed to canonicalize " + this);
         }
         Properties props = new Properties();
         props.putAll(mb.build());
@@ -205,27 +238,36 @@ public interface NodeSettings extends Settings {
     }
 
     default void store() {
+
+        // check required properties are set
+        checkKeys();
+
+        // delete stranded temp files if any exist
         for (File f : Settings.getConfigDir().listFiles()) {
             if (f.getName().endsWith(".tmp")) {
                 f.delete();
             }
         }
+
+        // Create a new temp file and write NodeSettings properties to file
         File tempFH = null;
         try {
-            tempFH = File.createTempFile("path", null, Settings.getConfigDir());
+            tempFH = File.createTempFile("path", ".tmp", Settings.getConfigDir());
         } catch (IOException e) {
-            throw new SettingsException("failed to create temp file in config dir");
+            throw new SettingsException("Failed to create .tmp file for paths in config directory");
         }
-        File configFH = new File(Settings.getConfigDir(), "path.properties");
         store(tempFH, "VoltDB path settings. DO NOT MODIFY THIS FILE!");
-        // need rename to be atomic on the platform...
-        if (!tempFH.renameTo(configFH)) {
-            throw new SettingsException("unable to rename path properties");
+
+        // rename temp file to path.properties
+        File pathFH = new File(Settings.getConfigDir(), "path.properties");
+        if (!tempFH.renameTo(pathFH)) {
+            throw new SettingsException("Unable to rename " + tempFH.getName() + " to path.properties");
         }
 
-        File deprectedConfigFH = new File(getVoltDBRoot(),".paths");
-        if (deprectedConfigFH.exists()) {
-            deprectedConfigFH.delete();
+        // delete deprecated file
+        File deprecatedPathFile = new File(getVoltDBRoot(),".paths");
+        if (deprecatedPathFile.exists()) {
+            deprecatedPathFile.delete();
         }
     }
 }

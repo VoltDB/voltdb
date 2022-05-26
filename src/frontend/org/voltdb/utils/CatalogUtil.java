@@ -3648,10 +3648,10 @@ public abstract class CatalogUtil {
         //snapshot
         if (paths.getSnapshots() == null) {
             PathsType.Snapshots snap = new PathsType.Snapshots();
-            snap.setPath(pathSettings.getSnapshoth().toString());
+            snap.setPath(pathSettings.getSnapshot().toString());
             paths.setSnapshots(snap);
         } else {
-            paths.getSnapshots().setPath(pathSettings.getSnapshoth().toString());
+            paths.getSnapshots().setPath(pathSettings.getSnapshot().toString());
         }
         if (paths.getCommandlog() == null) {
             //cl

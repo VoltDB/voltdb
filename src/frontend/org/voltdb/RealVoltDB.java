@@ -572,7 +572,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (isRunningWithOldVerbs()) {
            return path.getPath();
         }
-        return m_nodeSettings.resolveToAbsolutePath(m_nodeSettings.getSnapshoth()).getPath();
+        return m_nodeSettings.resolveToAbsolutePath(m_nodeSettings.getSnapshot()).getPath();
     }
 
     @Override
@@ -631,7 +631,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     @Override
     public String getSnapshotPath() {
-        return m_nodeSettings.resolveToAbsolutePath(m_nodeSettings.getSnapshoth()).getPath();
+        return m_nodeSettings.resolveToAbsolutePath(m_nodeSettings.getSnapshot()).getPath();
     }
 
     @Override
@@ -5097,7 +5097,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             FileFilter filter = new SnapshotUtil.SnapshotFilter();
 
             SnapshotUtil.retrieveSnapshotFiles(
-                    m_nodeSettings.resolveToAbsolutePath(m_nodeSettings.getSnapshoth()),
+                    m_nodeSettings.resolveToAbsolutePath(m_nodeSettings.getSnapshot()),
                     snapshots, filter, false, SnapshotPathType.SNAP_AUTO, hostLog);
 
             return snapshots.containsKey(nonce) ? nonce : null;
