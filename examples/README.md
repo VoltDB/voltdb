@@ -29,6 +29,9 @@ The Callcenter VoltDB application processes begin and end call events from a cal
 
 Use VoltDB's strong consistency and stored procedure logic to compute a running standard deviation on call length by agent. This is not a trivial thing to compute without strong consistency. Thankfully VoltDB provides strong consistency, making solving this problem much easier. The provided HTML dashboard shows a top-N list of agents by standard deviation.
 
+### compound-proc
+This simple example demonstrates the use of the VoltCompoundProcedure feature, introduced in VoltDB V11.4. A compound procedure is a non-transactional stored procedure that executes in an instance of the VoltDB server and can call other 'regular' stored procedures, where these sub-procedures can be independently partitioned.
+
 ### contentionmark
 ContentionMark is a small VoltDB application that measures VoltDB throughput under extreme contention. By default, ContentionMark creates one row, then updates it as fast as VoltDB will let it, one transaction per update.
 
@@ -53,6 +56,9 @@ This application simulates a simple position keeper application that maintains t
 
 ### uniquedevices
 This example counts unique device ids as they stream into VoltDB. It demonstrates VoltDB's stream processing power and the use of external libraries in Java stored procedures. It is loosely based on a real problem previously solved using the Lambda architecture.
+
+### user-hits
+User-hits is an application simulating VoltDB handling user hits on web pages, demonstrating how a Kafka producer application can send data to a VoltDB topic, and how a VoltDB topic can invoke a VoltDB 'compound' stored procedure, which in turn invokes other VoltDB stored procedures.
 
 ### voltkv
 This directory contains the sources for a "Key-Value" implementation in VoltDB along with a simple benchmark.

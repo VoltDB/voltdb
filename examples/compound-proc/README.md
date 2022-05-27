@@ -5,7 +5,7 @@ This example demonstrates the use of the VoltCompoundProcedure feature, introduc
 - is coded in Java
 - executes in an instance of the VoltDB server
 - can call other 'regular' stored procedures
-- where these sub-procedures can be indepdently partitioned
+- where these sub-procedures can be independently partitioned
 
 The example has a simple illustration of the use of a compound procedure. It looks up data in two tables (supposed customer data and parts data) and uses the result to update a third table, a 'pending orders' table. There is no pretence that this is a robust ordering system; the purpose of the example is just to show the coding.
 
