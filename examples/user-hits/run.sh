@@ -2,18 +2,17 @@
 
 APPNAME="userhitclient"
 
-# find voltdb binaries in either installation or distribution directory.
-if [ -n "$(which voltdb 2> /dev/null)" ]; then
+# find voltdb binaries
+if [ -e ../../bin/voltdb ]; then
+    # assume this is the examples folder for a kit
+    VOLTDB_BIN="$(dirname $(dirname $(pwd)))/bin"
+elif [ -n "$(which voltdb 2> /dev/null)" ]; then
+    # assume we're using voltdb from the path
     VOLTDB_BIN=$(dirname "$(which voltdb)")
 else
-    VOLTDB_BIN="$(dirname $(dirname $(dirname $(pwd))))/bin"
-    echo "The VoltDB scripts are not in your PATH."
-    echo "For ease of use, add the VoltDB bin directory: "
-    echo
-    echo $VOLTDB_BIN
-    echo
-    echo "to your PATH."
-    echo
+    echo "Unable to find VoltDB installation."
+    echo "Please add VoltDB's bin directory to your path."
+    exit -1
 fi
 
 # call script to set up paths, including

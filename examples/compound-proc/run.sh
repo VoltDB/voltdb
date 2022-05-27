@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 
+
+  
 # find voltdb binaries
-if [ -e ../../../bin/voltdb ]; then
-    # assume this is the tests/test_apps/compound directory
-    VOLTDB_BIN="$(dirname $(dirname $(dirname $(pwd))))/bin"
+if [ -e ../../bin/voltdb ]; then
+    # assume this is the examples folder for a kit
+    VOLTDB_BIN="$(dirname $(dirname $(pwd)))/bin"
 elif [ -n "$(which voltdb 2> /dev/null)" ]; then
     # assume we're using voltdb from the path
     VOLTDB_BIN=$(dirname "$(which voltdb)")
@@ -13,6 +15,7 @@ else
     exit -1
 fi
 
+echo "+++" $VOLTDB_BIN "+++"
 # call script to set up paths, including
 # java classpaths and binary paths
 source $VOLTDB_BIN/voltenv
