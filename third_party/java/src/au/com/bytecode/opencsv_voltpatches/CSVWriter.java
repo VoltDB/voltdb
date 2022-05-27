@@ -48,6 +48,8 @@ public class CSVWriter implements Closeable {
 
     private final boolean quoteAll;
 
+    private final String nullString;
+
     private char[] extraEscapeChars;
 
     /** The character used for escaping quotes. */
@@ -180,6 +182,22 @@ public class CSVWriter implements Closeable {
      * @param quoteAll   if {@code true} all values in the csv will be quoted even if not needed
      */
     public CSVWriter(Writer writer, char separator, char quotechar, char escapechar, String lineEnd, boolean quoteAll) {
+        this(writer, separator, quotechar, escapechar, lineEnd, quoteAll, null);
+    }
+
+    /**
+     * Constructs CSVWriter with all supplied parameters
+     *
+     * @param writer     the writer to an underlying CSV source.
+     * @param separator  the delimiter to use for separating entries
+     * @param quotechar  the character to use for quoted elements
+     * @param escapechar the character to use for escaping quotechars or escapechars
+     * @param lineEnd    the line feed terminator to use
+     * @param quoteAll   if {@code true} all values in the csv will be quoted even if not needed
+     * @param nullString a string for null fields or {@code null} if no null string
+     */
+    public CSVWriter(Writer writer, char separator, char quotechar, char escapechar, String lineEnd, boolean quoteAll,
+            String nullString) {
         this.rawWriter = writer;
         this.pw = new PrintWriter(writer);
         this.separator = separator;
@@ -187,6 +205,8 @@ public class CSVWriter implements Closeable {
         this.escapechar = escapechar;
         this.lineEnd = lineEnd;
         this.quoteAll = quoteAll;
+        this.nullString = nullString;
+        validateNullString();
     }
 
     // TSV writer escaping carriage return and newline characters
@@ -270,6 +290,13 @@ public class CSVWriter implements Closeable {
 
             String nextElement = nextLine[i];
             if (nextElement == null) {
+                if (nullString != null) {
+                    if (quoteAll && quotechar != NO_QUOTE_CHARACTER) {
+                        sb.append(quotechar).append(nullString).append(quotechar);
+                    } else {
+                        sb.append(nullString);
+                    }
+                }
                 continue;
             }
 
@@ -427,6 +454,23 @@ public class CSVWriter implements Closeable {
     // A VoltDB extension to support reset PrintWriter
     public void resetWriter() {
         pw = new PrintWriter(rawWriter);
+    }
+
+    private void validateNullString() {
+        if (nullString == null) return;
+
+        // Reject separator and quote character in null string
+        // (we accept the escape char to support the default null string "\N")
+        int len = nullString.length();
+        for (int i = 0; i < len; ++i) {
+            char c = nullString.charAt(i);
+
+            if (c == separator || (c == quotechar && quotechar != NO_QUOTE_CHARACTER)) {
+                throw new IllegalArgumentException("CSV null string cannot contain separator or quote");
+            }
+
+            // FIXME: should we also reject the characters in extraEscapeChars
+        }
     }
     // End of VoltDB extension
 }

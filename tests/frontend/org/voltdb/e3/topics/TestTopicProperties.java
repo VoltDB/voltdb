@@ -42,7 +42,7 @@ public class TestTopicProperties {
     public void csvProperties() {
         // Test that the default properties are all the expected
         TopicProperties props = new TopicProperties(ImmutableMap.of());
-        assertEquals(null, props.get(TopicProperties.Key.CONFIG_CSV_ESCAPE));
+        assertEquals('\\', props.get(TopicProperties.Key.CONFIG_CSV_ESCAPE).charValue());
         assertEquals(Boolean.TRUE, props.get(TopicProperties.Key.CONFIG_CSV_IGNORE_LEADING_WHITESPACE));
         assertEquals("\\N", props.get(TopicProperties.Key.CONFIG_CSV_NULL));
         assertEquals('"', props.get(TopicProperties.Key.CONFIG_CSV_QUOTE).charValue());

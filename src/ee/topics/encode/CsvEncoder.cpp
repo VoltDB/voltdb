@@ -30,7 +30,7 @@ const std::string CsvEncoder::PROP_CSV_QUOTE_ALL = "config.csv.quoteAll";
 
 const char CsvEncoder::DEFAULT_CSV_SEPARATOR = ',';
 const char CsvEncoder::DEFAULT_CSV_QUOTE = '"';
-const char CsvEncoder::DEFAULT_CSV_ESCAPE = DEFAULT_CSV_QUOTE;
+const char CsvEncoder::DEFAULT_CSV_ESCAPE = '\\';
 const std::string CsvEncoder::DEFAULT_CSV_NULL = "\\N";
 
 CsvEncoder::CsvEncoder(const std::vector<int32_t>& indexes,

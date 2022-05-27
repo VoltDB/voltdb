@@ -172,7 +172,7 @@ public class TopicProperties extends TypedPropertiesBase<TopicProperties.Key<?>>
         public static final Key<Character> CONFIG_CSV_QUOTE = new CharKey(
                 "config.csv.quote", CSVParser.DEFAULT_QUOTE_CHARACTER);
         public static final Key<Character> CONFIG_CSV_ESCAPE = new CharKey(
-                "config.csv.escape", null);
+                "config.csv.escape", CSVParser.DEFAULT_ESCAPE_CHARACTER);
         public static final Key<String> CONFIG_CSV_NULL = new TopicProperties.Key<String>(
                 "config.csv.null", String.class, Constants.CSV_NULL, null);
         public static final Key<Boolean> CONFIG_CSV_STRICT_QUOTES = new TopicProperties.BooleanKey(

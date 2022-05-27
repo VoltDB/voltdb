@@ -63,7 +63,7 @@ TEST_F(CsvEncoderTest, QuoteCarriageReturn) {
 }
 
 TEST_F(CsvEncoderTest, QuoteQuote) {
-    testString("i really\"should be quoted and escaped", "\"i really\"\"should be quoted and escaped\"");
+    testString("i really\"should be quoted and escaped", "\"i really\\\"should be quoted and escaped\"");
 }
 
 // Basic test that serialization of fields which cannot be null works
