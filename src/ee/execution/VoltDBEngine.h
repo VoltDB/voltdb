@@ -648,6 +648,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          * Clear all replicable tables
          */
         void clearAllReplicableTables();
+        inline bool isDestroying() { return m_destroying;}
 
     private:
         /*
@@ -954,6 +955,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // static variable for sharing loadTable result (and exception) across VoltDBEngines
         static VoltEEExceptionType s_loadTableException;
         static int s_drHiddenColumnSize;
+        bool m_destroying = false;
 };
 
 inline bool startsWith(const std::string& s1, const std::string& s2) {

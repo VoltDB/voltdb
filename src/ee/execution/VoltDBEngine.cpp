@@ -235,6 +235,7 @@ VoltDBEngine::~VoltDBEngine() {
     // object multiple times.  Change at your own risk.
     // --izzy 8/19/2009
 
+    m_destroying = true;
     // clean up execution plans
     m_plans.reset();
 
