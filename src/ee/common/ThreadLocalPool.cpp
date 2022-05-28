@@ -359,6 +359,8 @@ void* ThreadLocalPool::allocateExactSizedObject(std::size_t sz) {
     }
 #ifdef VOLT_POOL_CHECKING
     void* newMem = pool->malloc();
+    vassert(mapForAdd != mapBySize.cend());
+    vassert(newMem != nullptr);
 #ifdef VOLT_TRACE_ALLOCATIONS
     StackTrace* st = new StackTrace();
     bool success = mapForAdd->second.emplace(newMem, st).second;
