@@ -238,6 +238,7 @@ VoltDBEngine::~VoltDBEngine() {
     m_destroying = true;
     // clean up execution plans
     m_plans.reset();
+    m_groupStore.reset(nullptr);
 
     // Clear the undo log before deleting the persistent tables so
     // that the persistent table schema are still around so we can
