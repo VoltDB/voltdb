@@ -180,7 +180,9 @@ PersistentTable::~PersistentTable() {
     // delete all tuples to free strings
     TableIterator ti(this, m_data.begin());
     TableTuple tuple(m_schema);
-    if (!ExecutorContext::getEngine()->isDestroying()) {
+    auto engine = ExecutorContext::getEngine();
+    bool shutdown = engine == nullptr ? false : engine->isDestroying();
+    if (!shutdown) {
         while (ti.next(tuple)) {
             tuple.freeObjectColumns();
             tuple.setActiveFalse();
