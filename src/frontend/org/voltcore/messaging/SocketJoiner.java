@@ -49,7 +49,6 @@ import javax.net.ssl.SSLEngine;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
-import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.ReverseDNSCache;
 import org.voltcore.utils.CoreUtils;
@@ -297,7 +296,7 @@ public class SocketJoiner {
                         m_listenerSockets.clear();
                     }
                     catch (IOException ex) {
-                        new VoltLogger(SocketJoiner.class.getName()).l7dlog(Level.FATAL, null, ex);
+                        hostLog.debug("Exception closing listeners after exception", ex);
                     }
                 }
             }

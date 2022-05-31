@@ -31,7 +31,6 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
@@ -54,7 +53,6 @@ import org.voltdb.client.ProcedureCallback;
 import org.voltdb.export.ExportDataSource.StreamStartAction;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.LogKeys;
 
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.collect.HashMultimap;
@@ -352,7 +350,7 @@ public class ExportManager implements ExportManagerInterface
             newProcessor.readyForData();
         }
         catch (final ClassNotFoundException e) {
-            exportLog.l7dlog( Level.ERROR, LogKeys.export_ExportManager_NoLoaderExtensions.name(), e);
+            exportLog.error("No Export loader extensions are available", e);
             throw new RuntimeException(e);
         }
         catch (final Exception e) {
@@ -445,7 +443,7 @@ public class ExportManager implements ExportManagerInterface
                 }
             }
             catch (final ClassNotFoundException e) {
-                exportLog.l7dlog( Level.ERROR, LogKeys.export_ExportManager_NoLoaderExtensions.name(), e);
+                exportLog.error("No Export loader extensions are available", e);
                 throw new RuntimeException(e);
             }
             catch (final Exception e) {

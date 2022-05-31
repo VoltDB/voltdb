@@ -29,7 +29,6 @@ import java.util.Map;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
@@ -114,7 +113,6 @@ import org.voltdb.sysprocs.saverestore.HiddenColumnFilter;
 import org.voltdb.sysprocs.saverestore.SystemTable;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.CompressionService;
-import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MinimumRatioMaintainer;
 
 import com.google_voltpatches.common.base.Charsets;
@@ -893,8 +891,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
         // just print error info an bail if we run into an error here
         catch (final Exception ex) {
-            hostLog.l7dlog( Level.FATAL, LogKeys.host_ExecutionSite_FailedConstruction.name(),
-                            new Object[] { m_siteId, m_siteIndex }, ex);
+            hostLog.fatalFmt(ex, "Failed to construct execution siteId %s siteIndex %s",
+                             m_siteId, m_siteIndex);
             VoltDB.crashLocalVoltDB(ex.getMessage(), true, ex);
         }
         return eeTemp;

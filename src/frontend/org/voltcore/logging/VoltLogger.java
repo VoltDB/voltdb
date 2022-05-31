@@ -135,7 +135,6 @@ public class VoltLogger {
     static interface CoreVoltLogger {
         public boolean isEnabledFor(Level level);
         public void log(Level level, Object message, Throwable t);
-        public void l7dlog(Level level, String key, Object[] params, Throwable t);
         public long getLogLevels(VoltLogger[] loggers);
         public void setLevel(Level level);
     }
@@ -243,73 +242,6 @@ public class VoltLogger {
                 } catch (Throwable t2) {
                     System.err.printf("Exception thrown in logging thread for '%s': %s%n",
                                       callerThreadName, t2);
-                } finally {
-                    loggerThread.setName(ASYNCH_LOGGER_THREAD_NAME);
-                }
-            }
-        };
-    }
-
-    /*
-     * Variant on submit/execute that takes a 'key' for a localized message rather
-     * than the message string itself.
-     *
-     * Execution may be synchronous or asynchronous, depending on the severity/level.
-     * Contrast with separate submit/execute methods for non-localized cases.
-     */
-    private void submitl7d(Level level,String key, Object[] params, Throwable t) {
-        if (!m_logger.isEnabledFor(level)) {
-            return;
-        }
-
-        if (m_asynchLoggerPool == null) {
-            m_logger.l7dlog(level, key, params, t);
-            return;
-        }
-
-        Runnable task = createRunnableL7dLoggingTask(level, key, params, t);
-        switch (level) {
-            case INFO:
-            case WARN:
-            case DEBUG:
-            case TRACE:
-                m_asynchLoggerPool.execute(task);
-                break;
-            case FATAL:
-            case ERROR:
-                try {
-                    m_asynchLoggerPool.submit(task).get();
-                } catch (Exception e) {
-                    Throwables.propagate(e);
-                }
-                break;
-            default:
-                throw new AssertionError("Unrecognized level " + level);
-        }
-    }
-
-    /*
-     * Generate a runnable task that logs one localized message in an exception-safe way.
-     * The only difference between this task and that created by createRunnableLoggingTask()
-     * is the call to l7dlog() rather than to log().
-    */
-    private Runnable createRunnableL7dLoggingTask(final Level level,
-                                                  final String key,
-                                                  final Object[] params,
-                                                  final Throwable t) {
-        // While logging, the logger thread temporarily disguises itself as its caller.
-        final String callerThreadName = Thread.currentThread().getName();
-
-        return new Runnable() {
-            @Override
-            public void run() {
-                Thread loggerThread = Thread.currentThread();
-                loggerThread.setName(callerThreadName);
-                try {
-                    m_logger.l7dlog(level, key, params, t);
-                } catch (Throwable t2) {
-                   System.err.printf("Exception thrown in logging thread for '%s': %s%n",
-                                     callerThreadName, t2);
                 } finally {
                     loggerThread.setName(ASYNCH_LOGGER_THREAD_NAME);
                 }
@@ -474,19 +406,6 @@ public class VoltLogger {
         default:
             throw new AssertionError("Unrecognized level " + level);
         }
-    }
-
-    /**
-     * Variants that take a key rather than an actual message string,
-     * used for localized ("l7d", using a tired 30-year-old joke)
-     * messages.
-     */
-    public void l7dlog(final Level level, final String key, final Throwable t) {
-        submitl7d(level, key, null, t);
-    }
-
-    public void l7dlog(final Level level, final String key, final Object[] params, final Throwable t) {
-        submitl7d(level, key, params, t);
     }
 
     /**

@@ -28,11 +28,9 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.Encoder;
-import org.voltdb.utils.LogKeys;
 
 /**
  * A wrapper around a PostgreSQL database server, and JDBC connection. This
@@ -1128,7 +1126,7 @@ public class PostgreSQLBackend extends NonVoltDBBackend {
             }
             System.gc();
         } catch (Exception e) {
-            hostLog.l7dlog( Level.ERROR, LogKeys.host_Backend_ErrorOnShutdown.name(), e);
+            hostLog.error("Error shutting down backend", e);
         }
     }
 

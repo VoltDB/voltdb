@@ -17,12 +17,10 @@
 
 package org.voltdb;
 
-import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.common.Permission;
-import org.voltdb.utils.LogKeys;
 
 public class InvocationSqlPermissionPolicy extends InvocationPermissionPolicy {
     private static final VoltLogger authLog = new VoltLogger("AUTH");
@@ -56,9 +54,7 @@ public class InvocationSqlPermissionPolicy extends InvocationPermissionPolicy {
 
     @Override
     public ClientResponseImpl getErrorResponse(AuthUser user, StoredProcedureInvocation invocation, Procedure procedure) {
-        authLog.l7dlog(Level.INFO,
-                LogKeys.auth_ClientInterface_LackingPermissionForSql.name(),
-                new String[] {user.m_name}, null);
+        authLog.infoFmt("User %s lacks permission to invoke @AdHoc", user.m_name);
         return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
                 new VoltTable[0], "User does not have SQL read/write permission",
                 invocation.clientHandle);

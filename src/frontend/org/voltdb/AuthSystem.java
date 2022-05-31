@@ -66,7 +66,6 @@ import org.voltdb.client.DelegatePrincipal;
 import org.voltdb.common.Permission;
 import org.voltdb.security.AuthenticationRequest;
 import org.voltdb.utils.Encoder;
-import org.voltdb.utils.LogKeys;
 
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;

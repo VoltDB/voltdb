@@ -20,7 +20,6 @@ package org.voltdb.iv2;
 import java.io.IOException;
 
 import org.apache.commons.lang3.StringUtils;
-import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.LatencyWatchdog;
@@ -34,7 +33,6 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.rejoin.TaskLog;
-import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltTrace;
 
@@ -142,7 +140,7 @@ public class SpProcedureTask extends ProcedureTask
         // does not improve latencies. See ENG-21040.
         m_initiator.deliver(response);
         if (EXEC_TRACE_ENABLED) {
-            execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
+            execLog.trace("ExecutionSite sending completed workunit to dtxn.");
         }
         if (HOST_DEBUG_ENABLED) {
             hostLog.debug("COMPLETE: " + this);
@@ -222,7 +220,7 @@ public class SpProcedureTask extends ProcedureTask
         }
         m_txnState.setDone();
         if (EXEC_TRACE_ENABLED) {
-            execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
+            execLog.trace("ExecutionSite sending completed workunit to dtxn.", null);
         }
         if (HOST_DEBUG_ENABLED) {
             hostLog.debug("COMPLETE replaying txn: " + this);

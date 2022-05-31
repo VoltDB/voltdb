@@ -20,12 +20,10 @@ package org.voltdb.iv2;
 import java.io.IOException;
 import java.util.List;
 
-import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.rejoin.TaskLog;
-import org.voltdb.utils.LogKeys;
 
 public class MPIEndOfLogTask extends TransactionTask
 {
@@ -48,7 +46,7 @@ public class MPIEndOfLogTask extends TransactionTask
         m_mailbox.send(m_initiatorHSIds, m_txnState.getNotice());
         m_txnState.setDone();
         m_queue.flush(getTxnId());
-        execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
+        execLog.trace("ExecutionSite sending completed workunit to dtxn.");
         hostLog.debug("COMPLETE: " + this);
     }
 

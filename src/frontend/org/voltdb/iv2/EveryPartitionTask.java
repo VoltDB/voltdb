@@ -22,13 +22,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.rejoin.TaskLog;
-import org.voltdb.utils.LogKeys;
 
 /**
  * Implements the Single-partition everywhere procedure ProcedureTask.
@@ -59,7 +57,7 @@ public class EveryPartitionTask extends TransactionTask
         m_mailbox.send(com.google_voltpatches.common.primitives.Longs.toArray(m_initiatorHSIds), m_initiationMsg);
         m_txnState.setDone();
         m_queue.flush(getTxnId());
-        execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
+        execLog.trace("ExecutionSite sending completed workunit to dtxn.");
         hostLog.debug("COMPLETE: " + this);
     }
 

@@ -26,7 +26,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 
-import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
@@ -37,7 +36,6 @@ import org.voltdb.client.BatchTimeoutOverrideType;
 import org.voltdb.common.Constants;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.utils.Encoder;
-import org.voltdb.utils.LogKeys;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.collect.ImmutableSet;
@@ -568,8 +566,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
                 params = ParameterSet.fromByteBuffer(paramData);
             }
             catch (final IOException e) {
-                hostLog.l7dlog(Level.FATAL,
-                        LogKeys.host_ExecutionSite_FailedDeserializingParamsForFragmentTask.name(), e);
+                hostLog.fatal("Failure while deserializing a parameter set for a fragment task", e);
                 VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
             }
         }

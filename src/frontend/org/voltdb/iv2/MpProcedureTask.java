@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
@@ -37,7 +36,6 @@ import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.rejoin.TaskLog;
-import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltTrace;
 
 import com.google_voltpatches.common.base.Supplier;
@@ -232,7 +230,7 @@ public class MpProcedureTask extends ProcedureTask
                 // Set the source HSId (ugh) to ourselves so we track the message path correctly
                 response.m_sourceHSId = m_initiator.getHSId();
                 m_initiator.deliver(response);
-                execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
+                execLog.trace("ExecutionSite sending completed workunit to dtxn.");
                 if (hostLog.isDebugEnabled()) {
                     hostLog.debug("[MpProcedureTask] COMPLETE: " + this);
                 }

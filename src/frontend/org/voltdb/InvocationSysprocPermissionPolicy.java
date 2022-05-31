@@ -17,12 +17,10 @@
 
 package org.voltdb;
 
-import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.common.Permission;
-import org.voltdb.utils.LogKeys;
 
 /**
  * Checks if a user has permission to call a procedure.
@@ -58,10 +56,8 @@ public class InvocationSysprocPermissionPolicy extends InvocationPermissionPolic
 
     @Override
     public ClientResponseImpl getErrorResponse(AuthUser user, StoredProcedureInvocation invocation, Procedure procedure) {
-        authLog.l7dlog(Level.INFO,
-                LogKeys.auth_ClientInterface_LackingPermissionForSysproc.name(),
-                new String[] { user.m_name, invocation.getProcName() },
-                null);
+        authLog.infoFmt("User %s lacks permission to invoke admin %s",
+                        user.m_name, invocation.getProcName());
         return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
                 new VoltTable[0],
                 "User " + user.m_name + " does not have admin permission",

@@ -36,9 +36,6 @@ public class VoltNullLogger extends VoltLogger {
         public void log(Level level, Object message, Throwable t) {}
 
         @Override
-        public void l7dlog(Level level, String key, Object[] params, Throwable t) {}
-
-        @Override
         public long getLogLevels(VoltLogger[] loggers) {
             return 0;
         }

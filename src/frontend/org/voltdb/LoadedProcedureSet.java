@@ -25,7 +25,6 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.Column;
@@ -34,7 +33,6 @@ import org.voltdb.catalog.Table;
 import org.voltdb.compiler.PlannerTool;
 import org.voltdb.compiler.StatementCompiler;
 import org.voltdb.sysprocs.LowImpactDeleteNT.ComparisonOperation;
-import org.voltdb.utils.LogKeys;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.Lists;
@@ -210,25 +208,15 @@ public class LoadedProcedureSet {
                     if (sysProc.commercial) {
                         continue;
                     }
-                    hostLog.l7dlog(
-                            Level.WARN,
-                            LogKeys.host_ExecutionSite_GenericException.name(),
-                            // TODO: remove the extra meaningless parameter "0"
-                            new Object[] { site.getCorrespondingSiteId(), 0 },
-                            e);
+                    hostLog.warnFmt(e, "Execution site siteId %s", site.getCorrespondingSiteId());
                     VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
                 }
 
                 try {
                     procedure = (VoltSystemProcedure) procClass.newInstance();
                 }
-                catch (final InstantiationException e) {
-                    hostLog.l7dlog( Level.WARN, LogKeys.host_ExecutionSite_GenericException.name(),
-                            new Object[] { site.getCorrespondingSiteId(), 0 }, e);
-                }
-                catch (final IllegalAccessException e) {
-                    hostLog.l7dlog( Level.WARN, LogKeys.host_ExecutionSite_GenericException.name(),
-                            new Object[] { site.getCorrespondingSiteId(), 0 }, e);
+                catch (final InstantiationException | IllegalAccessException e) {
+                    hostLog.warnFmt(e, "Execution site siteId %s", site.getCorrespondingSiteId());
                 }
 
                 ProcedureRunner runner = new ProcedureRunner(procedure, site, proc);

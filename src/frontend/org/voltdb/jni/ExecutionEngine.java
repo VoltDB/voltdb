@@ -27,7 +27,6 @@ import java.util.Map.Entry;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.RejectedExecutionException;
 
-import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
@@ -56,7 +55,6 @@ import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.sysprocs.saverestore.HiddenColumnFilter;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.TimestampType;
-import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltTableUtil;
 import org.voltdb.utils.VoltTrace;
 
@@ -375,29 +373,24 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
          */
         void verifyDependencySanity(final Integer dependencyId, final List<VoltTable> dependencies) {
             if (dependencies == null) {
-                hostLog.l7dlog(Level.FATAL, LogKeys.host_ExecutionSite_DependencyNotFound.name(),
-                               new Object[] { dependencyId }, null);
+                hostLog.fatalFmt("dependency(id=%s) was not found.", dependencyId);
                 VoltDB.crashLocalVoltDB("No additional info.", false, null);
                 // Prevent warnings.
                 return;
             }
             for (final Object dependency : dependencies) {
                 if (dependency == null) {
-                    hostLog.l7dlog(Level.FATAL, LogKeys.host_ExecutionSite_DependencyContainedNull.name(),
-                                   new Object[] { dependencyId },
-                            null);
+                    hostLog.fatalFmt("dependency(id=%s) contained a null.", dependencyId);
                     VoltDB.crashLocalVoltDB("No additional info.", false, null);
                     // Prevent warnings.
                     return;
                 }
                 if (hostLog.isTraceEnabled()) {
-                    hostLog.l7dlog(Level.TRACE, LogKeys.org_voltdb_ExecutionSite_ImportingDependency.name(),
-                               new Object[] { dependencyId, dependency.getClass().getName(), dependency.toString() },
-                               null);
+                    hostLog.traceFmt("importing a dependency (id=%s):%s: toString=%s ...",
+                                     dependencyId, dependency.getClass().getName(), dependency.toString());
                 }
                 if (!(dependency instanceof VoltTable)) {
-                    hostLog.l7dlog(Level.FATAL, LogKeys.host_ExecutionSite_DependencyNotVoltTable.name(),
-                                   new Object[] { dependencyId }, null);
+                    hostLog.fatalFmt("dependency(id=%s) was not VoltTable type", dependencyId);
                     VoltDB.crashLocalVoltDB("No additional info.", false, null);
                 }
             }

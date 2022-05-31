@@ -99,7 +99,6 @@ import org.apache.zookeeper_voltpatches.data.Stat;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
-import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLog4jLogger;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
@@ -211,11 +210,11 @@ import org.voltdb.utils.CLibrary;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.CatalogAndDeployment;
 import org.voltdb.utils.CatalogUtil.SegmentedCatalog;
+import org.voltdb.utils.CustomProperties;
 import org.voltdb.utils.FailedLoginCounter;
 import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.InMemoryJarfile.JarLoader;
-import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
 import org.voltdb.utils.ProClass;
@@ -975,7 +974,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             // Print the startup banner, but only on actual start
             if (config.m_startAction != StartAction.INITIALIZE) {
-                consoleLog.l7dlog(Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
+                CustomProperties props = new CustomProperties();
+                consoleLog.info(props.get("host_VoltDB_StartupString", "VOLT ACTIVE DATA"));
                 hostLog.info("Initializing VoltDB ...");
                 hostLog.infoFmt("PID of this Volt process is %d", myPid);
             }
@@ -1543,10 +1543,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
              * are up would cause deadlock.
              */
             if (m_commandLog != null && m_commandLog.needsInitialization()) {
-                consoleLog.l7dlog(Level.INFO, LogKeys.host_VoltDB_StayTunedForLogging.name(), null);
+                consoleLog.info("Initializing the database and command logs. This may take a moment...");
             }
             else {
-                consoleLog.l7dlog(Level.INFO, LogKeys.host_VoltDB_StayTunedForNoLogging.name(), null);
+                consoleLog.info("Initializing the database. This may take a moment...");
             }
             if (m_commandLog != null && (m_rejoining || m_joining)) {
                 //On rejoin the starting IDs are all 0 so technically it will load any snapshot
@@ -3329,7 +3329,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
         catch (Exception ignored2) {
             if (logger != null) {
-                logger.l7dlog(Level.ERROR, LogKeys.org_voltdb_VoltDB_FailedToRetrieveBuildString.name(), null);
+                logger.error("Exception while retrieving build string");
             }
             return new String[] { m_defaultVersionString, "VoltDB" };
         }
@@ -4230,9 +4230,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             try {
                 m_clientInterface.startAcceptingConnections();
             } catch (IOException e) {
-                hostLog.l7dlog(Level.FATAL,
-                        LogKeys.host_VoltDB_ErrorStartAcceptingConnections.name(),
-                        e);
+                hostLog.fatal("There was an error trying to start a ClientInterface connecting acceptions", e);
                 VoltDB.crashLocalVoltDB("Error starting client interface.", true, e);
             }
             // send hostUp trap
@@ -4252,7 +4250,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 m_adminListener.start();
             }
         } catch (Exception e) {
-            hostLog.l7dlog(Level.FATAL, LogKeys.host_VoltDB_ErrorStartHTTPListener.name(), e);
+            hostLog.fatal("There was an error trying to start a HTTP interface", e);
             VoltDB.crashLocalVoltDB("HTTP service unable to bind to port.", true, e);
         }
         // Allow export datasources to start consuming their binary deques safely
@@ -4516,9 +4514,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 try {
                     m_clientInterface.startAcceptingConnections();
                 } catch (IOException e) {
-                    hostLog.l7dlog(Level.FATAL,
-                                   LogKeys.host_VoltDB_ErrorStartAcceptingConnections.name(),
-                                   e);
+                    hostLog.fatal("There was an error trying to start a ClientInterface connecting acceptions", e);
                     VoltDB.crashLocalVoltDB("Error starting client interface.", true, e);
                 }
                 // send hostUp trap
@@ -4542,7 +4538,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     m_adminListener.start();
                 }
             } catch (Exception e) {
-                hostLog.l7dlog(Level.FATAL, LogKeys.host_VoltDB_ErrorStartHTTPListener.name(), e);
+                hostLog.fatal("There was an error trying to start a HTTP interface", e);
                 VoltDB.crashLocalVoltDB("HTTP service unable to bind to port.", true, e);
             }
 
@@ -4574,9 +4570,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
      * including logging that event to the console.
      */
     private void initializationIsComplete(boolean allDone) {
-        Object args[] = { m_mode == OperationMode.PAUSED ? "PAUSED" : "NORMAL"};
-        consoleLog.l7dlog(Level.INFO, LogKeys.host_VoltDB_ServerOpMode.name(), args, null);
-        consoleLog.l7dlog(Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null, null);
+        consoleLog.infoFmt("Server Operational State is: %s", m_mode == OperationMode.PAUSED ? "PAUSED" : "NORMAL");
+        consoleLog.info("Server completed initialization.");
         m_statusTracker.set(m_mode == OperationMode.PAUSED ? NodeState.PAUSED : NodeState.UP);
         if (allDone) {
             m_statusTracker.setStartupComplete();

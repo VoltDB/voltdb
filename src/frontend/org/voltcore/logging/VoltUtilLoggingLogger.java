@@ -63,24 +63,6 @@ public class VoltUtilLoggingLogger implements VoltLogger.CoreVoltLogger {
     }
 
     @Override
-    public void l7dlog(Level level, String key, Object[] params, Throwable t) {
-        String msg = "NULL";
-        if (key != null)
-            msg = key;
-        if (t != null)
-            msg += " : Throwable: " + t.toString();
-        if ((params != null) && (params.length > 0)) {
-            msg += " : ";
-            for (Object o : params)
-                if (o != null)
-                    msg += o.toString() + ", ";
-                else
-                    msg += "NULL, ";
-        }
-        m_logger.log(getPriorityForLevel(level), msg);
-    }
-
-    @Override
     public void log(Level level, Object message, Throwable t) {
         String msg = "NULL";
         if (message != null)

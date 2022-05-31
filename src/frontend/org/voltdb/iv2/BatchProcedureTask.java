@@ -28,7 +28,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.ExpectedProcedureException;
@@ -43,7 +42,6 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
-import org.voltdb.utils.LogKeys;
 
 import com.google_voltpatches.common.base.Supplier;
 
@@ -212,14 +210,14 @@ abstract class BatchProcedureTask {
             response.setResults(cr);
 
         } catch (final ExpectedProcedureException e) {
-            execLog.l7dlog(Level.TRACE, LogKeys.org_voltdb_ExecutionSite_ExpectedProcedureException.name(), e);
+            execLog.trace("Procedure threw an expected procedure exception", e);
             response.setResults(
                     new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE, new VoltTable[] {}, e.toString()));
         } catch (final Exception e) {
             // Should not be able to reach here. VoltProcedure.call caught all invocation target exceptions
             // and converted them to error responses. Java errors are re-thrown, and not caught by this
             // exception clause. A truly unexpected exception reached this point. Crash. It's a defect.
-            hostLog.l7dlog(Level.ERROR, LogKeys.host_ExecutionSite_UnexpectedProcedureException.name(), e);
+            hostLog.error("Unexpected exception while executing procedure wrapper", e);
             VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
         }
         return response;

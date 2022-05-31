@@ -104,16 +104,6 @@ public class VoltLog4jLogger implements CoreVoltLogger {
     }
 
     @Override
-    public void l7dlog(Level level, String key, Object[] params, Throwable t) {
-        if (params == null) {
-            m_logger.l7dlog(getPriorityForLevel(level), key, t);
-        }
-        else {
-            m_logger.l7dlog(getPriorityForLevel(level), key, params, t);
-        }
-    }
-
-    @Override
     public void log(Level level, Object message, Throwable t) {
         m_logger.log(getPriorityForLevel(level), message, t);
     }

@@ -2807,7 +2807,7 @@ public abstract class CatalogUtil {
         try {
             md = MessageDigest.getInstance(ClientAuthScheme.getDigestScheme(scheme));
         } catch (final NoSuchAlgorithmException e) {
-            hostLog.l7dlog(Level.FATAL, LogKeys.compiler_VoltCompiler_NoSuchAlgorithm.name(), e);
+            hostLog.fatal("Password hashing algorithm not found", e);
             System.exit(-1);
         }
         final byte passwordHash[] = md.digest(password.getBytes(Charsets.UTF_8));

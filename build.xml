@@ -1308,7 +1308,6 @@ JAVA COMPILATION
     <mkdir dir='${build.testproc.dir}' />
     <mkdir dir='${build.testfunc.dir}' />
 
-    <exec dir='${src.gpl.dir}/org/voltdb/utils' executable='${src.gpl.dir}/org/voltdb/utils/generate_logkeys.py' failonerror='true' />
     <depend
         srcdir="${src.hsqldb.dir}:${src.hsqldb.test.dir}:${src.gpl.dir}:${src.test.dir}:${src.testproc.dir}:${src.testfunc.dir}:${vendor.src.dir}"
         destdir="${build.prod.dir}:${build.test.dir}:${build.testproc.dir}:${build.testfunc.dir}"
