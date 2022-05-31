@@ -244,7 +244,7 @@ void PersistentTable::nextFreeTuple(TableTuple* tuple) {
 
         // We have a block which has space we want to use.
         if (retval.first != NULL) {
-         
+
         /**
          * Check to see if the block needs to move to a new bucket
          */

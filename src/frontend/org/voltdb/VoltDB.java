@@ -132,7 +132,6 @@ public class VoltDB {
     static {
         REAL_DEFAULT_TIMEZONE = TimeZone.getDefault();
         setDefaultTimezone();
-        ClientFactory.preserveResources();
     }
 
     /** Encapsulates VoltDB configuration parameters */
@@ -1560,6 +1559,10 @@ public class VoltDB {
             } else if (config.m_startAction == StartAction.GET) {
                 cli(config);
             } else {
+                if (config.m_startAction != StartAction.INITIALIZE) {
+                    // we dont need Est time updater and DNS cache for INITIALIZE
+                    ClientFactory.preserveResources();
+                }
                 initialize(config, false);
                 instance().run();
             }
