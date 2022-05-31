@@ -164,7 +164,8 @@ class ExecutorContext {
     }
 
     static VoltDBEngine* getEngine() {
-        return getExecutorContext()->m_engine;
+        auto ctx = getExecutorContext();
+        return ctx == nullptr ? nullptr : ctx->m_engine;
     }
 
     static UndoQuantum *currentUndoQuantum() {
