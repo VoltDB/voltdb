@@ -394,20 +394,6 @@ public class ClientConfig {
     }
 
     /**
-     * Enables or disables client affinity.
-     * <p>
-     * @deprecated client affinity is now always {@code true}: transactions are always
-     * routed to the correct master partition improving latency and throughput.
-     * <p>
-     * (Deprecated in v11.0, 2021-03-23)
-     *
-     * @param on unused
-     */
-    @Deprecated
-    public void setClientAffinity(boolean on) {
-    }
-
-    /**
      * Configures the client so that it attempts to connect to all nodes in
      * the cluster as they are discovered, and will reconnect if those connections fail.
      * Defaults to false.
@@ -421,21 +407,6 @@ public class ClientConfig {
      */
     public void setTopologyChangeAware(boolean enabled) {
         m_topologyChangeAware = enabled;
-    }
-
-    /**
-     * Controls whether reads are set to replicas.
-     * <p>
-     * @deprecated no longer meaningful: reads are always sent
-     * to the leader; sending to a replica would not have resulted
-     * in better performance.
-     * <p>
-     * (Deprecated in v11.0, 2021-04-16)
-     *
-     * @param on unused
-     */
-    @Deprecated
-    public void setSendReadsToReplicasByDefault(boolean on) {
     }
 
     /**
