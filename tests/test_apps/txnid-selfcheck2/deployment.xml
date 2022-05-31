@@ -6,9 +6,19 @@
     </httpd>
 
     <export>
+        <configuration enabled="true" type="file" target="abc">
+            <property name="type">csv</property>
+            <property name="nonce">MigView</property>
+            <property name="skipinternals">true</property>
+        </configuration>
+        <configuration enabled="true" type="file" target="partitioned_target">
+            <property name="type">csv</property>
+            <property name="nonce">PartStream2</property>
+            <property name="skipinternals">true</property>
+        </configuration>
         <configuration enabled="true" type="file" target="partstream">
             <property name="type">csv</property>
-            <property name="nonce">PartStream</property>
+            <property name="nonce">PartStream1</property>
             <property name="skipinternals">true</property>
         </configuration>
         <configuration enabled="true" type="file" target="replstream">

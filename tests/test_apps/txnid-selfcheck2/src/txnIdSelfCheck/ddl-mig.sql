@@ -9,7 +9,7 @@ CREATE TABLE partitioned
 (
   txnid      bigint             NOT NULL
 , prevtxnid  bigint             NOT NULL
-, ts         timestamp          NOT NULL
+, ts         timestamp             NOT NULL
 , cid        tinyint            NOT NULL
 , cidallhash bigint             NOT NULL
 , rid        bigint             NOT NULL
@@ -58,7 +58,7 @@ CREATE TABLE replicated
 (
   txnid      bigint             NOT NULL
 , prevtxnid  bigint             NOT NULL
-, ts         timestamp          NOT NULL
+, ts         timestamp             NOT NULL
 , cid        tinyint            NOT NULL
 , cidallhash bigint             NOT NULL
 , rid        bigint             NOT NULL
@@ -92,7 +92,7 @@ FROM replicated r INNER JOIN dimension d ON r.cid=d.cid GROUP BY d.desc;
 CREATE TABLE adhocr
 (
   id         bigint             NOT NULL
-, ts         timestamp          NOT NULL
+, ts         timestamp             NOT NULL
 , inc        bigint             NOT NULL
 , jmp        bigint             NOT NULL
 , CONSTRAINT PK_id_ar PRIMARY KEY (id)
@@ -103,7 +103,7 @@ CREATE INDEX R_TSINDEX ON adhocr (ts);
 CREATE TABLE adhocp
 (
   id         bigint             NOT NULL
-, ts         timestamp          NOT NULL
+, ts         timestamp             NOT NULL
 , inc        bigint             NOT NULL
 , jmp        bigint             NOT NULL
 , CONSTRAINT PK_id_ap PRIMARY KEY (id)
@@ -167,6 +167,20 @@ CREATE STREAM partitioned_export PARTITION ON COLUMN cid export to target partit
 (
   txnid      bigint             NOT NULL
 , prevtxnid  bigint             NOT NULL
+, ts         timestamp             NOT NULL
+, cid        tinyint            NOT NULL
+, cidallhash bigint             NOT NULL
+, rid        bigint             NOT NULL
+, cnt        bigint             NOT NULL
+, adhocinc   bigint             NOT NULL
+, adhocjmp   bigint             NOT NULL
+, value      varbinary(1048576) NOT NULL
+);
+
+CREATE STREAM partitioned_export2 PARTITION ON COLUMN cid
+(
+  txnid      bigint             NOT NULL
+, prevtxnid  bigint             NOT NULL
 , ts         timestamp          NOT NULL
 , cid        tinyint            NOT NULL
 , cidallhash bigint             NOT NULL
@@ -191,7 +205,7 @@ CREATE VIEW ex_partview (
     SUM(cnt)
 FROM partitioned_export GROUP BY cid;
 
-CREATE VIEW ex_part_mig_view MIGRATE TO TARGET viewttl (
+CREATE VIEW ex_part_mig_view MIGRATE TO TARGET abc (
     cid,
     timespan,
     entries,
@@ -205,10 +219,11 @@ CREATE VIEW ex_part_mig_view MIGRATE TO TARGET viewttl (
     MAX(cnt),
     MIN(cnt),
     SUM(cnt)
-FROM partitioned_export GROUP BY cid, TRUNCATE(minute, ts)
+FROM partitioned_export2 GROUP BY cid, TRUNCATE(minute, ts)
 USING TTL 30 SECONDS ON COLUMN timespan;
 
-CREATE INDEX partts on ex_part_mig_view (timespan) WHERE NOT MIGRATING;
+CREATE INDEX MATVIEW_PK_INDEX ON EX_PART_MIG_VIEW (TIMESPAN) WHERE NOT MIGRATING;
+CREATE INDEX wints on ex_part_mig_view (timespan) WHERE NOT MIGRATING;
 
 CREATE TABLE ex_partview_shadow (
     cid tinyint not null,
@@ -224,7 +239,7 @@ CREATE STREAM replicated_export export to target replicated_target
 (
   txnid      bigint             NOT NULL
 , prevtxnid  bigint             NOT NULL
-, ts         timestamp          NOT NULL
+, ts         timestamp             NOT NULL
 , cid        tinyint            NOT NULL
 , cidallhash bigint             NOT NULL
 , rid        bigint             NOT NULL
@@ -233,6 +248,7 @@ CREATE STREAM replicated_export export to target replicated_target
 , adhocjmp   bigint             NOT NULL
 , value      varbinary(1048576) NOT NULL
 );
+
 
 CREATE TABLE T_PAYMENT50 (
    SEQ_NO varchar(32 BYTES) NOT NULL,
@@ -363,7 +379,7 @@ CREATE TABLE capr
 (
   p          bigint             NOT NULL
 , id         bigint             NOT NULL
-, tmstmp     timestamp          NOT NULL
+, tmstmp     timestamp            NOT NULL
 , value      varbinary(1048576) NOT NULL
 , CONSTRAINT PK_id_cr PRIMARY KEY (p,id)
 );
@@ -372,7 +388,7 @@ CREATE TABLE capp
 (
   p          bigint             NOT NULL
 , id         bigint             NOT NULL
-, tmstmp     timestamp          NOT NULL
+, tmstmp     timestamp            NOT NULL
 , value      varbinary(1048576) NOT NULL
 , CONSTRAINT PK_id_cp PRIMARY KEY (p,id)
 );
@@ -381,7 +397,7 @@ PARTITION TABLE capp ON COLUMN p;
 -- import table partitioned
 CREATE TABLE importp
 (
-  ts         timestamp          NOT NULL
+  ts         timestamp             NOT NULL
 , cid        tinyint            NOT NULL
 , cnt        bigint             NOT NULL
 , rc         bigint             NOT NULL
@@ -397,7 +413,7 @@ CREATE INDEX P_IMPORTCIDINDEX ON importp (cid);
 -- import table replicated
 CREATE TABLE importr
 (
-  ts         timestamp          NOT NULL
+  ts         timestamp             NOT NULL
 , cid        tinyint            NOT NULL
 , cnt        bigint             NOT NULL
 , rc         bigint             NOT NULL

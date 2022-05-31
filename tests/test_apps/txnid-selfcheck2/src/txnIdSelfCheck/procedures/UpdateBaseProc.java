@@ -29,6 +29,9 @@ import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
 import org.voltdb.utils.MiscUtils;
+import org.voltdb.VoltType;
+import org.voltdb.VoltTypeException;
+import org.voltdb.types.TimestampType;
 
 public class UpdateBaseProc extends VoltProcedure {
 
@@ -100,7 +103,9 @@ public class UpdateBaseProc extends VoltProcedure {
         VoltTable view = results[3];
 
         final long txnid = getUniqueId();
-        final long ts = getTransactionTime().getTime();
+        // final long ts = getTransactionTime().getTime();
+        // final TimestampType ts = getTransactionTime();
+        final TimestampType ts = new TimestampType(getTransactionTime());
         long prevtxnid = 0;
         long prevrid = 0;
         long cnt = 0;
@@ -200,7 +205,9 @@ public class UpdateBaseProc extends VoltProcedure {
         VoltTable view = results[2];
 
         final long txnid = getUniqueId();
-        final long ts = getTransactionTime().getTime();
+        // final long ts = getTransactionTime().getTime();
+        // final TimestampType ts = getTransactionTime();
+        final TimestampType ts = new TimestampType(getTransactionTime());
         long prevtxnid = 0;
         long prevrid = 0;
         long cnt = 0;

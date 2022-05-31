@@ -287,7 +287,7 @@ function async-benchmark() {
     java -ea -classpath txnid.jar:$CLASSPATH: -Dlog4j.configuration=file://$CLIENTLOG4J \
         txnIdSelfCheck.Benchmark $ARGS \
         --displayinterval=1 \
-        --duration=100 \
+        --duration=30 \
         --servers=localhost \
         --threads=20 \
         --threadoffset=0 \

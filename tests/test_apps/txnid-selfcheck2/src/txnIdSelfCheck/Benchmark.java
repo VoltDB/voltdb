@@ -732,7 +732,7 @@ public class Benchmark {
 
             // successfully called summarize
             VoltTable t = cr.getResults()[0];
-            long ts = t.fetchRow(0).getLong("ts");
+            long ts = t.fetchRow(0).getTimestampAsLong("ts");
             String tsStr = ts == 0 ? "NO TIMESTAMPS" : String.valueOf(ts) + " / " + new Date(ts).toString();
             long count = t.fetchRow(0).getLong("count");
 

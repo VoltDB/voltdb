@@ -68,7 +68,7 @@ public class ImportBaseProc extends VoltProcedure {
             if (fcid != cid)
                 throw new VoltAbortException(getClass().getName() +
                         " serious error expected cid " + cid + " != fetched cid: "+ fcid);
-            long mts = Math.max(row.getLong("ts"), ts);
+            long mts = Math.max(row.getTimestampAsLong("ts"), ts);
             long mcnt = Math.max(row.getLong("cnt"), cnt);
             //System.err.println("Invoke update query: mts " + mts + " mcnt " + mcnt + " cid " + cid + " ts " + ts + " cnt " + cnt);
             voltQueueSQL(update, mts, mcnt, cid);
