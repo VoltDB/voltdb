@@ -17,22 +17,17 @@
 
 package org.voltcore.utils;
 
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
-
-import com.google_voltpatches.common.base.Throwables;
-import com.google_voltpatches.common.cache.Cache;
-import com.google_voltpatches.common.cache.CacheBuilder;
 
 /*
  * Wraps a VoltLogger to provide rate-limited logging.
  * A single RateLimitedLogger will not log more frequently
  * than its configured limit. This rate limitation is
  * independent of the message and log level.
+ *
+ * Alternative mechanisms are available directly from
+ * VoltLogger; see rateLimitedLog, etc., for details.
  */
 public class RateLimitedLogger {
 
@@ -106,96 +101,6 @@ public class RateLimitedLogger {
                     m_lastLogTime = now;
                 }
             }
-        }
-    }
-
-    /*
-     * Internal cache of loggers used by tryLogForMessage (below)
-     */
-    private static Cache<String, RateLimitedLogger> m_loggersCached;
-    private static Object m_cacheLock = new Object();
-
-    /**
-     * Rate-limited logger. Logger is looked up cache by format
-     * prior to expansion with parameters, which is only done
-     * if the message is actually logged.
-     * <p>
-     * @deprecated
-     * VoltDB code wishing to use rate-limited logging is recommended
-     * to <b>not</b> use this method, but to instead use {@link VoltLogger#rateLimitedLog}
-     * and similar <code>VoltLogger</code> methods.
-     *
-     * @param now current time (as millisecs)
-     * @param maxLogInterval suppress time
-     * @param maxLogIntervalUnit suppress time units
-     * @param logger a {@link VoltLogger}
-     * @param level a logging {@link Level}
-     * @param format a {@link String#format(String, Object...)} string format
-     * @param parameters format arguments
-     * @see #tryLogForMessage(long,long,TimeUnit,VoltLogger,Level,Throwable,String,Object...)
-     */
-    @Deprecated
-    public static void tryLogForMessage(long now,
-            final long maxLogInterval,
-            final TimeUnit maxLogIntervalUnit,
-            final VoltLogger logger,
-            final Level level,
-            String format, Object... parameters) {
-        tryLogForMessage(now, maxLogInterval, maxLogIntervalUnit, logger, level, null, format, parameters);
-    }
-
-    /**
-     * Rate-limited logger. Logger is looked up cache by format
-     * prior to expansion with parameters, which is only done
-     * if the message is actually logged.
-     * <p>
-     * The <code>maxLogInterval</code>, <code>maxLogIntervalUntil</code>,
-     * and <code>logger</code> values are used when creating a
-     * <code>RateLimitedLogger</code> in the cache, and therefore
-     * changing the values on subsequent calls with the same format
-     * will not be effective.
-     * <p>
-     * @deprecated
-     * VoltDB code wishing to use rate-limited logging is recommended
-     * to <b>not</b> use this method, but to instead use {@link VoltLogger#rateLimitedLog}
-     * and similar <code>VoltLogger</code> methods.
-     *
-     * @param now current time (as millisecs)
-     * @param maxLogInterval suppress time
-     * @param maxLogIntervalUnit suppress time units
-     * @param logger a {@link VoltLogger}
-     * @param level a logging {@link Level}
-     * @param cause evidentiary exception (may be null)
-     * @param format a {@link String#format(String, Object...)} string format
-     * @param parameters format arguments
-     */
-    @Deprecated
-    public static void tryLogForMessage(long now,
-            final long maxLogInterval,
-            final TimeUnit maxLogIntervalUnit,
-            final VoltLogger logger,
-            final Level level, Throwable cause,
-            String format, Object... parameters) {
-
-        synchronized (m_cacheLock) {
-            if (m_loggersCached == null) {
-                m_loggersCached = CacheBuilder.newBuilder().maximumSize(1000).build();
-            }
-        }
-
-        Callable<RateLimitedLogger> builder = new Callable<RateLimitedLogger>() {
-            @Override
-            public RateLimitedLogger call() throws Exception {
-                return new RateLimitedLogger(maxLogIntervalUnit.toMillis(maxLogInterval), logger, level);
-            }
-        };
-
-        final RateLimitedLogger rll;
-        try {
-            rll = m_loggersCached.get(format, builder);
-            rll.log(now, level, cause, format, parameters);
-        } catch (ExecutionException ex) {
-            Throwables.propagate(Throwables.getRootCause(ex));
         }
     }
 }
