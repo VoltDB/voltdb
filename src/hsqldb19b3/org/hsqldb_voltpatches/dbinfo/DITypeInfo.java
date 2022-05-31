@@ -514,10 +514,10 @@ final class DITypeInfo {
     }
 
     /**
-     * Retrieves the minumum Short.MIN_VALUE bounded scale supported for
+     * Retrieves the minimum Short.MIN_VALUE bounded scale supported for
      * the type. <p>
      *
-     * @return the minumum Short.MIN_VALUE bounded scale
+     * @return the minimum Short.MIN_VALUE bounded scale
      *    supported for the type
      */
     Integer getMinScale() {
@@ -548,10 +548,10 @@ final class DITypeInfo {
     }
 
     /**
-     * Retrieves the minumum Integer.MIN_VALUE bounded scale supported
+     * Retrieves the minimum Integer.MIN_VALUE bounded scale supported
      * for the type. <p>
      *
-     * @return the minumum Integer.MIN_VALUE bounded scale supported
+     * @return the minimum Integer.MIN_VALUE bounded scale supported
      *    for the type
      */
     Integer getMinScaleAct() {
