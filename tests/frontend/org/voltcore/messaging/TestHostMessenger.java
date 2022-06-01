@@ -40,6 +40,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.IntStream;
 
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.assertj.core.util.Sets;
 import org.json_voltpatches.JSONObject;
 import org.junit.After;
 import org.junit.Before;
@@ -299,6 +300,41 @@ public class TestHostMessenger {
 
         assertTrue(hostids1.equals(hostids2));
         assertTrue(hostids2.equals(hostids3));
+    }
+
+    @Test
+    public void testShouldCreateAdditionalConnectionToPartitionGroupPeer() throws Exception {
+        MeshProber.Builder jc = MeshProber.builder()
+                .coordinators(coordinators(2))
+                .startAction(StartAction.PROBE)
+                .nodeState(NodeState.INITIALIZING)
+                .bare(true);
+
+        HostMessenger hm1 = createHostMessenger(0, jc.build(), true);
+        HostMessenger hm2 = createHostMessenger(1, jc.build(), false);
+
+        final AtomicReference<Exception> exception = new AtomicReference<Exception>();
+        HostMessengerThread hm2Start = new HostMessengerThread(hm2, exception);
+
+        hm2Start.start();
+        hm2Start.join();
+
+        if (exception.get() != null) {
+            fail(exception.get().toString());
+        }
+
+        Determination dtm = prober(hm1).waitForDetermination();
+        assertEquals(StartAction.CREATE, dtm.startAction);
+        assertEquals(2, dtm.hostCount);
+
+        assertEquals(dtm, prober(hm2).waitForDetermination());
+
+        assertFalse(hm1.m_foreignHosts.get(hm2.getHostId()).getHasMultiConnections());
+
+        hm1.setPartitionGroupPeers(Sets.set(hm2.getHostId()), 5);
+        hm1.createAuxiliaryConnections(false);
+
+        assertTrue(hm1.m_foreignHosts.get(hm2.getHostId()).getHasMultiConnections());
     }
 
     @Test

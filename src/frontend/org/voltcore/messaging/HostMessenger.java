@@ -54,7 +54,6 @@ import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -62,6 +61,11 @@ import org.voltcore.agreement.AgreementSite;
 import org.voltcore.agreement.InterfaceToMessenger;
 import org.voltcore.common.Constants;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.messages.RequestJoinResponse;
+import org.voltcore.messaging.messages.HostInformation;
+import org.voltcore.messaging.messages.PublishHostIdRequest;
+import org.voltcore.messaging.messages.RequestForConnectionRequest;
+import org.voltcore.messaging.messages.RequestHostIdRequest;
 import org.voltcore.network.CipherExecutor;
 import org.voltcore.network.LoopbackAddress;
 import org.voltcore.network.PicoNetwork;
@@ -781,10 +785,11 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      */
     @Override
     public void notifyOfJoin(
-            int hostId, SocketChannel socket,
+            SocketChannel socket,
             SSLEngine sslEngine,
             InetSocketAddress listeningAddress,
-            JSONObject jo) {
+            PublishHostIdRequest publishHostIdRequest) throws Exception {
+        int hostId = publishHostIdRequest.getHostId();
         networkLog.info(getHostId() + " notified of " + hostId);
         prepSocketChannel(socket);
         try {
@@ -796,7 +801,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         } catch (java.io.IOException e) {
             org.voltdb.VoltDB.crashLocalVoltDB("", true, e);
         }
-        m_acceptor.accrue(hostId, jo);
+        m_acceptor.accrue(hostId, publishHostIdRequest.getJsonObject());
     }
 
     private PicoNetwork createPicoNetwork(SSLEngine sslEngine, SocketChannel socket) {
@@ -883,7 +888,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     @Override
     public void requestJoin(SocketChannel socket, SSLEngine sslEngine,
                             MessagingChannel messagingChannel,
-                            InetSocketAddress listeningAddress, JSONObject jo) throws Exception {
+                            InetSocketAddress listeningAddress,
+                            RequestHostIdRequest requestHostIdRequest) throws Exception {
         /*
          * Generate the host id via creating an ephemeral sequential node
          */
@@ -892,7 +898,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         ForeignHost fhost;
         try {
             try {
-                JoinAcceptor.PleaDecision decision = m_acceptor.considerMeshPlea(m_zk, hostId, jo);
+                JoinAcceptor.PleaDecision decision = m_acceptor.considerMeshPlea(m_zk, hostId, requestHostIdRequest.getJsonObject());
 
                 /*
                  * Write the response that advertises the cluster topology
@@ -932,7 +938,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 putForeignHost(hostId, fhost);
                 fhost.enableRead(VERBOTEN_THREADS);
 
-                m_acceptor.accrue(hostId, jo);
+                m_acceptor.accrue(hostId, requestHostIdRequest.getJsonObject());
             } catch (Exception e) {
                 networkLog.error("Error joining new node", e);
                 addFailedHost(hostId);
@@ -979,54 +985,40 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             SocketChannel socket,
             MessagingChannel messagingChannel) throws Exception {
 
-        JSONObject jsObj = new JSONObject();
-
-        jsObj.put(SocketJoiner.ACCEPTED, decision.accepted);
+        RequestJoinResponse requestJoinResponse;
         if (decision.accepted) {
-            /*
-             * Tell the new node what its host id is
-             */
-            jsObj.put(SocketJoiner.NEW_HOST_ID, hostId);
-
-            /*
-             * Echo back the address that the node connected from
-             */
-            jsObj.put(SocketJoiner.REPORTED_ADDRESS,
-                      ((InetSocketAddress) socket.socket().getRemoteSocketAddress()).getAddress().getHostAddress());
-
-            /*
-             * Create an array containing an id for every node including this one
-             * even though the connection has already been made
-             */
-            JSONArray jsArray = new JSONArray();
-            JSONObject hostObj = new JSONObject();
-            hostObj.put(SocketJoiner.HOST_ID, getHostId());
-            hostObj.put(SocketJoiner.ADDRESS,
-                        m_config.internalInterface.isEmpty() ?
-                        socket.socket().getLocalAddress().getHostAddress() :
-                        m_config.internalInterface);
-            hostObj.put(SocketJoiner.PORT, m_config.internalPort);
-            jsArray.put(hostObj);
+            List<HostInformation> hosts = new ArrayList<>();
             for (Entry<Integer, ForeignHost> entry : m_foreignHosts.entrySet()) {
                 if (entry.getValue() == null) {
                     continue;
                 }
                 int hsId = entry.getKey();
                 ForeignHost fh = entry.getValue();
-                hostObj = new JSONObject();
-                hostObj.put(SocketJoiner.HOST_ID, hsId);
-                hostObj.put(SocketJoiner.ADDRESS,
-                        fh.m_listeningAddress.getAddress().getHostAddress());
-                hostObj.put(SocketJoiner.PORT, fh.m_listeningAddress.getPort());
-                jsArray.put(hostObj);
+                HostInformation hostInformation = HostInformation.create(
+                        hsId,
+                        fh.m_listeningAddress.getAddress().getHostAddress(),
+                        fh.m_listeningAddress.getPort()
+                );
+                hosts.add(hostInformation);
             }
-            jsObj.put(SocketJoiner.HOSTS, jsArray);
+
+            requestJoinResponse = RequestJoinResponse.createAccepted(
+                    hostId, // Tell the new node what its host id is
+                    ((InetSocketAddress) socket.socket().getRemoteSocketAddress()).getAddress().getHostAddress(), // Echo back the address that the node connected from
+                    getHostId(),
+                    m_config.internalInterface.isEmpty() ? socket.socket().getLocalAddress().getHostAddress() : m_config.internalInterface,
+                    m_config.internalPort,
+                    hosts
+            );
         }
         else {
-            jsObj.put(SocketJoiner.REASON, decision.errMsg);
-            jsObj.put(SocketJoiner.MAY_RETRY, decision.mayRetry);
+            requestJoinResponse = RequestJoinResponse.createNotAccepted(
+                    decision.errMsg,
+                    decision.mayRetry
+            );
         }
 
+        JSONObject jsObj = requestJoinResponse.getJsonObject();
         byte[] messageBytes = jsObj.toString(4).getBytes(StandardCharsets.UTF_8);
         ByteBuffer message = ByteBuffer.allocate(4 + messageBytes.length);
         message.putInt(messageBytes.length);
@@ -1039,14 +1031,10 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      * This method constructs all the hosts and puts them in the map
      */
     @Override
-    public void notifyOfHosts(
-            int yourHostId,
-            int[] hosts,
-            SocketChannel[] sockets,
-            SSLEngine[] sslEngines,
-            InetSocketAddress[] listeningAddresses,
-            Map<Integer, JSONObject> jos) throws Exception {
-        m_localHostId = yourHostId;
+    public void notifyOfHosts(int thisHostId,
+                              Map<Integer, JSONObject> jos,
+                              List<ConnectedHostInformation> connectedHostInformations) throws Exception {
+        m_localHostId = thisHostId;
         long agreementHSId = getHSIdForLocalSite(AGREEMENT_SITE_ID);
 
         /*
@@ -1057,15 +1045,25 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
         m_network.start();//network must be running for register to work
 
-        for (int ii = 0; ii < hosts.length; ii++) {
-            networkLog.info(yourHostId + " notified of host " + hosts[ii]);
-            agreementSites.add(CoreUtils.getHSIdFromHostAndSite(hosts[ii], AGREEMENT_SITE_ID));
-            prepSocketChannel(sockets[ii]);
+        for (int ii = 0; ii < connectedHostInformations.size(); ii++) {
+            ConnectedHostInformation hostInfo = connectedHostInformations.get(ii);
+            networkLog.info(thisHostId + " notified of host " + hostInfo.getHostId());
+            agreementSites.add(CoreUtils.getHSIdFromHostAndSite(hostInfo.getHostId(), AGREEMENT_SITE_ID));
+            prepSocketChannel(hostInfo.getSocket());
             try {
                 // todo pk why do we recreate map every iteration
-                ForeignHost fhost = new ForeignHost(this, hosts[ii], sockets[ii], m_config.deadHostTimeout,
-                        listeningAddresses[ii], createPicoNetwork(sslEngines[ii], sockets[ii]));
-                putForeignHost(hosts[ii], fhost);
+                ForeignHost fhost = new ForeignHost(
+                        this,
+                        hostInfo.getHostId(),
+                        hostInfo.getSocket(),
+                        m_config.deadHostTimeout,
+                        hostInfo.getListeningAddress(),
+                        createPicoNetwork(
+                                hostInfo.getSslEngine(),
+                                hostInfo.getSocket()
+                        )
+                );
+                putForeignHost(hostInfo.getHostId(), fhost);
             } catch (java.io.IOException e) {
                 org.voltdb.VoltDB.crashLocalVoltDB("Failed to instantiate foreign host", true, e);
             }
@@ -1150,11 +1148,12 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      */
     @Override
     public void notifyOfConnection(
-            int hostId,
             SocketChannel socket,
             SSLEngine sslEngine,
-            InetSocketAddress listeningAddress) throws Exception
+            InetSocketAddress listeningAddress,
+            RequestForConnectionRequest requestForConnectionMessage) throws Exception
     {
+        int hostId = requestForConnectionMessage.getHostId();
         networkLog.info("Host " + getHostId() + " receives a new connection request from host " + hostId);
         prepSocketChannel(socket);
         ForeignHost fh = m_foreignHosts.get(hostId);
@@ -1777,7 +1776,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 InetSocketAddress listeningAddress = fh.m_listeningAddress;
                 for (int ii = 0; ii < m_secondaryConnections; ii++) {
                     try {
-                        SocketJoiner.SocketInfo socketInfo = m_joiner.requestForConnection(listeningAddress, hostId);
+                        SocketJoiner.SocketInfo socketInfo = m_joiner.requestForConnection(listeningAddress);
                         fh.createAndEnableNewConnection(
                                 socketInfo.m_socket,
                                 createPicoNetwork(socketInfo.m_sslEngine, socketInfo.m_socket),

@@ -46,10 +46,17 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.net.ssl.SSLEngine;
 
-import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.messages.SocketJoinerMessageBase;
+import org.voltcore.messaging.messages.HostInformation;
+import org.voltcore.messaging.messages.PublishHostIdRequest;
+import org.voltcore.messaging.messages.RequestForConnectionRequest;
+import org.voltcore.messaging.messages.RequestHostIdRequest;
+import org.voltcore.messaging.messages.RequestJoinResponse;
+import org.voltcore.messaging.messages.SocketJoinerMessageParser;
+import org.voltcore.messaging.messages.VersionBuildMessage;
 import org.voltcore.network.ReverseDNSCache;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.VersionChecker;
@@ -76,20 +83,8 @@ import io.netty.handler.ssl.SslContext;
  * before accepting new connections
  */
 public class SocketJoiner {
-    static final String HOSTS = "hosts";
-    static final String REPORTED_ADDRESS = "reportedAddress";
-    static final String NEW_HOST_ID = "newHostId";
-    static final String REASON = "reason";
-    static final String MAY_RETRY = "mayRetry";
-    static final String ACCEPTED = "accepted";
-    private static final String MAY_EXCHANGE_TS = "mayExchangeTs";
-    private static final String TYPE = "type";
-    static final String HOST_ID = "hostId";
-    static final String PORT = "port";
-    static final String ADDRESS = "address";
-    private static final String VERSION_COMPATIBLE = "versionCompatible";
-    private static final String BUILD_STRING = "buildString";
-    public  static final String VERSION_STRING = "versionString";
+    static final String MAY_EXCHANGE_TS = "mayExchangeTs";
+    public static final String VERSION_STRING = "versionString";
 
     private static final int MAX_CLOCKSKEW = Integer.getInteger("MAX_CLOCKSKEW", 200);
     private static final int RETRY_INTERVAL = Integer.getInteger("MESH_JOIN_RETRY_INTERVAL", 10);
@@ -102,7 +97,7 @@ public class SocketJoiner {
 
     public static final String FAIL_ESTABLISH_MESH_MSG = "Failed to establish socket mesh.";
 
-    enum ConnectionType {
+    public enum ConnectionType {
         REQUEST_HOSTID,
         PUBLISH_HOSTID,
         REQUEST_CONNECTION;
@@ -126,43 +121,35 @@ public class SocketJoiner {
         /*
          * Notify that a specific host has joined with the specified host id.
          */
-        public void notifyOfJoin(
-                int hostId,
-                SocketChannel socket,
-                SSLEngine sslEngine,
-                InetSocketAddress listeningAddress,
-                JSONObject jo);
+        public void notifyOfJoin(SocketChannel socket,
+                                 SSLEngine sslEngine,
+                                 InetSocketAddress listeningAddress,
+                                 PublishHostIdRequest publishHostIdRequest) throws Exception;
 
         /*
          * A node wants to join the socket mesh
          */
-        public void requestJoin(
-                SocketChannel socket,
-                SSLEngine sslEngine,
-                MessagingChannel messagingChannel,
-                InetSocketAddress listeningAddress,
-                JSONObject jo) throws Exception;
+        public void requestJoin(SocketChannel socket,
+                                SSLEngine sslEngine,
+                                MessagingChannel messagingChannel,
+                                InetSocketAddress listeningAddress,
+                                RequestHostIdRequest requestHostIdRequest) throws Exception;
 
         /*
          * A connection has been made to all of the specified hosts. Invoked by
          * nodes connected to the cluster
          */
-        public void notifyOfHosts(
-                int yourLocalHostId,
-                int hosts[],
-                SocketChannel sockets[],
-                SSLEngine[] sslEngines,
-                InetSocketAddress listeningAddresses[],
-                Map<Integer, JSONObject> jos) throws Exception;
+        public void notifyOfHosts(int yourLocalHostId,
+                                  Map<Integer, JSONObject> jos,
+                                  List<ConnectedHostInformation> connectedHostInformations) throws Exception;
 
         /*
          * Create new connection between given node and current node
          */
-        public void notifyOfConnection(
-                int hostId,
-                SocketChannel socket,
-                SSLEngine sslEngine,
-                InetSocketAddress listeningAddress) throws Exception;
+        public void notifyOfConnection(SocketChannel socket,
+                                       SSLEngine sslEngine,
+                                       InetSocketAddress listeningAddress,
+                                       RequestForConnectionRequest requestForConnectionMessage) throws Exception;
     }
 
     private static class RequestHostIdResponse {
@@ -533,9 +520,7 @@ public class SocketJoiner {
      */
     private JSONObject readJSONObjFromWire(MessagingChannel messagingChannel) throws IOException, JSONException {
         ByteBuffer messageBytes = messagingChannel.readMessage();
-
-        JSONObject jsObj = new JSONObject(new String(messageBytes.array(), StandardCharsets.UTF_8));
-        return jsObj;
+        return new JSONObject(new String(messageBytes.array(), StandardCharsets.UTF_8));
     }
 
     /**
@@ -593,7 +578,7 @@ public class SocketJoiner {
      * Pull all ready to accept sockets
      */
     private void processSSC(ServerSocketChannel ssc) throws Exception {
-        SocketChannel sc = null;
+        SocketChannel sc;
         while ((sc = ssc.accept()) != null) {
             boolean success = false;
             boolean active = false;
@@ -627,57 +612,59 @@ public class SocketJoiner {
                     LOG.debug(jsObj.toString(2));
                 }
 
-                // get the connecting node's version string
-                String remoteBuildString = jsObj.getString(VERSION_STRING);
+                SocketJoinerMessageBase request = SocketJoinerMessageParser.parse(jsObj);
+                String remoteBuildString = request.getVersionString();
 
-                VersionChecker versionChecker = m_acceptor.getVersionChecker();
                 // send a response with version/build data of this node
-                JSONObject returnJs = new JSONObject();
-                returnJs.put(VERSION_STRING, versionChecker.getVersionString());
-                returnJs.put(BUILD_STRING, versionChecker.getBuildString());
-                returnJs.put(VERSION_COMPATIBLE,
-                        versionChecker.isCompatibleVersionString(remoteBuildString));
+                VersionChecker versionChecker = m_acceptor.getVersionChecker();
+                VersionBuildMessage versionBuildMessage = VersionBuildMessage.create(
+                        versionChecker.getVersionString(),
+                        versionChecker.getBuildString(),
+                        versionChecker.isCompatibleVersionString(remoteBuildString)
+                );
 
                 // inject acceptor fields
-                returnJs = m_acceptor.decorate(returnJs, Optional.of(m_paused.get()));
-                byte jsBytes[] = returnJs.toString(4).getBytes(StandardCharsets.UTF_8);
-
-                ByteBuffer returnJsBuffer = ByteBuffer.allocate(4 + jsBytes.length);
-                returnJsBuffer.putInt(jsBytes.length);
-                returnJsBuffer.put(jsBytes).flip();
-                messagingChannel.writeMessage(returnJsBuffer);
-
-                /*
-                 * The type of connection, it can be a new request to join the cluster
-                 * or a node that is connecting to the rest of the cluster and publishing its
-                 * host id or a request to add a new connection to the request node.
-                 */
-                String type = jsObj.getString(TYPE);
+                ByteBuffer messageByteBuffer = decorateAndSerialize(
+                        versionBuildMessage.getJsonObject(),
+                        Optional.of(m_paused.get()),
+                        false
+                );
+                messagingChannel.writeMessage(messageByteBuffer);
 
                 /*
                  * The new connection may specify the address it is listening on,
                  * or it can be derived from the connection itself
                  */
                 InetSocketAddress listeningAddress;
-                if (jsObj.has(ADDRESS)) {
+                if (request.hasAddress()) {
                     listeningAddress = new InetSocketAddress(
-                            InetAddress.getByName(jsObj.getString(ADDRESS)),
-                            jsObj.getInt(PORT));
+                            InetAddress.getByName(request.getAddress()),
+                            request.getPort()
+                    );
                 } else {
-                    listeningAddress =
-                        new InetSocketAddress(
-                                ((InetSocketAddress)sc.socket().
-                                        getRemoteSocketAddress()).getAddress().getHostAddress(),
-                                        jsObj.getInt(PORT));
+                    listeningAddress = new InetSocketAddress(
+                            ((InetSocketAddress) sc.socket().getRemoteSocketAddress()).getAddress().getHostAddress(),
+                            request.getPort()
+                    );
                 }
+
+                /*
+                 * The type of connection, it can be a new request to join the cluster
+                 * or a node that is connecting to the rest of the cluster and publishing its
+                 * host id or a request to add a new connection to the request node.
+                 */
+                String type = request.getType();
 
                 hostLog.infoFmt("Received request type %s from %s", type, remoteAddress);
                 if (type.equals(ConnectionType.REQUEST_HOSTID.name())) {
-                    m_joinHandler.requestJoin(sc, sslEngine, messagingChannel, listeningAddress, jsObj);
+                    RequestHostIdRequest requestHostIdRequest = (RequestHostIdRequest) request;
+                    m_joinHandler.requestJoin(sc, sslEngine, messagingChannel, listeningAddress, requestHostIdRequest);
                 } else if (type.equals(ConnectionType.PUBLISH_HOSTID.name())){
-                    m_joinHandler.notifyOfJoin(jsObj.getInt(HOST_ID), sc, sslEngine, listeningAddress, jsObj);
+                    PublishHostIdRequest publishHostIdRequest = (PublishHostIdRequest) request;
+                    m_joinHandler.notifyOfJoin(sc, sslEngine, listeningAddress, publishHostIdRequest);
                 } else if (type.equals(ConnectionType.REQUEST_CONNECTION.name())) {
-                    m_joinHandler.notifyOfConnection(jsObj.getInt(HOST_ID), sc, sslEngine, listeningAddress);
+                    RequestForConnectionRequest requestForConnectionMessage = (RequestForConnectionRequest) request;
+                    m_joinHandler.notifyOfConnection(sc, sslEngine, listeningAddress, requestForConnectionMessage);
                 } else {
                     throw new RuntimeException("Unexpected message type " + type + " from " + remoteAddress);
                 }
@@ -744,21 +731,20 @@ public class SocketJoiner {
     /**
      * Read version info from a socket and check compatibility.
      * After verifying versions return if "paused" start is indicated. True if paused start otherwise normal start.
+     * @return
      */
-    private JSONObject processJSONResponse(MessagingChannel messagingChannel,
-                                            Set<String> activeVersions,
-                                            boolean checkVersion) throws IOException, JSONException
+    private JSONObject readAndValidateResponseVersion(MessagingChannel messagingChannel,
+                                                      Set<String> activeVersions) throws IOException, JSONException
     {
         // read the json response from socketjoiner with version info
         JSONObject jsonResponse = readJSONObjFromWire(messagingChannel);
-        if (!checkVersion) {
-            return jsonResponse;
-        }
-
         VersionChecker versionChecker = m_acceptor.getVersionChecker();
-        String remoteVersionString = jsonResponse.getString(VERSION_STRING);
-        String remoteBuildString = jsonResponse.getString(BUILD_STRING);
-        boolean remoteAcceptsLocalVersion = jsonResponse.getBoolean(VERSION_COMPATIBLE);
+
+        VersionBuildMessage versionBuildMessage = VersionBuildMessage.fromJsonObject(jsonResponse);
+        String remoteVersionString = versionBuildMessage.getVersionString();
+        String remoteBuildString = versionBuildMessage.getBuildString();
+        boolean remoteAcceptsLocalVersion = versionBuildMessage.isVersionCompatible();
+
         if (remoteVersionString.equals(versionChecker.getVersionString())) {
             if (!versionChecker.getBuildString().equals(remoteBuildString)) {
                 // ignore test/eclipse build string so tests still work
@@ -781,7 +767,7 @@ public class SocketJoiner {
         }
         //Do this only after we think we are compatible.
         activeVersions.add(remoteVersionString);
-        return jsonResponse;
+        return versionBuildMessage.getJsonObject();
     }
 
     /**
@@ -847,33 +833,25 @@ public class SocketJoiner {
         VersionChecker versionChecker = m_acceptor.getVersionChecker();
         activeVersions.add(versionChecker.getVersionString());
 
-        JSONObject jsObj = new JSONObject();
-        jsObj.put(TYPE, ConnectionType.REQUEST_HOSTID.name());
-
-        // put the version compatibility status in the json
-        jsObj.put(VERSION_STRING, versionChecker.getVersionString());
-
-        // Advertise the port we are going to listen on based on config
-        jsObj.put(PORT, m_internalPort);
-
-        // If config specified an internal interface use that.
-        // Otherwise the leader will echo back what we connected on
+        RequestHostIdRequest request;
         if (!m_internalInterface.isEmpty()) {
-            jsObj.put(ADDRESS, m_internalInterface);
+            request = RequestHostIdRequest.createWithAddress(
+                    versionChecker.getVersionString(),
+                    m_internalPort,
+                    m_internalInterface
+            );
+        } else {
+            request = RequestHostIdRequest.createWithoutAddress(
+                    versionChecker.getVersionString(),
+                    m_internalPort
+            );
         }
 
         // communicate configuration and node state
-        jsObj = m_acceptor.decorate(jsObj, Optional.empty());
-        jsObj.put(MAY_EXCHANGE_TS, true);
-
-        byte jsBytes[] = jsObj.toString(4).getBytes(StandardCharsets.UTF_8);
-        ByteBuffer requestHostIdBuffer = ByteBuffer.allocate(4 + jsBytes.length);
-        requestHostIdBuffer.putInt(jsBytes.length);
-        requestHostIdBuffer.put(jsBytes).flip();
-        messagingChannel.writeMessage(requestHostIdBuffer);
+        messagingChannel.writeMessage(decorateAndSerialize(request.getJsonObject(), Optional.empty(), true));
 
         // read the json response from socketjoiner with version info and validate it
-        JSONObject leaderInfo = processJSONResponse(messagingChannel, activeVersions, true);
+        JSONObject leaderInfo = readAndValidateResponseVersion(messagingChannel, activeVersions);
         // read the json response sent by HostMessenger with HostID
         JSONObject jsonObj = readJSONObjFromWire(messagingChannel);
 
@@ -888,30 +866,41 @@ public class SocketJoiner {
      * @throws Exception
      */
     private JSONObject publishHostId(
-            InetSocketAddress hostAddr,
             MessagingChannel messagingChannel,
             Set<String> activeVersions) throws Exception
     {
-        JSONObject jsObj = new JSONObject();
-        jsObj.put(TYPE, ConnectionType.PUBLISH_HOSTID.name());
-        jsObj.put(HOST_ID, m_localHostId);
-        jsObj.put(PORT, m_internalPort);
-        jsObj.put(ADDRESS,
-                m_internalInterface.isEmpty() ? m_reportedInternalInterface : m_internalInterface);
-        jsObj.put(VERSION_STRING, m_acceptor.getVersionChecker().getVersionString());
+        PublishHostIdRequest publishHostIdRequest = PublishHostIdRequest.create(
+                m_localHostId,
+                m_internalPort,
+                m_internalInterface.isEmpty() ? m_reportedInternalInterface : m_internalInterface,
+                m_acceptor.getVersionChecker().getVersionString()
+        );
 
-        jsObj = m_acceptor.decorate(jsObj, Optional.empty());
-        jsObj.put(MAY_EXCHANGE_TS, true);
+        JSONObject jsObj = publishHostIdRequest.getJsonObject();
+        ByteBuffer messageByteBuffer = decorateAndSerialize(jsObj, Optional.empty(), true);
+        messagingChannel.writeMessage(messageByteBuffer);
 
+        // read the json response from socketjoiner with version info and validate it
+        return readAndValidateResponseVersion(messagingChannel, activeVersions);
+    }
+
+    private ByteBuffer decorateAndSerialize(JSONObject jsObj, Optional<Boolean> paused, boolean mayExchangeTs) throws JSONException {
+        jsObj = m_acceptor.decorate(jsObj, paused);
+        if (mayExchangeTs) {
+            jsObj.put(MAY_EXCHANGE_TS, mayExchangeTs);
+        }
+
+        return serialize(jsObj);
+    }
+
+    private ByteBuffer serialize(JSONObject jsObj) throws JSONException {
         byte[] jsBytes = jsObj.toString(4).getBytes(StandardCharsets.UTF_8);
         ByteBuffer pushHostId = ByteBuffer.allocate(4 + jsBytes.length);
         pushHostId.putInt(jsBytes.length);
         pushHostId.put(jsBytes).flip();
-        messagingChannel.writeMessage(pushHostId);
-
-        // read the json response from socketjoiner with version info and validate it
-        return processJSONResponse(messagingChannel, activeVersions, true);
+        return pushHostId;
     }
+
 
     static class SocketInfo {
         public final SocketChannel m_socket;
@@ -922,7 +911,7 @@ public class SocketJoiner {
             m_sslEngine = sslEngine;
         }
     }
-    public SocketInfo requestForConnection(InetSocketAddress hostAddr, int hostId) throws IOException, JSONException
+    public SocketInfo requestForConnection(InetSocketAddress hostAddr) throws IOException, JSONException
     {
         SocketChannel socket = connectToHost(hostAddr);
         SSLEngine sslEngine;
@@ -933,21 +922,19 @@ public class SocketJoiner {
             throw new IOException("SSL setup to " + socket.getRemoteAddress() + " failed", e);
         }
         MessagingChannel messagingChannel = MessagingChannel.get(socket, sslEngine);
+        RequestForConnectionRequest requestForConnectionMessage = RequestForConnectionRequest.create(
+                m_acceptor.getVersionChecker().getVersionString(),
+                m_localHostId,
+                m_internalPort,
+                m_internalInterface.isEmpty() ? m_reportedInternalInterface : m_internalInterface
+        );
 
-        JSONObject jsObj = new JSONObject();
-        jsObj.put(TYPE, ConnectionType.REQUEST_CONNECTION.name());
-        jsObj.put(VERSION_STRING, m_acceptor.getVersionChecker().getVersionString());
-        jsObj.put(HOST_ID, m_localHostId);
-        jsObj.put(PORT, m_internalPort);
-        jsObj.put(ADDRESS,
-                m_internalInterface.isEmpty() ? m_reportedInternalInterface : m_internalInterface);
-        byte[] jsBytes = jsObj.toString(4).getBytes(StandardCharsets.UTF_8);
-        ByteBuffer addConnection = ByteBuffer.allocate(4 + jsBytes.length);
-        addConnection.putInt(jsBytes.length);
-        addConnection.put(jsBytes).flip();
-        messagingChannel.writeMessage(addConnection);
+        ByteBuffer byteBuffer = serialize(requestForConnectionMessage.getJsonObject());
+        messagingChannel.writeMessage(byteBuffer);
+
         // read the json response from socketjoiner with version info and validate it
-        processJSONResponse(messagingChannel, null, false);
+        // (Actually version is not checked here, since we pass checkVersion=false)
+        readJSONObjFromWire(messagingChannel);
         return new SocketInfo(socket, sslEngine);
     }
 
@@ -987,22 +974,23 @@ public class SocketJoiner {
             RequestHostIdResponse response = requestHostId(leaderChannel, activeVersions);
             // check if the membership request is accepted
             JSONObject responseBody = response.getResponseBody();
-            if (!responseBody.optBoolean(ACCEPTED, true)) {
+            RequestJoinResponse requestJoinResponse = RequestJoinResponse.fromJsonObject(responseBody);
+
+            if (!(requestJoinResponse.isAccepted().orElse(true))) {
                 safeClose(socket);
-                if (!responseBody.optBoolean(MAY_RETRY, false)) {
-                    org.voltdb.VoltDB.crashLocalVoltDB(
-                            "Request to join cluster is rejected: "
-                            + responseBody.optString(REASON, "rejection reason is not available"));
+                String rejectionReason = requestJoinResponse.getReason().orElse("rejection reason is not available");
+                if (!requestJoinResponse.mayRetry().orElse(false)) {
+                    org.voltdb.VoltDB.crashLocalVoltDB("Request to join cluster is rejected: " + rejectionReason);
                 }
-                throw new CoreUtils.RetryException(responseBody.optString(REASON, "rejection reason is not available"));
+                throw new CoreUtils.RetryException(rejectionReason);
             }
 
             /*
              * Get the generated host id, and the interface we connected on
              * that was echoed back
              */
-            m_localHostId = responseBody.getInt(NEW_HOST_ID);
-            m_reportedInternalInterface = responseBody.getString(REPORTED_ADDRESS);
+            m_localHostId = requestJoinResponse.getNewHostId();
+            m_reportedInternalInterface = requestJoinResponse.getReportedAddress();
 
             ImmutableMap.Builder<Integer, JSONObject> cmbld = ImmutableMap.builder();
             cmbld.put(m_localHostId, m_acceptor.decorate(responseBody, Optional.<Boolean>empty()));
@@ -1011,41 +999,44 @@ public class SocketJoiner {
              * Loop over all the hosts and create a connection (except for the first entry, that is the leader)
              * and publish the host id that was generated. This finishes creating the mesh
              */
-            JSONArray otherHosts = responseBody.getJSONArray(HOSTS);
-            int hostIds[] = new int[otherHosts.length()];
-            SocketChannel hostSockets[] = new SocketChannel[hostIds.length];
-            SSLEngine sslEngines[] = new SSLEngine[hostIds.length];
-            InetSocketAddress listeningAddresses[] = new InetSocketAddress[hostIds.length];
+            List<HostInformation> hosts = requestJoinResponse.getHosts();
+            List<ConnectedHostInformation> connectedHostInformations = new ArrayList<>();
 
-            for (int ii = 0; ii < otherHosts.length(); ii++) {
-                JSONObject host = otherHosts.getJSONObject(ii);
-                String address = host.getString(ADDRESS);
-                int port = host.getInt(PORT);
-                final int hostId = host.getInt(HOST_ID);
+            for (int ii = 0; ii < hosts.size(); ii++) {
+                HostInformation hostInformation = hosts.get(ii);
+                String address = hostInformation.getAddress();
+                int port = hostInformation.getPort();
+                final int hostId = hostInformation.getHostId();
 
                 LOG.info("Leader provided address " + address + ":" + port);
                 InetSocketAddress hostAddr = new InetSocketAddress(address, port);
                 if (ii == 0) {
                     //Leader already has a socket
-                    hostIds[ii] = hostId;
-                    listeningAddresses[ii] = hostAddr;
-                    hostSockets[ii] = socket;
-                    sslEngines[ii] = leaderSSLEngine;
                     cmbld.put(ii, response.getLeaderInfo());
+                    connectedHostInformations.add(
+                            new ConnectedHostInformation(
+                                    hostId,
+                                    socket,
+                                    leaderSSLEngine,
+                                    hostAddr
+                            )
+                    );
                     continue;
                 }
                 // connect to all the peer hosts (except leader) and advertise our existence
                 SocketChannel hostSocket = connectToHost(hostAddr);
                 SSLEngine sslEngine = initializeSocket(hostSocket, true, skews).m_sslEngine;
                 MessagingChannel messagingChannel = MessagingChannel.get(hostSocket, sslEngine);
-                JSONObject hostInfo = publishHostId(hostAddr, messagingChannel, activeVersions);
-
-                hostIds[ii] = hostId;
-                hostSockets[ii] = hostSocket;
-                sslEngines[ii] = sslEngine;
-                listeningAddresses[ii] = hostAddr;
-
+                JSONObject hostInfo = publishHostId(messagingChannel, activeVersions);
                 cmbld.put(ii, hostInfo);
+
+                ConnectedHostInformation connectedHostInformation = new ConnectedHostInformation(
+                        hostId,
+                        hostSocket,
+                        sslEngine,
+                        hostAddr
+                );
+                connectedHostInformations.add(connectedHostInformation);
             }
 
             /*
@@ -1062,14 +1053,14 @@ public class SocketJoiner {
             ByteBuffer joinCompleteBuffer = ByteBuffer.allocate(1);
             // No need to encrypt this one byte
             while (joinCompleteBuffer.hasRemaining()) {
-                hostSockets[0].write(joinCompleteBuffer);
+                connectedHostInformations.get(0).getSocket().write(joinCompleteBuffer);
             }
 
             /*
              * Let host messenger know about the connections.
              * It will init the agreement site and then we are done.
              */
-            m_joinHandler.notifyOfHosts( m_localHostId, hostIds, hostSockets, sslEngines, listeningAddresses, cmbld.build());
+            m_joinHandler.notifyOfHosts( m_localHostId, cmbld.build(), connectedHostInformations);
         } catch (ClosedByInterruptException e) {
             //This is how shutdown is done
         }

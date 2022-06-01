@@ -164,6 +164,10 @@ public class ForeignHost {
         m_hasMultiConnections = true;
     }
 
+    public boolean getHasMultiConnections() {
+        return m_hasMultiConnections;
+    }
+
     @SuppressWarnings("deprecation")
     synchronized void close()
     {
