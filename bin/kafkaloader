@@ -47,8 +47,8 @@
 
 
 # The VoltDB Kafka Loader script
-# This script calls kafkaloader10 which is based on Kafka 10 API
 
+# resolve symlinks and canonicalize the path (make it absolute)
 pushd . > /dev/null
 this=$0
 cd `dirname $this`
@@ -63,4 +63,76 @@ this="$(pwd -P)/$this"
 popd > /dev/null
 # the root of the VoltDB installation
 VOLTDB_HOME=$(dirname $(dirname "$this"))
-${VOLTDB_HOME}/bin/kafkaloader10 "$@"
+
+# path to voltdb and bundle jars
+VOLTDB_VOLTDB=$VOLTDB_HOME/voltdb
+BUNDLES_DIR=$VOLTDB_HOME/bundles
+VOLTDB_LIB=$VOLTDB_HOME/lib
+
+JAVA=`which java`
+if [ x"$JAVA_HEAP_MAX" = "x" ]
+then
+    JAVA_HEAP_MAX=-Xmx2048m
+fi
+
+# some Java parameters
+if [ "$JAVA_HOME" != "" ]; then
+  #echo "run java in $JAVA_HOME"
+  JAVA=$JAVA_HOME/bin/java
+fi
+
+if [ "$JAVA" = "" ]; then
+  echo "Couldn't find java version to run (make sure JAVA_HOME is set)."
+  exit 1
+fi
+
+# check envvars to see if a user overrides log4j conf
+# otherwise apply defaults
+if [ -z "${LOG4J_CONFIG_PATH}" ]; then
+  if [ -f "$VOLTDB_HOME/voltdb/utility-log4j.xml" ]; then
+    LOG4J_CONFIG_PATH=$VOLTDB_HOME/voltdb/utility-log4j.xml
+  elif [ -f "$VOLTDB_HOME/voltdb/log4j.xml" ]; then
+    LOG4J_CONFIG_PATH=$VOLTDB_HOME/voltdb/log4j.xml
+  else
+    echo "Couldn't find log4j configuration file."
+    exit 1
+  fi
+fi
+
+# add kakfka jar file to classpath
+KAFKA_LOADER10_BUNDLE=${BUNDLES_DIR}/kafkastream10.jar
+if [ ! -f ${KAFKA_LOADER10_BUNDLE} ]; then
+  echo "Couldn't find kafka jar file."
+  exit 1
+fi
+CLASSPATH=${KAFKA_LOADER10_BUNDLE}
+
+
+# add voltdb artifacts to classpath
+VOLTDBJAR=`ls $VOLTDB_VOLTDB/voltdb-*.*.jar | grep -v "doc.jar" | head -1`
+if [ -n "${VOLTDBJAR}" ]; then
+  CLASSPATH=${VOLTDBJAR}:${CLASSPATH}
+else
+  echo "Couldn't find compiled VoltDB jar to run."
+  exit 1
+fi
+
+LIB_JARS="super-csv-2.4.0.jar netty-all-4.1.53.Final.jar netty-tcnative-boringssl-static-2.0.46.Final.jar"
+for jar in $LIB_JARS; do
+  jar_path="${VOLTDB_LIB}/${jar}"
+  if [ ! -f ${jar_path} ]; then
+    echo "Couldn't find ${jar_path} jar file."
+    exit 1
+  fi
+  CLASSPATH=${CLASSPATH}:${jar_path}
+done
+
+# add formatter lib if using --formatter option.
+for f in $FORMATTER_LIB/*.jar; do
+  CLASSPATH=${CLASSPATH}:$f;
+done
+
+# run it
+export CMDVAL="$JAVA -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Djava.awt.headless=true $JAVA_HEAP_MAX $VOLTDB_OPTS -Dlog4j.configuration=file://${LOG4J_CONFIG_PATH} "
+export CMDVAL=$CMDVAL"-classpath $CLASSPATH org.voltdb.importclient.kafka10.KafkaLoader"
+exec $CMDVAL "$@"
