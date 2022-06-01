@@ -3163,7 +3163,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 "INSERT INTO P3DIFF (ID, TM1, TM2) VALUES (10000, '2000-01-01 01:00:00.00000', '2001-02-02 02:01:01.001001');");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         cr = client.callProcedure("@AdHoc",
-                "INSERT INTO P3DIFF (ID, TM1, TM2) VALUES (10001, NOW(), DATEADD(DAY, 1, NOW()));");
+                "INSERT INTO P3DIFF (ID, TM1, TM2) VALUES (10001, '2000-01-01 01:00:00.00000', DATEADD(DAY, 1, '2000-01-01 01:00:00.00000'));");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
         // Simple day apart timestamps
