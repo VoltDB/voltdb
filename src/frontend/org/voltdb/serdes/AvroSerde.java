@@ -195,6 +195,7 @@ public class AvroSerde {
      * @return ID for schema in the given subject
      * @throws IOException if the id could not be retrieved or the schema registry is not configured
      */
+    @SuppressWarnings("deprecation")
     public int getIdForSchema(String subject, String schemaName, List<FieldDescription> fields,
             Configuration configuration)
             throws IOException {
@@ -235,6 +236,7 @@ public class AvroSerde {
         return new Deserializer();
     }
 
+    @SuppressWarnings("deprecation")
     Schema getById(int id) throws IOException {
         try {
             return getInternal().m_client.getById(id);
