@@ -438,8 +438,9 @@ public class UpdateCore extends VoltSystemProcedure {
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
         long start, duration = 0;
 
-        if (VoltZK.zkNodeExists(zk, VoltZK.elasticOperationInProgress)) {
-            throw new VoltAbortException("Can't do a catalog update while an elastic join is active. Please retry catalog update later.");
+        if (VoltZK.zkNodeExists(zk, VoltZK.elasticOperationInProgress) ||
+                VoltZK.zkNodeExists(zk, VoltZK.rejoinInProgress)) {
+            throw new VoltAbortException("Can't do a catalog update while an elastic join or rejoin is active. Please retry catalog update later.");
         }
         if (requiresSnapshotIsolation == 1 && VoltZK.hasHostsSnapshotting(zk)) {
             throw new VoltAbortException("Snapshot in progress. Please retry catalog update later.");
