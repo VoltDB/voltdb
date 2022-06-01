@@ -310,7 +310,6 @@ public class HTTPBenchmark {
 
         ClientConfig clientConfig = new ClientConfig("", "");
         clientConfig.setReconnectOnConnectionLoss(true);
-        clientConfig.setClientAffinity(true);
         client = ClientFactory.createClient(clientConfig);
 
         periodicStatsContext = client.createStatsContext();

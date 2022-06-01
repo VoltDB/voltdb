@@ -215,14 +215,12 @@ public class OneShotBenchmark {
         this.config = config;
 
         ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
-        clientConfig.setClientAffinity(true);
         client = ClientFactory.createClient(clientConfig);
 
         periodicStatsContext = client.createStatsContext();
         fullStatsContext = client.createStatsContext();
 
         ClientConfig mpClientConfig = new ClientConfig("", "", new StatusListener());
-        mpClientConfig.setClientAffinity(true);
         mpClient = ClientFactory.createClient(mpClientConfig);
         mpPeriodicStatsContext = mpClient.createStatsContext();
         mpFullStatsContext = mpClient.createStatsContext();

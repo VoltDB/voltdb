@@ -148,7 +148,7 @@ public class SyncBenchmark {
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
 
-        @Option(desc = "disable client affinity.")
+        @Option(desc = "disable client affinity (as of V11, this has no effect).")
         boolean noclientaffinity = false;
 
         @Option(desc = "user id.")
@@ -201,7 +201,6 @@ public class SyncBenchmark {
             clientConfig.enableKerberosAuthentication("VoltDBClient");
         }
         clientConfig.setReconnectOnConnectionLoss(true);
-        clientConfig.setClientAffinity(!config.noclientaffinity);
         client = ClientFactory.createClient(clientConfig);
 
         periodicStatsContext = client.createStatsContext();

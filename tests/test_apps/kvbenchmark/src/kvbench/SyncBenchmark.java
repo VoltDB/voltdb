@@ -306,7 +306,6 @@ public class SyncBenchmark {
         }
 
         clientConfig.setReconnectOnConnectionLoss(true);
-        clientConfig.setClientAffinity(true);
         if ( config.topologyaware ) {
             clientConfig.setTopologyChangeAware(true);
         }

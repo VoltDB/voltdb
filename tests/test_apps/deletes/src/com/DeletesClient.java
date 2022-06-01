@@ -670,7 +670,6 @@ public class DeletesClient
         Client client = null;
         ClientConfig config = new ClientConfig("program", "none");
         config.setProcedureCallTimeout(Long.MAX_VALUE);
-        config.setClientAffinity(true);
         config.setTopologyChangeAware(true);
         client = ClientFactory.createClient(config);
         // with topo awareness, we only need to connect to one server and it

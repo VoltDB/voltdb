@@ -188,7 +188,6 @@ public class TopicBenchmark {
         ClientConfig clientConfig = new ClientConfig();
         clientConfig.setReconnectOnConnectionLoss(true);
         clientConfig.setTopologyChangeAware(true);
-        clientConfig.setClientAffinity(true);
         client = ClientFactory.createClient(clientConfig);
 
         fullStatsContext = client.createStatsContext();

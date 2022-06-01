@@ -140,7 +140,7 @@ public class HTTPBenchmark {
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
 
-        @Option(desc = "disable client affinity.")
+        @Option(desc = "disable client affinity (as of V11, this has no effect).")
         boolean noclientaffinity = false;
 
         @Option(desc = "user id.")
@@ -208,7 +208,6 @@ public class HTTPBenchmark {
 
         ClientConfig clientConfig = new ClientConfig(config.username, config.password);
         clientConfig.setReconnectOnConnectionLoss(true);
-        clientConfig.setClientAffinity(!config.noclientaffinity);
         if (config.kerberos) {
             clientConfig.enableKerberosAuthentication("VoltDBClient");
         }
