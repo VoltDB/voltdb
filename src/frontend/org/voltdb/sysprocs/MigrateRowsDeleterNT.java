@@ -18,6 +18,7 @@ package org.voltdb.sysprocs;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
@@ -27,8 +28,8 @@ import org.voltdb.TheHashinator;
 import org.voltdb.VoltNTSystemProcedure;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
 import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.VoltType;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.TxnEgo;
@@ -85,7 +86,7 @@ public class MigrateRowsDeleterNT extends VoltNTSystemProcedure {
         } else {
             cf = callProcedure("@MigrateRowsAcked_SP", getHashinatorPartitionKey(partitionId), tableName, deletableTxnId, partitionId);
         }
-        ClientResponse resp = cf.get(TTLManager.NT_PROC_TIMEOUT, TimeUnit.SECONDS);
+        ClientResponse resp = cf.get(TTLManager.NT_PROC_TIMEOUT, TimeUnit.MILLISECONDS);
         if (resp.getStatus() == ClientResponse.TXN_MISPARTITIONED){
             exportLog.rateLimitedLog(LOG_SUPPRESSION_INTERVAL_SECONDS, Level.WARN, null,
                     "Errors on deleting migrated row on table %s: %s", tableName, resp.getStatusString());

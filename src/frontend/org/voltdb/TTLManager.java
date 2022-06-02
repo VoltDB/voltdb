@@ -384,7 +384,7 @@ public class TTLManager extends StatsSource{
                 "@MigrateRowsNT", new Object[] {task.tableName, task.getColumnName(), task.getValue(), "<=", task.getBatchSize(),
                         TIMEOUT, task.getMaxFrequency(), INTERVAL});
         try {
-            latch.await(NT_PROC_TIMEOUT, TimeUnit.SECONDS);
+            latch.await(NT_PROC_TIMEOUT, TimeUnit.MILLISECONDS);
         } catch (InterruptedException e) {
             // ignored
         }
@@ -435,7 +435,7 @@ public class TTLManager extends StatsSource{
                 "@LowImpactDeleteNT", new Object[] {task.tableName, task.getColumnName(), task.getValue(), "<=", task.getBatchSize(),
                         TIMEOUT, task.getMaxFrequency(), INTERVAL});
         try {
-            latch.await(NT_PROC_TIMEOUT, TimeUnit.SECONDS);
+            latch.await(NT_PROC_TIMEOUT, TimeUnit.MILLISECONDS);
         } catch (InterruptedException e) {
             hostLog.warn("TTL waiting interrupted" + e.getMessage());
         }
