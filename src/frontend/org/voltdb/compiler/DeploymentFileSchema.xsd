@@ -318,7 +318,7 @@
     </xs:all>
     <xs:attribute name="synchronous" type="xs:boolean" default="false"/>
     <xs:attribute name="enabled" type="xs:boolean" default="true"/>
-    <xs:attribute name="logsize" type="logSizeType" default="1024" />
+    <xs:attribute name="logsize" type="logSizeType" default="5120" />
   </xs:complexType>
 
   <!-- <partition-detection> -->
