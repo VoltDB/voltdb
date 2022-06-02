@@ -648,7 +648,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          * Clear all replicable tables
          */
         void clearAllReplicableTables();
+#ifdef VOLT_POOL_CHECKING
         inline bool isDestroying() { return m_destroying;}
+#endif
 
     private:
         /*
