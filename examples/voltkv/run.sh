@@ -65,7 +65,7 @@ function server() {
 # load schema and procedures
 function init() {
     jars-ifneeded
-    sqlcmd < ddl.sql
+    sqlcmd --servers=$SERVERS < ddl.sql
 }
 
 # run the client that drives the example

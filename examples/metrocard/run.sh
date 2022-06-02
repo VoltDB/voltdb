@@ -78,7 +78,7 @@ function server() {
 # load schema and procedures
 function init() {
     jars-ifneeded
-    sqlcmd < ddl.sql
+    sqlcmd --servers=$SERVERS < ddl.sql
     echo "----Loading Stations----"
     csvloader --servers $SERVERS --file data/stations.csv --reportdir log stations
 }

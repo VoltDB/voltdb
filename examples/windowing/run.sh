@@ -67,7 +67,7 @@ function server() {
 # load schema and procedures
 function init() {
     jars-ifneeded
-    sqlcmd < ddl.sql
+    sqlcmd --servers=$SERVERS < ddl.sql
 }
 
 # run this target to see what command line options the client offers

@@ -88,7 +88,7 @@ function server() {
 # load schema and procedures
 function init() {
     jars-ifneeded
-    sqlcmd < ddl.sql
+    sqlcmd --servers=$SERVERS < ddl.sql
     echo "----Loading Redline Stations----"
     csvloader --servers $SERVERS --port 21211 --file data/redline.csv --reportdir log stations
     csvloader --servers $SERVERS --port 21211 --file data/trains.csv --reportdir log trains

@@ -54,7 +54,7 @@ function server {
 
 # init the customer/parts tables
 function init {
-    sqlcmd <populate.sql
+    sqlcmd --servers=$SERVERS < populate.sql
     echo " "
 }
 

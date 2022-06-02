@@ -68,7 +68,7 @@ function server() {
 # load schema and procedures
 function init() {
     jars-ifneeded
-    sqlcmd < ddl.sql
+    sqlcmd --servers=$SERVERS < ddl.sql
 }
 
 version=$(java -version 2>&1 | awk -F '"' '/version/ {print $2}')

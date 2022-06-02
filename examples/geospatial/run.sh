@@ -56,7 +56,7 @@ function jars-ifneeded() {
 # load schema, procedures, and static data
 function init() {
     jars-ifneeded
-    sqlcmd < ddl.sql
+    sqlcmd --servers=$SERVERS < ddl.sql
     csvloader -f advertisers.csv advertisers
 }
 

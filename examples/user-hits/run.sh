@@ -138,7 +138,7 @@ function server_common() {
 # load schema and procedures
 function init() {
     srccompile-ifneeded
-    sqlcmd < ddl.sql
+    sqlcmd --servers=$SERVERS < ddl.sql
 }
 
 function client() {
