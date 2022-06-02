@@ -181,7 +181,9 @@ public:
     static void resetStateForTest();
     static int32_t* getThreadPartitionIdForTest();
     static void setThreadPartitionIdForTest(int32_t* partitionId);
-    inline static void shutdown() {m_shutdown = true;}
+#ifdef VOLT_POOL_CHECKING
+    inline void shutdown() {m_shutdown = true;}
+#endif
 private:
     #ifdef VOLT_POOL_CHECKING
         friend class SynchronizedThreadLock;
@@ -198,8 +200,8 @@ private:
         using SizeBucketMap_t = std::unordered_map<std::size_t, AllocTraceMap_t> ;
         using PartitionBucketMap_t = std::unordered_map<int32_t, SizeBucketMap_t> ;
         static PartitionBucketMap_t s_allocations;
+        bool m_shutdown = false;
     #endif
-    static bool m_shutdown;
 };
 }
 

@@ -955,7 +955,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // static variable for sharing loadTable result (and exception) across VoltDBEngines
         static VoltEEExceptionType s_loadTableException;
         static int s_drHiddenColumnSize;
+#ifdef VOLT_POOL_CHECKING
         bool m_destroying = false;
+#endif
 };
 
 inline bool startsWith(const std::string& s1, const std::string& s2) {

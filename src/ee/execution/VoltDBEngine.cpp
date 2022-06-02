@@ -235,11 +235,13 @@ VoltDBEngine::~VoltDBEngine() {
     // object multiple times.  Change at your own risk.
     // --izzy 8/19/2009
 
+#ifdef VOLT_POOL_CHECKING
     m_destroying = true;
-    ThreadLocalPool::shutdown();
+    m_tlPool.shutdown();
+    m_groupStore.reset(nullptr);
+#endif
     // clean up execution plans
     m_plans.reset();
-    m_groupStore.reset(nullptr);
 
     // Clear the undo log before deleting the persistent tables so
     // that the persistent table schema are still around so we can

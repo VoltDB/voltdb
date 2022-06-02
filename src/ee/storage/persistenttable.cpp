@@ -180,14 +180,18 @@ PersistentTable::~PersistentTable() {
     // delete all tuples to free strings
     TableIterator ti(this, m_data.begin());
     TableTuple tuple(m_schema);
+#ifdef VOLT_POOL_CHECKING
     auto engine = ExecutorContext::getEngine();
     bool shutdown = engine == nullptr ? false : engine->isDestroying();
     if (!shutdown) {
+#endif
         while (ti.next(tuple)) {
             tuple.freeObjectColumns();
             tuple.setActiveFalse();
         }
+#ifdef VOLT_POOL_CHECKING
     }
+#endif
 
     // clean up indexes
     BOOST_FOREACH (auto index, m_indexes) {
