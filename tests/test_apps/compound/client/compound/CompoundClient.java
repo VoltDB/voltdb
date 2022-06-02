@@ -64,6 +64,9 @@ public class CompoundClient {
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
 
+        @Option(desc = "Transaction rate limit (tps).")
+        int ratelimit = 0;
+
         @Override
         public void validate() {
             if (duration <= 0)
@@ -114,6 +117,10 @@ public class CompoundClient {
             .connectionDownHandler((h,p) -> print("[down: %s %d]", h, p))
             .connectFailureHandler((h,p) -> print("[fail: %s %d]", h, p));
 
+        if (config.ratelimit > 0) {
+            clientConfig.transactionRateLimit(config.ratelimit);
+        }
+
         client = ClientFactory.createClient(clientConfig);
         statsCtx = client.createStatsContext();
  }
@@ -152,6 +159,10 @@ public class CompoundClient {
         String procName = "SimpleCompoundProc";
         if (config.test.equalsIgnoreCase("null"))
             procName = "NullCompoundProc";
+
+        if (config.ratelimit > 0) {
+            print("Using rate limit of %d tps", config.ratelimit);
+        }
 
         print("Running %s test for %d secs ...", procName, config.duration);
         final long benchmarkStartTime = System.currentTimeMillis();
@@ -205,7 +216,7 @@ public class CompoundClient {
 
         // Write stats to file if requested
         try {
-            if ((config.statsfile != null) && (config.statsfile.length() != 0)) {
+            if (config.statsfile != null && config.statsfile.length() != 0) {
                 FileWriter fw = new FileWriter(config.statsfile);
                 fw.append(String.format("%d,%d,%d,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,0,0,0\n",
                                     stats.getStartTimestamp(),
