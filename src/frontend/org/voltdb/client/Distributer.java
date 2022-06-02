@@ -143,7 +143,6 @@ class Distributer {
     // contains all nodes from the latest topo update for which we do not
     // have connections. It's not directly adjusted on connection failure.
     private boolean m_topologyChangeAware;
-    private boolean m_topoAwareReconnect;
     private final AtomicReference<ImmutableSet<Integer>> m_unconnectedHosts = new AtomicReference<>();
     private final AtomicBoolean m_createConnectionUponTopoChangeInProgress = new AtomicBoolean(false);
 
@@ -1355,7 +1354,7 @@ class Distributer {
                                                         CxnStatsData statsData) throws NoConnectionsException {
         final int totalConnections = m_connections.size();
         if (totalConnections == 0) {
-            if (!m_topoAwareReconnect) {
+            if (!m_topologyChangeAware) {
                 throw new NoConnectionsException("No connections.");
             }
             if (ignoreBackpressure) {
@@ -1850,10 +1849,10 @@ class Distributer {
 
     /**
      * Configure topology-change awareness
+     * (Implies autoreconnect)
      */
-    void setTopologyChangeAware(boolean topoAware, boolean autoReconnect) {
+    void setTopologyChangeAware(boolean topoAware) {
         m_topologyChangeAware = topoAware;
-        m_topoAwareReconnect = topoAware & autoReconnect;
     }
 
     /**

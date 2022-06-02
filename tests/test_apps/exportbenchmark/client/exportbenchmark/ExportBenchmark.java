@@ -231,7 +231,6 @@ public class ExportBenchmark {
     public ExportBenchmark(ExportBenchConfig config) {
         this.config = config;
         ClientConfig clientConfig = new ClientConfig();
-        clientConfig.setReconnectOnConnectionLoss(true);
         clientConfig.setTopologyChangeAware(true);
         client = ClientFactory.createClient(clientConfig);
 

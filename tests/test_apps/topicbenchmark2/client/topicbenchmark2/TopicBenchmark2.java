@@ -321,7 +321,6 @@ public class TopicBenchmark2 {
         this.m_config = config;
         if (!m_config.usekafka) {
             ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
-            clientConfig.setReconnectOnConnectionLoss(true);
             clientConfig.setTopologyChangeAware(true);
             m_client = ClientFactory.createClient(clientConfig);
         }

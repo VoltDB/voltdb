@@ -166,7 +166,7 @@ public final class ClientImpl implements Client {
         m_reconnectDelay = config.m_initialConnectionRetryIntervalMS;
         m_reconnectMaxDelay = config.m_maxConnectionRetryIntervalMS;
 
-        m_distributer.setTopologyChangeAware(m_topologyChangeAware, m_autoReconnect);
+        m_distributer.setTopologyChangeAware(m_topologyChangeAware);
         if (m_topologyChangeAware) {
             m_ex = Executors.newSingleThreadScheduledExecutor(CoreUtils.getThreadFactory("Topoaware thread"));
             m_connectHistory = new LinkedHashSet<>();
@@ -710,7 +710,7 @@ public final class ClientImpl implements Client {
 
         @Override
         public void connectionCreated(String hostname, int port, AutoConnectionStatus status) {
-            if (m_topologyChangeAware && m_autoReconnect && status == AutoConnectionStatus.SUCCESS) {
+            if (m_topologyChangeAware && status == AutoConnectionStatus.SUCCESS) {
                 // Track potential targets for reconnection. A new epoch begins
                 // on the first successful connection after having no connections;
                 // previous targets are then forgotten.
@@ -728,7 +728,7 @@ public final class ClientImpl implements Client {
         public void connectionLost(String hostname, int port, int connectionsLeft,
                                    DisconnectCause cause) {
             if (connectionsLeft == 0) {
-                if (m_topologyChangeAware && m_autoReconnect && !m_isShutdown) {
+                if (m_topologyChangeAware && !m_isShutdown) {
                     // Special-case handling of no connections in topo-change aware mode.
                     // Must make a connection first of all.
                     createAnyConnection();

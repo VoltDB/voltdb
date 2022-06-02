@@ -186,7 +186,6 @@ public class TopicBenchmark {
     public TopicBenchmark(TopicBenchConfig config) {
         this.config = config;
         ClientConfig clientConfig = new ClientConfig();
-        clientConfig.setReconnectOnConnectionLoss(true);
         clientConfig.setTopologyChangeAware(true);
         client = ClientFactory.createClient(clientConfig);
 
