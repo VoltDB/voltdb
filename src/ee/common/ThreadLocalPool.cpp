@@ -93,6 +93,7 @@ ThreadLocalPool::~ThreadLocalPool() {
         SizeBucketMap_t& mapBySize = s_allocations[*m_enginePartitionIdPtr];
         auto mapForAdd = mapBySize.begin();
         while (mapForAdd != mapBySize.end()) {
+            if (m_shutdown == true) break;
             AllocTraceMap_t& allocMap = mapForAdd->second;
             mapForAdd++;
             if (!allocMap.empty()) {
