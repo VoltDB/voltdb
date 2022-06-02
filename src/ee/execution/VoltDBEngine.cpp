@@ -236,6 +236,7 @@ VoltDBEngine::~VoltDBEngine() {
     // --izzy 8/19/2009
 
     m_destroying = true;
+    ThreadLocalPool::shutdown();
     // clean up execution plans
     m_plans.reset();
     m_groupStore.reset(nullptr);

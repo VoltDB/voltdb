@@ -40,6 +40,7 @@ thread_local CompactingStringStorage* m_stringKey = nullptr;
 thread_local size_t* m_allocated = nullptr;
 thread_local int32_t* m_threadPartitionIdPtr = nullptr;
 thread_local int32_t* m_enginePartitionIdPtr = nullptr;
+bool ThreadLocalPool::m_shutdown = false;
 
 #ifdef VOLT_POOL_CHECKING
 std::mutex ThreadLocalPool::s_sharedMemoryMutex;
@@ -93,6 +94,7 @@ ThreadLocalPool::~ThreadLocalPool() {
         SizeBucketMap_t& mapBySize = s_allocations[*m_enginePartitionIdPtr];
         auto mapForAdd = mapBySize.begin();
         while (mapForAdd != mapBySize.end()) {
+            if (m_shutdown == true) break;
             AllocTraceMap_t& allocMap = mapForAdd->second;
             mapForAdd++;
             if (!allocMap.empty()) {
