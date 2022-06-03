@@ -69,6 +69,13 @@ Table::Table(int tableAllocationTargetSize) :
 }
 
 Table::~Table() {
+#ifdef VOLT_POOL_CHECKING
+    auto engine = ExecutorContext::getEngine();
+    bool shutdown = engine == nullptr ? false : engine->isDestroying();
+    if (shutdown) {
+       m_tlPool.shutdown();
+    }
+#endif
     // not all tables are reference counted but this should be invariant
     vassert(m_refcount == 0);
 
