@@ -24,6 +24,7 @@ import java.net.URL;
 import org.voltcore.common.Constants;
 import org.voltcore.network.LoopbackAddress;
 import org.voltcore.utils.InstanceId;
+import org.voltdb.client.ClientFactory;
 import org.voltdb.probe.MeshProber;
 import org.voltdb.utils.MiscUtils;
 
@@ -34,6 +35,10 @@ import org.apache.commons.io.FileUtils;
  */
 public class ServerThread extends Thread {
     VoltDB.Configuration m_config;
+
+    static {
+        ClientFactory.preserveResources();
+    }
 
     public ServerThread(VoltDB.Configuration config) {
         m_config = config;
