@@ -21,7 +21,6 @@ import java.io.IOException;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
-import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.SiteProcedureConnection;
@@ -33,20 +32,27 @@ import org.voltdb.rejoin.TaskLog;
  */
 public class TickProducer extends SiteTasker implements Runnable
 {
-    private final SiteTaskerQueue m_taskQueue;
+    protected VoltLogger m_logger;
+    protected final long m_procedureLogThreshold;
+    protected final SiteTaskerQueue m_taskQueue;
+
     private ScheduledFuture<?> m_scheduledTick;
-    private final long m_procedureLogThreshold;
     private final long SUPPRESS_INTERVAL = 60; // 60 seconds
-    private VoltLogger m_logger;
     private int m_partitionId;
     private final long m_siteId;
     private long m_previousTaskTimestamp = -1;
     private long m_previousTaskPeekTime = -1;
     private long m_scheduledTickInterval = 1000;
 
-    private static String TICK_MESSAGE = " A process (procedure, fragment, or operational task) is taking a long time "
+    private static final String GENERAL_TEMPLATE = " A process (procedure, fragment, or operational task) is taking a long time "
             + "-- over %d seconds -- and blocking the queue for site %d (%s) "
-            + "No other jobs will be executed until that process completes.";
+            + "No other jobs will be executed until it completes. %s";
+
+    private static final String PROCEDURE_TEMPLATE = " The procedure %s is taking a long time "
+            + "-- over %d seconds -- and blocking the queue for site %d (%s) "
+            + "No other jobs will be executed until it completes. %s";
+
+    private String m_procedureName;
 
     TickProducer(SiteTaskerQueue taskQueue, long siteId)
     {
@@ -93,8 +99,7 @@ public class TickProducer extends SiteTasker implements Runnable
 
     // Runnable.run() schedules execution
     @Override
-    public void run()
-    {
+    public void run() {
         m_taskQueue.offer(this);
         // check if previous task is running for more than threshold
         SiteTasker task = m_taskQueue.peek();
@@ -103,32 +108,53 @@ public class TickProducer extends SiteTasker implements Runnable
         if (task != null) {
             headOfQueueOfferTime = task.getQueueOfferTime();
         } else {
+            // SP site must have grabbed this task just offered
             headOfQueueOfferTime = currentTime;
         }
         if (headOfQueueOfferTime != m_previousTaskTimestamp) {
             m_previousTaskTimestamp = headOfQueueOfferTime;
             m_previousTaskPeekTime = currentTime;
         } else if (currentTime - m_previousTaskPeekTime >= m_procedureLogThreshold) {
-            long waitTime = (currentTime - m_previousTaskPeekTime)/1_000_000_000L; // in seconds
-            if (m_logger.isDebugEnabled()) {
-                String taskInfo = (task == null) ? "" : " Task Info: " + task.getTaskInfo();
-                m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.DEBUG, null, TICK_MESSAGE + taskInfo, waitTime, m_partitionId, CoreUtils.hsIdToString(m_siteId));
-            } else {
-                m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.WARN, null, TICK_MESSAGE, waitTime, m_partitionId, CoreUtils.hsIdToString(m_siteId));
-            }
+            logTimeout(currentTime, m_previousTaskPeekTime, task);
+        }
+    }
+
+    protected void logTimeout(long currentTime, long previousTime, SiteTasker task) {
+        long waitTime = (currentTime - previousTime)/1_000_000_000L; // in seconds
+        String procName = getProcedure();
+        String taskInfo = "";
+        if (m_logger.isDebugEnabled() && task != null) {
+            taskInfo = " Task Info: " + task.getTaskInfo();
+        }
+        if (procName == null) {
+            m_logger.rateLimitedWarn(SUPPRESS_INTERVAL, GENERAL_TEMPLATE,
+                    waitTime, m_partitionId, CoreUtils.hsIdToString(m_siteId), taskInfo);
+        } else {
+            m_logger.rateLimitedWarn(SUPPRESS_INTERVAL, PROCEDURE_TEMPLATE,
+                    procName, waitTime, m_partitionId, CoreUtils.hsIdToString(m_siteId), taskInfo);
         }
     }
 
     @Override
-    public void run(final SiteProcedureConnection siteConnection)
-    {
+    public void run(final SiteProcedureConnection siteConnection) {
         siteConnection.tick();
     }
 
     @Override
     public void runForRejoin(final SiteProcedureConnection siteConnection, TaskLog taskLog)
-    throws IOException
-    {
+    throws IOException {
         siteConnection.tick();
+    }
+
+    public synchronized void setupProcedure(String procedureName) {
+        m_procedureName = procedureName;
+    }
+
+    public void completeProcedure()  {
+        m_procedureName = null;
+    }
+
+    private synchronized String getProcedure() {
+        return m_procedureName;
     }
 }

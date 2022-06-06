@@ -742,7 +742,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             m_tableStats = null;
             m_indexStats = null;
             m_memStats = null;
-            m_tickProducer = null;
+            m_tickProducer = new MPTickProducer(pendingSiteTasks, siteId);
         }
     }
 
@@ -1766,7 +1766,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_loadedProcedures.loadProcedures(m_context, isReplay);
         m_ee.loadFunctions(m_context);
 
+        Cluster newCluster = m_context.catalog.getClusters().get("cluster");
         if (isMPI) {
+            m_tickProducer.changeTickInterval(newCluster.getGlobalflushinterval());
             // the rest of the work applies to sites with real EEs
             return true;
         }
@@ -1777,9 +1779,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             return true;
         }
 
-        Cluster newCluster = m_context.catalog.getClusters().get("cluster");
         CatalogMap<Table> tables = newCluster.getDatabases().get("database").getTables();
-
         boolean DRCatalogChange = false;
         for (Table t : tables) {
             if (t.getIsdred()) {
@@ -1922,11 +1922,13 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     @Override
     public void setupProcedure(String procedureName) {
+        if (m_tickProducer != null) m_tickProducer.setupProcedure(procedureName);
         m_ee.setupProcedure(procedureName);
     }
 
     @Override
     public void completeProcedure() {
+        if (m_tickProducer != null) m_tickProducer.completeProcedure();
         m_ee.completeProcedure();
     }
 
