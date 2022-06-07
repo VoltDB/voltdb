@@ -23,7 +23,7 @@ namespace voltdb {
 
 #ifdef VOLT_POOL_CHECKING
 CompactingPool::~CompactingPool() {
-    if (!m_allocations.empty()) {
+    if (!m_shutdown && !m_allocations.empty()) {
         VOLT_ERROR("ContiguousAllocator data not deallocated on thread for partition %d",
                 ThreadLocalPool::getThreadPartitionId());
         VOLT_ERROR_STACK();

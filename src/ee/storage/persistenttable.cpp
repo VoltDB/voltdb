@@ -182,7 +182,7 @@ PersistentTable::~PersistentTable() {
     TableTuple tuple(m_schema);
 #ifdef VOLT_POOL_CHECKING
     auto engine = ExecutorContext::getEngine();
-    bool shutdown = engine == nullptr ? false : engine->isDestroying();
+    bool shutdown = engine == nullptr ? true : engine->isDestroying();
     if (!shutdown) {
 #endif
         while (ti.next(tuple)) {

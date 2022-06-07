@@ -69,12 +69,16 @@ Table::Table(int tableAllocationTargetSize) :
 }
 
 Table::~Table() {
+std::cout << name() << ", in table detor"<< std::endl;
 #ifdef VOLT_POOL_CHECKING
     auto engine = ExecutorContext::getEngine();
-    bool shutdown = engine == nullptr ? false : engine->isDestroying();
+    bool shutdown = engine == nullptr ? true : engine->isDestroying();
     if (shutdown) {
+std::cout << name() << ", in table detor, shutdwon true"<< std::endl;
        m_tlPool.shutdown();
     }
+else
+std::cout << name() << ", in table detor, shutdwon false"<< std::endl;
 #endif
     // not all tables are reference counted but this should be invariant
     vassert(m_refcount == 0);
