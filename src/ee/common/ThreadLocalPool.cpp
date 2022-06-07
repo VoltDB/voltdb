@@ -44,6 +44,14 @@ thread_local int32_t* m_enginePartitionIdPtr = nullptr;
 #ifdef VOLT_POOL_CHECKING
 std::mutex ThreadLocalPool::s_sharedMemoryMutex;
 ThreadLocalPool::PartitionBucketMap_t ThreadLocalPool::s_allocations;
+
+void ThreadLocalPool::shutdown() {
+    m_shutdown = true;
+    auto& poolMap = *m_stringKey;
+    for (auto itr= poolMap.begin(); itr != poolMap.end(); ++itr) {
+         itr->second->shutdown();
+    }
+}
 #endif
 
 ThreadLocalPool::ThreadLocalPool() {

@@ -182,7 +182,7 @@ public:
     static int32_t* getThreadPartitionIdForTest();
     static void setThreadPartitionIdForTest(int32_t* partitionId);
 #ifdef VOLT_POOL_CHECKING
-    inline void shutdown() {m_shutdown = true;}
+    void shutdown();
 #endif
 private:
     #ifdef VOLT_POOL_CHECKING
