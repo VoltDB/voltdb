@@ -97,6 +97,8 @@ public class SocketJoiner {
 
     public static final String FAIL_ESTABLISH_MESH_MSG = "Failed to establish socket mesh.";
 
+    private final String m_hostDisplayName;
+
     public enum ConnectionType {
         REQUEST_HOSTID,
         PUBLISH_HOSTID,
@@ -436,10 +438,12 @@ public class SocketJoiner {
     public SocketJoiner(
             String internalInterface,
             int internalPort,
+            String hostDisplayName,
             AtomicBoolean isPaused,
             JoinAcceptor acceptor,
             JoinHandler jh,
-            SslContext sslServerContext, SslContext sslClientContext) {
+            SslContext sslServerContext,
+            SslContext sslClientContext) {
         if (internalInterface == null || jh == null || acceptor == null) {
             throw new IllegalArgumentException();
         }
@@ -450,6 +454,7 @@ public class SocketJoiner {
         m_acceptor = acceptor;
         m_sslServerContext = sslServerContext;
         m_sslClientContext = sslClientContext;
+        m_hostDisplayName = hostDisplayName;
     }
 
     /*
@@ -838,12 +843,14 @@ public class SocketJoiner {
             request = RequestHostIdRequest.createWithAddress(
                     versionChecker.getVersionString(),
                     m_internalPort,
-                    m_internalInterface
+                    m_internalInterface,
+                    m_hostDisplayName
             );
         } else {
             request = RequestHostIdRequest.createWithoutAddress(
                     versionChecker.getVersionString(),
-                    m_internalPort
+                    m_internalPort,
+                    m_hostDisplayName
             );
         }
 
@@ -872,6 +879,7 @@ public class SocketJoiner {
         PublishHostIdRequest publishHostIdRequest = PublishHostIdRequest.create(
                 m_localHostId,
                 m_internalPort,
+                m_hostDisplayName,
                 m_internalInterface.isEmpty() ? m_reportedInternalInterface : m_internalInterface,
                 m_acceptor.getVersionChecker().getVersionString()
         );
@@ -926,6 +934,7 @@ public class SocketJoiner {
                 m_acceptor.getVersionChecker().getVersionString(),
                 m_localHostId,
                 m_internalPort,
+                m_hostDisplayName,
                 m_internalInterface.isEmpty() ? m_reportedInternalInterface : m_internalInterface
         );
 
@@ -1007,6 +1016,7 @@ public class SocketJoiner {
                 String address = hostInformation.getAddress();
                 int port = hostInformation.getPort();
                 final int hostId = hostInformation.getHostId();
+                String hostDisplayName = hostInformation.getHostDisplayName();
 
                 LOG.info("Leader provided address " + address + ":" + port);
                 InetSocketAddress hostAddr = new InetSocketAddress(address, port);
@@ -1016,6 +1026,7 @@ public class SocketJoiner {
                     connectedHostInformations.add(
                             new ConnectedHostInformation(
                                     hostId,
+                                    hostDisplayName,
                                     socket,
                                     leaderSSLEngine,
                                     hostAddr
@@ -1032,6 +1043,7 @@ public class SocketJoiner {
 
                 ConnectedHostInformation connectedHostInformation = new ConnectedHostInformation(
                         hostId,
+                        hostDisplayName,
                         hostSocket,
                         sslEngine,
                         hostAddr

@@ -39,9 +39,10 @@ public class TestRequestHostIdRequest {
         String version = "version";
         int port = 123;
         String address = "address";
+        String hostDisplayName = "hostDisplayName";
 
         // When
-        RequestHostIdRequest requestHostIdRequest1 = RequestHostIdRequest.createWithAddress(version, port, address);
+        RequestHostIdRequest requestHostIdRequest1 = RequestHostIdRequest.createWithAddress(version, port, hostDisplayName, address);
         RequestHostIdRequest requestHostIdRequest2 = (RequestHostIdRequest) SocketJoinerMessageParser.parse(requestHostIdRequest1.getJsonObject());
 
         // Then
@@ -49,6 +50,7 @@ public class TestRequestHostIdRequest {
         assertThat(requestHostIdRequest2.getVersionString()).isEqualTo(version);
         assertThat(requestHostIdRequest2.getPort()).isEqualTo(port);
         assertThat(requestHostIdRequest2.getAddress()).isEqualTo(address);
+        assertThat(requestHostIdRequest2.getHostDisplayName()).isEqualTo(hostDisplayName);
     }
 
     @Test
@@ -56,14 +58,16 @@ public class TestRequestHostIdRequest {
         // Given
         String version = "version";
         int port = 123;
+        String hostDisplayName = "hostDisplayName";
 
         // When
-        RequestHostIdRequest requestHostIdRequest1 = RequestHostIdRequest.createWithoutAddress(version, port);
+        RequestHostIdRequest requestHostIdRequest1 = RequestHostIdRequest.createWithoutAddress(version, port, hostDisplayName);
         RequestHostIdRequest requestHostIdRequest2 = (RequestHostIdRequest) SocketJoinerMessageParser.parse(requestHostIdRequest1.getJsonObject());
 
         // Then
         assertThat(requestHostIdRequest2.getType()).isEqualTo(REQUEST_HOSTID.name());
         assertThat(requestHostIdRequest2.getVersionString()).isEqualTo(version);
         assertThat(requestHostIdRequest2.getPort()).isEqualTo(port);
+        assertThat(requestHostIdRequest2.getHostDisplayName()).isEqualTo(hostDisplayName);
     }
 }

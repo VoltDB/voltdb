@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.apache.commons.lang3.RandomStringUtils;
 import org.voltcore.utils.PortGenerator;
 
 import junit.framework.TestCase;
@@ -116,9 +117,9 @@ public class TestMessaging extends TestCase {
 
     public void testSimple() throws Exception {
         List<HostMessenger.Config> configs = getConfigs(2);
-        HostMessenger msg1 = new HostMessenger(configs.get(0), null);
+        HostMessenger msg1 = createHostMessenger(configs.get(0));
         msg1.start();
-        HostMessenger msg2 = new HostMessenger(configs.get(1), null);
+        HostMessenger msg2 = createHostMessenger(configs.get(1));
         msg2.start();
 
         System.out.println("Waiting for socketjoiners...");
@@ -175,11 +176,11 @@ public class TestMessaging extends TestCase {
 
     public void testMultiMailbox() throws Exception {
         List<HostMessenger.Config> configs = getConfigs(3);
-        HostMessenger msg1 = new HostMessenger(configs.get(0), null);
+        HostMessenger msg1 = createHostMessenger(configs.get(0));
         msg1.start();
-        HostMessenger msg2 = new HostMessenger(configs.get(1), null);
+        HostMessenger msg2 = createHostMessenger(configs.get(1));
         msg2.start();
-        HostMessenger msg3 = new HostMessenger(configs.get(2), null);
+        HostMessenger msg3 = createHostMessenger(configs.get(2));
         msg3.start();
 
         System.out.println("Waiting for socketjoiners...");
@@ -293,7 +294,7 @@ public class TestMessaging extends TestCase {
         @Override
         public void run() {
             try {
-                HostMessenger msg = new HostMessenger(config, null);
+                HostMessenger msg = createHostMessenger(config);
                 msg.start();
                 m_ready.set(true);
                 msg.waitForGroupJoin(2);
@@ -313,9 +314,9 @@ public class TestMessaging extends TestCase {
         }
         List<HostMessenger.Config> configs = getConfigs(2);
 
-        HostMessenger msg1 = new HostMessenger(configs.get(0), null);
+        HostMessenger msg1 = createHostMessenger(configs.get(0));
         msg1.start();
-        HostMessenger msg2 = new HostMessenger(configs.get(1), null);
+        HostMessenger msg2 = createHostMessenger(configs.get(1));
         msg2.start();
         System.out.println("Waiting for socketjoiners...");
         msg1.waitForGroupJoin(2);
@@ -349,5 +350,9 @@ public class TestMessaging extends TestCase {
         if (newnode.isAlive()) fail();
 
         msg1.shutdown();
+    }
+
+    private HostMessenger createHostMessenger(HostMessenger.Config config) {
+        return new HostMessenger(config, null, RandomStringUtils.random(20));
     }
 }

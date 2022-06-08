@@ -181,9 +181,9 @@ public class TestClockSkewStats {
         when(clock.millis()).thenReturn(0L);
         collector.reportCompletion(null, null, response);
 
-        when(hostMessenger.getHostnameForHostID(1)).thenReturn("192.168.66.62");
-        when(hostMessenger.getHostnameForHostID(2)).thenReturn("/192.168.66.63:64349");
-        when(hostMessenger.getHostnameForHostID(3)).thenReturn("pk-voltdb-cluster-0.pk-voltdb-cluster-internal.pkaminski.svc.cluster.local/10.104.0.218:3021");
+        when(hostMessenger.getHostDisplayNameForHostId(1)).thenReturn("pk-voltdb-cluster-1");
+        when(hostMessenger.getHostDisplayNameForHostId(2)).thenReturn("pk-voltdb-cluster-2");
+        when(hostMessenger.getHostDisplayNameForHostId(3)).thenReturn("pk-voltdb-cluster-3");
 
         // when
         Object[][] statsRows = collector.getStatsRows(true, 0L);
@@ -192,9 +192,9 @@ public class TestClockSkewStats {
         assertThat(statsRows)
                 .isNotNull()
                 .isEqualTo(new Object[] {
-                        new Object[] {0L, 0, "localhost", 10L, 1, "192.168.66.62"},
-                        new Object[] {0L, 0, "localhost", 200L, 2, "/192.168.66.63"},
-                        new Object[] {0L, 0, "localhost", 30L, 3, "pk-voltdb-cluster-0.pk-voltdb-cluster-internal.pkaminski.svc.cluster.local/10.104.0.218"}
+                        new Object[] {0L, 0, "localhost", 10L, 1, "pk-voltdb-cluster-1"},
+                        new Object[] {0L, 0, "localhost", 200L, 2, "pk-voltdb-cluster-2"},
+                        new Object[] {0L, 0, "localhost", 30L, 3, "pk-voltdb-cluster-3"}
                 });
     }
 

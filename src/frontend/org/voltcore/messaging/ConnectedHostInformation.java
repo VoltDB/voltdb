@@ -22,17 +22,20 @@ import java.nio.channels.SocketChannel;
 
 class ConnectedHostInformation {
     private final int hostId;
+    private final String hostDisplayName;
     private final SocketChannel socket;
     private final SSLEngine sslEngine;
     private final InetSocketAddress listeningAddress;
 
     public ConnectedHostInformation(
             int hostId,
+            String hostDisplayName,
             SocketChannel socket,
             SSLEngine sslEngine,
             InetSocketAddress listeningAddress
     ) {
         this.hostId = hostId;
+        this.hostDisplayName = hostDisplayName;
         this.socket = socket;
         this.sslEngine = sslEngine;
         this.listeningAddress = listeningAddress;
@@ -40,6 +43,10 @@ class ConnectedHostInformation {
 
     public int getHostId() {
         return hostId;
+    }
+
+    public String getHostDisplayName() {
+        return hostDisplayName;
     }
 
     public SocketChannel getSocket() {

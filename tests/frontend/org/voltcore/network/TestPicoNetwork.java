@@ -134,7 +134,7 @@ public class TestPicoNetwork extends TestCase {
         networkChannel = ssc.accept();
         rawChannel.finishConnect();
         rawChannel.configureBlocking(true);
-        pn = new PicoNetwork(networkChannel);
+        pn = new PicoNetwork(networkChannel, "hostDisplayName");
         handler = new MockInputHandler();
         pn.start(handler, new HashSet<Long>());
     }

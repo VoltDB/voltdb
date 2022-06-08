@@ -22,6 +22,7 @@ import org.json_voltpatches.JSONObject;
 import org.voltcore.messaging.SocketJoiner;
 
 import static org.voltcore.messaging.messages.FieldNames.ADDRESS;
+import static org.voltcore.messaging.messages.FieldNames.HOST_DISPLAY_NAME;
 import static org.voltcore.messaging.messages.FieldNames.PORT;
 import static org.voltcore.messaging.messages.FieldNames.TYPE;
 import static org.voltcore.messaging.messages.FieldNames.VERSION_STRING;
@@ -32,20 +33,27 @@ public class RequestHostIdRequest extends SocketJoinerMessageBase {
         super(jsonObject);
     }
 
-    public static RequestHostIdRequest createWithAddress(String versionString, int port, String address) throws JSONException {
+    public static RequestHostIdRequest createWithAddress(String versionString,
+                                                         int port,
+                                                         String hostDisplayName,
+                                                         String address) throws JSONException {
         JSONObject jsonObject = new JSONObject();
         jsonObject.put(TYPE, SocketJoiner.ConnectionType.REQUEST_HOSTID.name());
         jsonObject.put(VERSION_STRING, versionString);
         jsonObject.put(PORT, port);
         jsonObject.put(ADDRESS, address);
+        jsonObject.put(HOST_DISPLAY_NAME, hostDisplayName);
         return new RequestHostIdRequest(jsonObject);
     }
 
-    public static RequestHostIdRequest createWithoutAddress(String versionString, int port) throws JSONException {
+    public static RequestHostIdRequest createWithoutAddress(String versionString,
+                                                            int port,
+                                                            String hostDisplayName) throws JSONException {
         JSONObject jsonObject = new JSONObject();
         jsonObject.put(TYPE, SocketJoiner.ConnectionType.REQUEST_HOSTID.name());
         jsonObject.put(VERSION_STRING, versionString);
         jsonObject.put(PORT, port);
+        jsonObject.put(HOST_DISPLAY_NAME, hostDisplayName);
         return new RequestHostIdRequest(jsonObject);
     }
 }

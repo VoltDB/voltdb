@@ -26,7 +26,6 @@ package org.voltcore.messaging.messages;
 import org.junit.Test;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
-import static org.voltcore.messaging.SocketJoiner.ConnectionType.PUBLISH_HOSTID;
 
 public class TestHostInformation {
 
@@ -36,14 +35,16 @@ public class TestHostInformation {
         int hostId = 123;
         String address = "address";
         int port = 123;
+        String hostDisplayName = "hostDisplayName";
 
         // When
-        HostInformation hostInformation1 = HostInformation.create(hostId,address, port);
+        HostInformation hostInformation1 = HostInformation.create(hostId,address, port, hostDisplayName);
         HostInformation hostInformation2 = HostInformation.fromJsonObject(hostInformation1.getJsonObject());
 
         // Then
         assertThat(hostInformation2.getHostId()).isEqualTo(hostId);
         assertThat(hostInformation2.getPort()).isEqualTo(port);
         assertThat(hostInformation2.getAddress()).isEqualTo(address);
+        assertThat(hostInformation2.getHostDisplayName()).isEqualTo(hostDisplayName);
     }
 }

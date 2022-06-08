@@ -21,6 +21,7 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 
 import static org.voltcore.messaging.messages.FieldNames.ADDRESS;
+import static org.voltcore.messaging.messages.FieldNames.HOST_DISPLAY_NAME;
 import static org.voltcore.messaging.messages.FieldNames.PORT;
 import static org.voltcore.messaging.messages.FieldNames.TYPE;
 import static org.voltcore.messaging.messages.FieldNames.VERSION_STRING;
@@ -49,5 +50,9 @@ public abstract class SocketJoinerMessageBase extends MessageBase {
 
     public String getType() throws JSONException {
         return jsonObject.getString(TYPE);
+    }
+
+    public String getHostDisplayName() throws JSONException {
+        return jsonObject.getString(HOST_DISPLAY_NAME);
     }
 }

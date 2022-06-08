@@ -22,6 +22,7 @@ import org.json_voltpatches.JSONObject;
 import org.voltcore.messaging.SocketJoiner;
 
 import static org.voltcore.messaging.messages.FieldNames.ADDRESS;
+import static org.voltcore.messaging.messages.FieldNames.HOST_DISPLAY_NAME;
 import static org.voltcore.messaging.messages.FieldNames.HOST_ID;
 import static org.voltcore.messaging.messages.FieldNames.PORT;
 import static org.voltcore.messaging.messages.FieldNames.TYPE;
@@ -37,13 +38,18 @@ public class PublishHostIdRequest extends SocketJoinerMessageBase {
         return getJsonObject().getInt(HOST_ID);
     }
 
-    public static PublishHostIdRequest create(int hostId, int port, String address, String versionString) throws JSONException {
+    public static PublishHostIdRequest create(int hostId,
+                                              int port,
+                                              String hostDisplayName,
+                                              String address,
+                                              String versionString) throws JSONException {
         JSONObject jsObj = new JSONObject();
         jsObj.put(TYPE, SocketJoiner.ConnectionType.PUBLISH_HOSTID.name());
         jsObj.put(VERSION_STRING, versionString);
         jsObj.put(HOST_ID, hostId);
         jsObj.put(PORT, port);
         jsObj.put(ADDRESS, address);
+        jsObj.put(HOST_DISPLAY_NAME, hostDisplayName);
         return new PublishHostIdRequest(jsObj);
     }
 }

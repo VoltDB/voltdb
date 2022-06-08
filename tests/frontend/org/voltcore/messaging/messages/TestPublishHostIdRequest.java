@@ -38,9 +38,10 @@ public class TestPublishHostIdRequest {
         int hostId = 123;
         int port = 123;
         String address = "address";
+        String hostDisplayName = "hostDisplayName";
 
         // When
-        PublishHostIdRequest publishHostIdRequest1 = PublishHostIdRequest.create(hostId, port, address, version);
+        PublishHostIdRequest publishHostIdRequest1 = PublishHostIdRequest.create(hostId, port, hostDisplayName, address, version);
         PublishHostIdRequest publishHostIdRequest2 = (PublishHostIdRequest) SocketJoinerMessageParser.parse(publishHostIdRequest1.getJsonObject());
 
         // Then
@@ -49,5 +50,6 @@ public class TestPublishHostIdRequest {
         assertThat(publishHostIdRequest2.getHostId()).isEqualTo(hostId);
         assertThat(publishHostIdRequest2.getPort()).isEqualTo(port);
         assertThat(publishHostIdRequest2.getAddress()).isEqualTo(address);
+        assertThat(publishHostIdRequest2.getHostDisplayName()).isEqualTo(hostDisplayName);
     }
 }

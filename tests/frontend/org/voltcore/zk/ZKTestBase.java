@@ -29,6 +29,7 @@ import java.util.TreeMap;
 import java.util.concurrent.Semaphore;
 import java.util.stream.IntStream;
 
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.Watcher.Event.KeeperState;
@@ -72,7 +73,7 @@ public class ZKTestBase {
             config.zkPort = externalPort;
             m_siteIdToZKPort.put(ii, externalPort);
             config.networkThreads = 1;
-            HostMessenger hm = new HostMessenger(config, null);
+            HostMessenger hm = new HostMessenger(config, null, randomHostDisplayName());
             hm.start();
             m_messengers.add(hm);
         }
@@ -98,7 +99,7 @@ public class ZKTestBase {
             config.zkPort = externalPort;
             m_siteIdToZKPort.put(i, externalPort);
             config.networkThreads = 1;
-            HostMessenger hm = new HostMessenger(config, null);
+            HostMessenger hm = new HostMessenger(config, null, randomHostDisplayName());
             hm.start();
             m_messengers.add(hm);
             ++i;
@@ -113,7 +114,7 @@ public class ZKTestBase {
             config.zkPort = externalPort;
             m_siteIdToZKPort.put(i, externalPort);
             config.networkThreads = 1;
-            HostMessenger hm = new HostMessenger(config, null);
+            HostMessenger hm = new HostMessenger(config, null, randomHostDisplayName());
             hm.start();
             m_messengers.add(hm);
         }
@@ -153,5 +154,9 @@ public class ZKTestBase {
         m_clients.add(keeper);
         permit.acquire();
         return keeper;
+    }
+
+    protected String randomHostDisplayName() {
+        return RandomStringUtils.random(20);
     }
 }

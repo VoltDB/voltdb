@@ -21,6 +21,7 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 
 import static org.voltcore.messaging.messages.FieldNames.ADDRESS;
+import static org.voltcore.messaging.messages.FieldNames.HOST_DISPLAY_NAME;
 import static org.voltcore.messaging.messages.FieldNames.HOST_ID;
 import static org.voltcore.messaging.messages.FieldNames.PORT;
 
@@ -42,11 +43,16 @@ public class HostInformation extends MessageBase {
         return jsonObject.getInt(HOST_ID);
     }
 
-    public static HostInformation create(int hostId, String address, int port) throws JSONException {
+    public String getHostDisplayName() throws JSONException {
+        return jsonObject.getString(HOST_DISPLAY_NAME);
+    }
+
+    public static HostInformation create(int hostId, String address, int port, String hostDisplayName) throws JSONException {
         JSONObject jsonObject = new JSONObject();
         jsonObject.put(HOST_ID, hostId);
         jsonObject.put(ADDRESS, address);
         jsonObject.put(PORT, port);
+        jsonObject.put(HOST_DISPLAY_NAME, hostDisplayName);
         return new HostInformation(jsonObject);
     }
 

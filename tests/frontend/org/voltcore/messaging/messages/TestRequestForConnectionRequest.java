@@ -38,9 +38,10 @@ public class TestRequestForConnectionRequest {
         int hostId = 123;
         int port = 123;
         String address = "address";
+        String hostDisplayName = "hostDisplayName";
 
         // When
-        RequestForConnectionRequest requestForConnectionRequest1 = RequestForConnectionRequest.create(version, hostId, port, address);
+        RequestForConnectionRequest requestForConnectionRequest1 = RequestForConnectionRequest.create(version, hostId, port, hostDisplayName, address);
         RequestForConnectionRequest requestForConnectionRequest2 = (RequestForConnectionRequest) SocketJoinerMessageParser.parse(requestForConnectionRequest1.getJsonObject());
 
         // Then
@@ -49,5 +50,6 @@ public class TestRequestForConnectionRequest {
         assertThat(requestForConnectionRequest2.getHostId()).isEqualTo(hostId);
         assertThat(requestForConnectionRequest2.getPort()).isEqualTo(port);
         assertThat(requestForConnectionRequest2.getAddress()).isEqualTo(address);
+        assertThat(requestForConnectionRequest2.getHostDisplayName()).isEqualTo(hostDisplayName);
     }
 }

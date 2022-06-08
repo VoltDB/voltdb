@@ -112,21 +112,20 @@ public class ClockSkewStats extends StatsSource implements InternalConnectionSta
         int offset = super.updateStatsRow(rowKey, rowValues);
 
         Long skew = cachedSkews.get(rowKey);
-        String fullHostname = voltDb.getHostMessenger().getHostnameForHostID((Integer) rowKey);
-        String hostname = HostAndPort.fromString(fullHostname).getHost();
+        String hostDisplayName = voltDb.getHostMessenger().getHostDisplayNameForHostId((Integer) rowKey);
         rowValues[offset + Skew.SKEW_TIME.ordinal()] = skew;
         rowValues[offset + Skew.REMOTE_HOST_ID.ordinal()] = rowKey;
-        rowValues[offset + Skew.REMOTE_HOST_NAME.ordinal()] = hostname;
+        rowValues[offset + Skew.REMOTE_HOST_NAME.ordinal()] = hostDisplayName;
         return offset + Skew.values().length;
     }
 
     private void traceResponse(int localHostId, int remoteHostId, long skew) {
         if (hostLog.isTraceEnabled()) {
             String localHostName = voltDb.getHostMessenger().getHostname();
-            String remoteHostName = voltDb.getHostMessenger().getHostnameForHostID(remoteHostId);
+            String hostDisplayName = voltDb.getHostMessenger().getHostDisplayNameForHostId(remoteHostId);
             hostLog.trace(format("Collecting reply in node %d(%s) got skew result from %d(%s) equal to %d",
                                     localHostId, localHostName,
-                                    remoteHostId, remoteHostName,
+                                    remoteHostId, hostDisplayName,
                                     skew));
         }
 

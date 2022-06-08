@@ -106,6 +106,7 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
     protected long m_messagesRead;
     protected int m_interestOps = 0;
     protected final SocketChannel m_sc;
+    private final String m_hostDisplayName;
     protected final SelectionKey m_key;
     protected InputHandler m_ih;
 
@@ -135,9 +136,12 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
     /**
      * Create a pico network thread
      * @param sc  SocketChannel
+     * @param hostDisplayName
      */
-    public PicoNetwork(SocketChannel sc) {
+    public PicoNetwork(SocketChannel sc,
+                       String hostDisplayName) {
         m_sc = sc;
+        m_hostDisplayName = hostDisplayName;
         InetSocketAddress remoteAddress = (InetSocketAddress)sc.socket().getRemoteSocketAddress();
         m_remoteSocketAddress = remoteAddress;
         m_remoteSocketAddressString = remoteAddress.getAddress().getHostAddress();
@@ -399,7 +403,7 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
             retval.put(
                     m_ih.connectionId(),
                     Pair.of(
-                            getHostnameOrIP(),
+                            m_hostDisplayName,
                             new long[]{
                                     read,
                                     messagesRead,

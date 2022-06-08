@@ -374,6 +374,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
     private final Object m_mapLock = new Object();
 
+    private final String m_hostDisplayName;
+
     /*
      * References to other hosts in the mesh.
      * Updates via COW
@@ -418,28 +420,34 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         return m_siteMailboxes.get(hsId);
     }
 
-    public HostMessenger(Config config, HostWatcher hostWatcher) {
-        this(config, hostWatcher, null, null);
+    public HostMessenger(Config config, HostWatcher hostWatcher, String hostDisplayName) {
+        this(config, hostWatcher, null, null, hostDisplayName);
     }
 
-    public HostMessenger(Config config, HostWatcher hostWatcher, SslContext sslServerContext,
-            SslContext sslClientContext) {
+    public HostMessenger(Config config,
+                         HostWatcher hostWatcher,
+                         SslContext sslServerContext,
+                         SslContext sslClientContext,
+                         String hostDisplayName) {
         checkArgument(!HostAndPort.fromString(config.zkInterface).hasPort(),
-                      "zkInterface '%s' should not contain port", config.zkInterface);
+                "zkInterface '%s' should not contain port", config.zkInterface);
         m_config = config;
         m_hostWatcher = hostWatcher;
         m_network = new VoltNetworkPool(m_config.networkThreads, 0, m_config.coreBindIds, "Server");
         m_acceptor = config.acceptor;
         //This ref is updated after the mesh decision is made.
         m_paused.set(m_config.startPause);
+        m_hostDisplayName = hostDisplayName;
         m_joiner = new SocketJoiner(
                 m_config.internalInterface,
                 m_config.internalPort,
+                m_hostDisplayName,
                 m_paused,
                 m_acceptor,
                 this,
                 sslServerContext,
-                sslClientContext);
+                sslClientContext
+        );
 
         // Register a clean shutdown hook for the network threads.  This gets cranky
         // when crashLocalVoltDB() is called because System.exit() can get called from
@@ -793,9 +801,15 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         networkLog.info(getHostId() + " notified of " + hostId);
         prepSocketChannel(socket);
         try {
-            ForeignHost fhost = new ForeignHost(this, hostId, socket, m_config.deadHostTimeout,
+            ForeignHost fhost = new ForeignHost(
+                    this,
+                    hostId,
+                    publishHostIdRequest.getHostDisplayName(),
+                    socket,
+                    m_config.deadHostTimeout,
                     listeningAddress,
-                    createPicoNetwork(sslEngine, socket));
+                    createPicoNetwork(sslEngine, socket, publishHostIdRequest.getHostDisplayName())
+            );
             putForeignHost(hostId, fhost);
             fhost.enableRead(VERBOTEN_THREADS);
         } catch (java.io.IOException e) {
@@ -804,12 +818,12 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         m_acceptor.accrue(hostId, publishHostIdRequest.getJsonObject());
     }
 
-    private PicoNetwork createPicoNetwork(SSLEngine sslEngine, SocketChannel socket) {
+    private PicoNetwork createPicoNetwork(SSLEngine sslEngine, SocketChannel socket, String hostDisplayName) {
         if (sslEngine == null) {
-            return new PicoNetwork(socket);
+            return new PicoNetwork(socket, hostDisplayName);
         } else {
             //TODO: Share the same cipher executor threads as the ones used for client connections?
-            return new TLSPicoNetwork(socket, sslEngine, CipherExecutor.SERVER);
+            return new TLSPicoNetwork(socket, sslEngine, CipherExecutor.SERVER, hostDisplayName);
         }
     }
 
@@ -933,8 +947,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 /*
                  * Now add the host to the mailbox system
                  */
-                PicoNetwork picoNetwork = createPicoNetwork(sslEngine, socket);
-                fhost = new ForeignHost(this, hostId, socket, m_config.deadHostTimeout, listeningAddress, picoNetwork);
+                PicoNetwork picoNetwork = createPicoNetwork(sslEngine, socket, requestHostIdRequest.getHostDisplayName());
+                fhost = new ForeignHost(this, hostId, requestHostIdRequest.getHostDisplayName(), socket, m_config.deadHostTimeout, listeningAddress, picoNetwork);
                 putForeignHost(hostId, fhost);
                 fhost.enableRead(VERBOTEN_THREADS);
 
@@ -997,7 +1011,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 HostInformation hostInformation = HostInformation.create(
                         hsId,
                         fh.m_listeningAddress.getAddress().getHostAddress(),
-                        fh.m_listeningAddress.getPort()
+                        fh.m_listeningAddress.getPort(),
+                        fh.hostDisplayName()
                 );
                 hosts.add(hostInformation);
             }
@@ -1008,6 +1023,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                     getHostId(),
                     m_config.internalInterface.isEmpty() ? socket.socket().getLocalAddress().getHostAddress() : m_config.internalInterface,
                     m_config.internalPort,
+                    m_hostDisplayName,
                     hosts
             );
         }
@@ -1055,12 +1071,14 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 ForeignHost fhost = new ForeignHost(
                         this,
                         hostInfo.getHostId(),
+                        hostInfo.getHostDisplayName(),
                         hostInfo.getSocket(),
                         m_config.deadHostTimeout,
                         hostInfo.getListeningAddress(),
                         createPicoNetwork(
                                 hostInfo.getSslEngine(),
-                                hostInfo.getSocket()
+                                hostInfo.getSocket(),
+                                hostInfo.getHostDisplayName()
                         )
                 );
                 putForeignHost(hostInfo.getHostId(), fhost);
@@ -1159,13 +1177,24 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         ForeignHost fh = m_foreignHosts.get(hostId);
         if (fh == null) {
             // highly unlikely
-            fh = new ForeignHost(this, hostId, socket, m_config.deadHostTimeout,
-                        listeningAddress, createPicoNetwork(sslEngine, socket));
+            fh = new ForeignHost(
+                    this,
+                    hostId,
+                    requestForConnectionMessage.getHostDisplayName(),
+                    socket,
+                    m_config.deadHostTimeout,
+                    listeningAddress,
+                    createPicoNetwork(sslEngine, socket, requestForConnectionMessage.getHostDisplayName())
+            );
             putForeignHost(hostId, fh);
             fh.enableRead(VERBOTEN_THREADS);
             networkLog.info("Host " + getHostId() + " creates a new connection from host " + hostId);
         } else {
-            fh.createAndEnableNewConnection(socket, createPicoNetwork(sslEngine, socket), VERBOTEN_THREADS);
+            fh.createAndEnableNewConnection(
+                    socket,
+                    createPicoNetwork(sslEngine, socket, requestForConnectionMessage.getHostDisplayName()),
+                    VERBOTEN_THREADS
+            );
         }
         // Allow to use the new connections
         if (fh.connectionNumber() == m_secondaryConnections + 1) {
@@ -1323,6 +1352,19 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                     : "UNKNOWN";
         } else {
             return fh.hostname();
+        }
+    }
+
+    public String getHostDisplayNameForHostId(int hostId) {
+        if (hostId == m_localHostId) {
+            return m_hostDisplayName;
+        }
+
+        ForeignHost fh = m_foreignHosts.get(hostId);
+        if (fh == null) {
+            return "UNKNOWN";
+        } else {
+            return fh.hostDisplayName();
         }
     }
 
@@ -1779,8 +1821,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                         SocketJoiner.SocketInfo socketInfo = m_joiner.requestForConnection(listeningAddress);
                         fh.createAndEnableNewConnection(
                                 socketInfo.m_socket,
-                                createPicoNetwork(socketInfo.m_sslEngine, socketInfo.m_socket),
-                                VERBOTEN_THREADS);
+                                createPicoNetwork(socketInfo.m_sslEngine, socketInfo.m_socket, fh.hostDisplayName()),
+                                VERBOTEN_THREADS
+                        );
                     } catch (IOException | JSONException e) {
                         hostLog.error("Failed to connect to peer nodes.", e);
                         throw new RuntimeException("Failed to establish socket connection with " +

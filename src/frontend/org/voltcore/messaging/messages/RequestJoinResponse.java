@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.voltcore.messaging.messages.FieldNames.ACCEPTED;
+import static org.voltcore.messaging.messages.FieldNames.HOST_DISPLAY_NAME;
 import static org.voltcore.messaging.messages.FieldNames.HOSTS;
 import static org.voltcore.messaging.messages.FieldNames.MAY_RETRY;
 import static org.voltcore.messaging.messages.FieldNames.NEW_HOST_ID;
@@ -74,11 +75,13 @@ public class RequestJoinResponse extends MessageBase {
                                                      int hostId,
                                                      String address,
                                                      int port,
+                                                     String hostDisplayName,
                                                      List<HostInformation> hosts) throws JSONException {
         HostInformation thisHostInformation = HostInformation.create(
                 hostId,
                 address,
-                port
+                port,
+                hostDisplayName
         );
         JSONArray hostsJson = new JSONArray();
         hostsJson.put(thisHostInformation.getJsonObject());
@@ -88,6 +91,7 @@ public class RequestJoinResponse extends MessageBase {
         jsonObject.put(ACCEPTED, true);
         jsonObject.put(NEW_HOST_ID, newNodeHostId);
         jsonObject.put(REPORTED_ADDRESS, reportedAddress);
+        jsonObject.put(HOST_DISPLAY_NAME, hostDisplayName);
         jsonObject.put(HOSTS, hostsJson);
         return new RequestJoinResponse(jsonObject);
     }

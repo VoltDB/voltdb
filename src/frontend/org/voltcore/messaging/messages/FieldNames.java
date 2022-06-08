@@ -31,4 +31,5 @@ public class FieldNames {
     static final String VERSION_COMPATIBLE = "versionCompatible";
     static final String BUILD_STRING = "buildString";
     static final String VERSION_STRING = "versionString";
+    static final String HOST_DISPLAY_NAME = "hostDisplayName";
 }

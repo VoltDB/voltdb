@@ -48,6 +48,7 @@ public class ForeignHost {
 
     private final HostMessenger m_hostMessenger;
     private final Integer m_hostId;
+    private final String m_hostDisplayName;
     final InetSocketAddress m_listeningAddress;
 
     boolean m_isUp;
@@ -111,13 +112,20 @@ public class ForeignHost {
         m_logRate = logRate;
     }
 
-    /** Create a ForeignHost and install in VoltNetwork */
-    ForeignHost(HostMessenger host, int hostId, SocketChannel socket, int deadHostTimeout,
-            InetSocketAddress listeningAddress, PicoNetwork network)
-    throws IOException
-    {
+    /**
+     * Create a ForeignHost and install in VoltNetwork
+     */
+    ForeignHost(HostMessenger host,
+                int hostId,
+                String hostDisplayName,
+                SocketChannel socket,
+                int deadHostTimeout,
+                InetSocketAddress listeningAddress,
+                PicoNetwork network)
+            throws IOException {
         m_hostMessenger = host;
         m_hostId = hostId;
+        m_hostDisplayName = hostDisplayName;
         m_isUp = true;
         m_deadHostTimeout = deadHostTimeout;
         m_listeningAddress = listeningAddress;
@@ -360,5 +368,9 @@ public class ForeignHost {
         for (Subconnection c : m_connections) {
             c.cutLink();
         }
+    }
+
+    public String hostDisplayName() {
+        return m_hostDisplayName;
     }
 }

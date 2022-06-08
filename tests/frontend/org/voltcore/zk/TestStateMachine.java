@@ -191,7 +191,7 @@ public class TestStateMachine extends ZKTestBase {
         config.zkPort = clientPort;
         m_siteIdToZKPort.put(site, clientPort);
         config.networkThreads = 1;
-        HostMessenger hm = new HostMessenger(config, null);
+        HostMessenger hm = new HostMessenger(config, null, randomHostDisplayName());
         hm.start();
         MeshProber.prober(hm).waitForDetermination();
         m_messengers.set(site, hm);

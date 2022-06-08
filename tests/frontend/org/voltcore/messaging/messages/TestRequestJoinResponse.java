@@ -40,17 +40,19 @@ public class TestRequestJoinResponse {
         int hostId = 2;
         String address = "address";
         int port = 12345;
+        String hostDisplayName = "hostDisplayName";
 
         List<HostInformation> hostInformationList = new ArrayList<>();
         int additionalHostId = 3;
         String additionalHostAddress = "address2";
         int additionalHostPort = 54321;
+        String additionalHostDisplayName = "additionalHostDisplayName";
 
-        HostInformation hostInformation = HostInformation.create(additionalHostId, additionalHostAddress, additionalHostPort);
+        HostInformation hostInformation = HostInformation.create(additionalHostId, additionalHostAddress, additionalHostPort, additionalHostDisplayName);
         hostInformationList.add(hostInformation);
 
         // When
-        RequestJoinResponse requestJoinResponse1 = RequestJoinResponse.createAccepted(newNodeHostId, reportedAddress, hostId, address, port, hostInformationList);
+        RequestJoinResponse requestJoinResponse1 = RequestJoinResponse.createAccepted(newNodeHostId, reportedAddress, hostId, address, port, hostDisplayName, hostInformationList);
         RequestJoinResponse requestJoinResponse2 = RequestJoinResponse.fromJsonObject(requestJoinResponse1.getJsonObject());
 
         // Then
@@ -67,11 +69,13 @@ public class TestRequestJoinResponse {
         assertThat(hostInformation1.getHostId()).isEqualTo(hostId);
         assertThat(hostInformation1.getAddress()).isEqualTo(address);
         assertThat(hostInformation1.getPort()).isEqualTo(port);
+        assertThat(hostInformation1.getHostDisplayName()).isEqualTo(hostDisplayName);
 
         HostInformation hostInformation2 = requestJoinResponse2.getHosts().get(1);
         assertThat(hostInformation2.getHostId()).isEqualTo(additionalHostId);
         assertThat(hostInformation2.getAddress()).isEqualTo(additionalHostAddress);
         assertThat(hostInformation2.getPort()).isEqualTo(additionalHostPort);
+        assertThat(hostInformation2.getHostDisplayName()).isEqualTo(additionalHostDisplayName);
     }
 
     @Test
