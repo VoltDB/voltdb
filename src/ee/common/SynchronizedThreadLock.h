@@ -87,7 +87,11 @@ public:
     static void create();
     static void destroy();
     static void init(int32_t sitesPerHost, EngineLocals& newEngineLocals);
-    static void resetMemory(int32_t partitionId);
+    static void resetMemory(int32_t partitionId
+#ifdef VOLT_POOL_CHECKING
+      , bool shutdown = false
+#endif
+    );
     static void updateSitePerHost(int32_t sitePerHost);
     static void deactiveEngineLocals(int32_t partitionId);
 

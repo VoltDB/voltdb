@@ -118,7 +118,11 @@ void SynchronizedThreadLock::init(int32_t sitesPerHost, EngineLocals& newEngineL
     }
 }
 
-void SynchronizedThreadLock::resetMemory(int32_t partitionId) {
+void SynchronizedThreadLock::resetMemory(int32_t partitionId
+#ifdef VOLT_POOL_CHECKING
+      , bool shutdown
+#endif
+         ) {
     lockReplicatedResourceForInit();
     if (partitionId == s_mpMemoryPartitionId) {
         // This is being called twice. First when the lowestSite goes away and then
@@ -143,6 +147,7 @@ void SynchronizedThreadLock::resetMemory(int32_t partitionId) {
             ThreadLocalPool::SizeBucketMap_t& mapBySize = ThreadLocalPool::s_allocations[s_mpMemoryPartitionId];
             auto mapForAdd = mapBySize.begin();
             while (mapForAdd != mapBySize.end()) {
+                if (shutdown) break;
                 auto& allocMap = mapForAdd->second;
                 mapForAdd++;
                 if (!allocMap.empty()) {

@@ -288,7 +288,11 @@ VoltDBEngine::~VoltDBEngine() {
         m_systemTables.clear();
 
         if (isLowestSite()) {
-            SynchronizedThreadLock::resetMemory(SynchronizedThreadLock::s_mpMemoryPartitionId);
+            SynchronizedThreadLock::resetMemory(SynchronizedThreadLock::s_mpMemoryPartitionId
+#ifdef VOLT_POOL_CHECKING
+               , m_destroying
+#endif
+            );
         }
         for (auto tid : m_snapshottingTables) {
             tid.second->decrementRefcount();

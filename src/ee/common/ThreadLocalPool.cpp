@@ -121,7 +121,11 @@ ThreadLocalPool::~ThreadLocalPool() {
         }
 #endif
         if (m_threadPartitionIdPtr) {
-            SynchronizedThreadLock::resetMemory(*m_threadPartitionIdPtr);
+            SynchronizedThreadLock::resetMemory(*m_threadPartitionIdPtr
+#ifdef VOLT_POOL_CHECKING
+              , m_shutdown
+#endif
+            );
         }
         delete m_threadPartitionIdPtr;
         delete m_enginePartitionIdPtr;
