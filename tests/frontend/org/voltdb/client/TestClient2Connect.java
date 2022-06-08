@@ -103,7 +103,7 @@ public class TestClient2Connect {
         System.out.printf("%05d | Notification: connect failed: %s port %d%n", relTime, host, port);
     }
 
-    private boolean connect(String servers, int timeout) {
+    private boolean connect(String servers, int timeout, boolean async) {
         errorCount = 0;
         Client2Config config = new Client2Config()
             .connectionUpHandler(this::connectionUp)
@@ -111,9 +111,21 @@ public class TestClient2Connect {
             .connectFailureHandler(this::connectFailed);
         try (Client2 client = ClientFactory.createClient(config)) {
             int delay = 200;
-            System.out.printf("Test case: servers %s, timeout %d, retry delay %d\n", servers, timeout, delay);
+            System.out.printf("Test case: servers %s, timeout %d, retry delay %d, %s\n",
+                              servers, timeout, delay, async ? "async" : "sync");
             startTime = System.currentTimeMillis();
-            client.connectSync(servers, timeout, delay, TimeUnit.MILLISECONDS);
+            if (async) {
+                if (timeout == 0) // using 4-arg format would work, this just exercises a different entry point
+                    client.connectAsync(servers).get();
+                else
+                    client.connectAsync(servers, timeout, delay, TimeUnit.MILLISECONDS).get();
+            }
+            else {
+                if (timeout == 0) // same here: just for testing
+                    client.connectSync(servers);
+                else
+                    client.connectSync(servers, timeout, delay, TimeUnit.MILLISECONDS);
+            }
             elapsedTime = System.currentTimeMillis() - startTime;
             System.out.printf("%05d | Finally: connected\n", elapsedTime);
             return true;
@@ -125,30 +137,57 @@ public class TestClient2Connect {
         }
     }
 
-    @Test
-    public void testConnectSuccess() throws Exception {
-        boolean b = connect("nxnode1:12345, localhost, nxnode2", 0);
+    private void doConnectSuccess(boolean async) throws Exception {
+        boolean b = connect("nxnode1:12345, localhost, nxnode2", 0, async);
         assertEquals("expected success", true, b);
         assertEquals("error count wrong", 1, errorCount);
     }
 
-    @Test
-    public void testConnectFail() throws Exception {
-        boolean b = connect("nxnode1:12345, nxnode2", 0);
+    private void doConnectFail(boolean async) throws Exception {
+        boolean b = connect("nxnode1:12345, nxnode2", 0, async);
         assertEquals("expected failure", false, b);
         assertEquals("error count wrong", 2, errorCount);
     }
 
-    @Test
-    public void testConnectTimeout() throws Exception {
+    private void doConnectTimeout(boolean async) throws Exception {
         // huge timeout values, junits run in the lab
         // fail with anything reasonable. i suppose the
         // machines are just stupidly overloaded.
         final int tmo = 6000, slop = 6000;
-        boolean b = connect("nxnode1:12345, nxnode2", tmo);
+        boolean b = connect("nxnode1:12345, nxnode2", tmo, async);
         assertEquals("expected failure", false, b);
         assertTrue("error count low (no retries)", errorCount > 2);
         assertTrue("too short", elapsedTime > tmo);
         assertTrue("too long", elapsedTime < tmo+slop);
+    }
+
+    @Test
+    public void TestSyncConnectSuccess() throws Exception {
+        doConnectSuccess(false);
+    }
+
+    @Test
+    public void TestSyncConnectFail() throws Exception {
+        doConnectFail(false);
+    }
+
+    @Test
+    public void TestSyncConnectTimeout() throws Exception {
+        doConnectTimeout(false);
+    }
+
+    @Test
+    public void TestAsyncConnectSuccess() throws Exception {
+        doConnectSuccess(true);
+    }
+
+    @Test
+    public void TestAsyncConnectFail() throws Exception {
+        doConnectFail(true);
+    }
+
+    @Test
+    public void TestAsyncConnectTimeout() throws Exception {
+        doConnectTimeout(true);
     }
 }

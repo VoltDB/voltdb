@@ -206,7 +206,16 @@ public interface Client2 extends Closeable {
      */
     CompletableFuture<Void> connectAsync(String servers, long timeout, long delay, TimeUnit unit);
 
-   /**
+    /**
+     * Convenient form of {@link #connectAsync(String,long,long,TimeUnit)}
+     * that specifies no retry.
+     *
+     * @param servers list of servers, each as host and optional port
+     * @return a {@code CompletableFuture}
+     */
+     CompletableFuture<Void> connectAsync(String servers);
+
+    /**
      * Connect to specified host on specified port.
      * <p>
      * Completion is asynchronous. On a failure to connect, a
@@ -222,6 +231,16 @@ public interface Client2 extends Closeable {
      * @return a {@code CompletableFuture}
      */
     CompletableFuture<Void> connectAsync(String host, int port, long timeout, long delay, TimeUnit unit);
+
+    /**
+     * Convenient form of {@link #connectAsync(String,int,long,long,TimeUnit)}
+     * that specifies no retry.
+     *
+     * @param host as address or hostname
+     * @param port port number
+     * @return a {@code CompletableFuture}
+     */
+    CompletableFuture<Void> connectAsync(String host, int port);
 
     /**
      * Gets a list of currently-connected hosts.

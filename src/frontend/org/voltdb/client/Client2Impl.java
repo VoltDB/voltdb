@@ -682,6 +682,11 @@ public class Client2Impl implements Client2 {
         return doConnect(hpList, timeout, delay, unit);
     }
 
+    @Override
+    public CompletableFuture<Void> connectAsync(String servers) {
+        return connectAsync(servers, 0, 0, TimeUnit.NANOSECONDS);
+    }
+
     /**
      * Connect to specified host on specified port.
      * Retries are supported. with user-supplied overall
@@ -691,6 +696,11 @@ public class Client2Impl implements Client2 {
     public CompletableFuture<Void> connectAsync(String host, int port, long timeout, long delay, TimeUnit unit) {
         List<HostAndPort> hpList = hostAndPortList(host, port);
         return doConnect(hpList, timeout, delay, unit);
+    }
+
+    @Override
+    public CompletableFuture<Void> connectAsync(String host, int port) {
+        return connectAsync(host, port, 0, 0, TimeUnit.NANOSECONDS);
     }
 
     /**
