@@ -19,6 +19,7 @@ package org.voltdb.iv2;
 
 import java.io.IOException;
 
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.rejoin.TaskLog;
 
@@ -34,17 +35,34 @@ public class MPTickProducer extends TickProducer {
 
     private volatile long m_lastTickTime = -1;
 
+    private static final String GENERAL_TEMPLATE = "A multipartition process (procedure, fragment, or operational task) is taking a long time "
+            + "-- over %d seconds -- and blocking the MPI queue on host id %d. "
+            + "No other jobs will be executed until it completes.";
+
+    private static final String PROCEDURE_TEMPLATE = "The multipartition procedure %s is taking a long time "
+            + "-- over %d seconds -- and blocking the MPI queue on host id %d. "
+            + "No other jobs will be executed until it completes.";
+
     MPTickProducer(SiteTaskerQueue taskQueue, long siteId) {
         super(taskQueue, siteId);
     }
 
     @Override
     public void run() {
+        String procName = super.getProcedure();
         m_taskQueue.offer(this);
-        long currentTime = System.nanoTime();
+        long waitTime = System.nanoTime() - m_lastTickTime;
+        if (m_lastTickTime != -1 && waitTime >= m_procedureLogThreshold) {
+            logTimeout(procName, waitTime / 1_000_000_000L);
+        }
+    }
 
-        if (m_lastTickTime != -1 && currentTime - m_lastTickTime >= m_procedureLogThreshold) {
-            logTimeout(currentTime, m_lastTickTime, null);
+    private void logTimeout(String procName, long waitSecs) {
+        int host = CoreUtils. getHostIdFromHSId(m_siteId);
+        if (procName == null) {
+            m_logger.rateLimitedWarn(SUPPRESS_INTERVAL, GENERAL_TEMPLATE, waitSecs, host);
+        } else {
+            m_logger.rateLimitedWarn(SUPPRESS_INTERVAL, PROCEDURE_TEMPLATE, procName, waitSecs, host);
         }
     }
 

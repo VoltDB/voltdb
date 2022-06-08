@@ -20,6 +20,7 @@ package org.voltdb.iv2;
 import java.io.IOException;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
@@ -30,32 +31,30 @@ import org.voltdb.rejoin.TaskLog;
 /**
  * Runs the tick operation against the EE
  */
-public class TickProducer extends SiteTasker implements Runnable
-{
-    protected VoltLogger m_logger;
+public class TickProducer extends SiteTasker implements Runnable {
+    protected final VoltLogger m_logger;
     protected final long m_procedureLogThreshold;
     protected final SiteTaskerQueue m_taskQueue;
+    protected final long SUPPRESS_INTERVAL = 60; // 60 seconds
+    protected final int m_partitionId;
+    protected final long m_siteId;
 
     private ScheduledFuture<?> m_scheduledTick;
-    private final long SUPPRESS_INTERVAL = 60; // 60 seconds
-    private int m_partitionId;
-    private final long m_siteId;
     private long m_previousTaskTimestamp = -1;
     private long m_previousTaskPeekTime = -1;
     private long m_scheduledTickInterval = 1000;
 
-    private static final String GENERAL_TEMPLATE = " A process (procedure, fragment, or operational task) is taking a long time "
-            + "-- over %d seconds -- and blocking the queue for site %d (%s) "
+    private static final String GENERAL_TEMPLATE = "A process (procedure, fragment, or operational task) is taking a long time "
+            + "-- over %d seconds -- and blocking the queue for site %d (%s). "
             + "No other jobs will be executed until it completes. %s";
 
-    private static final String PROCEDURE_TEMPLATE = " The procedure %s is taking a long time "
-            + "-- over %d seconds -- and blocking the queue for site %d (%s) "
+    private static final String PROCEDURE_TEMPLATE = "The procedure %s is taking a long time "
+            + "-- over %d seconds -- and blocking the queue for site %d (%s). "
             + "No other jobs will be executed until it completes. %s";
 
-    private String m_procedureName;
+    private final AtomicReference<String> m_procedureName = new AtomicReference<>();
 
-    TickProducer(SiteTaskerQueue taskQueue, long siteId)
-    {
+    TickProducer(SiteTaskerQueue taskQueue, long siteId) {
         m_taskQueue = taskQueue;
         m_logger = new VoltLogger("HOST");
         m_partitionId = taskQueue.getPartitionId();
@@ -97,41 +96,57 @@ public class TickProducer extends SiteTasker implements Runnable
         }
     }
 
-    // Runnable.run() schedules execution
+    // Runnable.run() schedules execution.
+    // Checks whether current task has been running for a long time, inferred
+    // by checking whether the head of the queue has been waiting at the
+    // head of the queue for a long time.
+    //
+    // This routine is carefully sequenced so that we read the name of a
+    // possibly-long-running proc first of all. If the head of queue changes
+    // after that, then we know that proc is no longer long-running, and we
+    // won't use the name. The reverse order would risk getting a wrong name.
     @Override
     public void run() {
+        String procName = getProcedure();
         m_taskQueue.offer(this);
-        // check if previous task is running for more than threshold
         SiteTasker task = m_taskQueue.peek();
         long currentTime = System.nanoTime();
         long headOfQueueOfferTime;
         if (task != null) {
+            // The task could be us, could be some other task
             headOfQueueOfferTime = task.getQueueOfferTime();
         } else {
-            // SP site must have grabbed this task just offered
+            // The tick task we just offered is already running on the site
             headOfQueueOfferTime = currentTime;
         }
         if (headOfQueueOfferTime != m_previousTaskTimestamp) {
+            // New head of queue, therefore current task must have changed
             m_previousTaskTimestamp = headOfQueueOfferTime;
             m_previousTaskPeekTime = currentTime;
-        } else if (currentTime - m_previousTaskPeekTime >= m_procedureLogThreshold) {
-            logTimeout(currentTime, m_previousTaskPeekTime, task);
+        } else {
+            // Wait time is calculated on when we first saw it at head.
+            long waitTime = currentTime - m_previousTaskPeekTime;
+            if (waitTime >= m_procedureLogThreshold) {
+                // Head of queue is blocked by the executing proc.
+                logTimeout(procName, waitTime/1_000_000_000L, task);
+            }
         }
     }
 
-    protected void logTimeout(long currentTime, long previousTime, SiteTasker task) {
-        long waitTime = (currentTime - previousTime)/1_000_000_000L; // in seconds
-        String procName = getProcedure();
+    // Log message for a long-executing task. Identifies procedure by name
+    // when possible, otherwise logs a generalized message.
+    private void logTimeout(String procName, long waitSecs, SiteTasker task) {
+        String site = CoreUtils.hsIdToString(m_siteId);
         String taskInfo = "";
         if (m_logger.isDebugEnabled() && task != null) {
             taskInfo = " Task Info: " + task.getTaskInfo();
         }
         if (procName == null) {
             m_logger.rateLimitedWarn(SUPPRESS_INTERVAL, GENERAL_TEMPLATE,
-                    waitTime, m_partitionId, CoreUtils.hsIdToString(m_siteId), taskInfo);
+                    waitSecs, m_partitionId, site, taskInfo);
         } else {
             m_logger.rateLimitedWarn(SUPPRESS_INTERVAL, PROCEDURE_TEMPLATE,
-                    procName, waitTime, m_partitionId, CoreUtils.hsIdToString(m_siteId), taskInfo);
+                    procName, waitSecs, m_partitionId, site, taskInfo);
         }
     }
 
@@ -146,15 +161,18 @@ public class TickProducer extends SiteTasker implements Runnable
         siteConnection.tick();
     }
 
-    public synchronized void setupProcedure(String procedureName) {
-        m_procedureName = procedureName;
+    // These are used to record the name of the
+    // currently-executing procedure task, if any.
+
+    public void setupProcedure(String procedureName) {
+        m_procedureName.set(procedureName);
     }
 
     public void completeProcedure()  {
-        m_procedureName = null;
+        m_procedureName.set(null);
     }
 
-    private synchronized String getProcedure() {
-        return m_procedureName;
+    protected String getProcedure() {
+        return m_procedureName.get();
     }
 }
