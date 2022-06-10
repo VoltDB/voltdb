@@ -587,8 +587,18 @@ struct GenericPersistentKey : public GenericKey<keySize>
         }
         TableTuple keyTuple(m_keySchema);
         keyTuple.moveNoHeader(reinterpret_cast<void*>(this->data));
+#ifdef VOLT_POOL_CHECKING
+        if (!m_shutdown) {
+#endif
         keyTuple.freeObjectColumns();
+#ifdef VOLT_POOL_CHECKING
+        }
+#endif
     }
+
+#ifdef VOLT_POOL_CHECKING
+    void shutdown(bool sd) { m_shutdown = sd;}
+#endif
 
 private:
     // The keySchema is only retained for object memory reclaim purposes.
@@ -597,6 +607,9 @@ private:
     // in the map, passing its memory management responsibilities
     // to another key, so no reclaim is required.
     const TupleSchema *m_keySchema;
+#ifdef VOLT_POOL_CHECKING
+    bool m_shutdown = false;
+#endif
 };
 
 template <std::size_t keySize>
@@ -994,8 +1007,14 @@ public:
         return k.setPointerValue(value);
     }
 
+#ifdef VOLT_POOL_CHECKING
+        void shutdown(bool sd) { m_shutdown = sd;}
+#endif
 private:
     first_type k;
+#ifdef VOLT_POOL_CHECKING
+    bool m_shutdown = false;
+#endif
 };
 
 }

@@ -534,10 +534,14 @@ TEST_F(CoveringCellIndexTest, Simple) {
     tempTuple.setNValue(GEOG_COL_INDEX, polygonWktToNval("polygon((0 0, 5 0, 0 5, 0 0))"));
     table->insertTuple(tempTuple);
 
+#ifdef VOLT_POOL_CHECKING
+    ASSERT_EQ(ccIndex->getMemoryEstimate(), 1600000);
+#else
     // This number is always 1440000, regardless of number of indexed
     // polygons... suspicious.  Maybe it's only considering block
     // allocations?
     ASSERT_EQ(ccIndex->getMemoryEstimate(), 1440000);
+#endif
 
     // The size of the index in terms of indexed polygons.
     ASSERT_EQ(ccIndex->getSize(), 3);

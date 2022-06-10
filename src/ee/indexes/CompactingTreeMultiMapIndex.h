@@ -68,7 +68,11 @@ class CompactingTreeMultiMapIndex : public TableIndex
     typedef std::pair<MapIterator, MapIterator> MapRange;
 
 
-    ~CompactingTreeMultiMapIndex() {};
+    ~CompactingTreeMultiMapIndex() {
+#ifdef VOLT_POOL_CHECKING
+        m_entries.shutdown(m_shutdown);
+#endif
+    }
 
     static MapIterator& castToIter(IndexCursor& cursor) {
         return *reinterpret_cast<MapIterator*> (cursor.m_keyIter);

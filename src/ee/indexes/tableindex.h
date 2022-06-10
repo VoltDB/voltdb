@@ -535,6 +535,9 @@ public:
     const TupleSchema *getTupleSchema() const {
         return m_scheme.tupleSchema;
     }
+#ifdef VOLT_POOL_CHECKING
+    void shutdown(bool sd) {m_shutdown = sd;}
+#endif
 
 protected:
 
@@ -560,6 +563,9 @@ protected:
                                          const TableTuple &originalTuple) = 0;
     virtual bool existsDo(const TableTuple* values) const = 0;
     virtual bool checkForIndexChangeDo(const TableTuple *lhs, const TableTuple *rhs) const = 0;
+#ifdef VOLT_POOL_CHECKING
+    bool m_shutdown = false;
+#endif
 
 private:
 

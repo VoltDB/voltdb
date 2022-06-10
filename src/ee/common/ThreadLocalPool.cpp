@@ -319,7 +319,11 @@ void* ThreadLocalPool::allocateExactSizedObject(std::size_t sz) {
 #ifdef VOLT_POOL_CHECKING
     int32_t enginePartitionId =  getEnginePartitionId();
     std::lock_guard<std::mutex> guard(ThreadLocalPool::s_sharedMemoryMutex);
-    SizeBucketMap_t& mapBySize = s_allocations[enginePartitionId];
+    auto itr = s_allocations.find(enginePartitionId);
+    if (itr == s_allocations.end()) {
+         itr = s_allocations.emplace(enginePartitionId, SizeBucketMap_t()).first;
+    }
+    SizeBucketMap_t& mapBySize = itr->second;
     SizeBucketMap_t::iterator mapForAdd;
 #endif
     if (iter == pools.end()) {
