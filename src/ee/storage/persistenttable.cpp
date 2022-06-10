@@ -195,6 +195,9 @@ PersistentTable::~PersistentTable() {
 
     // clean up indexes
     BOOST_FOREACH (auto index, m_indexes) {
+#ifdef VOLT_POOL_CHECKING
+        index->shutdown(shutdown);
+#endif
         delete index;
     }
 
