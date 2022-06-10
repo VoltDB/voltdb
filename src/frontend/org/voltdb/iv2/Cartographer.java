@@ -734,7 +734,7 @@ public class Cartographer extends StatsSource
                     } catch (KeeperException.NoNodeException ignore) {}
                     otherStoppedHids.remove(ihid);
                     if (!otherStoppedHids.isEmpty()) {
-                        return "Cann't move partition leaders while other nodes are being shutdown.";
+                        return "Can't move partition leaders while other nodes are being shut down.";
                     }
                     String message = doPartitionsHaveReplicas(ihid, otherStoppedHids);
                     if (message != null) {
@@ -745,9 +745,18 @@ public class Cartographer extends StatsSource
                     // Partition leader distribution must be balanced, otherwise leader might be ping-ponged
                     // from one request to another.
                     try {
-                        if (m_zk.exists(VoltZK.migratePartitionLeaderBlocker, false) != null || !isPartitionLeadersBalanced()) {
-                            return "Can't move partition leaders while another leader migration is in progress";
+                        final String errMsg = "Can't move partition leaders while another leader migration is in progress";
+                        final String logForm = "[Host id %d] Can't stop host id %d: %s";
+                        int thisHost = VoltDB.instance().getMyHostId();
+                        if (m_zk.exists(VoltZK.migratePartitionLeaderBlocker, false) != null) {
+                            hostLog.rateLimitedWarn(60, logForm, thisHost, ihid, "ZooKeeper reports partition leadership migration in progress");
+                            return errMsg;
                         }
+                        else if (!isPartitionLeadersBalanced()) {
+                            hostLog.rateLimitedWarn(60, logForm, thisHost, ihid, "partition leadership is not in balance");
+                            return errMsg;
+                        }
+                        hostLog.infoFmt("[Host id %d] OK to stop host id %d, no other leader migration in progress", thisHost, ihid);
                     } catch (KeeperException.NoNodeException ignore) {}
                     return null;
                 }}).get();
@@ -977,7 +986,7 @@ public class Cartographer extends StatsSource
     }
 
     private int findNewHostForPartitionLeader(Host src, Host target, int maxMastersPerHost, int minMastersPerHost) {
-        // cann't move onto itself
+        // can't move onto itself
         if (src.equals(target)) {
             return -1;
         }
