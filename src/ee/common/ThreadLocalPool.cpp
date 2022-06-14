@@ -313,17 +313,17 @@ void ThreadLocalPool::freeRelocatable(Sized* sized) {
 #endif
 
 void* ThreadLocalPool::allocateExactSizedObject(std::size_t sz) {
+    if (m_threadPartitionIdPtr == nullptr) { 
+        m_threadPartitionIdPtr = new int32_t(0);
+        m_enginePartitionIdPtr = new int32_t(0);
+    }
     PoolsByObjectSize& pools = *(m_key->second);
     auto iter = pools.find(sz);
     PoolForObjectSize* pool;
 #ifdef VOLT_POOL_CHECKING
-    int32_t enginePartitionId =  getEnginePartitionId();
     std::lock_guard<std::mutex> guard(ThreadLocalPool::s_sharedMemoryMutex);
-    auto itr = s_allocations.find(enginePartitionId);
-    if (itr == s_allocations.end()) {
-         itr = s_allocations.emplace(enginePartitionId, SizeBucketMap_t()).first;
-    }
-    SizeBucketMap_t& mapBySize = itr->second;
+    int32_t enginePartitionId =  getEnginePartitionId();
+    SizeBucketMap_t& mapBySize = s_allocations[enginePartitionId];
     SizeBucketMap_t::iterator mapForAdd;
 #endif
     if (iter == pools.end()) {
