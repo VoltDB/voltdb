@@ -313,7 +313,7 @@ void ThreadLocalPool::freeRelocatable(Sized* sized) {
 #endif
 
 void* ThreadLocalPool::allocateExactSizedObject(std::size_t sz) {
-    if (m_threadPartitionIdPtr == nullptr) { 
+    if (m_threadPartitionIdPtr == nullptr) {
         m_threadPartitionIdPtr = new int32_t(0);
         m_enginePartitionIdPtr = new int32_t(0);
     }
