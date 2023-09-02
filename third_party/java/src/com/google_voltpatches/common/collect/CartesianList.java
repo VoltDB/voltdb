@@ -97,7 +97,7 @@ final class CartesianList<E> extends AbstractList<List<E>> implements RandomAcce
 
   @Override
   public boolean contains(@Nullable Object o) {
-    if (!(o instanceof List)) {
+    if (!(o instanceof List<?>)) {
       return false;
     }
     List<?> list = (List<?>) o;

@@ -312,11 +312,11 @@ final class Constraints {
 
   static <E> Collection<E> constrainedTypePreservingCollection(
       Collection<E> collection, Constraint<E> constraint) {
-    if (collection instanceof SortedSet) {
+    if (collection instanceof SortedSet<?>) {
       return constrainedSortedSet((SortedSet<E>) collection, constraint);
-    } else if (collection instanceof Set) {
+    } else if (collection instanceof Set<?>) {
       return constrainedSet((Set<E>) collection, constraint);
-    } else if (collection instanceof List) {
+    } else if (collection instanceof List<?>) {
       return constrainedList((List<E>) collection, constraint);
     } else {
       return constrainedCollection(collection, constraint);

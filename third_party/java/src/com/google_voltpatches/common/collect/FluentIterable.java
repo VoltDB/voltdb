@@ -138,7 +138,7 @@ public abstract class FluentIterable<E> implements Iterable<E> {
    * {@link Collection}; {@code StreamSupport.stream(iterable.spliterator(), false)} otherwise.
    */
   public static <E> FluentIterable<E> from(final Iterable<E> iterable) {
-    return (iterable instanceof FluentIterable)
+    return (iterable instanceof FluentIterable<?>)
         ? (FluentIterable<E>) iterable
         : new FluentIterable<E>(iterable) {
           @Override
@@ -526,7 +526,7 @@ public abstract class FluentIterable<E> implements Iterable<E> {
 
     // TODO(kevinb): Support a concurrently modified collection?
     Iterable<E> iterable = getDelegate();
-    if (iterable instanceof List) {
+    if (iterable instanceof List<?>) {
       List<E> list = (List<E>) iterable;
       if (list.isEmpty()) {
         return Optional.absent();
@@ -542,7 +542,7 @@ public abstract class FluentIterable<E> implements Iterable<E> {
      * TODO(kevinb): consider whether this "optimization" is worthwhile. Users with SortedSets tend
      * to know they are SortedSets and probably would not call this method.
      */
-    if (iterable instanceof SortedSet) {
+    if (iterable instanceof SortedSet<?>) {
       SortedSet<E> sortedSet = (SortedSet<E>) iterable;
       return Optional.of(sortedSet.last());
     }
@@ -794,7 +794,7 @@ public abstract class FluentIterable<E> implements Iterable<E> {
   public final <C extends Collection<? super E>> C copyInto(C collection) {
     checkNotNull(collection);
     Iterable<E> iterable = getDelegate();
-    if (iterable instanceof Collection) {
+    if (iterable instanceof Collection<?>) {
       collection.addAll(Collections2.cast(iterable));
     } else {
       for (E item : iterable) {
