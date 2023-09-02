@@ -76,34 +76,37 @@ public class MPQueryFallBackRule extends RelOptRule {
                     call.rel(1).getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE);
             if (childDist != RelDistributions.ANY) {
                 final SingleRel node = call.rel(0);
-                final RelDistribution dist;
+                final RelDistribution finalChildDist;
                 if (node instanceof Calc) {
-                    dist = childDist.with(childDist.getType(),
+                    finalChildDist = childDist.with(childDist.getType(),
                             RelDistributionUtils.adjustProjection(((Calc) node).getProgram(), childDist.getKeys()),
                             childDist.getPartitionEqualValue(),
                             childDist.getIsSP());
                 } else {
-                    dist = childDist;
+                    finalChildDist = childDist;
                 }
                 // Nodes that require LogicalExchange for a multi-partitioned query-
                 // Sort, Limit, Aggregate
-                if (RelDistributions.SINGLETON.getType() != dist.getType() &&
-                        dist.getPartitionEqualValue() == null) {
+                if (RelDistributions.SINGLETON.getType() != finalChildDist.getType() &&
+                        finalChildDist.getPartitionEqualValue() == null) {
                     // Create a new multi partitioned SINGLETON distribution for the coordinator fragment
-                    RelDistribution topDist = RelDistributions.SINGLETON.with(dist.getPartitionEqualValue(), false);
+                    RelDistribution exchangeDist = RelDistributions.SINGLETON.with(finalChildDist.getPartitionEqualValue(), false);
                     if (node instanceof VoltLogicalLimit ||
                             node instanceof VoltLogicalSort ||
                             node instanceof VoltLogicalAggregate) {
                         VoltLogicalExchange exchange = new VoltLogicalExchange(node.getCluster(),
-                                node.getTraitSet().replace(dist), node.getInput(), dist);
+                                node.getTraitSet().replace(exchangeDist),
+                                node.getInput(),
+                                exchangeDist,
+                                finalChildDist);
                         // Transforming COUNT, AVG aggregates for MP queries would happen during the physical transformation phase
-                        RelNode coordinatorLimit = node.copy(node.getTraitSet().replace(topDist), Collections.list(exchange));
-                        call.transformTo(coordinatorLimit);
+                        RelNode coordinatorNode = node.copy(node.getTraitSet().replace(exchangeDist), Collections.list(exchange));
+                        call.transformTo(coordinatorNode);
                     } else {
-                        call.transformTo(node.copy(node.getTraitSet().replace(dist), node.getInputs()));
+                        call.transformTo(node.copy(node.getTraitSet().replace(finalChildDist), node.getInputs()));
                     }
                 } else {
-                    call.transformTo(node.copy(node.getTraitSet().replace(dist), node.getInputs()));
+                    call.transformTo(node.copy(node.getTraitSet().replace(finalChildDist), node.getInputs()));
                 }
             }
         }

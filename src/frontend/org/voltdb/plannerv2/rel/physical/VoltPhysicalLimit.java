@@ -44,7 +44,7 @@ public class VoltPhysicalLimit extends SingleRel implements VoltPhysicalRel {
 
     // In a partitioned query Limit could be pushed down to fragments
     // by the LimitExchange Transpose Rule -
-    // Limit / RenNode => Coordinator Limit / Exchange / Fragment Limit / RelNode
+    // Limit / Exchange / RelNode => Coordinator Limit / Exchange / Fragment Limit / RelNode
     // This indicator prevents this rule to fire indefinitely by setting it to TRUE
     private final boolean m_isPushedDown;
 

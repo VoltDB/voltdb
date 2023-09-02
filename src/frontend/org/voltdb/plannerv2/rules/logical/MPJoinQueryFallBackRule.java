@@ -74,13 +74,19 @@ public class MPJoinQueryFallBackRule extends RelOptRule {
                 && !isOuterPartitioned && isInnerPartitioned) {
             newDist = RelDistributions.SINGLETON.with(innerDist.getPartitionEqualValue(), false);
             VoltLogicalExchange innerExchange = new VoltLogicalExchange(inner.getCluster(),
-                    inner.getTraitSet(), inner, innerDist);
+                    inner.getTraitSet().replace(newDist),
+                    inner,
+                    newDist,
+                    innerDist);
             newInputs = Lists.newArrayList(outer, innerExchange);
         } else if((JoinRelType.RIGHT == join.getJoinType() || JoinRelType.FULL == join.getJoinType())
                 && isOuterPartitioned && !isInnerPartitioned) {
             newDist = RelDistributions.SINGLETON.with(outerDist.getPartitionEqualValue(), false);
             VoltLogicalExchange outerExchange = new VoltLogicalExchange(outer.getCluster(),
-                    outer.getTraitSet(), outer, outerDist);
+                    outer.getTraitSet().replace(newDist),
+                    outer,
+                    newDist,
+                    outerDist);
             newInputs = Lists.newArrayList(outerExchange, inner);
         } else {
             newDist = intermediate

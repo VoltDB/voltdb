@@ -150,7 +150,7 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
                     "  VoltLogicalJoin(condition=[=($2, $0)], joinType=[left])\n" +
                     "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
                     "      VoltLogicalTableScan(table=[[public, R1]])\n" +
-                    "    VoltLogicalExchange(distribution=[hash[0]])\n" +
+                    "    VoltLogicalExchange(distribution=[single], childDistribution=[hash[0]])\n" +
                     "      VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[CAST($t1):INTEGER], expr#7=[8], expr#8=[=($t0, $t7)], I=[$t0], SI0=[$t6], $condition=[$t8])\n" +
                     "        VoltLogicalTableScan(table=[[public, P1]])\n")
         .pass();
@@ -162,7 +162,7 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
                     "  VoltLogicalJoin(condition=[AND(=($2, $0), =($1, 8))], joinType=[full])\n" +
                     "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
                     "      VoltLogicalTableScan(table=[[public, R1]])\n" +
-                    "    VoltLogicalExchange(distribution=[hash[0]])\n" +
+                    "    VoltLogicalExchange(distribution=[single], childDistribution=[hash[0]])\n" +
                     "      VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[CAST($t1):INTEGER], I=[$t0], SI0=[$t6])\n" +
                     "        VoltLogicalTableScan(table=[[public, P1]])\n")
         .pass();
@@ -172,7 +172,7 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
         m_tester.sql("select p1.i from p1 right join r1 on p1.si = r1.i and p1.i = 8")
         .transform("VoltLogicalCalc(expr#0..2=[{inputs}], I=[$t0])\n" +
                     "  VoltLogicalJoin(condition=[=($1, $2)], joinType=[right])\n" +
-                    "    VoltLogicalExchange(distribution=[hash[0]])\n" +
+                    "    VoltLogicalExchange(distribution=[single], childDistribution=[hash[0]])\n" +
                     "      VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[CAST($t1):INTEGER], expr#7=[8], expr#8=[=($t0, $t7)], I=[$t0], SI0=[$t6], $condition=[$t8])\n" +
                     "        VoltLogicalTableScan(table=[[public, P1]])\n" +
                     "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
@@ -184,7 +184,7 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
         m_tester.sql("select p1.i from p1 full join r1 on p1.si = r1.i and p1.i = 8")
         .transform("VoltLogicalCalc(expr#0..2=[{inputs}], I=[$t0])\n" +
                     "  VoltLogicalJoin(condition=[AND(=($1, $2), =($0, 8))], joinType=[full])\n" +
-                    "    VoltLogicalExchange(distribution=[hash[0]])\n" +
+                    "    VoltLogicalExchange(distribution=[single], childDistribution=[hash[0]])\n" +
                     "      VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[CAST($t1):INTEGER], I=[$t0], SI0=[$t6])\n" +
                     "        VoltLogicalTableScan(table=[[public, P1]])\n" +
                     "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
@@ -232,7 +232,7 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
                     "    VoltLogicalJoin(condition=[=($2, $0)], joinType=[full])\n" +
                     "      VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
                     "        VoltLogicalTableScan(table=[[public, R1]])\n" +
-                    "      VoltLogicalExchange(distribution=[hash[0]])\n" +
+                    "      VoltLogicalExchange(distribution=[single], childDistribution=[hash[0]])\n" +
                     "        VoltLogicalCalc(expr#0..5=[{inputs}], expr#6=[CAST($t1):INTEGER], I=[$t0], SI0=[$t6])\n" +
                     "          VoltLogicalTableScan(table=[[public, P1]])\n")
         .pass();
@@ -681,7 +681,7 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
                     "      VoltLogicalTableScan(table=[[public, RI1]])\n" +
                     "    VoltLogicalCalc(expr#0..1=[{inputs}], SI=[$t0])\n" +
                     "      VoltLogicalSort(sort0=[$1], dir0=[ASC])\n" +
-                    "        VoltLogicalExchange(distribution=[hash[1]])\n" +
+                    "        VoltLogicalExchange(distribution=[single], childDistribution=[hash[1]])\n" +
                     "          VoltLogicalCalc(expr#0..5=[{inputs}], SI=[$t1], I=[$t0])\n" +
                     "            VoltLogicalTableScan(table=[[public, P2]])\n")
         .pass();
@@ -693,7 +693,7 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
                     "    VoltLogicalCalc(expr#0..3=[{inputs}], I=[$t0], BI=[$t2])\n" +
                     "      VoltLogicalTableScan(table=[[public, RI1]])\n" +
                     "    VoltLogicalSort(sort0=[$0], dir0=[ASC])\n" +
-                    "      VoltLogicalExchange(distribution=[hash[0]])\n" +
+                    "      VoltLogicalExchange(distribution=[single], childDistribution=[hash[0]])\n" +
                     "        VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
                     "          VoltLogicalTableScan(table=[[public, P2]])\n")
         .pass();
@@ -714,7 +714,7 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
                     "  VoltLogicalJoin(condition=[=($0, $6)], joinType=[inner])\n" +
                     "    VoltLogicalTableScan(table=[[public, R1]])\n" +
                     "    VoltLogicalAggregate(group=[{0}])\n" +
-                    "      VoltLogicalExchange(distribution=[hash])\n" +
+                    "      VoltLogicalExchange(distribution=[single], childDistribution=[hash])\n" +
                     "        VoltLogicalCalc(expr#0..5=[{inputs}], SI=[$t1])\n" +
                     "          VoltLogicalTableScan(table=[[public, P1]])\n")
         .pass();
@@ -867,7 +867,7 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
                     "  VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
                     "    VoltLogicalTableScan(table=[[public, R1]])\n" +
                     "  VoltLogicalMinus(all=[false])\n" +
-                    "    VoltLogicalExchange(distribution=[hash[0]])\n" +
+                    "    VoltLogicalExchange(distribution=[single], childDistribution=[hash[0]])\n" +
                     "      VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
                     "        VoltLogicalTableScan(table=[[public, P1]])\n" +
                     "    VoltLogicalCalc(expr#0..2=[{inputs}], II=[$t2])\n" +
@@ -881,7 +881,7 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
                     "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
                     "      VoltLogicalTableScan(table=[[public, R1]])\n" +
                     "    VoltLogicalMinus(all=[false])\n" +
-                    "      VoltLogicalExchange(distribution=[hash[0]])\n" +
+                    "      VoltLogicalExchange(distribution=[single], childDistribution=[hash[0]])\n" +
                     "        VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
                     "          VoltLogicalTableScan(table=[[public, P1]])\n" +
                     "      VoltLogicalCalc(expr#0..2=[{inputs}], II=[$t2])\n" +
@@ -919,7 +919,7 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
         // SetOP of partitioned and replicated tables. Pass
         m_tester.sql("select P1.I from P1 union select I from R1")
         .transform("VoltLogicalUnion(all=[false])\n" +
-                    "  VoltLogicalExchange(distribution=[hash[0]])\n" +
+                    "  VoltLogicalExchange(distribution=[single], childDistribution=[hash[0]])\n" +
                     "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
                     "      VoltLogicalTableScan(table=[[public, P1]])\n" +
                     "  VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
@@ -934,7 +934,7 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
                     "  VoltLogicalMinus(all=[false])\n" +
                     "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
                     "      VoltLogicalTableScan(table=[[public, R2]])\n" +
-                    "    VoltLogicalExchange(distribution=[hash[0]])\n" +
+                    "    VoltLogicalExchange(distribution=[single], childDistribution=[hash[0]])\n" +
                     "      VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
                     "        VoltLogicalTableScan(table=[[public, P1]])\n")
         .pass();
@@ -958,7 +958,7 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
         m_tester.sql("select P1.I from P1 order by 1 limit 10")
         .transform("VoltLogicalLimit(limit=[10])\n" +
                     "  VoltLogicalSort(sort0=[$0], dir0=[ASC])\n" +
-                    "    VoltLogicalExchange(distribution=[hash[0]])\n" +
+                    "    VoltLogicalExchange(distribution=[single], childDistribution=[hash[0]])\n" +
                     "      VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
                     "        VoltLogicalTableScan(table=[[public, P1]])\n")
         .pass();
@@ -976,7 +976,7 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
     public void testPartitionedWithAggregate1() {
         m_tester.sql("select max(P1.I) from P1")
         .transform("VoltLogicalAggregate(group=[{}], EXPR$0=[MAX($0)])\n" +
-                    "  VoltLogicalExchange(distribution=[hash[0]])\n" +
+                    "  VoltLogicalExchange(distribution=[single], childDistribution=[hash[0]])\n" +
                     "    VoltLogicalCalc(expr#0..5=[{inputs}], I=[$t0])\n" +
                     "      VoltLogicalTableScan(table=[[public, P1]])\n")
         .pass();
@@ -986,7 +986,7 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
         m_tester.sql("select max(P1.I), P1.SI from P1 group by P1.SI having max(P1.I) > 0")
         .transform("VoltLogicalCalc(expr#0..1=[{inputs}], expr#2=[0], expr#3=[>($t1, $t2)], EXPR$0=[$t1], SI=[$t0], $condition=[$t3])\n" +
                     "  VoltLogicalAggregate(group=[{0}], EXPR$0=[MAX($1)])\n" +
-                    "    VoltLogicalExchange(distribution=[hash[1]])\n" +
+                    "    VoltLogicalExchange(distribution=[single], childDistribution=[hash[1]])\n" +
                     "      VoltLogicalCalc(expr#0..5=[{inputs}], SI=[$t1], I=[$t0])\n" +
                     "        VoltLogicalTableScan(table=[[public, P1]])\n")
         .pass();
@@ -997,7 +997,7 @@ public class TestMPQueryFallbackRules extends Plannerv2TestCase {
         .transform("VoltLogicalSort(sort0=[$1], dir0=[ASC])\n" +
                     "  VoltLogicalCalc(expr#0..1=[{inputs}], expr#2=[0], expr#3=[>($t1, $t2)], EXPR$0=[$t1], SI=[$t0], $condition=[$t3])\n" +
                     "    VoltLogicalAggregate(group=[{0}], EXPR$0=[MAX($1)])\n" +
-                    "      VoltLogicalExchange(distribution=[hash[1]])\n" +
+                    "      VoltLogicalExchange(distribution=[single], childDistribution=[hash[1]])\n" +
                     "        VoltLogicalCalc(expr#0..5=[{inputs}], SI=[$t1], I=[$t0])\n" +
                     "          VoltLogicalTableScan(table=[[public, P1]])\n")
         .pass();

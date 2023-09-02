@@ -23,6 +23,7 @@ import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.Calc;
 import org.apache.calcite.rel.core.Exchange;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
@@ -38,23 +39,35 @@ import com.google.common.base.Preconditions;
  */
 public class VoltLogicalExchange extends Exchange implements VoltLogicalRel {
 
+    // Exchange's input Distribution
+    final private RelDistribution m_childDistribution;
+
     /**
      * Create a VoltLogicalCalc.
      *
      * @param cluster Cluster
      * @param traitSet Traits
      * @param input Input relation
-     * @param distribution
+     * @param exchangetDistribution Exchange's Distribution.
+     *                              It's always a SINGLETON with isSP = FALSE and a possible partitioning value
+     * @param childDistribution Distribution below this exchange node
      */
     public VoltLogicalExchange(RelOptCluster cluster, RelTraitSet traitSet,
-            RelNode input, RelDistribution distribution) {
-        super(cluster, traitSet, input, distribution);
+            RelNode input, RelDistribution exchangetDistribution, RelDistribution childDistribution) {
+        super(cluster, traitSet, input, exchangetDistribution);
         Preconditions.checkArgument(getConvention() == VoltLogicalRel.CONVENTION);
+        Preconditions.checkArgument(exchangetDistribution.getType() == RelDistribution.Type.SINGLETON);
+        Preconditions.checkArgument(exchangetDistribution.getIsSP() == false);
+        m_childDistribution = childDistribution;
     }
 
-    @Override public Exchange copy(RelTraitSet traitSet, RelNode newInput,
-            RelDistribution newDistributionm) {
-        return new VoltLogicalExchange(getCluster(), traitSet, newInput, newDistributionm);
+    @Override
+    public Exchange copy(RelTraitSet traitSet, RelNode newInput, RelDistribution parentDistributionm) {
+        return copy(traitSet, newInput, parentDistributionm, m_childDistribution);
+    }
+
+    public Exchange copy(RelTraitSet traitSet, RelNode newInput, RelDistribution parentDistributionm, RelDistribution childDistribution) {
+        return new VoltLogicalExchange(getCluster(), traitSet, newInput, parentDistributionm, childDistribution);
     }
 
     @Override
@@ -65,4 +78,13 @@ public class VoltLogicalExchange extends Exchange implements VoltLogicalRel {
                 cost.getIo());
     }
 
+    @Override
+    public RelWriter explainTerms(RelWriter pw) {
+        return super.explainTerms(pw)
+                .item("childDistribution", m_childDistribution);
+    }
+
+    public RelDistribution getChildDistribution() {
+        return m_childDistribution;
+    }
 }

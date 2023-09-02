@@ -70,15 +70,19 @@ public class MPSetOpsQueryFallBackRule extends RelOptRule {
         boolean isMP = !setOpState.isSP() && setOpState.getLiteral() == null;
         List<RelNode> inputs = setOp.getInputs()
                 .stream()
-                .map(node -> {
-                    RelDistribution dist = node.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE);
-                    boolean needExchange = isMP && RelDistribution.Type.SINGLETON != dist.getType();
+                .map(childNode -> {
+                    RelDistribution childDist = childNode.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE);
+                    boolean needExchange = isMP && RelDistribution.Type.SINGLETON != childDist.getType();
                     if (needExchange) {
-                        VoltLogicalExchange exchange = new VoltLogicalExchange(node.getCluster(),
-                                    node.getTraitSet(), node, dist);
+                        RelDistribution exchangeDist = RelDistributions.SINGLETON.with(setOpState.getLiteral(), setOpState.isSP());
+                        VoltLogicalExchange exchange = new VoltLogicalExchange(childNode.getCluster(),
+                                    childNode.getTraitSet().replace(exchangeDist),
+                                    childNode,
+                                    exchangeDist,
+                                    childDist);
                         return exchange;
                     } else {
-                        return node;
+                        return childNode;
                     }
                 })
                 .collect(Collectors.toList());

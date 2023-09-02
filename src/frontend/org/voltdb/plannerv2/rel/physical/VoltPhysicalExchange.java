@@ -25,6 +25,7 @@ import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelDistributionTraitDef;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.Exchange;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.voltdb.plannerv2.converter.RexConverter;
@@ -36,17 +37,36 @@ import com.google_voltpatches.common.base.Preconditions;
 
 public class VoltPhysicalExchange extends Exchange implements VoltPhysicalRel {
 
+    // Exchange's input Distribution
+    final private RelDistribution m_childDistribution;
+
+    /**
+     * Create a VoltPhysicalExchange.
+     *
+     * @param cluster Cluster
+     * @param traitSet Traits
+     * @param input Input relation
+     * @param exchangetDistribution Exchange's Distribution.
+     *                              It's always a SINGLETON with isSP = FALSE and a possible partitioning value
+     * @param childDistribution Distribution below this exchange node
+     */
     public VoltPhysicalExchange(
-            RelOptCluster cluster, RelTraitSet traitSet, RelNode input, RelDistribution newDistribution) {
-        super(cluster, traitSet, input, newDistribution);
+            RelOptCluster cluster, RelTraitSet traitSet, RelNode input, RelDistribution exchangetDistribution, RelDistribution childDistribution) {
+        super(cluster, traitSet, input, exchangetDistribution);
         Preconditions.checkArgument(! RelDistributions.ANY.getType().equals(
                 traitSet.getTrait(RelDistributionTraitDef.INSTANCE).getType()));
+        Preconditions.checkArgument(exchangetDistribution.getType() == RelDistribution.Type.SINGLETON);
+        Preconditions.checkArgument(exchangetDistribution.getIsSP() == false);
+        m_childDistribution = childDistribution;
     }
 
     @Override
-    public VoltPhysicalExchange copy(
-            RelTraitSet traitSet, RelNode newInput, RelDistribution newDistribution) {
-        return new VoltPhysicalExchange(getCluster(), traitSet, newInput, newDistribution);
+    public Exchange copy(RelTraitSet traitSet, RelNode newInput, RelDistribution parentDistributionm) {
+        return copy(traitSet, newInput, parentDistributionm, m_childDistribution);
+    }
+
+    public Exchange copy(RelTraitSet traitSet, RelNode newInput, RelDistribution parentDistributionm, RelDistribution childDistribution) {
+        return new VoltPhysicalExchange(getCluster(), traitSet, newInput, parentDistributionm, childDistribution);
     }
 
     @Override
@@ -61,6 +81,16 @@ public class VoltPhysicalExchange extends Exchange implements VoltPhysicalRel {
         double cpu = rowCount;
         double io = rowCount;
         return planner.getCostFactory().makeCost(rowCount, cpu, io);
+    }
+
+    @Override
+    public RelWriter explainTerms(RelWriter pw) {
+        return super.explainTerms(pw)
+                .item("childDistribution", m_childDistribution);
+    }
+
+    public RelDistribution getChildDistribution() {
+        return m_childDistribution;
     }
 
     @Override

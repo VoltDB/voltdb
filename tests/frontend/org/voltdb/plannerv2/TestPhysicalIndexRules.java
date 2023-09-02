@@ -49,7 +49,7 @@ public class TestPhysicalIndexRules extends Plannerv2TestCase {
         m_tester.sql("select max(i) - min(si) from (select si, i from RI1 where i > 0) as foo")
                 .transform("VoltPhysicalCalc(expr#0..1=[{inputs}], expr#2=[-($t0, $t1)], EXPR$0=[$t2])\n" +
                         "  VoltPhysicalSerialAggregate(group=[{}], agg#0=[MAX($0)], agg#1=[MIN($1)], " +
-                        "coordinator=[false], type=[serial])\n" +
+                        "pusheddown=[false], type=[serial])\n" +
                         "    VoltPhysicalTableIndexScan(table=[[public, RI1]], expr#0..3=[{inputs}], " +
                         "expr#4=[0], expr#5=[>($t0, $t4)], proj#0..1=[{exprs}], $condition=[$t5], " +
                         "index=[VOLTDB_AUTOGEN_IDX_PK_RI1_I_INVALIDGT1_0])\n")
@@ -63,7 +63,7 @@ public class TestPhysicalIndexRules extends Plannerv2TestCase {
     @Test
     public void testAggregationUsingIndex() {
         m_tester.sql("select count(si) from RI1 where i > 0")
-                .transform("VoltPhysicalSerialAggregate(group=[{}], EXPR$0=[COUNT($0)], coordinator=[false], type=[serial])\n" +
+                .transform("VoltPhysicalSerialAggregate(group=[{}], EXPR$0=[COUNT($0)], pusheddown=[false], type=[serial])\n" +
                         "  VoltPhysicalTableIndexScan(table=[[public, RI1]], expr#0..3=[{inputs}], " +
                         "expr#4=[0], expr#5=[>($t0, $t4)], SI=[$t1], $condition=[$t5], " +
                         "index=[VOLTDB_AUTOGEN_IDX_PK_RI1_I_INVALIDGT1_0])\n")

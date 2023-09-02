@@ -25,6 +25,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.plan.hep.HepMatchOrder;
+import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelDistributionTraitDef;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
@@ -262,6 +263,12 @@ public class PlannerTool {
 
         // Transform RIGHT Outer joins to LEFT ones
         transformed = VoltPlanner.transformHep(Phase.LOGICAL_JOIN, transformed);
+
+        // Need to transform Aggregate (AVG) to (SUN / COUNT) in case of MP queries
+        RelDistribution mpTrait =  transformed.getTraitSet().getTrait(RelDistributionTraitDef.INSTANCE);
+        if(RelDistribution.Type.SINGLETON != mpTrait.getType() || !mpTrait.getIsSP()) {
+            transformed = VoltPlanner.transformHep(Phase.LOGICAL_AGGREGATE, transformed);
+        }
 
         // Prepare the set of RelTraits required of the root node at the termination of the physical conversion phase.
         // RelDistributions.ANY can satisfy any other types of RelDistributions.
