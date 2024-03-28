@@ -100,7 +100,7 @@ namespace voltdb {
 
 
 /** Abstract class for reading from memory buffers. */
-template <Endianess E> class SerializeInput {
+template <Endianness E> class SerializeInput {
 protected:
     /** Does no initialization. Subclasses must call initialize. */
     SerializeInput() = default;
@@ -558,7 +558,7 @@ public:
 };
 
 /** Implementation of SerializeInput that references an existing buffer. */
-template <Endianess E>
+template <Endianness E>
 class ReferenceSerializeInput : public SerializeInput<E> {
 public:
     ReferenceSerializeInput(const void* data, size_t length) {
@@ -570,7 +570,7 @@ public:
 };
 
 /** Implementation of SerializeInput that makes a copy of the buffer. */
-template <Endianess E>
+template <Endianness E>
 class CopySerializeInput : public SerializeInput<E> {
 public:
     CopySerializeInput(const void* data, size_t length) :
