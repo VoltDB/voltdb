@@ -536,9 +536,9 @@ inline size_t rowCostForDRRecord(DRRecordType type) {
 enum TupleSerializationFormat { TUPLE_SERIALIZATION_NATIVE = 0, TUPLE_SERIALIZATION_DR = 1 };
 
 // ------------------------------------------------------------------
-// Endianess
+// Endianness
 // ------------------------------------------------------------------
-enum Endianess { BYTE_ORDER_BIG_ENDIAN = 0, BYTE_ORDER_LITTLE_ENDIAN = 1 };
+enum Endianness { BYTE_ORDER_BIG_ENDIAN = 0, BYTE_ORDER_LITTLE_ENDIAN = 1 };
 
 // ------------------------------------------------------------------
 // Types of DR conflict (keep sync with DRConflictType at PartitionDRGateway.java)

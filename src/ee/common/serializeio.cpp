@@ -41,7 +41,7 @@ void FallbackSerializeOutput::expand(size_t minimum_desired) {
     ExecutorContext::getPhysicalTopend()->fallbackToEEAllocatedBuffer(m_fallbackBuffer, maxAllocationSize);
 }
 
-template<voltdb::Endianess E>
+template<voltdb::Endianness E>
 std::string SerializeInput<E>::fullBufferStringRep() {
     std::stringstream message(std::stringstream::in | std::stringstream::out);
 

@@ -298,7 +298,7 @@ class NValue {
        provided. This function will perform memory allocations for
        Object types as necessary using the provided data pool or the
        heap. This is used to deserialize tables. */
-    template <TupleSerializationFormat F, Endianess E>
+    template <TupleSerializationFormat F, Endianness E>
     static void deserializeFrom(SerializeInput<E>& input, Pool* tempPool, char* storage,
         const ValueType type, bool isInlined, int32_t maxLength, bool isInBytes);
     static void deserializeFrom(SerializeInputBE& input, Pool* tempPool, char* storage,
@@ -2918,7 +2918,7 @@ inline void NValue::deserializeFrom(SerializeInputBE& input, Pool* tempPool, cha
             type, isInlined, maxLength, isInBytes);
 }
 
-template <TupleSerializationFormat F, Endianess E> inline void NValue::deserializeFrom(
+template <TupleSerializationFormat F, Endianness E> inline void NValue::deserializeFrom(
         SerializeInput<E>& input, Pool* tempPool, char *storage,
         ValueType type, bool isInlined, int32_t maxLength, bool isInBytes) {
     switch (type) {
